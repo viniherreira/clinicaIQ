@@ -1,0 +1,25 @@
+{
+  "name": "odontoflow",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "db:generate": "pnpm --filter @odontoflow/db generate",
+    "db:push": "pnpm --filter @odontoflow/db push",
+    "db:seed": "pnpm --filter @odontoflow/db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "prettier": "^3"
+  },
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

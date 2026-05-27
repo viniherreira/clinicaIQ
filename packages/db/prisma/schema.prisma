@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  RECEPTIONIST
+  PROFESSIONAL
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  RESCHEDULED
+  CANCELLED
+  ATTENDED
+  MISSED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model Tenant {
+  id         String   @id @default(cuid())
+  clerkOrgId String   @unique
+  name       String
+  slug       String   @unique
+  document   String?
+  phone      String?
+  email      String?
+  address    String?
+  logoUrl    String?
+  settings   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users          User[]
+  patients       Patient[]
+  professionals  Professional[]
+  procedures     Procedure[]
+  appointments   Appointment[]
+  quotes         Quote[]
+  messages       WhatsAppMessage[]
+  auditLogs      AuditLog[]
+  blockedSlots   BlockedSlot[]
+  patientNotes   PatientNote[]
+
+  @@map("tenants")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String
+  clerkUserId String   @unique
+  name        String
+  email       String
+  role        Role     @default(RECEPTIONIST)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  patientNotes PatientNote[]
+  auditLogs    AuditLog[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Patient {
+  id             String    @id @default(cuid())
+  tenantId       String
+  name           String
+  cpfEncrypted   String?   @map("cpf")
+  phoneEncrypted String    @map("phone")
+  email          String?
+  birthDate      DateTime?
+  address        String?
+  lgpdConsentAt  DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  notes        PatientNote[]
+  appointments Appointment[]
+  quotes       Quote[]
+  messages     WhatsAppMessage[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@map("patients")
+}
+
+model PatientNote {
+  id        String   @id @default(cuid())
+  tenantId  String
+  patientId String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([patientId, createdAt(sort: Desc)])
+  @@map("patient_notes")
+}
+
+model Professional {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?  @unique
+  name      String
+  specialty String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id])
+  schedules    ProfessionalSchedule[]
+  appointments Appointment[]
+  blockedSlots BlockedSlot[]
+
+  @@index([tenantId])
+  @@map("professionals")
+}
+
+model ProfessionalSchedule {
+  id             String  @id @default(cuid())
+  professionalId String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  lunchStart     String?
+  lunchEnd       String?
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, dayOfWeek])
+  @@map("professional_schedules")
+}
+
+model Procedure {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  basePrice       Decimal  @db.Decimal(10, 2)
+  durationMinutes Int
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  appointments Appointment[]
+  quoteItems   QuoteItem[]
+
+  @@index([tenantId])
+  @@map("procedures")
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String
+  procedureId    String?
+  startTime      DateTime
+  endTime        DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  patient      Patient           @relation(fields: [patientId], references: [id])
+  professional Professional      @relation(fields: [professionalId], references: [id])
+  procedure    Procedure?        @relation(fields: [procedureId], references: [id])
+  messages     WhatsAppMessage[]
+
+  @@index([tenantId, professionalId, startTime])
+  @@index([tenantId, startTime])
+  @@index([tenantId, status])
+  @@map("appointments")
+}
+
+model BlockedSlot {
+  id             String   @id @default(cuid())
+  tenantId       String
+  professionalId String
+  startTime      DateTime
+  endTime        DateTime
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@index([tenantId, professionalId, startTime])
+  @@map("blocked_slots")
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  tenantId        String
+  patientId       String
+  publicToken     String      @unique @default(cuid())
+  status          QuoteStatus @default(DRAFT)
+  discountPercent Decimal?    @default(0) @db.Decimal(5, 2)
+  subtotal        Decimal     @db.Decimal(10, 2)
+  total           Decimal     @db.Decimal(10, 2)
+  validUntil      DateTime
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  pdfUrl          String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  patient  Patient           @relation(fields: [patientId], references: [id])
+  items    QuoteItem[]
+  messages WhatsAppMessage[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id              String   @id @default(cuid())
+  quoteId         String
+  procedureId     String?
+  name            String
+  description     String?
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  quantity        Int      @default(1)
+  discountPercent Decimal? @default(0) @db.Decimal(5, 2)
+  total           Decimal  @db.Decimal(10, 2)
+
+  quote     Quote      @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  procedure Procedure? @relation(fields: [procedureId], references: [id])
+
+  @@index([quoteId])
+  @@map("quote_items")
+}
+
+model WhatsAppMessage {
+  id            String           @id @default(cuid())
+  tenantId      String
+  patientId     String
+  appointmentId String?
+  quoteId       String?
+  direction     MessageDirection
+  templateName  String?
+  content       String
+  status        MessageStatus    @default(PENDING)
+  externalId    String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  quote       Quote?       @relation(fields: [quoteId], references: [id])
+
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, patientId, createdAt(sort: Desc)])
+  @@index([externalId])
+  @@map("whatsapp_messages")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
