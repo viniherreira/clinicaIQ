@@ -25,6 +25,12 @@ enum AppointmentStatus {
   MISSED
 }
 
+enum AppointmentType {
+  PARTICULAR
+  CONVENIO
+  CORTESIA
+}
+
 enum QuoteStatus {
   DRAFT
   SENT
@@ -97,27 +103,46 @@ model User {
 }
 
 model Patient {
-  id             String    @id @default(cuid())
-  tenantId       String
-  name           String
-  cpfEncrypted   String?   @map("cpf")
-  phoneEncrypted String    @map("phone")
-  email          String?
-  birthDate      DateTime?
-  address        String?
-  lgpdConsentAt  DateTime?
-  active         Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  tenantId        String
+  controlNumber   Int
+  name            String
+  nickname        String?
+  cpfEncrypted    String?   @map("cpf")
+  phoneEncrypted  String    @map("phone")
+  phone2Encrypted String?   @map("phone2")
+  email           String?
+  birthDate       DateTime?
+  gender          String?
+  maritalStatus   String?
+  profession      String?
+  referredBy      String?
+  notes           String?
+  zipCode         String?
+  street          String?
+  addressNumber   String?
+  complement      String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  lgpdConsentAt   DateTime?
+  active          Boolean   @default(true)
+  deletedAt       DateTime?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  notes        PatientNote[]
+  patientNotes PatientNote[]
   appointments Appointment[]
   quotes       Quote[]
   messages     WhatsAppMessage[]
 
+  @@unique([tenantId, controlNumber])
   @@index([tenantId])
   @@index([tenantId, name])
+  @@index([tenantId, deletedAt])
   @@map("patients")
 }
 
@@ -200,7 +225,11 @@ model Appointment {
   startTime      DateTime
   endTime        DateTime
   status         AppointmentStatus @default(SCHEDULED)
+  type           AppointmentType   @default(PARTICULAR)
   notes          String?
+  cancelReason   String?
+  createdById    String?
+  updatedById    String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+import { prisma } from '@odontoflow/db';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutIcon },
@@ -9,7 +12,17 @@ const navItems = [
   { href: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
 ];
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const { userId } = await auth();
+  if (!userId) redirect('/sign-in');
+
+  const tenant = await prisma.tenant.findFirst({
+    where: { users: { some: { clerkUserId: userId } } },
+    select: { id: true, name: true },
+  });
+
+  if (!tenant) redirect('/onboarding');
+
   return (
     <div className="flex min-h-screen">
       <nav
@@ -38,11 +51,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="border-t p-3">
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-alt text-xs font-medium">
-              VS
+              {tenant.name.slice(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 truncate">
-              <p className="truncate text-xs font-medium">Vini Studio</p>
-              <p className="truncate text-2xs text-muted-foreground">Odontologia</p>
+              <p className="truncate text-xs font-medium">{tenant.name}</p>
             </div>
           </div>
         </div>
