@@ -7,8 +7,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'OdontoFlow',
-    template: '%s | OdontoFlow',
+    default: 'ClinicaIQ',
+    template: '%s | ClinicaIQ',
   },
   description: 'Gestão inteligente para clínicas odontológicas e estéticas',
 };

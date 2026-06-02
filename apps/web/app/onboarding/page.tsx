@@ -112,7 +112,7 @@ export default function OnboardingPage() {
             disabled={isPending}
             className="touch-target w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
           >
-            {isPending ? 'Criando conta...' : 'Ir para o OdontoFlow'}
+            {isPending ? 'Criando conta...' : 'Ir para o ClinicaIQ'}
           </button>
         </form>
       </div>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { prisma } from '@odontoflow/db';
+import { prisma } from '@clinicaiq/db';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutIcon },
@@ -31,9 +31,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         <div className="flex h-14 items-center gap-2 border-b px-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">OF</span>
+            <span className="text-xs font-bold text-primary-foreground">CIQ</span>
           </div>
-          <span className="text-sm font-semibold tracking-tight">OdontoFlow</span>
+          <span className="text-sm font-semibold tracking-tight">ClinicaIQ</span>
         </div>
         <ul className="flex-1 space-y-0.5 p-2" role="list">
           {navItems.map((item) => (

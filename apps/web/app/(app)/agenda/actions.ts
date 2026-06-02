@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient } from '@odontoflow/db';
+import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -60,7 +60,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
       orderBy: { name: 'asc' },
     }),
     db.procedure.findMany({
-      where: { active: true },
+      where: { active: true, deletedAt: null },
       orderBy: { name: 'asc' },
     }),
   ]);

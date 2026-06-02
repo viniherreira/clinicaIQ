@@ -1,4 +1,4 @@
-# OdontoFlow
+# ClinicaIQ
 
 SaaS B2B para clínicas odontológicas e estéticas no Brasil.
 
@@ -35,7 +35,7 @@ SaaS B2B para clínicas odontológicas e estéticas no Brasil.
 
 ## Multi-tenancy
 
-Every tenant-scoped table has `tenantId`. Use `getTenantClient(tenantId)` from `@odontoflow/db` — it auto-filters all queries by tenant. Never use raw `prisma` for tenant-scoped data.
+Every tenant-scoped table has `tenantId`. Use `getTenantClient(tenantId)` from `@clinicaiq/db` — it auto-filters all queries by tenant. Never use raw `prisma` for tenant-scoped data.
 
 ## Accessibility
 
@@ -43,4 +43,4 @@ WCAG 2.1 AA is a product differentiator. Every component must be keyboard-naviga
 
 ## LGPD
 
-CPF and phone are encrypted at rest (AES-256-GCM). Use `encrypt`/`decrypt` from `@odontoflow/db`. Never log or expose raw PII.
+CPF and phone are encrypted at rest (AES-256-GCM). Use `encrypt`/`decrypt` from `@clinicaiq/db`. Never log or expose raw PII.

@@ -69,16 +69,17 @@ model Tenant {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  users          User[]
-  patients       Patient[]
-  professionals  Professional[]
-  procedures     Procedure[]
-  appointments   Appointment[]
-  quotes         Quote[]
-  messages       WhatsAppMessage[]
-  auditLogs      AuditLog[]
-  blockedSlots   BlockedSlot[]
-  patientNotes   PatientNote[]
+  users               User[]
+  patients            Patient[]
+  professionals       Professional[]
+  procedures          Procedure[]
+  procedureCategories ProcedureCategory[]
+  appointments        Appointment[]
+  quotes              Quote[]
+  messages            WhatsAppMessage[]
+  auditLogs           AuditLog[]
+  blockedSlots        BlockedSlot[]
+  patientNotes        PatientNote[]
 
   @@map("tenants")
 }
@@ -177,6 +178,7 @@ model Professional {
   schedules    ProfessionalSchedule[]
   appointments Appointment[]
   blockedSlots BlockedSlot[]
+  procedures   Procedure[]            @relation("ProcedureProfessionals")
 
   @@index([tenantId])
   @@map("professionals")
@@ -197,22 +199,54 @@ model ProfessionalSchedule {
   @@map("professional_schedules")
 }
 
-model Procedure {
-  id              String   @id @default(cuid())
-  tenantId        String
-  name            String
-  description     String?
-  basePrice       Decimal  @db.Decimal(10, 2)
-  durationMinutes Int
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model ProcedureCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  color     String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  appointments Appointment[]
-  quoteItems   QuoteItem[]
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  procedures Procedure[]
 
+  @@unique([tenantId, name])
   @@index([tenantId])
+  @@map("procedure_categories")
+}
+
+model Procedure {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  categoryId         String?
+  name               String
+  description        String?
+  basePrice          Decimal  @db.Decimal(10, 2)
+  durationMinutes    Int
+  prepTimeMinutes    Int?
+  color              String?
+  internalCode       String?
+  materials          String?
+  allowsDiscount     Boolean  @default(false)
+  maxDiscountPercent Decimal? @db.Decimal(5, 2)
+  active             Boolean  @default(true)
+  deletedAt          DateTime?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  category      ProcedureCategory? @relation(fields: [categoryId], references: [id])
+  professionals Professional[]     @relation("ProcedureProfessionals")
+  appointments  Appointment[]
+  quoteItems    QuoteItem[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, categoryId])
   @@map("procedures")
 }
 

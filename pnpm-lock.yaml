@@ -23,6 +23,18 @@ importers:
       '@clerk/nextjs':
         specifier: ^6
         version: 6.39.4(next@15.5.18(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@clinicaiq/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@clinicaiq/pdf':
+        specifier: workspace:*
+        version: link:../../packages/pdf
+      '@clinicaiq/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@clinicaiq/whatsapp':
+        specifier: workspace:*
+        version: link:../../packages/whatsapp
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -35,18 +47,6 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3.3.5
         version: 3.3.5
-      '@odontoflow/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@odontoflow/pdf':
-        specifier: workspace:*
-        version: link:../../packages/pdf
-      '@odontoflow/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@odontoflow/whatsapp':
-        specifier: workspace:*
-        version: link:../../packages/whatsapp
       '@prisma/client':
         specifier: ^6
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)

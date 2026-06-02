@@ -1,5 +1,5 @@
 {
-  "name": "odontoflow",
+  "name": "clinicaiq",
   "private": true,
   "scripts": {
     "build": "turbo build",
@@ -10,9 +10,9 @@
     "test:e2e": "turbo test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "db:generate": "pnpm --filter @odontoflow/db generate",
-    "db:push": "pnpm --filter @odontoflow/db push",
-    "db:seed": "pnpm --filter @odontoflow/db seed"
+    "db:generate": "pnpm --filter @clinicaiq/db generate",
+    "db:push": "pnpm --filter @clinicaiq/db push",
+    "db:seed": "pnpm --filter @clinicaiq/db seed"
   },
   "devDependencies": {
     "turbo": "^2",

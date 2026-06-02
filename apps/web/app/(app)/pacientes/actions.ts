@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient, encrypt, decrypt } from '@odontoflow/db';
+import { prisma, getTenantClient, encrypt, decrypt } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
