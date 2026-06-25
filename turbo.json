@@ -1,8 +1,29 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "CLERK_SECRET_KEY",
+    "CLERK_WEBHOOK_SECRET",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+    "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL",
+    "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL",
+    "ENCRYPTION_MASTER_KEY",
+    "WHATSAPP_PROVIDER",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_VERIFY_TOKEN",
+    "NEXT_PUBLIC_APP_URL",
+    "REDIS_URL"
+  ],
   "tasks": {
+    "generate": {
+      "cache": false
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
@@ -13,10 +34,10 @@
       "dependsOn": ["^build"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^generate"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^generate"]
     },
     "test:e2e": {
       "dependsOn": ["build"]
