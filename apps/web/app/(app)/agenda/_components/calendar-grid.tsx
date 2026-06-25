@@ -43,7 +43,7 @@ function TimeColumn() {
     hours.push(
       <span
         key={h}
-        className="absolute right-2 text-[10px] text-slate-400 select-none"
+        className="absolute right-2 text-[10px] text-muted-foreground select-none"
         style={{ top: top - 7 }}
         aria-hidden="true"
       >
@@ -52,7 +52,7 @@ function TimeColumn() {
     );
   }
   return (
-    <div className="relative shrink-0 w-14 border-r border-slate-100" style={{ height: TOTAL_HEIGHT_PX }}>
+    <div className="relative shrink-0 w-14 border-r border-border" style={{ height: TOTAL_HEIGHT_PX }}>
       {hours}
     </div>
   );
@@ -72,7 +72,7 @@ function GridLines() {
           aria-hidden="true"
           className={[
             'absolute inset-x-0 border-t pointer-events-none',
-            isHour ? 'border-slate-200' : isHalf ? 'border-slate-100' : 'border-slate-50',
+            isHour ? 'border-border' : isHalf ? 'border-border/60' : 'border-border/30',
           ].join(' ')}
           style={{ top }}
         />
@@ -111,8 +111,8 @@ export function CalendarGrid({
   if (mode === 'sidebyside') {
     return (
       <div className="flex overflow-x-auto">
-        <div className="sticky left-0 z-10 bg-white">
-          <div className="h-10 border-b border-slate-100" />
+        <div className="sticky left-0 z-10 bg-surface">
+          <div className="h-10 border-b border-border" />
           <TimeColumn />
         </div>
 
@@ -121,16 +121,16 @@ export function CalendarGrid({
           return (
             <div key={prof.id} className="flex-1 min-w-[180px]">
               <div
-                className="h-10 border-b border-l border-slate-100 flex items-center justify-center gap-2 px-2"
+                className="h-10 border-b border-l border-border flex items-center justify-center gap-2 px-2"
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ background: prof.color }}
                   aria-hidden="true"
                 />
-                <span className="text-xs font-medium text-slate-700 truncate">{prof.name}</span>
+                <span className="text-xs font-medium text-foreground truncate">{prof.name}</span>
               </div>
-              <div className="relative border-l border-slate-100" style={{ height: TOTAL_HEIGHT_PX }}>
+              <div className="relative border-l border-border" style={{ height: TOTAL_HEIGHT_PX }}>
                 {onSlotClick && (
                   <button
                     type="button"
@@ -155,14 +155,14 @@ export function CalendarGrid({
   // Grouped mode
   return (
     <div className="flex">
-      <div className="sticky left-0 z-10 bg-white">
-        <div className="h-10 border-b border-slate-100" />
+      <div className="sticky left-0 z-10 bg-surface">
+        <div className="h-10 border-b border-border" />
         <TimeColumn />
       </div>
       <div className="flex-1">
-        <div className="h-10 border-b border-slate-100 flex items-center px-3 gap-2">
+        <div className="h-10 border-b border-border flex items-center px-3 gap-2">
           {visibleProfs.map((p) => (
-            <span key={p.id} className="flex items-center gap-1 text-xs text-slate-500">
+            <span key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
               <span className="w-2 h-2 rounded-full" style={{ background: p.color }} aria-hidden="true" />
               {p.name}
             </span>

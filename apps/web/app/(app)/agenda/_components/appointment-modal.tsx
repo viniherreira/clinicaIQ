@@ -133,12 +133,12 @@ export function AppointmentModal({
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <Dialog.Title className="text-sm font-semibold text-slate-800">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-surface shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <Dialog.Title className="text-sm font-semibold text-foreground">
               Novo agendamento
             </Dialog.Title>
-            <Dialog.Close className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <Dialog.Close className="rounded p-1 text-muted-foreground hover:bg-surface-alt hover:text-foreground">
               <X className="h-4 w-4" aria-hidden="true" />
               <span className="sr-only">Fechar</span>
             </Dialog.Close>
@@ -150,19 +150,19 @@ export function AppointmentModal({
 
             {/* Global error */}
             {state && !state.success && state.message && (
-              <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
+              <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {state.message}
               </p>
             )}
 
             {/* Patient search */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600" htmlFor="patient-search">
-                Paciente <span className="text-red-500">*</span>
+              <label className="text-xs font-medium text-foreground" htmlFor="patient-search">
+                Paciente <span className="text-destructive">*</span>
               </label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-                {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" aria-hidden="true" />}
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
+                {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" aria-hidden="true" />}
                 <input
                   id="patient-search"
                   role="combobox"
@@ -174,7 +174,7 @@ export function AppointmentModal({
                   onBlur={() => setTimeout(() => setShowPatients(false), 150)}
                   placeholder="Buscar paciente..."
                   autoComplete="off"
-                  className="w-full rounded-md border border-slate-200 py-2 pl-8 pr-8 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 pl-8 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   aria-autocomplete="list"
                   aria-expanded={showPatients}
                 />
@@ -182,48 +182,48 @@ export function AppointmentModal({
                   <ul
                     id="patient-listbox"
                     role="listbox"
-                    className="absolute z-10 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg py-1"
+                    className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg py-1"
                   >
                     {patients.map((p) => (
                       <li key={p.id} role="option" aria-selected={selectedPatient?.id === p.id}>
                         <button
                           type="button"
                           onMouseDown={() => selectPatient(p)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-surface-alt"
                         >
-                          <span className="font-medium text-slate-700">{p.name}</span>
-                          <span className="ml-2 text-xs text-slate-400">#{p.controlNumber}</span>
+                          <span className="font-medium text-foreground">{p.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">#{p.controlNumber}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              {errorFor('patientId') && <p className="text-xs text-red-500">{errorFor('patientId')}</p>}
+              {errorFor('patientId') && <p className="text-xs text-destructive">{errorFor('patientId')}</p>}
             </div>
 
             {/* Professional + Procedure */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="professionalId">
-                  Profissional <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-foreground" htmlFor="professionalId">
+                  Profissional <span className="text-destructive">*</span>
                 </label>
                 <select
                   id="professionalId"
                   name="professionalId"
                   value={profId}
                   onChange={(e) => setProfId(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {professionals.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
-                {errorFor('professionalId') && <p className="text-xs text-red-500">{errorFor('professionalId')}</p>}
+                {errorFor('professionalId') && <p className="text-xs text-destructive">{errorFor('professionalId')}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="procedureId">
+                <label className="text-xs font-medium text-foreground" htmlFor="procedureId">
                   Procedimento
                 </label>
                 <select
@@ -231,7 +231,7 @@ export function AppointmentModal({
                   name="procedureId"
                   value={procId}
                   onChange={(e) => onProcedureChange(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">— Selecione —</option>
                   {procedures.map((p) => (
@@ -246,8 +246,8 @@ export function AppointmentModal({
             {/* Date + Times */}
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="date">
-                  Data <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-foreground" htmlFor="date">
+                  Data <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="date"
@@ -255,13 +255,13 @@ export function AppointmentModal({
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-                {errorFor('date') && <p className="text-xs text-red-500">{errorFor('date')}</p>}
+                {errorFor('date') && <p className="text-xs text-destructive">{errorFor('date')}</p>}
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="startTime">
-                  Início <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-foreground" htmlFor="startTime">
+                  Início <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="startTime"
@@ -269,13 +269,13 @@ export function AppointmentModal({
                   type="time"
                   value={startTime}
                   onChange={(e) => onStartTimeChange(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-                {errorFor('startTime') && <p className="text-xs text-red-500">{errorFor('startTime')}</p>}
+                {errorFor('startTime') && <p className="text-xs text-destructive">{errorFor('startTime')}</p>}
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="endTime">
-                  Fim <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-foreground" htmlFor="endTime">
+                  Fim <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="endTime"
@@ -283,21 +283,21 @@ export function AppointmentModal({
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-                {errorFor('endTime') && <p className="text-xs text-red-500">{errorFor('endTime')}</p>}
+                {errorFor('endTime') && <p className="text-xs text-destructive">{errorFor('endTime')}</p>}
               </div>
             </div>
 
             {/* Type + Status */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="type">Tipo</label>
+                <label className="text-xs font-medium text-foreground" htmlFor="type">Tipo</label>
                 <select
                   id="type"
                   name="type"
                   defaultValue="PARTICULAR"
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {Object.entries(TYPE_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
@@ -305,12 +305,12 @@ export function AppointmentModal({
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600" htmlFor="status">Status</label>
+                <label className="text-xs font-medium text-foreground" htmlFor="status">Status</label>
                 <select
                   id="status"
                   name="status"
                   defaultValue="SCHEDULED"
-                  className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {Object.entries(STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
@@ -321,14 +321,14 @@ export function AppointmentModal({
 
             {/* Notes */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600" htmlFor="notes">Observações</label>
+              <label className="text-xs font-medium text-foreground" htmlFor="notes">Observações</label>
               <textarea
                 id="notes"
                 name="notes"
                 rows={2}
                 maxLength={500}
                 placeholder="Observações sobre o agendamento..."
-                className="w-full rounded-md border border-slate-200 py-2 px-3 text-sm text-slate-700 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 
@@ -339,24 +339,24 @@ export function AppointmentModal({
                 name="sendWhatsApp"
                 value="true"
                 defaultChecked
-                className="accent-emerald-500 w-4 h-4"
+                className="accent-primary w-4 h-4"
               />
-              <span className="text-xs text-slate-600">Enviar confirmação por WhatsApp</span>
+              <span className="text-xs text-foreground">Enviar confirmação por WhatsApp</span>
             </label>
 
             {/* Footer */}
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-md text-sm text-foreground hover:bg-surface-alt transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={pending || !selectedPatient}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-500 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
                 Salvar

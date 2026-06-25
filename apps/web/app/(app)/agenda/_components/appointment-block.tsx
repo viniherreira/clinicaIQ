@@ -39,32 +39,38 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
   const statusLabel = STATUS_LABELS[appointment.status as keyof typeof STATUS_LABELS] ?? appointment.status;
   const timeLabel = `${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`;
   const isCancelled = appointment.status === 'CANCELLED';
+  const compact = heightPx < 34;
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(appointment.id)}
       className={[
-        'absolute left-0.5 right-0.5 overflow-hidden rounded-sm border-l-2 px-1 py-0.5 text-left text-xs transition-opacity',
+        'group absolute left-1 right-1 z-10 flex flex-col overflow-hidden rounded-md border border-black/5 pl-2 pr-1.5 py-1 text-left shadow-sm transition-all',
         style.bg, style.text,
-        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500',
-        isCancelled ? 'opacity-50' : 'hover:brightness-95',
+        'hover:z-20 hover:shadow-md hover:-translate-y-px',
+        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+        isCancelled ? 'opacity-60' : '',
       ].join(' ')}
       style={{
         top: topPx,
         height: heightPx,
+        borderLeftWidth: 3,
         borderLeftColor: appointment.professionalColor ?? '#94a3b8',
       }}
-      aria-label={`${appointment.patient.name}, ${timeLabel}, ${statusLabel}`}
+      aria-label={`${appointment.patient.name}, ${timeLabel}, ${appointment.professional.name}, ${statusLabel}`}
     >
-      <p className={['font-medium leading-tight truncate', isCancelled ? 'line-through' : ''].join(' ')}>
-        {appointment.patient.name}
-      </p>
-      {heightPx >= 32 && (
-        <p className="leading-tight truncate opacity-70">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
+        <span className={`truncate text-xs font-semibold leading-tight ${isCancelled ? 'line-through' : ''}`}>
+          {appointment.patient.name}
+        </span>
+      </div>
+      {!compact && (
+        <span className="truncate pl-3 text-[11px] leading-tight opacity-75">
           {timeLabel}
           {appointment.procedure && ` · ${appointment.procedure.name}`}
-        </p>
+        </span>
       )}
     </button>
   );
