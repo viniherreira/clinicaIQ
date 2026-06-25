@@ -37,7 +37,6 @@ function DropdownMenu({ patient }: { patient: Patient }) {
   const [open, setOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
 
   function handleToggle() {

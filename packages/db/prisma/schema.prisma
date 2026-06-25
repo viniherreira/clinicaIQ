@@ -3,8 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooler (Supabase Transaction mode, port 6543) — used by the app at runtime.
+  url       = env("DATABASE_URL")
+  // Direct/session connection (port 5432) — used by `prisma db push`/migrations.
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────────
@@ -51,6 +54,11 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
 }
 
 // ─── Models ──────────────────────────────────────────────
@@ -296,26 +304,36 @@ model BlockedSlot {
 }
 
 model Quote {
-  id              String      @id @default(cuid())
-  tenantId        String
-  patientId       String
-  publicToken     String      @unique @default(cuid())
-  status          QuoteStatus @default(DRAFT)
-  discountPercent Decimal?    @default(0) @db.Decimal(5, 2)
-  subtotal        Decimal     @db.Decimal(10, 2)
-  total           Decimal     @db.Decimal(10, 2)
-  validUntil      DateTime
-  acceptedAt      DateTime?
-  rejectedAt      DateTime?
-  pdfUrl          String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id            String       @id @default(cuid())
+  tenantId      String
+  patientId     String
+  number        Int
+  publicToken   String       @unique @default(cuid())
+  status        QuoteStatus  @default(DRAFT)
+  discountType  DiscountType @default(PERCENT)
+  discountValue Decimal      @default(0) @db.Decimal(10, 2)
+  subtotal      Decimal      @db.Decimal(10, 2)
+  total         Decimal      @db.Decimal(10, 2)
+  notes         String?
+  internalNotes String?
+  validUntil    DateTime
+  sentAt        DateTime?
+  viewedAt      DateTime?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  rejectReason  String?
+  pdfUrl        String?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   tenant   Tenant            @relation(fields: [tenantId], references: [id])
   patient  Patient           @relation(fields: [patientId], references: [id])
   items    QuoteItem[]
   messages WhatsAppMessage[]
 
+  @@unique([tenantId, number])
   @@index([tenantId])
   @@index([tenantId, status])
   @@map("quotes")

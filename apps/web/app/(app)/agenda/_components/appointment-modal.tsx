@@ -165,6 +165,8 @@ export function AppointmentModal({
                 {searching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" aria-hidden="true" />}
                 <input
                   id="patient-search"
+                  role="combobox"
+                  aria-controls="patient-listbox"
                   type="text"
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setSelectedPatient(null); }}
@@ -178,6 +180,7 @@ export function AppointmentModal({
                 />
                 {showPatients && patients.length > 0 && (
                   <ul
+                    id="patient-listbox"
                     role="listbox"
                     className="absolute z-10 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg py-1"
                   >

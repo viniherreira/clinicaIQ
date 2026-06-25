@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -224,7 +224,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
             <CalendarGrid
               dateStr={currentDate}
               professionals={data.professionals}
-              appointments={data.appointments as any}
+              appointments={data.appointments}
               visibleProfessionals={visibleProfessionals}
               mode={mode}
               onAppointmentClick={(id) => {

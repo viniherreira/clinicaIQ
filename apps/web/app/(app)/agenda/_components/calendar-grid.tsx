@@ -95,10 +95,10 @@ export function CalendarGrid({
   }));
 
   const handleSlotClick = useCallback(
-    (professionalId: string, e: React.MouseEvent<HTMLDivElement>) => {
+    (professionalId: string, e: React.MouseEvent<HTMLElement>) => {
       if (!onSlotClick) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      const y = e.clientY - rect.top;
+      const y = Math.max(0, e.clientY - rect.top);
       const minutes = Math.floor(y / SLOT_HEIGHT_PX) * SLOT_MINUTES;
       const hours = GRID_START_HOUR + Math.floor(minutes / 60);
       const mins = minutes % 60;
@@ -130,21 +130,19 @@ export function CalendarGrid({
                 />
                 <span className="text-xs font-medium text-slate-700 truncate">{prof.name}</span>
               </div>
-              <div
-                className="relative border-l border-slate-100 cursor-pointer"
-                style={{ height: TOTAL_HEIGHT_PX }}
-                onClick={(e) => handleSlotClick(prof.id, e)}
-                role="grid"
-                aria-label={`Agenda de ${prof.name}`}
-              >
+              <div className="relative border-l border-slate-100" style={{ height: TOTAL_HEIGHT_PX }}>
+                {onSlotClick && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleSlotClick(prof.id, e)}
+                    className="absolute inset-0 w-full cursor-pointer"
+                    aria-label={`Criar agendamento para ${prof.name}`}
+                  />
+                )}
                 <GridLines />
                 {isCurrentDay && <CurrentTimeIndicator />}
                 {profApts.map((apt) => (
-                  <AppointmentBlock
-                    key={apt.id}
-                    appointment={apt as any}
-                    onClick={onAppointmentClick}
-                  />
+                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
                 ))}
               </div>
             </div>
@@ -170,25 +168,21 @@ export function CalendarGrid({
             </span>
           ))}
         </div>
-        <div
-          className="relative cursor-pointer"
-          style={{ height: TOTAL_HEIGHT_PX }}
-          onClick={(e) => {
-            if (visibleProfs.length === 1) handleSlotClick(visibleProfs[0].id, e);
-          }}
-          role="grid"
-          aria-label="Agenda do dia"
-        >
+        <div className="relative" style={{ height: TOTAL_HEIGHT_PX }}>
+          {onSlotClick && visibleProfs.length === 1 && (
+            <button
+              type="button"
+              onClick={(e) => handleSlotClick(visibleProfs[0].id, e)}
+              className="absolute inset-0 w-full cursor-pointer"
+              aria-label="Criar agendamento"
+            />
+          )}
           <GridLines />
           {isCurrentDay && <CurrentTimeIndicator />}
           {appointmentsWithColor
             .filter((a) => visibleProfessionals.has(a.professional.id))
             .map((apt) => (
-              <AppointmentBlock
-                key={apt.id}
-                appointment={apt as any}
-                onClick={onAppointmentClick}
-              />
+              <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
             ))}
         </div>
       </div>

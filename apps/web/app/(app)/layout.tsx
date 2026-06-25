@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <span className="text-sm font-semibold tracking-tight">ClinicaIQ</span>
         </div>
-        <ul className="flex-1 space-y-0.5 p-2" role="list">
+        <ul className="flex-1 space-y-0.5 p-2">
           {navItems.map((item) => (
             <li key={item.href}>
               <Link

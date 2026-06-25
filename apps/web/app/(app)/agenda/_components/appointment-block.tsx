@@ -10,7 +10,7 @@ interface Appointment {
   id: string;
   startTime: Date | string;
   endTime: Date | string;
-  status: keyof typeof STATUS_STYLES;
+  status: string;
   patient: { id: string; name: string };
   professional: { id: string; name: string; specialty?: string | null };
   procedure?: { id: string; name: string; durationMinutes: number } | null;
@@ -35,7 +35,8 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
     };
   }, [start, end]);
 
-  const style = STATUS_STYLES[appointment.status] ?? STATUS_STYLES.SCHEDULED;
+  const style = STATUS_STYLES[appointment.status as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.SCHEDULED;
+  const statusLabel = STATUS_LABELS[appointment.status as keyof typeof STATUS_LABELS] ?? appointment.status;
   const timeLabel = `${format(start, 'HH:mm')}–${format(end, 'HH:mm')}`;
   const isCancelled = appointment.status === 'CANCELLED';
 
@@ -54,7 +55,7 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
         height: heightPx,
         borderLeftColor: appointment.professionalColor ?? '#94a3b8',
       }}
-      aria-label={`${appointment.patient.name}, ${timeLabel}, ${STATUS_LABELS[appointment.status]}`}
+      aria-label={`${appointment.patient.name}, ${timeLabel}, ${statusLabel}`}
     >
       <p className={['font-medium leading-tight truncate', isCancelled ? 'line-through' : ''].join(' ')}>
         {appointment.patient.name}

@@ -6,8 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
-  startOfDay, endOfDay, startOfWeek, endOfWeek,
-  addDays, parseISO, addMinutes,
+  startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
 
@@ -196,8 +195,8 @@ export async function createAppointment(
       procedureId: procedureId || null,
       startTime: start,
       endTime: end,
-      status: status as any,
-      type: type as any,
+      status,
+      type,
       notes: notes || null,
       createdById: userId,
       updatedById: userId,
@@ -205,14 +204,17 @@ export async function createAppointment(
   });
 
   if (sendWhatsApp) {
+    // Immediate "created" notice — sent directly so it works without a running
+    // worker; the dispatcher persists the WhatsAppMessage row.
+    try {
+      const { dispatchAppointmentMessage } = await import('@/lib/whatsapp');
+      await dispatchAppointmentMessage(appointment.id, 'created');
+    } catch {}
+
+    // 24h confirmation reminder — needs scheduling, so it goes through the queue
+    // (best-effort: a no-op in dev when Redis/worker are absent).
     try {
       const { appointmentQueue } = await import('@/lib/queue');
-      await appointmentQueue.add('whatsapp-immediate', {
-        type: 'whatsapp-immediate',
-        appointmentId: appointment.id,
-        tenantId,
-      });
-      // Schedule 24h reminder
       const reminderTime = new Date(start.getTime() - 24 * 60 * 60 * 1000);
       const delay = Math.max(0, reminderTime.getTime() - Date.now());
       if (delay > 0) {
@@ -268,8 +270,8 @@ export async function updateAppointment(
       procedureId: procedureId || null,
       startTime: start,
       endTime: end,
-      status: status as any,
-      type: type as any,
+      status,
+      type,
       notes: notes || null,
       updatedById: userId,
     },
