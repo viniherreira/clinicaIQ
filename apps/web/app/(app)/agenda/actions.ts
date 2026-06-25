@@ -64,10 +64,11 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     }),
   ]);
 
-  // Attach color index to professionals
+  // Each professional keeps its own chosen color; fall back to the palette by
+  // index for any created before colors existed.
   const professionalsWithColor = professionals.map((p, i) => ({
     ...p,
-    color: PROFESSIONAL_COLORS[i % PROFESSIONAL_COLORS.length],
+    color: p.color ?? PROFESSIONAL_COLORS[i % PROFESSIONAL_COLORS.length],
   }));
 
   // Serialize Decimal fields — Prisma Decimal is not a plain object

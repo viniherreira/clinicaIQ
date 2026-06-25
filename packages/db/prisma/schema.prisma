@@ -178,6 +178,7 @@ model Professional {
   userId    String?  @unique
   name      String
   specialty String?
+  color     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
