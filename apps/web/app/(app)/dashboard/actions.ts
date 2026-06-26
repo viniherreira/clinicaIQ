@@ -3,8 +3,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { redirect } from 'next/navigation';
-import { startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { subDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { clinicToday, wallClockTime } from '@/lib/tz';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -24,9 +25,10 @@ export async function getDashboardData() {
   const db = getTenantClient(tenantId);
 
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-  const weekStart = startOfDay(subDays(now, 6)); // 7-day window incl. today
+  const today = clinicToday(); // YYYY-MM-DD in the clinic timezone
+  const todayStart = new Date(`${today}T00:00:00.000Z`);
+  const todayEnd = new Date(`${today}T23:59:59.999Z`);
+  const weekStart = new Date(todayStart.getTime() - 6 * 86400000);
   const monthStart = subDays(now, 30);
 
   const [todayAppointments, weekAppointments, quotes] = await Promise.all([
@@ -68,16 +70,16 @@ export async function getDashboardData() {
 
   // ── 7-day series ────────────────────────────────────────────────
   const series = Array.from({ length: 7 }, (_, i) => {
-    const d = subDays(now, 6 - i);
-    const key = format(d, 'yyyy-MM-dd');
+    const d = new Date(todayStart.getTime() - (6 - i) * 86400000);
+    const key = d.toISOString().slice(0, 10);
     const dayAppts = weekAppointments.filter(
-      (a) => format(new Date(a.startTime), 'yyyy-MM-dd') === key && a.status !== 'CANCELLED',
+      (a) => new Date(a.startTime).toISOString().slice(0, 10) === key && a.status !== 'CANCELLED',
     );
     return {
-      label: format(d, 'EEEEEE', { locale: ptBR }).replace('.', ''),
+      label: format(new Date(`${key}T12:00:00.000Z`), 'EEEEEE', { locale: ptBR }).replace('.', ''),
       total: dayAppts.length,
       confirmed: dayAppts.filter((a) => a.status === 'CONFIRMED' || a.status === 'ATTENDED').length,
-      isToday: key === format(now, 'yyyy-MM-dd'),
+      isToday: key === today,
     };
   });
 
@@ -96,7 +98,7 @@ export async function getDashboardData() {
     today: todayAppointments.map((a) => ({
       id: a.id,
       status: a.status,
-      time: format(new Date(a.startTime), 'HH:mm'),
+      time: wallClockTime(a.startTime),
       patient: a.patient.name,
       professional: a.professional.name,
       professionalColor: a.professional.color,
@@ -105,6 +107,6 @@ export async function getDashboardData() {
     counts,
     series,
     quoteStats,
-    dateLabel: format(now, "EEEE, d 'de' MMMM", { locale: ptBR }),
+    dateLabel: format(new Date(`${today}T12:00:00.000Z`), "EEEE, d 'de' MMMM", { locale: ptBR }),
   };
 }

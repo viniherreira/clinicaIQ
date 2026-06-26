@@ -3,6 +3,7 @@
 import { useEffect, useId, useState, useTransition } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { wallClockTime } from '@/lib/tz';
 import { getAppointment, updateAppointmentStatus } from '../actions';
 import { STATUS_STYLES, STATUS_LABELS, TYPE_LABELS } from './constants';
 
@@ -107,7 +108,7 @@ export function AppointmentDetailModal({ open, appointmentId, onClose, onChanged
                 </span>
                 {' · '}
                 <span className="font-medium tabular-nums">
-                  {format(new Date(detail.startTime), 'HH:mm')}–{format(new Date(detail.endTime), 'HH:mm')}
+                  {wallClockTime(detail.startTime)}–{wallClockTime(detail.endTime)}
                 </span>
               </Row>
               <Row label="Profissional">{detail.professional.name}</Row>

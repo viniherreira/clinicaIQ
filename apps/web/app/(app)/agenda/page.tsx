@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { getAgendaData } from './actions';
 import { AgendaShell } from './_components/agenda-shell';
+import { clinicToday } from '@/lib/tz';
 
 interface PageProps {
   searchParams: Promise<{ date?: string; view?: string }>;
@@ -8,7 +9,7 @@ interface PageProps {
 
 export default async function AgendaPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const dateStr = params.date ?? new Date().toISOString().slice(0, 10);
+  const dateStr = params.date ?? clinicToday();
   const view = (params.view === 'week' ? 'week' : 'day') as 'day' | 'week';
 
   const data = await getAgendaData(dateStr, view);

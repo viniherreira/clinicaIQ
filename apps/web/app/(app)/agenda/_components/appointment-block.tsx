@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format } from 'date-fns';
 import { Check, CheckCheck, X, Ban, Clock, RotateCw } from 'lucide-react';
+import { wallClockTime, wallClockMinutes } from '@/lib/tz';
 import {
   GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES, STATUS_STYLES, STATUS_LABELS,
 } from './constants';
@@ -37,8 +37,8 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
   const end = new Date(appointment.endTime);
 
   const { topPx, heightPx } = useMemo(() => {
-    const startMinutes = (start.getHours() - GRID_START_HOUR) * 60 + start.getMinutes();
-    const endMinutes = (end.getHours() - GRID_START_HOUR) * 60 + end.getMinutes();
+    const startMinutes = wallClockMinutes(start) - GRID_START_HOUR * 60;
+    const endMinutes = wallClockMinutes(end) - GRID_START_HOUR * 60;
     return {
       topPx: (startMinutes / SLOT_MINUTES) * SLOT_HEIGHT_PX,
       heightPx: Math.max(((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT_PX, SLOT_HEIGHT_PX * 2),
@@ -49,7 +49,7 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
   const style = STATUS_STYLES[key] ?? STATUS_STYLES.SCHEDULED;
   const statusLabel = STATUS_LABELS[key as keyof typeof STATUS_LABELS] ?? appointment.status;
   const Icon = STATUS_ICON[key] ?? Clock;
-  const timeLabel = format(start, 'HH:mm');
+  const timeLabel = wallClockTime(start);
   const isCancelled = appointment.status === 'CANCELLED';
   const compact = heightPx < 34;
 
