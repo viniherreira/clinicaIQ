@@ -6,7 +6,9 @@ import {
   updateClinic,
   toggleProfessionalActive,
   deleteProfessional,
+  updateBusinessHours,
   type ClinicFormState,
+  type DayHours,
 } from '../actions';
 import { ProfessionalModal, type ProfessionalModalData } from './professional-modal';
 
@@ -30,21 +32,92 @@ interface Props {
   clinic: Clinic;
   professionals: Professional[];
   suggestedColor: string;
+  businessHours: DayHours[];
 }
 
-export function SettingsView({ clinic, professionals, suggestedColor }: Props) {
+export function SettingsView({ clinic, professionals, suggestedColor, businessHours }: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6 lg:p-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gerencie os dados da clínica e a equipe de profissionais.
+          Gerencie os dados da clínica, a equipe e os horários de atendimento.
         </p>
       </header>
 
       <ClinicSection clinic={clinic} />
       <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
+      <BusinessHoursSection initialHours={businessHours} />
     </div>
+  );
+}
+
+const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday-first display
+
+function BusinessHoursSection({ initialHours }: { initialHours: DayHours[] }) {
+  const [hours, setHours] = useState(initialHours);
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  function update(i: number, patch: Partial<DayHours>) {
+    setHours((prev) => prev.map((h, idx) => (idx === i ? { ...h, ...patch } : h)));
+  }
+
+  function save() {
+    startTransition(async () => {
+      await updateBusinessHours(hours);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    });
+  }
+
+  return (
+    <section aria-labelledby="hours-heading" className="rounded-xl border border-border bg-surface">
+      <div className="border-b border-border px-5 py-4">
+        <h2 id="hours-heading" className="text-base font-semibold">Horário de funcionamento</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">Dias e horas em que a clínica atende.</p>
+      </div>
+      <div className="divide-y divide-border">
+        {DAY_ORDER.map((i) => {
+          const h = hours[i];
+          return (
+            <div key={i} className="flex items-center gap-3 px-5 py-3">
+              <label className="flex w-32 cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={h.open}
+                  onChange={(e) => update(i, { open: e.target.checked })}
+                  className="h-4 w-4 rounded accent-primary"
+                  aria-label={`${DAY_LABELS[i]} — aberto`}
+                />
+                <span className="text-sm font-medium">{DAY_LABELS[i]}</span>
+              </label>
+              {h.open ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <input type="time" value={h.start} onChange={(e) => update(i, { start: e.target.value })} aria-label={`${DAY_LABELS[i]} — abertura`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+                  <span className="text-muted-foreground">às</span>
+                  <input type="time" value={h.end} onChange={(e) => update(i, { end: e.target.value })} aria-label={`${DAY_LABELS[i]} — fechamento`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Fechado</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-3 border-t border-border px-5 py-4">
+        <button
+          type="button"
+          onClick={save}
+          disabled={isPending}
+          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          {isPending ? 'Salvando...' : 'Salvar horários'}
+        </button>
+        <span aria-live="polite" className="text-sm text-success">{saved && '✓ Salvo'}</span>
+      </div>
+    </section>
   );
 }
 

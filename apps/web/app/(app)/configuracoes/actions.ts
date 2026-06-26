@@ -206,6 +206,66 @@ export async function toggleProfessionalActive(id: string) {
   revalidatePath('/agenda');
 }
 
+// ─── Business hours ────────────────────────────────────────────────────────────
+
+export interface DayHours {
+  open: boolean;
+  start: string;
+  end: string;
+}
+
+/** Index 0..6 = Sunday..Saturday (matches Date.getDay()). */
+const DEFAULT_HOURS: DayHours[] = [
+  { open: false, start: '08:00', end: '12:00' }, // Dom
+  { open: true, start: '08:00', end: '18:00' }, // Seg
+  { open: true, start: '08:00', end: '18:00' }, // Ter
+  { open: true, start: '08:00', end: '18:00' }, // Qua
+  { open: true, start: '08:00', end: '18:00' }, // Qui
+  { open: true, start: '08:00', end: '18:00' }, // Sex
+  { open: true, start: '08:00', end: '12:00' }, // Sáb
+];
+
+function isDayHours(v: unknown): v is DayHours {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    typeof (v as DayHours).open === 'boolean' &&
+    typeof (v as DayHours).start === 'string' &&
+    typeof (v as DayHours).end === 'string'
+  );
+}
+
+export async function getBusinessHours(): Promise<DayHours[]> {
+  const { tenantId } = await requireOwner();
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+  const hours = settings.businessHours;
+  if (Array.isArray(hours) && hours.length === 7 && hours.every(isDayHours)) {
+    return hours as DayHours[];
+  }
+  return DEFAULT_HOURS;
+}
+
+export async function updateBusinessHours(hours: DayHours[]): Promise<{ ok: boolean }> {
+  const { tenantId, userId } = await requireOwner();
+  if (!Array.isArray(hours) || hours.length !== 7 || !hours.every(isDayHours)) {
+    return { ok: false };
+  }
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+  // Serialize to plain JSON so it satisfies Prisma's InputJsonValue type.
+  const merged = JSON.parse(JSON.stringify({ ...settings, businessHours: hours }));
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { settings: merged },
+  });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'UPDATE_HOURS', entity: 'Tenant', entityId: tenantId },
+  });
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
 export async function deleteProfessional(
   id: string,
 ): Promise<{ ok: boolean; message?: string }> {
