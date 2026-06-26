@@ -4,7 +4,7 @@ import path from 'path';
 const nextConfig: NextConfig = {
   transpilePackages: ['@clinicaiq/db', '@clinicaiq/whatsapp', '@clinicaiq/pdf', '@clinicaiq/ui'],
   outputFileTracingRoot: path.join(__dirname, '../../'),
-  serverExternalPackages: [],
+  serverExternalPackages: ['@react-pdf/renderer'],
 };
 
 export default nextConfig;

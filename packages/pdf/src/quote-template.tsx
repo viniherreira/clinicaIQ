@@ -138,12 +138,14 @@ export interface QuoteDocumentProps {
   };
   quote: {
     id: string;
+    number?: number;
     items: QuoteItem[];
     subtotal: number;
-    discountPercent: number;
+    discountLabel?: string;
     total: number;
     validUntil: string;
     createdAt: string;
+    notes?: string;
   };
 }
 
@@ -166,7 +168,9 @@ export function QuoteDocument({ clinic, patient, quote }: QuoteDocumentProps) {
           </View>
           <View>
             <Text style={styles.label}>Orçamento</Text>
-            <Text style={styles.value}>#{quote.id.slice(-8).toUpperCase()}</Text>
+            <Text style={styles.value}>
+              {quote.number ? `ORC-${String(quote.number).padStart(4, '0')}` : `#${quote.id.slice(-8).toUpperCase()}`}
+            </Text>
             <Text style={styles.label}>Data</Text>
             <Text style={styles.value}>{quote.createdAt}</Text>
           </View>
@@ -218,9 +222,11 @@ export function QuoteDocument({ clinic, patient, quote }: QuoteDocumentProps) {
             <Text style={styles.totalLabel}>Subtotal</Text>
             <Text style={styles.totalValue}>{formatCurrency(quote.subtotal)}</Text>
           </View>
-          {quote.discountPercent > 0 && (
+          {quote.subtotal - quote.total > 0.001 && (
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Desconto ({quote.discountPercent}%)</Text>
+              <Text style={styles.totalLabel}>
+                Desconto{quote.discountLabel ? ` (${quote.discountLabel})` : ''}
+              </Text>
               <Text style={styles.totalValue}>
                 -{formatCurrency(quote.subtotal - quote.total)}
               </Text>
@@ -233,6 +239,13 @@ export function QuoteDocument({ clinic, patient, quote }: QuoteDocumentProps) {
             </Text>
           </View>
         </View>
+
+        {quote.notes ? (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.label}>Observações</Text>
+            <Text style={{ fontSize: 10, color: '#3A3A38', lineHeight: 1.4 }}>{quote.notes}</Text>
+          </View>
+        ) : null}
 
         <Text style={styles.validity}>
           Orçamento válido até {quote.validUntil}. Valores sujeitos a alteração após esta data.

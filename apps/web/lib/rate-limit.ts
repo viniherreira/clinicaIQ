@@ -44,8 +44,9 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { ok: true, remaining: limit - bucket.count, retryAfter: 0 };
 }
 
-/** Best-effort client IP from standard proxy headers. */
-export function clientIp(headers: Headers): string {
+/** Best-effort client IP from standard proxy headers. Accepts both the fetch
+ *  `Headers` and Next's read-only `headers()` result. */
+export function clientIp(headers: { get(name: string): string | null }): string {
   const fwd = headers.get('x-forwarded-for');
   if (fwd) return fwd.split(',')[0]!.trim();
   return headers.get('x-real-ip') ?? 'unknown';
