@@ -39,7 +39,7 @@ export default async function DashboardPage() {
         {/* Left: chart + today's list */}
         <div className="space-y-6 lg:col-span-2">
           {/* 7-day chart */}
-          <section className="rounded-xl border border-border bg-surface p-5">
+          <section className="rounded-xl border border-border bg-surface shadow-card p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold">Atendimentos · últimos 7 dias</h2>
               <span className="text-xs text-muted-foreground">{series.reduce((s, d) => s + d.total, 0)} no período</span>
@@ -61,7 +61,7 @@ export default async function DashboardPage() {
           </section>
 
           {/* Today's schedule */}
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-xl border border-border bg-surface shadow-card">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold">Agenda de hoje</h2>
               <Link href="/agenda" className="text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
 
         {/* Right: quotes */}
         <aside className="space-y-6">
-          <section className="rounded-xl border border-border bg-surface p-5">
+          <section className="rounded-xl border border-border bg-surface shadow-card p-5">
             <h2 className="text-sm font-semibold">Orçamentos · 30 dias</h2>
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -145,7 +145,7 @@ function Kpi({
     muted: 'text-muted-foreground',
   }[tone];
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-xl border border-border bg-surface shadow-card p-4">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className={`mt-1 text-3xl font-semibold tracking-tight ${toneCls}`}>{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>

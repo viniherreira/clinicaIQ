@@ -111,7 +111,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
 
   return (
     <>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-full overflow-hidden bg-background">
         {/* Sidebar */}
         <aside className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4">
           <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} />

@@ -48,7 +48,70 @@ export function SettingsView({ clinic, professionals, suggestedColor, businessHo
       <ClinicSection clinic={clinic} />
       <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
       <BusinessHoursSection initialHours={businessHours} />
+      <AppearanceSection />
     </div>
+  );
+}
+
+function AppearanceSection() {
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem('theme');
+      setTheme(t === 'dark' ? 'dark' : t === 'light' ? 'light' : 'system');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function apply(t: 'light' | 'dark' | 'system') {
+    setTheme(t);
+    try {
+      if (t === 'system') {
+        localStorage.removeItem('theme');
+        const sys = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', sys);
+      } else {
+        localStorage.setItem('theme', t);
+        document.documentElement.classList.toggle('dark', t === 'dark');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const options = [
+    { v: 'light', l: 'Claro' },
+    { v: 'dark', l: 'Escuro' },
+    { v: 'system', l: 'Sistema' },
+  ] as const;
+
+  return (
+    <section aria-labelledby="appearance-heading" className="rounded-xl border border-border bg-surface shadow-card">
+      <div className="border-b border-border px-5 py-4">
+        <h2 id="appearance-heading" className="text-base font-semibold">Aparência</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">Escolha o tema da interface.</p>
+      </div>
+      <div className="p-5">
+        <div role="radiogroup" aria-label="Tema da interface" className="inline-flex rounded-lg border border-border p-1">
+          {options.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              role="radio"
+              aria-checked={theme === o.v}
+              onClick={() => apply(o.v)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                theme === o.v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -73,7 +136,7 @@ function BusinessHoursSection({ initialHours }: { initialHours: DayHours[] }) {
   }
 
   return (
-    <section aria-labelledby="hours-heading" className="rounded-xl border border-border bg-surface">
+    <section aria-labelledby="hours-heading" className="rounded-xl border border-border bg-surface shadow-card">
       <div className="border-b border-border px-5 py-4">
         <h2 id="hours-heading" className="text-base font-semibold">Horário de funcionamento</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">Dias e horas em que a clínica atende.</p>
@@ -144,7 +207,7 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
     'h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
   return (
-    <section aria-labelledby="clinic-heading" className="rounded-xl border border-border bg-surface">
+    <section aria-labelledby="clinic-heading" className="rounded-xl border border-border bg-surface shadow-card">
       <div className="border-b border-border px-5 py-4">
         <h2 id="clinic-heading" className="text-base font-semibold">Dados da clínica</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">Aparecem nos orçamentos e mensagens.</p>
@@ -212,7 +275,7 @@ function ProfessionalsSection({
   }
 
   return (
-    <section aria-labelledby="prof-heading" className="rounded-xl border border-border bg-surface">
+    <section aria-labelledby="prof-heading" className="rounded-xl border border-border bg-surface shadow-card">
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div>
           <h2 id="prof-heading" className="text-base font-semibold">Profissionais</h2>
