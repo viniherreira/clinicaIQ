@@ -77,6 +77,9 @@ importers:
       '@radix-ui/react-visually-hidden':
         specifier: ^1
         version: 1.2.4(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@react-pdf/renderer':
+        specifier: ^4
+        version: 4.5.1(react@19.2.6)
       bullmq:
         specifier: ^5.77.4
         version: 5.77.4

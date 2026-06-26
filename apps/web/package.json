@@ -24,6 +24,7 @@
     "@clinicaiq/ui": "workspace:*",
     "@clinicaiq/whatsapp": "workspace:*",
     "@prisma/client": "^6",
+    "@react-pdf/renderer": "^4",
     "@radix-ui/react-dialog": "^1",
     "@radix-ui/react-dropdown-menu": "^2",
     "@radix-ui/react-label": "^2",
