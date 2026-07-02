@@ -6,6 +6,7 @@ import { X, Search, Loader2, Check, CalendarDays } from 'lucide-react';
 import { createAppointment, updateAppointment, searchPatients } from '../actions';
 import type { AppointmentFormState } from '../actions';
 import { STATUS_LABELS, TYPE_LABELS } from './constants';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface Professional {
   id: string;
@@ -88,6 +89,8 @@ export function AppointmentModal({
   const [showPatients, setShowPatients] = useState(false);
   const [searching, startSearch] = useTransition();
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic id per search — lets us drop out-of-order (stale) responses.
+  const searchSeq = useRef(0);
 
   // Form fields
   const [date, setDate] = useState(defaultDate);
@@ -96,6 +99,8 @@ export function AppointmentModal({
   const [profId, setProfId] = useState(defaultProfessionalId ?? professionals[0]?.id ?? '');
   const [procId, setProcId] = useState('');
   const [notes, setNotes] = useState('');
+  const [type, setType] = useState(editing?.type ?? 'PARTICULAR');
+  const [status, setStatus] = useState(editing?.status ?? 'SCHEDULED');
 
   // Reset when modal opens (prefilled from `editing` in edit mode)
   useEffect(() => {
@@ -106,6 +111,8 @@ export function AppointmentModal({
       setEndTime(editing.endTime);
       setProfId(editing.professionalId);
       setProcId(editing.procedureId ?? '');
+      setType(editing.type);
+      setStatus(editing.status);
       setSelectedPatient({
         id: editing.patientId,
         name: editing.patientName,
@@ -120,6 +127,8 @@ export function AppointmentModal({
       setEndTime(addMinutesToTime(defaultTime, 30));
       setProfId(defaultProfessionalId ?? professionals[0]?.id ?? '');
       setProcId('');
+      setType('PARTICULAR');
+      setStatus('SCHEDULED');
       setQuery('');
       setNotes('');
       setSelectedPatient(null);
@@ -140,10 +149,16 @@ export function AppointmentModal({
   // Patient search debounce
   useEffect(() => {
     if (searchRef.current) clearTimeout(searchRef.current);
-    if (!query.trim() || selectedPatient) { setPatients([]); return; }
+    if (!query.trim() || selectedPatient) {
+      setPatients([]);
+      setShowPatients(false);
+      return;
+    }
     searchRef.current = setTimeout(() => {
+      const seq = ++searchSeq.current;
       startSearch(async () => {
         const results = await searchPatients(query);
+        if (seq !== searchSeq.current) return; // stale response — a newer search is in flight
         setPatients(results);
         setShowPatients(true);
       });
@@ -172,8 +187,6 @@ export function AppointmentModal({
   const errorFor = (field: string) =>
     state && !state.success ? state.errors?.[field]?.[0] : undefined;
 
-  const selectedProf = professionals.find((p) => p.id === profId);
-
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
@@ -198,6 +211,10 @@ export function AppointmentModal({
           <form action={formAction} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
               <input type="hidden" name="patientId" value={selectedPatient?.id ?? ''} />
+              <input type="hidden" name="professionalId" value={profId} />
+              <input type="hidden" name="procedureId" value={procId} />
+              <input type="hidden" name="type" value={type} />
+              <input type="hidden" name="status" value={status} />
 
               {state && !state.success && state.message && (
                 <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">
@@ -227,48 +244,58 @@ export function AppointmentModal({
                     {errorFor('endTime') && <p className="text-xs text-destructive">{errorFor('endTime')}</p>}
                   </div>
                   <div className="col-span-2 space-y-1.5 sm:col-span-1">
-                    <label className={labelCls} htmlFor="type">Tipo</label>
-                    <select id="type" name="type" defaultValue={editing?.type ?? 'PARTICULAR'} className={inputCls}>
-                      {Object.entries(TYPE_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
+                    <span className={`${labelCls} block`} id="type-label">Tipo</span>
+                    <Select value={type} onValueChange={setType}>
+                      <SelectTrigger aria-labelledby="type-label">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TYPE_LABELS).map(([v, l]) => (
+                          <SelectItem key={v} value={v}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label className={labelCls} htmlFor="professionalId">Profissional <span className="text-destructive">*</span></label>
-                    <div className="relative">
-                      {selectedProf && (
-                        <span
-                          className="pointer-events-none absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full"
-                          style={{ background: selectedProf.color }}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <select
-                        id="professionalId"
-                        name="professionalId"
-                        value={profId}
-                        onChange={(e) => setProfId(e.target.value)}
-                        className={`${inputCls} ${selectedProf ? 'pl-8' : ''}`}
-                      >
+                    <span className={`${labelCls} block`} id="prof-label">Profissional <span className="text-destructive">*</span></span>
+                    <Select value={profId || undefined} onValueChange={setProfId}>
+                      <SelectTrigger aria-labelledby="prof-label">
+                        <SelectValue placeholder="Selecione o profissional" />
+                      </SelectTrigger>
+                      <SelectContent>
                         {professionals.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.color }} aria-hidden="true" />
+                              {p.name}
+                            </span>
+                          </SelectItem>
                         ))}
-                      </select>
-                    </div>
+                      </SelectContent>
+                    </Select>
                     {errorFor('professionalId') && <p className="text-xs text-destructive">{errorFor('professionalId')}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <label className={labelCls} htmlFor="procedureId">Procedimento</label>
-                    <select id="procedureId" name="procedureId" value={procId} onChange={(e) => onProcedureChange(e.target.value)} className={inputCls}>
-                      <option value="">— Selecione —</option>
-                      {procedures.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.durationMinutes}min)</option>
-                      ))}
-                    </select>
+                    <span className={`${labelCls} block`} id="proc-label">Procedimento</span>
+                    <Select value={procId || undefined} onValueChange={(v) => onProcedureChange(v === '__none__' ? '' : v)}>
+                      <SelectTrigger aria-labelledby="proc-label">
+                        <SelectValue placeholder="— Selecione —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nenhum procedimento</SelectItem>
+                        {procedures.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="inline-flex items-baseline gap-1.5">
+                              {p.name}
+                              <span className="text-xs text-muted-foreground">({p.durationMinutes}min)</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </fieldset>
@@ -295,7 +322,7 @@ export function AppointmentModal({
                       type="text"
                       value={query}
                       onChange={(e) => { setQuery(e.target.value); setSelectedPatient(null); }}
-                      onFocus={() => patients.length > 0 && setShowPatients(true)}
+                      onFocus={() => { if (query.trim() && !selectedPatient) setShowPatients(true); }}
                       onBlur={() => setTimeout(() => setShowPatients(false), 150)}
                       placeholder="Digite o nome do paciente..."
                       autoComplete="off"
@@ -303,14 +330,19 @@ export function AppointmentModal({
                       aria-autocomplete="list"
                       aria-expanded={showPatients}
                     />
-                    {showPatients && patients.length > 0 && (
+                    {showPatients && !selectedPatient && (
                       <ul
                         id="patient-listbox"
                         role="listbox"
                         className="absolute z-10 mt-1.5 max-h-56 w-full overflow-y-auto rounded-xl border border-border bg-surface py-1.5 shadow-xl"
                       >
+                        {patients.length === 0 && !searching && (
+                          <li className="px-3 py-4 text-center text-sm text-muted-foreground" aria-live="polite">
+                            Nenhum paciente encontrado para “{query.trim()}”.
+                          </li>
+                        )}
                         {patients.map((p) => (
-                          <li key={p.id} role="option" aria-selected={selectedPatient?.id === p.id}>
+                          <li key={p.id} role="option" aria-selected={false}>
                             <button
                               type="button"
                               onMouseDown={() => selectPatient(p)}
@@ -347,12 +379,17 @@ export function AppointmentModal({
                 </legend>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1.5">
-                    <label className={labelCls} htmlFor="status">Situação do agendamento</label>
-                    <select id="status" name="status" defaultValue={editing?.status ?? 'SCHEDULED'} className={inputCls}>
-                      {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
+                    <span className={`${labelCls} block`} id="status-label">Situação do agendamento</span>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger aria-labelledby="status-label">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUS_LABELS).map(([v, l]) => (
+                          <SelectItem key={v} value={v}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className={labelCls} htmlFor="notes">Observações</label>

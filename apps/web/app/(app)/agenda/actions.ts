@@ -84,16 +84,19 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
 
 export async function searchPatients(query: string) {
   const { tenantId } = await requireTenant();
-  if (!query.trim()) return [];
+  // Tokenized match: each word must appear somewhere in the name, so full
+  // names, extra middle names, word order and trailing spaces all still hit.
+  const words = query.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+  if (words.length === 0) return [];
 
   const db = getTenantClient(tenantId);
   const patients = await db.patient.findMany({
     where: {
       deletedAt: null,
       active: true,
-      name: { contains: query, mode: 'insensitive' },
+      AND: words.map((w) => ({ name: { contains: w, mode: 'insensitive' as const } })),
     },
-    select: { id: true, name: true, controlNumber: true, phoneEncrypted: true },
+    select: { id: true, name: true, controlNumber: true },
     take: 10,
     orderBy: { name: 'asc' },
   });

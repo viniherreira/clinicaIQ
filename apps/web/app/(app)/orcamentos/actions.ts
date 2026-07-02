@@ -144,10 +144,16 @@ export async function getQuote(id: string) {
 
 export async function searchQuotePatients(query: string) {
   const { tenantId } = await requireTenant();
-  if (!query.trim()) return [];
+  // Tokenized match — same behavior as the agenda search (full names work).
+  const words = query.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+  if (words.length === 0) return [];
   const db = getTenantClient(tenantId);
   const patients = await db.patient.findMany({
-    where: { deletedAt: null, active: true, name: { contains: query, mode: 'insensitive' } },
+    where: {
+      deletedAt: null,
+      active: true,
+      AND: words.map((w) => ({ name: { contains: w, mode: 'insensitive' as const } })),
+    },
     select: { id: true, name: true, controlNumber: true },
     take: 10,
     orderBy: { name: 'asc' },
