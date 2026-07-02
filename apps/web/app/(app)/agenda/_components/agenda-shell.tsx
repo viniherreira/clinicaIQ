@@ -132,17 +132,6 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   const todayActive = isToday(parseISO(currentDate));
   const hasProfessionals = data.professionals.length > 0;
 
-  const segBtn = (active: boolean) =>
-    [
-      'px-2.5 py-1 text-xs font-medium transition-colors',
-      active ? 'bg-surface-alt text-foreground' : 'text-muted-foreground hover:bg-surface-alt/60',
-    ].join(' ');
-  const iconBtn = (active: boolean) =>
-    [
-      'p-1.5 transition-colors',
-      active ? 'bg-surface-alt text-foreground' : 'text-muted-foreground hover:bg-surface-alt/60',
-    ].join(' ');
-
   return (
     <>
       <div className="flex h-full overflow-hidden bg-background">
@@ -162,43 +151,39 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Top bar */}
           <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:px-4">
-            <div className="flex items-center gap-0.5">
-              <button type="button" onClick={goPrev} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-alt hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Dia anterior (seta esquerda)">
+            <div className="segmented" role="group" aria-label="Navegar entre dias">
+              <button type="button" onClick={goPrev} className="segmented-item !px-2" aria-label="Dia anterior (seta esquerda)">
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </button>
-              <button type="button" onClick={goNext} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-alt hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Próximo dia (seta direita)">
+              <button
+                type="button"
+                onClick={goToday}
+                aria-pressed={todayActive}
+                className="segmented-item"
+                aria-label="Ir para hoje (T)"
+              >
+                Hoje
+              </button>
+              <button type="button" onClick={goNext} className="segmented-item !px-2" aria-label="Próximo dia (seta direita)">
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={goToday}
-              className={[
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                todayActive ? 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/20' : 'text-muted-foreground hover:bg-surface-alt hover:text-foreground',
-              ].join(' ')}
-              aria-label="Ir para hoje (T)"
-            >
-              Hoje
-            </button>
-
-            <h1 className="flex-1 truncate text-sm font-semibold capitalize text-foreground" aria-live="polite">
+            <h1 className="min-w-0 flex-1 truncate text-sm font-semibold capitalize text-foreground" aria-live="polite">
               {dateLabel}
+              {loading && <span className="ml-2 text-xs font-normal text-muted-foreground" aria-hidden="true">carregando…</span>}
             </h1>
 
-            {loading && <span className="text-xs text-muted-foreground" aria-hidden="true">Carregando…</span>}
-
-            <div className="flex items-center overflow-hidden rounded-md border border-border">
-              <button type="button" onClick={() => navigate(currentDate, 'day')} className={segBtn(view === 'day')} aria-pressed={view === 'day'}>Dia</button>
-              <button type="button" onClick={() => navigate(currentDate, 'week')} className={`border-l border-border ${segBtn(view === 'week')}`} aria-pressed={view === 'week'}>Semana</button>
+            <div className="segmented" role="group" aria-label="Modo de visualização">
+              <button type="button" onClick={() => navigate(currentDate, 'day')} className="segmented-item" aria-pressed={view === 'day'}>Dia</button>
+              <button type="button" onClick={() => navigate(currentDate, 'week')} className="segmented-item" aria-pressed={view === 'week'}>Semana</button>
             </div>
 
-            <div className="flex items-center overflow-hidden rounded-md border border-border">
-              <button type="button" onClick={() => setMode('grouped')} title="Agrupado" aria-label="Visualização agrupada" aria-pressed={mode === 'grouped'} className={iconBtn(mode === 'grouped')}>
+            <div className="segmented hidden sm:inline-flex" role="group" aria-label="Layout das agendas">
+              <button type="button" onClick={() => setMode('grouped')} title="Agrupado" aria-label="Visualização agrupada" aria-pressed={mode === 'grouped'} className="segmented-item !px-2">
                 <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => setMode('sidebyside')} title="Lado a lado" aria-label="Visualização lado a lado" aria-pressed={mode === 'sidebyside'} className={`border-l border-border ${iconBtn(mode === 'sidebyside')}`}>
+              <button type="button" onClick={() => setMode('sidebyside')} title="Lado a lado" aria-label="Visualização lado a lado" aria-pressed={mode === 'sidebyside'} className="segmented-item !px-2">
                 <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
@@ -206,16 +191,17 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
             <button
               type="button"
               onClick={() => openNewModal()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="btn-primary btn-sm !h-9 sm:px-3.5"
               aria-label="Novo agendamento (N)"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              Novo
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Novo agendamento</span>
+              <span className="sm:hidden">Novo</span>
             </button>
           </header>
 
           {/* Grid / empty state */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto overscroll-contain bg-surface">
             {hasProfessionals ? (
               <CalendarGrid
                 dateStr={currentDate}

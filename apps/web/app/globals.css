@@ -190,6 +190,39 @@
   }
 }
 
+@layer components {
+  /* Botões — base consistente para todo o app */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover active:scale-[0.98];
+  }
+  .btn-outline {
+    @apply btn border border-border bg-surface hover:border-border-strong hover:bg-surface-alt active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn text-muted-foreground hover:bg-surface-alt hover:text-foreground;
+  }
+  .btn-danger {
+    @apply btn bg-destructive text-white shadow-sm hover:bg-destructive/90 active:scale-[0.98];
+  }
+  .btn-sm { @apply h-8 px-3 text-xs; }
+  .btn-md { @apply h-10 px-4; }
+
+  /* Segmented control (Dia/Semana etc.) */
+  .segmented {
+    @apply inline-flex items-center gap-0.5 rounded-lg bg-surface-alt p-0.5;
+  }
+  .segmented-item {
+    @apply rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-150 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
+  .segmented-item[aria-pressed='true'],
+  .segmented-item[aria-selected='true'] {
+    @apply bg-surface text-foreground shadow-sm;
+  }
+}
+
 @layer utilities {
   @keyframes fade-in {
     from { opacity: 0; }

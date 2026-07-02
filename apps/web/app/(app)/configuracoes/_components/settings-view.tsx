@@ -174,7 +174,7 @@ function BusinessHoursSection({ initialHours }: { initialHours: DayHours[] }) {
           type="button"
           onClick={save}
           disabled={isPending}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="btn-primary btn-md"
         >
           {isPending ? 'Salvando...' : 'Salvar horários'}
         </button>
@@ -239,7 +239,7 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
           <button
             type="submit"
             disabled={pending}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="btn-primary btn-md"
           >
             {pending ? 'Salvando...' : 'Salvar alterações'}
           </button>
@@ -284,7 +284,7 @@ function ProfessionalsSection({
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="btn-primary btn-md shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           Adicionar profissional
