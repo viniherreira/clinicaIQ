@@ -7,7 +7,7 @@ import {
 } from './constants';
 import { AppointmentBlock } from './appointment-block';
 import { CurrentTimeIndicator } from './current-time-indicator';
-import { isToday, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 interface Professional {
   id: string;
@@ -97,7 +97,8 @@ export function CalendarGrid({
   onAppointmentClick, onSlotClick,
 }: CalendarGridProps) {
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
-  const isCurrentDay = isToday(parseISO(dateStr));
+  // String compare so the "now" line only ever renders on the real today.
+  const isCurrentDay = dateStr === format(new Date(), 'yyyy-MM-dd');
 
   const appointmentsWithColor = appointments.map((apt) => ({
     ...apt,

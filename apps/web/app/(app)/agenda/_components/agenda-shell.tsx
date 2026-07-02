@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, addDays, subDays, parseISO, isToday } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2 } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
@@ -129,7 +129,9 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   }, [currentDate, view, modal.open, detailId]);
 
   const dateLabel = format(parseISO(currentDate), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
-  const todayActive = isToday(parseISO(currentDate));
+  // Plain string compare against the browser's calendar date — immune to
+  // timezone/parse quirks that could make other days read as "today".
+  const todayActive = currentDate === format(new Date(), 'yyyy-MM-dd');
   const hasProfessionals = data.professionals.length > 0;
 
   return (
