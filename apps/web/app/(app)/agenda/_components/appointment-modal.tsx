@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Search, Loader2 } from 'lucide-react';
-import { createAppointment, searchPatients } from '../actions';
+import { createAppointment, updateAppointment, searchPatients } from '../actions';
 import type { AppointmentFormState } from '../actions';
 import { STATUS_LABELS, TYPE_LABELS } from './constants';
 
@@ -27,6 +27,21 @@ interface Patient {
   controlNumber: number;
 }
 
+export interface EditingAppointment {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientControlNumber: number;
+  professionalId: string;
+  procedureId: string | null;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  type: string;
+  status: string;
+  notes: string | null;
+}
+
 interface AppointmentModalProps {
   open: boolean;
   onClose: () => void;
@@ -35,6 +50,9 @@ interface AppointmentModalProps {
   defaultDate: string;
   defaultTime?: string;
   defaultProfessionalId?: string;
+  /** When set, the modal edits this appointment instead of creating one.
+   *  Callers should also key the modal by the appointment id so state resets. */
+  editing?: EditingAppointment | null;
   onSuccess: () => void;
 }
 
@@ -49,10 +67,11 @@ function addMinutesToTime(time: string, minutes: number): string {
 export function AppointmentModal({
   open, onClose, professionals, procedures,
   defaultDate, defaultTime = '08:00', defaultProfessionalId,
+  editing = null,
   onSuccess,
 }: AppointmentModalProps) {
   const [state, formAction, pending] = useActionState<AppointmentFormState | null, FormData>(
-    createAppointment,
+    editing ? updateAppointment.bind(null, editing.id) : createAppointment,
     null,
   );
 
@@ -71,9 +90,23 @@ export function AppointmentModal({
   const [profId, setProfId] = useState(defaultProfessionalId ?? professionals[0]?.id ?? '');
   const [procId, setProcId] = useState('');
 
-  // Reset when modal opens
+  // Reset when modal opens (prefilled from `editing` in edit mode)
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setDate(editing.date);
+      setStartTime(editing.startTime);
+      setEndTime(editing.endTime);
+      setProfId(editing.professionalId);
+      setProcId(editing.procedureId ?? '');
+      setSelectedPatient({
+        id: editing.patientId,
+        name: editing.patientName,
+        controlNumber: editing.patientControlNumber,
+      });
+      setQuery(editing.patientName);
+      setPatients([]);
+    } else {
       setDate(defaultDate);
       setStartTime(defaultTime);
       setEndTime(addMinutesToTime(defaultTime, 30));
@@ -83,7 +116,8 @@ export function AppointmentModal({
       setSelectedPatient(null);
       setPatients([]);
     }
-  }, [open, defaultDate, defaultTime, defaultProfessionalId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing, defaultDate, defaultTime, defaultProfessionalId]);
 
   // Close on success
   useEffect(() => {
@@ -133,10 +167,10 @@ export function AppointmentModal({
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-surface shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-surface shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <Dialog.Title className="text-sm font-semibold text-foreground">
-              Novo agendamento
+              {editing ? 'Editar agendamento' : 'Novo agendamento'}
             </Dialog.Title>
             <Dialog.Close className="rounded p-1 text-muted-foreground hover:bg-surface-alt hover:text-foreground">
               <X className="h-4 w-4" aria-hidden="true" />
@@ -296,7 +330,7 @@ export function AppointmentModal({
                 <select
                   id="type"
                   name="type"
-                  defaultValue="PARTICULAR"
+                  defaultValue={editing?.type ?? 'PARTICULAR'}
                   className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {Object.entries(TYPE_LABELS).map(([v, l]) => (
@@ -309,7 +343,7 @@ export function AppointmentModal({
                 <select
                   id="status"
                   name="status"
-                  defaultValue="SCHEDULED"
+                  defaultValue={editing?.status ?? 'SCHEDULED'}
                   className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {Object.entries(STATUS_LABELS).map(([v, l]) => (
@@ -327,22 +361,25 @@ export function AppointmentModal({
                 name="notes"
                 rows={2}
                 maxLength={500}
+                defaultValue={editing?.notes ?? ''}
                 placeholder="Observações sobre o agendamento..."
                 className="w-full rounded-md border border-border py-2 px-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 
-            {/* WhatsApp */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="sendWhatsApp"
-                value="true"
-                defaultChecked
-                className="accent-primary w-4 h-4"
-              />
-              <span className="text-xs text-foreground">Enviar confirmação por WhatsApp</span>
-            </label>
+            {/* WhatsApp — only offered on creation, editing never re-sends */}
+            {!editing && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="sendWhatsApp"
+                  value="true"
+                  defaultChecked
+                  className="accent-primary w-4 h-4"
+                />
+                <span className="text-xs text-foreground">Enviar confirmação por WhatsApp</span>
+              </label>
+            )}
 
             {/* Footer */}
             <div className="flex justify-end gap-2 pt-2 border-t border-border">

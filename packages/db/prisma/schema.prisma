@@ -61,6 +61,14 @@ enum DiscountType {
   FIXED
 }
 
+enum ToothStatus {
+  TO_TREAT
+  IN_TREATMENT
+  TREATED
+  EXTRACTED
+  MISSING
+}
+
 // ─── Models ──────────────────────────────────────────────
 
 model Tenant {
@@ -88,6 +96,8 @@ model Tenant {
   auditLogs           AuditLog[]
   blockedSlots        BlockedSlot[]
   patientNotes        PatientNote[]
+  toothRecords        ToothRecord[]
+  payments            Payment[]
 
   @@map("tenants")
 }
@@ -147,6 +157,8 @@ model Patient {
   appointments Appointment[]
   quotes       Quote[]
   messages     WhatsAppMessage[]
+  toothRecords ToothRecord[]
+  payments     Payment[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -333,6 +345,7 @@ model Quote {
   patient  Patient           @relation(fields: [patientId], references: [id])
   items    QuoteItem[]
   messages WhatsAppMessage[]
+  payments Payment[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -384,6 +397,45 @@ model WhatsAppMessage {
   @@index([tenantId, patientId, createdAt(sort: Desc)])
   @@index([externalId])
   @@map("whatsapp_messages")
+}
+
+model ToothRecord {
+  id          String      @id @default(cuid())
+  tenantId    String
+  patientId   String
+  toothNumber Int
+  status      ToothStatus
+  note        String?
+  updatedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@unique([patientId, toothNumber])
+  @@index([tenantId, patientId])
+  @@map("tooth_records")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  patientId   String
+  quoteId     String?
+  amount      Decimal  @db.Decimal(10, 2)
+  method      String?
+  notes       String?
+  paidAt      DateTime @default(now())
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  quote   Quote?  @relation(fields: [quoteId], references: [id])
+
+  @@index([tenantId, patientId, paidAt(sort: Desc)])
+  @@map("payments")
 }
 
 model AuditLog {

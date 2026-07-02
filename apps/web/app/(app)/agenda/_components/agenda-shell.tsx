@@ -9,9 +9,10 @@ import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2 } from 'lucide-re
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
-import { AppointmentModal } from './appointment-modal';
+import { AppointmentModal, type EditingAppointment } from './appointment-modal';
 import { AppointmentDetailModal } from './appointment-detail-modal';
 import { getAgendaData } from '../actions';
+import { wallClockTime } from '@/lib/tz';
 
 type AgendaData = Awaited<ReturnType<typeof getAgendaData>>;
 
@@ -37,6 +38,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   const [data, setData] = useState<AgendaData>(initialData);
   const [loading, setLoading] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditingAppointment | null>(null);
   const [modal, setModal] = useState<ModalState>({ open: false, defaultDate: initialDate });
 
   const [visibleProfessionals, setVisibleProfessionals] = useState<Set<string>>(
@@ -75,7 +77,39 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   function goToday() { navigate(format(new Date(), 'yyyy-MM-dd')); }
 
   function openNewModal(professionalId?: string, timeStr?: string) {
+    setEditing(null);
     setModal({ open: true, defaultDate: currentDate, defaultTime: timeStr, defaultProfessionalId: professionalId });
+  }
+
+  interface EditableDetail {
+    id: string;
+    startTime: Date | string;
+    endTime: Date | string;
+    status: string;
+    type: string;
+    notes: string | null;
+    patient: { id: string; name: string; controlNumber: number };
+    professional: { id: string; name: string };
+    procedure: { id: string } | null;
+  }
+
+  function startEdit(detail: EditableDetail) {
+    setDetailId(null);
+    setEditing({
+      id: detail.id,
+      patientId: detail.patient.id,
+      patientName: detail.patient.name,
+      patientControlNumber: detail.patient.controlNumber,
+      professionalId: detail.professional.id,
+      procedureId: detail.procedure?.id ?? null,
+      date: new Date(detail.startTime).toISOString().slice(0, 10),
+      startTime: wallClockTime(detail.startTime),
+      endTime: wallClockTime(detail.endTime),
+      type: detail.type,
+      status: detail.status,
+      notes: detail.notes,
+    });
+    setModal({ open: true, defaultDate: currentDate });
   }
 
   useEffect(() => {
@@ -112,8 +146,8 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   return (
     <>
       <div className="flex h-full overflow-hidden bg-background">
-        {/* Sidebar */}
-        <aside className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4">
+        {/* Sidebar — hidden on small screens; header arrows/mini date nav cover mobile */}
+        <aside className="hidden w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4 lg:flex">
           <MiniCalendar selectedDate={currentDate} onSelect={(d) => navigate(d)} />
           <div className="border-t border-border pt-4">
             <ProfessionalFilter
@@ -127,7 +161,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         {/* Main */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Top bar */}
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-4">
+          <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:px-4">
             <div className="flex items-center gap-0.5">
               <button type="button" onClick={goPrev} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-alt hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Dia anterior (seta esquerda)">
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -215,14 +249,22 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
       </div>
 
       <AppointmentModal
+        key={editing?.id ?? 'new'}
         open={modal.open}
-        onClose={() => setModal((m) => ({ ...m, open: false }))}
+        onClose={() => {
+          setModal((m) => ({ ...m, open: false }));
+          setEditing(null);
+        }}
         professionals={data.professionals}
         procedures={data.procedures}
         defaultDate={modal.defaultDate}
         defaultTime={modal.defaultTime}
         defaultProfessionalId={modal.defaultProfessionalId}
-        onSuccess={refreshData}
+        editing={editing}
+        onSuccess={() => {
+          refreshData();
+          setEditing(null);
+        }}
       />
 
       <AppointmentDetailModal
@@ -230,6 +272,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         appointmentId={detailId}
         onClose={() => setDetailId(null)}
         onChanged={refreshData}
+        onEdit={startEdit}
       />
     </>
   );
