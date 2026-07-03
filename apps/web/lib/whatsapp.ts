@@ -41,6 +41,13 @@ function appUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
 }
 
+/** Meta only accepts business-initiated messages via pre-approved templates.
+ *  While templates aren't approved yet (or when testing inside a 24h session
+ *  window), keep this off to send the formatted body as plain text instead. */
+function templatesEnabled(): boolean {
+  return process.env.WHATSAPP_USE_TEMPLATES === 'true';
+}
+
 function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
@@ -93,7 +100,7 @@ export async function dispatchAppointmentMessage(
   const result = await getWhatsAppProvider().sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    templateName,
+    templateName: templatesEnabled() ? templateName : undefined,
     buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined,
   });
 
@@ -146,7 +153,7 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
   const result = await getWhatsAppProvider().sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    templateName: WHATSAPP_TEMPLATES.quoteSent,
+    templateName: templatesEnabled() ? WHATSAPP_TEMPLATES.quoteSent : undefined,
   });
 
   await prisma.whatsAppMessage.create({
