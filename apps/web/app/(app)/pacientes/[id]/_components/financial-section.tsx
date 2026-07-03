@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from 'reac
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
 import { addPayment, deletePayment, type PaymentFormState } from '../actions';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface PaymentRow {
   id: string;
@@ -43,6 +44,8 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('');
+  const [quoteId, setQuoteId] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<PaymentFormState | null, FormData>(
     addPayment.bind(null, patientId),
@@ -54,6 +57,8 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
     if (state?.success) {
       formRef.current?.reset();
       setAmount('');
+      setMethod('');
+      setQuoteId('');
       setShowForm(false);
       router.refresh();
     }
@@ -117,20 +122,27 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
                 {errors.amount && <p className="text-xs text-destructive">{errors.amount[0]}</p>}
               </div>
               <div className="space-y-1">
-                <label htmlFor="pay-method" className="text-xs font-medium">Forma</label>
-                <select id="pay-method" name="method" className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                  <option value="">—</option>
-                  {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+                <span className="text-xs font-medium" id="pay-method-label">Forma</span>
+                <input type="hidden" name="method" value={method} />
+                <Select value={method || undefined} onValueChange={setMethod}>
+                  <SelectTrigger aria-labelledby="pay-method-label"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
-                <label htmlFor="pay-quote" className="text-xs font-medium">Orçamento</label>
-                <select id="pay-quote" name="quoteId" className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                  <option value="">Sem vínculo</option>
-                  {acceptedQuotes.map((q) => (
-                    <option key={q.id} value={q.id}>ORC-{String(q.number).padStart(4, '0')} · {brl(q.total)}</option>
-                  ))}
-                </select>
+                <span className="text-xs font-medium" id="pay-quote-label">Orçamento</span>
+                <input type="hidden" name="quoteId" value={quoteId} />
+                <Select value={quoteId || '__none__'} onValueChange={(v) => setQuoteId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger aria-labelledby="pay-quote-label"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem vínculo</SelectItem>
+                    {acceptedQuotes.map((q) => (
+                      <SelectItem key={q.id} value={q.id}>ORC-{String(q.number).padStart(4, '0')} · {brl(q.total)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-1">

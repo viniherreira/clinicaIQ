@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Plus, Trash2, Loader2 } from 'lucide-react';
 import { createQuote, updateQuote, searchQuotePatients, type QuoteFormState } from '../actions';
 import { formatBRL, maskBRLInput, brlToNumber } from './constants';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface ProcedureOption {
   id: string;
@@ -188,10 +189,17 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Procedimentos</h2>
             <div className="flex items-center gap-2">
-              <select value={procToAdd} onChange={(e) => e.target.value && addProcedure(e.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Adicionar procedimento">
-                <option value="">+ Adicionar procedimento</option>
-                {procedures.map((p) => <option key={p.id} value={p.id}>{p.name} — {formatBRL(p.basePrice)}</option>)}
-              </select>
+              <Select value={procToAdd || undefined} onValueChange={(v) => addProcedure(v)}>
+                <SelectTrigger className="h-9 w-56 max-w-full" aria-label="Adicionar procedimento">
+                  <SelectValue placeholder="+ Adicionar procedimento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {procedures.length === 0 && <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum procedimento ativo</div>}
+                  {procedures.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} — {formatBRL(p.basePrice)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <button type="button" onClick={addCustom} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-sm hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Item
               </button>
@@ -273,10 +281,13 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Desconto geral</span>
             <div className="flex gap-2">
-              <select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'PERCENT' | 'FIXED')} className="h-10 rounded-md border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Tipo de desconto">
-                <option value="PERCENT">%</option>
-                <option value="FIXED">R$</option>
-              </select>
+              <Select value={discountType} onValueChange={(v) => setDiscountType(v as 'PERCENT' | 'FIXED')}>
+                <SelectTrigger className="w-20 shrink-0" aria-label="Tipo de desconto"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERCENT">%</SelectItem>
+                  <SelectItem value="FIXED">R$</SelectItem>
+                </SelectContent>
+              </Select>
               {discountType === 'PERCENT' ? (
                 <input type="number" min={0} max={100} value={discountValue || ''} onChange={(e) => setDiscountValue(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={inputCls} placeholder="0" aria-label="Valor do desconto em porcentagem" />
               ) : (

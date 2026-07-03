@@ -12,6 +12,7 @@ import type { ProcedureSort } from '../actions';
 import { formatBRL, formatDuration } from './constants';
 import { ProcedureModal, type ProcedureModalData } from './procedure-modal';
 import { CategoryManager } from './category-manager';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface ProcedureRow {
   id: string;
@@ -227,7 +228,6 @@ export function ProceduresView(props: Props) {
     );
   }
 
-  const selectCls = 'rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
   return (
     <div className="space-y-4">
@@ -250,15 +250,21 @@ export function ProceduresView(props: Props) {
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
           <input type="search" value={inputValue} onChange={(e) => updateSearch(e.target.value)} placeholder="Buscar por nome..." aria-label="Buscar procedimento por nome" className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
         </div>
-        <select aria-label="Filtrar por categoria" value={categoryId} onChange={(e) => setParam({ categoria: e.target.value || null })} className={selectCls}>
-          <option value="">Todas as categorias</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select aria-label="Filtrar por situação" value={active} onChange={(e) => setParam({ situacao: e.target.value || null })} className={selectCls}>
-          <option value="">Todas as situações</option>
-          <option value="true">Ativos</option>
-          <option value="false">Inativos</option>
-        </select>
+        <Select value={categoryId || '__all__'} onValueChange={(v) => setParam({ categoria: v === '__all__' ? null : v })}>
+          <SelectTrigger className="w-full sm:w-52" aria-label="Filtrar por categoria"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todas as categorias</SelectItem>
+            {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={active || '__all__'} onValueChange={(v) => setParam({ situacao: v === '__all__' ? null : v })}>
+          <SelectTrigger className="w-full sm:w-40" aria-label="Filtrar por situação"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todas as situações</SelectItem>
+            <SelectItem value="true">Ativos</SelectItem>
+            <SelectItem value="false">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
         {isPending && <span aria-live="polite" className="sr-only">Atualizando...</span>}
       </div>
 

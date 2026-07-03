@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
 import { addQuotePayment, deleteQuotePayment, type QuotePaymentState } from '../actions';
 import { formatBRL, maskBRLInput } from './constants';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface PaymentRow {
   id: string;
@@ -26,6 +27,7 @@ export function QuotePayments({ quoteId, total, payments }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<QuotePaymentState | null, FormData>(
     addQuotePayment.bind(null, quoteId),
@@ -42,6 +44,7 @@ export function QuotePayments({ quoteId, total, payments }: Props) {
     if (state?.success) {
       formRef.current?.reset();
       setAmount('');
+      setMethod('');
       setShowForm(false);
       router.refresh();
     }
@@ -130,11 +133,14 @@ export function QuotePayments({ quoteId, total, payments }: Props) {
               {errors.amount && <p className="text-xs text-destructive">{errors.amount[0]}</p>}
             </div>
             <div className="space-y-1">
-              <label htmlFor="qpay-method" className="text-xs font-medium">Forma</label>
-              <select id="qpay-method" name="method" className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                <option value="">—</option>
-                {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              <span className="text-xs font-medium" id="qpay-method-label">Forma</span>
+              <input type="hidden" name="method" value={method} />
+              <Select value={method || undefined} onValueChange={setMethod}>
+                <SelectTrigger aria-labelledby="qpay-method-label"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <label htmlFor="qpay-notes" className="text-xs font-medium">Observação</label>

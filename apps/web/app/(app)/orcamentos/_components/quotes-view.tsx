@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { Plus, Search, FileText } from 'lucide-react';
 import { QUOTE_STATUS, formatBRL, quoteCode } from './constants';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface QuoteRow {
   id: string;
@@ -51,8 +52,6 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
     debounce.current = setTimeout(() => setParam({ q: v || null }), 300);
   }
 
-  const selectCls = 'rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-6 lg:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -60,7 +59,7 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
           <h1 className="text-2xl font-semibold tracking-tight">Orçamentos</h1>
           <p className="mt-1 text-sm text-muted-foreground">{total} orçamento{total !== 1 ? 's' : ''}</p>
         </div>
-        <Link href="/orcamentos/novo" className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <Link href="/orcamentos/novo" className="btn-primary btn-md">
           <Plus className="h-4 w-4" aria-hidden="true" /> Novo orçamento
         </Link>
       </div>
@@ -70,10 +69,15 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input type="search" value={input} onChange={(e) => onSearch(e.target.value)} placeholder="Buscar por paciente..." aria-label="Buscar orçamento por paciente" className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
         </div>
-        <select aria-label="Filtrar por situação" value={status} onChange={(e) => setParam({ status: e.target.value || null })} className={selectCls}>
-          <option value="">Todas as situações</option>
-          {Object.entries(QUOTE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
+        <Select value={status || '__all__'} onValueChange={(v) => setParam({ status: v === '__all__' ? null : v })}>
+          <SelectTrigger className="w-full sm:w-52" aria-label="Filtrar por situação">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todas as situações</SelectItem>
+            {Object.entries(QUOTE_STATUS).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
         {isPending && <span aria-live="polite" className="sr-only">Atualizando…</span>}
       </div>
 
