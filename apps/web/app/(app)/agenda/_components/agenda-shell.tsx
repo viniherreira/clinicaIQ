@@ -76,9 +76,9 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   function goNext() { navigate(format(addDays(parseISO(currentDate), 1), 'yyyy-MM-dd')); }
   function goToday() { navigate(format(new Date(), 'yyyy-MM-dd')); }
 
-  function openNewModal(professionalId?: string, timeStr?: string) {
+  function openNewModal(professionalId?: string, timeStr?: string, dateOverride?: string) {
     setEditing(null);
-    setModal({ open: true, defaultDate: currentDate, defaultTime: timeStr, defaultProfessionalId: professionalId });
+    setModal({ open: true, defaultDate: dateOverride ?? currentDate, defaultTime: timeStr, defaultProfessionalId: professionalId });
   }
 
   interface EditableDetail {
@@ -205,15 +205,20 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
           {/* Grid / empty state */}
           <div className="flex-1 overflow-auto overscroll-contain bg-surface">
             {hasProfessionals ? (
-              <CalendarGrid
-                dateStr={currentDate}
-                professionals={data.professionals}
-                appointments={data.appointments}
-                visibleProfessionals={visibleProfessionals}
-                mode={mode}
-                onAppointmentClick={(id) => setDetailId(id)}
-                onSlotClick={(professionalId, _dateStr, timeStr) => openNewModal(professionalId, timeStr)}
-              />
+              <>
+                <CalendarGrid
+                  dateStr={currentDate}
+                  view={view}
+                  professionals={data.professionals}
+                  appointments={data.appointments}
+                  visibleProfessionals={visibleProfessionals}
+                  mode={mode}
+                  onAppointmentClick={(id) => setDetailId(id)}
+                  onSlotClick={(professionalId, slotDate, timeStr) => openNewModal(professionalId, timeStr, slotDate)}
+                  onDayClick={(d) => navigate(d, 'day')}
+                />
+                <div className="h-10" aria-hidden="true" />
+              </>
             ) : (
               <div className="flex h-full flex-col items-center justify-center px-6 text-center">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">

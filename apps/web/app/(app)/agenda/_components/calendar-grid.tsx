@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback } from 'react';
+import { addDays, format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   GRID_START_HOUR, GRID_END_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES,
   TOTAL_HEIGHT_PX,
 } from './constants';
 import { AppointmentBlock } from './appointment-block';
 import { CurrentTimeIndicator } from './current-time-indicator';
-import { format } from 'date-fns';
 
 interface Professional {
   id: string;
@@ -28,12 +29,15 @@ interface Appointment {
 
 interface CalendarGridProps {
   dateStr: string;
+  view: 'day' | 'week';
   professionals: Professional[];
   appointments: Appointment[];
   visibleProfessionals: Set<string>;
   mode: 'grouped' | 'sidebyside';
   onAppointmentClick: (id: string) => void;
   onSlotClick?: (professionalId: string, dateStr: string, timeStr: string) => void;
+  /** Week view: clicking a day header opens that day. */
+  onDayClick?: (dateStr: string) => void;
 }
 
 const HOUR_PX = (60 / SLOT_MINUTES) * SLOT_HEIGHT_PX;
@@ -53,11 +57,14 @@ function TimeColumn() {
   const hours: React.ReactNode[] = [];
   for (let h = GRID_START_HOUR; h <= GRID_END_HOUR; h++) {
     const top = ((h - GRID_START_HOUR) * 60 / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+    // Clamp first/last labels inside the column so they don't get clipped by
+    // the sticky header above or the scroll edge below.
+    const labelTop = h === GRID_START_HOUR ? top + 3 : h === GRID_END_HOUR ? top - 16 : top - 7;
     hours.push(
       <span
         key={h}
         className="absolute right-2.5 select-none font-mono text-[10px] font-medium tabular-nums text-muted-foreground"
-        style={{ top: top - 7 }}
+        style={{ top: labelTop }}
         aria-hidden="true"
       >
         {String(h).padStart(2, '0')}:00
@@ -71,7 +78,7 @@ function TimeColumn() {
   );
 }
 
-function ColumnHeader({ prof }: { prof: Professional }) {
+function ProfessionalHeader({ prof }: { prof: Professional }) {
   return (
     <div
       className="sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-l border-border bg-surface/95 px-2 backdrop-blur-sm"
@@ -93,20 +100,21 @@ function ColumnHeader({ prof }: { prof: Professional }) {
 }
 
 export function CalendarGrid({
-  dateStr, professionals, appointments, visibleProfessionals, mode,
-  onAppointmentClick, onSlotClick,
+  dateStr, view, professionals, appointments, visibleProfessionals, mode,
+  onAppointmentClick, onSlotClick, onDayClick,
 }: CalendarGridProps) {
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
-  // String compare so the "now" line only ever renders on the real today.
-  const isCurrentDay = dateStr === format(new Date(), 'yyyy-MM-dd');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-  const appointmentsWithColor = appointments.map((apt) => ({
-    ...apt,
-    professionalColor: professionals.find((p) => p.id === apt.professional.id)?.color,
-  }));
+  const appointmentsWithColor = appointments
+    .filter((a) => visibleProfessionals.has(a.professional.id))
+    .map((apt) => ({
+      ...apt,
+      professionalColor: professionals.find((p) => p.id === apt.professional.id)?.color,
+    }));
 
   const handleSlotClick = useCallback(
-    (professionalId: string, e: React.MouseEvent<HTMLElement>) => {
+    (professionalId: string, slotDate: string, e: React.MouseEvent<HTMLElement>) => {
       if (!onSlotClick) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const y = Math.max(0, e.clientY - rect.top);
@@ -114,10 +122,76 @@ export function CalendarGrid({
       const hours = GRID_START_HOUR + Math.floor(minutes / 60);
       const mins = minutes % 60;
       const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-      onSlotClick(professionalId, dateStr, timeStr);
+      onSlotClick(professionalId, slotDate, timeStr);
     },
-    [onSlotClick, dateStr]
+    [onSlotClick]
   );
+
+  // ── Week view: 7 day columns (Mon–Sun), appointments grouped by day ──
+  if (view === 'week') {
+    const base = parseISO(dateStr);
+    const monday = addDays(base, -((base.getDay() + 6) % 7));
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(monday, i);
+      return { iso: format(d, 'yyyy-MM-dd'), date: d };
+    });
+    const singleProf = visibleProfs.length === 1 ? visibleProfs[0] : null;
+
+    return (
+      <div className="flex min-w-max">
+        <div className="sticky left-0 z-40 bg-surface">
+          <div className="sticky top-0 z-50 border-b border-border bg-surface" style={{ height: HEADER_H }} />
+          <TimeColumn />
+        </div>
+
+        {days.map(({ iso, date }) => {
+          const isToday = iso === todayStr;
+          const dayApts = appointmentsWithColor.filter(
+            (a) => new Date(a.startTime).toISOString().slice(0, 10) === iso,
+          );
+          return (
+            <div key={iso} className="w-44 min-w-36 flex-1">
+              <button
+                type="button"
+                onClick={() => onDayClick?.(iso)}
+                className="sticky top-0 z-30 flex w-full items-center justify-center gap-1.5 border-b border-l border-border bg-surface/95 px-2 backdrop-blur-sm transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                style={{ height: HEADER_H }}
+                aria-label={`Abrir ${format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}`}
+              >
+                <span className={`text-xs font-medium capitalize ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {format(date, 'EEEEEE', { locale: ptBR }).replace('.', '')}
+                </span>
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+                    isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                  }`}
+                >
+                  {date.getDate()}
+                </span>
+              </button>
+              <div className="relative border-l border-border" style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}>
+                {onSlotClick && singleProf && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleSlotClick(singleProf.id, iso, e)}
+                    className="absolute inset-0 w-full cursor-pointer transition-colors hover:bg-primary/[0.04] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    aria-label={`Criar agendamento em ${format(date, 'dd/MM')}`}
+                  />
+                )}
+                {isToday && <CurrentTimeIndicator />}
+                {dayApts.map((apt) => (
+                  <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Day view ──────────────────────────────────────────────────────────
+  const isCurrentDay = dateStr === todayStr;
 
   if (mode === 'sidebyside') {
     return (
@@ -131,15 +205,12 @@ export function CalendarGrid({
           const profApts = appointmentsWithColor.filter((a) => a.professional.id === prof.id);
           return (
             <div key={prof.id} className="w-56 min-w-44 flex-1">
-              <ColumnHeader prof={prof} />
-              <div
-                className="group/col relative border-l border-border"
-                style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}
-              >
+              <ProfessionalHeader prof={prof} />
+              <div className="relative border-l border-border" style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}>
                 {onSlotClick && (
                   <button
                     type="button"
-                    onClick={(e) => handleSlotClick(prof.id, e)}
+                    onClick={(e) => handleSlotClick(prof.id, dateStr, e)}
                     className="absolute inset-0 w-full cursor-pointer transition-colors hover:bg-primary/[0.04] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                     aria-label={`Criar agendamento para ${prof.name}`}
                   />
@@ -160,7 +231,7 @@ export function CalendarGrid({
   return (
     <div className="flex">
       <div className="sticky left-0 z-40 bg-surface">
-        <div className="border-b border-border bg-surface" style={{ height: HEADER_H }} />
+        <div className="sticky top-0 z-50 border-b border-border bg-surface" style={{ height: HEADER_H }} />
         <TimeColumn />
       </div>
       <div className="min-w-0 flex-1">
@@ -179,17 +250,15 @@ export function CalendarGrid({
           {onSlotClick && visibleProfs.length === 1 && (
             <button
               type="button"
-              onClick={(e) => handleSlotClick(visibleProfs[0].id, e)}
+              onClick={(e) => handleSlotClick(visibleProfs[0].id, dateStr, e)}
               className="absolute inset-0 w-full cursor-pointer transition-colors hover:bg-primary/[0.04] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
               aria-label="Criar agendamento"
             />
           )}
           {isCurrentDay && <CurrentTimeIndicator />}
-          {appointmentsWithColor
-            .filter((a) => visibleProfessionals.has(a.professional.id))
-            .map((apt) => (
-              <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
-            ))}
+          {appointmentsWithColor.map((apt) => (
+            <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
+          ))}
         </div>
       </div>
     </div>
