@@ -169,7 +169,10 @@ export function CalendarGrid({
                   {date.getDate()}
                 </span>
               </button>
-              <div className="relative border-l border-border" style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}>
+              <div
+                className={`relative border-l border-border ${isToday ? 'bg-primary/[0.03]' : ''}`}
+                style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}
+              >
                 {onSlotClick && singleProf && (
                   <button
                     type="button"

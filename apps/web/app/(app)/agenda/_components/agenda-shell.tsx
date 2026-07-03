@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -171,10 +171,23 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
               </button>
             </div>
 
-            <h1 className="min-w-0 flex-1 truncate text-sm font-semibold capitalize text-foreground" aria-live="polite">
-              {dateLabel}
-              {loading && <span className="ml-2 text-xs font-normal text-muted-foreground" aria-hidden="true">carregando…</span>}
-            </h1>
+            {/* Date — own centered row on mobile (tap opens the native picker),
+                inline on desktop. */}
+            <div className="relative order-last min-w-full text-center sm:order-none sm:min-w-0 sm:flex-1 sm:text-left">
+              <h1 className="inline-flex items-center gap-1.5 text-[15px] font-semibold capitalize text-foreground sm:text-sm" aria-live="polite">
+                <CalendarDays className="h-4 w-4 text-primary sm:hidden" aria-hidden="true" />
+                <span className="sm:hidden">{format(parseISO(currentDate), 'EEEE, dd/MM/yyyy', { locale: ptBR })}</span>
+                <span className="hidden sm:inline">{dateLabel}</span>
+                {loading && <span className="text-xs font-normal text-muted-foreground" aria-hidden="true">…</span>}
+              </h1>
+              <input
+                type="date"
+                value={currentDate}
+                onChange={(e) => e.target.value && navigate(e.target.value)}
+                aria-label="Escolher data"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:hidden"
+              />
+            </div>
 
             <div className="segmented" role="group" aria-label="Modo de visualização">
               <button type="button" onClick={() => navigate(currentDate, 'day')} className="segmented-item" aria-pressed={view === 'day'}>Dia</button>

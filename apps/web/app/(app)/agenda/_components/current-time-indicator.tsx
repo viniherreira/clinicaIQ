@@ -27,8 +27,8 @@ export function CurrentTimeIndicator() {
       className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
       style={{ top }}
     >
-      <div className="h-2 w-2 rounded-full bg-red-500 -ml-1 shrink-0" />
-      <div className="h-px flex-1 bg-red-500" />
+      <div className="-ml-1 h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 shadow-sm" />
+      <div className="h-[2px] flex-1 rounded-full bg-red-500/90" />
     </div>
   );
 }
