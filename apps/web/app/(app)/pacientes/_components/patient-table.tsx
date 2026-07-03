@@ -206,7 +206,33 @@ export function PatientTable({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: card list (table below sm gets unusable) */}
+          <ul className="divide-y divide-border sm:hidden">
+            {patients.map((patient) => (
+              <li key={patient.id} className="flex items-center gap-3 p-3">
+                <Link
+                  href={`/pacientes/${patient.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <PatientAvatar name={patient.name} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">{patient.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      Nº {String(patient.controlNumber).padStart(4, '0')} · {formatPhone(patient.phone)}
+                    </span>
+                    <span className="mt-1 block">
+                      <PatientStatusBadge active={patient.active} />
+                    </span>
+                  </span>
+                </Link>
+                <DropdownMenu patient={patient} />
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop: full table */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Lista de pacientes — {total} no total</caption>
               <thead>
@@ -254,6 +280,7 @@ export function PatientTable({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

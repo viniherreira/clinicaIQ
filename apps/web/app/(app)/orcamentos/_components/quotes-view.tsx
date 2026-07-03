@@ -93,7 +93,44 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: card list */}
+          <ul className="divide-y divide-border sm:hidden">
+            {quotes.map((q) => {
+              const meta = QUOTE_STATUS[q.status] ?? QUOTE_STATUS.DRAFT;
+              return (
+                <li key={q.id}>
+                  <Link
+                    href={`/orcamentos/${q.id}`}
+                    className="flex items-start justify-between gap-3 p-3 transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <span className="min-w-0">
+                      <span className="font-mono text-xs font-medium text-primary">{quoteCode(q.number)}</span>
+                      <span className="block truncate text-sm font-medium text-foreground">{q.patient.name}</span>
+                      <span className="mt-1 block">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${meta.bg} ${meta.text}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+                          {meta.label}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-semibold tabular-nums">{formatBRL(q.total)}</span>
+                      {q.total > 0 && q.paid >= q.total ? (
+                        <span className="block text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ Pago</span>
+                      ) : q.paid > 0 ? (
+                        <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">Parcial · {formatBRL(q.paid)}</span>
+                      ) : null}
+                      <span className="mt-0.5 block text-xs text-muted-foreground">até {format(new Date(q.validUntil), 'dd/MM/yy')}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Desktop: full table */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Lista de orçamentos</caption>
               <thead>
@@ -146,6 +183,7 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
