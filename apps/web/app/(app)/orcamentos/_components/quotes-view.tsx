@@ -12,6 +12,7 @@ interface QuoteRow {
   number: number;
   status: string;
   total: number;
+  paid: number;
   validUntil: Date | string;
   createdAt: Date | string;
   patient: { name: string };
@@ -119,7 +120,16 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{format(new Date(q.createdAt), 'dd/MM/yyyy')}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{format(new Date(q.validUntil), 'dd/MM/yyyy')}</td>
-                      <td className="px-4 py-3 text-right font-medium tabular-nums">{formatBRL(q.total)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-medium tabular-nums">{formatBRL(q.total)}</span>
+                        {q.total > 0 && q.paid >= q.total ? (
+                          <span className="mt-0.5 block text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ Pago</span>
+                        ) : q.paid > 0 ? (
+                          <span className="mt-0.5 block text-xs font-medium text-amber-700 dark:text-amber-400">
+                            Parcial · {formatBRL(q.paid)}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.bg} ${meta.text}`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />

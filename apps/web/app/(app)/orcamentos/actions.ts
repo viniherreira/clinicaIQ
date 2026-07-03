@@ -101,13 +101,19 @@ export async function listQuotes({
         createdAt: true,
         patient: { select: { name: true } },
         _count: { select: { items: true } },
+        payments: { select: { amount: true } },
       },
     }),
     db.quote.count({ where }),
   ]);
 
   return {
-    quotes: quotes.map((q) => ({ ...q, total: Number(q.total) })),
+    quotes: quotes.map((q) => ({
+      ...q,
+      total: Number(q.total),
+      paid: q.payments.reduce((s, p) => s + Number(p.amount), 0),
+      payments: undefined,
+    })),
     total,
     pages: Math.ceil(total / PAGE_SIZE),
   };
@@ -123,6 +129,7 @@ export async function getQuote(id: string) {
     include: {
       patient: { select: { id: true, name: true, controlNumber: true } },
       items: { orderBy: { id: 'asc' } },
+      payments: { orderBy: { paidAt: 'desc' } },
     },
   });
   if (!quote) return null;
@@ -136,6 +143,13 @@ export async function getQuote(id: string) {
       unitPrice: Number(it.unitPrice),
       discountPercent: Number(it.discountPercent ?? 0),
       total: Number(it.total),
+    })),
+    payments: quote.payments.map((p) => ({
+      id: p.id,
+      amount: Number(p.amount),
+      method: p.method,
+      notes: p.notes,
+      paidAt: p.paidAt,
     })),
   };
 }
@@ -348,6 +362,87 @@ export async function sendQuote(id: string): Promise<{ ok: boolean; message?: st
   revalidatePath('/orcamentos');
   revalidatePath(`/orcamentos/${id}`);
   return { ok: true };
+}
+
+/** Transitions a DRAFT quote to SENT (no message dispatch) — used when the
+ *  clinic shares the public link/PDF manually instead of sending via WhatsApp. */
+export async function markQuoteSent(id: string): Promise<{ ok: boolean }> {
+  const { tenantId, userId } = await requireTenant();
+  const quote = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
+  if (!quote) return { ok: false };
+  if (quote.status !== 'DRAFT') return { ok: true };
+
+  await prisma.quote.update({
+    where: { id, tenantId },
+    data: { status: 'SENT', sentAt: new Date(), updatedById: userId },
+  });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'MARK_SENT', entity: 'Quote', entityId: id },
+  });
+  revalidatePath('/orcamentos');
+  revalidatePath(`/orcamentos/${id}`);
+  return { ok: true };
+}
+
+// ─── Pagamentos do orçamento ───────────────────────────────────────────────────
+
+const quotePaymentSchema = z.object({
+  amount: z.string().transform(parseBRL).refine((v) => v > 0, { message: 'Valor obrigatório' }),
+  method: z.string().trim().max(40).optional().or(z.literal('')),
+  notes: z.string().trim().max(300).optional().or(z.literal('')),
+});
+
+export type QuotePaymentState =
+  | { success: true }
+  | { success: false; errors: Record<string, string[]> };
+
+export async function addQuotePayment(
+  quoteId: string,
+  _prev: QuotePaymentState | null,
+  formData: FormData,
+): Promise<QuotePaymentState> {
+  const { tenantId, userId } = await requireTenant();
+  const parsed = quotePaymentSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) {
+    return { success: false, errors: parsed.error.flatten().fieldErrors };
+  }
+
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, tenantId },
+    select: { id: true, patientId: true },
+  });
+  if (!quote) return { success: false, errors: { amount: ['Orçamento não encontrado'] } };
+
+  const payment = await prisma.payment.create({
+    data: {
+      tenantId,
+      patientId: quote.patientId,
+      quoteId: quote.id,
+      amount: parsed.data.amount,
+      method: parsed.data.method || null,
+      notes: parsed.data.notes || null,
+      createdById: userId,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'CREATE', entity: 'Payment', entityId: payment.id },
+  });
+
+  revalidatePath(`/orcamentos/${quoteId}`);
+  revalidatePath('/orcamentos');
+  revalidatePath(`/pacientes/${quote.patientId}`);
+  return { success: true };
+}
+
+export async function deleteQuotePayment(paymentId: string, quoteId: string) {
+  const { tenantId, userId } = await requireTenant();
+  await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
+  });
+  revalidatePath(`/orcamentos/${quoteId}`);
+  revalidatePath('/orcamentos');
 }
 
 export async function deleteQuote(id: string) {

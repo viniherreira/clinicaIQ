@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { ChevronLeft } from 'lucide-react';
 import { getQuote } from '../actions';
 import { QuoteDetailActions } from '../_components/quote-detail-actions';
+import { QuotePayments } from '../_components/quote-payments';
 import { QUOTE_STATUS, formatBRL, quoteCode } from '../_components/constants';
 
 export const metadata = { title: 'Orçamento · ClinicaIQ' };
@@ -78,6 +79,8 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
           <div className="flex justify-between border-t border-border pt-2 text-base font-semibold"><span>Total</span><span className="tabular-nums text-primary">{formatBRL(Number(quote.total))}</span></div>
         </div>
       </section>
+
+      <QuotePayments quoteId={quote.id} total={Number(quote.total)} payments={quote.payments} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-4 text-sm">
