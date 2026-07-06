@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import { z } from 'zod';
 import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO,
@@ -208,27 +209,31 @@ export async function createAppointment(
   });
 
   if (sendWhatsApp) {
-    // Immediate "created" notice — sent directly so it works without a running
-    // worker; the dispatcher persists the WhatsAppMessage row.
-    try {
-      const { dispatchAppointmentMessage } = await import('@/lib/whatsapp');
-      await dispatchAppointmentMessage(appointment.id, 'created');
-    } catch {}
+    // Fire the outbound WhatsApp work *after* the response is flushed so a slow
+    // Meta API call never blocks saving the appointment. On Vercel the function
+    // stays alive to finish `after()` callbacks.
+    after(async () => {
+      // Immediate "created" notice — the dispatcher persists the WhatsAppMessage row.
+      try {
+        const { dispatchAppointmentMessage } = await import('@/lib/whatsapp');
+        await dispatchAppointmentMessage(appointment.id, 'created');
+      } catch {}
 
-    // 24h confirmation reminder — needs scheduling, so it goes through the queue
-    // (best-effort: a no-op in dev when Redis/worker are absent).
-    try {
-      const { appointmentQueue } = await import('@/lib/queue');
-      const reminderTime = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-      const delay = Math.max(0, reminderTime.getTime() - Date.now());
-      if (delay > 0) {
-        await appointmentQueue.add(
-          'whatsapp-reminder-24h',
-          { type: 'whatsapp-reminder-24h', appointmentId: appointment.id, tenantId },
-          { delay },
-        );
-      }
-    } catch {}
+      // 24h confirmation reminder — needs scheduling, so it goes through the queue
+      // (best-effort: a no-op in dev when Redis/worker are absent).
+      try {
+        const { appointmentQueue } = await import('@/lib/queue');
+        const reminderTime = new Date(start.getTime() - 24 * 60 * 60 * 1000);
+        const delay = Math.max(0, reminderTime.getTime() - Date.now());
+        if (delay > 0) {
+          await appointmentQueue.add(
+            'whatsapp-reminder-24h',
+            { type: 'whatsapp-reminder-24h', appointmentId: appointment.id, tenantId },
+            { delay },
+          );
+        }
+      } catch {}
+    });
   }
 
   revalidatePath('/agenda');
