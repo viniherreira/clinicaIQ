@@ -5,18 +5,26 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
 import { AppointmentModal, type EditingAppointment } from './appointment-modal';
 import { AppointmentDetailModal } from './appointment-detail-modal';
-import { getAgendaData } from '../actions';
+import { BlockSlotModal } from './block-slot-modal';
+import { getAgendaData, deleteBlockedSlot } from '../actions';
 import { wallClockTime } from '@/lib/tz';
 
 type AgendaData = Awaited<ReturnType<typeof getAgendaData>>;
 
 interface ModalState {
+  open: boolean;
+  defaultDate: string;
+  defaultTime?: string;
+  defaultProfessionalId?: string;
+}
+
+interface BlockModalState {
   open: boolean;
   defaultDate: string;
   defaultTime?: string;
@@ -40,6 +48,9 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditingAppointment | null>(null);
   const [modal, setModal] = useState<ModalState>({ open: false, defaultDate: initialDate });
+  const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, defaultDate: initialDate });
+  const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const [visibleProfessionals, setVisibleProfessionals] = useState<Set<string>>(
     () => new Set(initialData.professionals.map((p) => p.id)),
@@ -79,6 +90,18 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   function openNewModal(professionalId?: string, timeStr?: string, dateOverride?: string) {
     setEditing(null);
     setModal({ open: true, defaultDate: dateOverride ?? currentDate, defaultTime: timeStr, defaultProfessionalId: professionalId });
+  }
+
+  async function confirmRemoveBlock() {
+    if (!removingBlockId) return;
+    setRemoving(true);
+    try {
+      await deleteBlockedSlot(removingBlockId);
+      setRemovingBlockId(null);
+      await refreshData();
+    } finally {
+      setRemoving(false);
+    }
   }
 
   interface EditableDetail {
@@ -205,6 +228,18 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
 
             <button
               type="button"
+              onClick={() => setBlockModal({ open: true, defaultDate: currentDate })}
+              disabled={!hasProfessionals}
+              className="btn-outline btn-sm !h-9 sm:px-3"
+              aria-label="Bloquear horário"
+              title="Bloquear horário (almoço, férias, feriado)"
+            >
+              <Lock className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Bloquear</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => openNewModal()}
               className="btn-primary btn-sm !h-9 sm:px-3.5"
               aria-label="Novo agendamento (N)"
@@ -224,9 +259,12 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
                   view={view}
                   professionals={data.professionals}
                   appointments={data.appointments}
+                  blockedSlots={data.blockedSlots}
+                  workingHours={data.workingHours}
                   visibleProfessionals={visibleProfessionals}
                   mode={mode}
                   onAppointmentClick={(id) => setDetailId(id)}
+                  onBlockedSlotClick={(id) => setRemovingBlockId(id)}
                   onSlotClick={(professionalId, slotDate, timeStr) => openNewModal(professionalId, timeStr, slotDate)}
                   onDayClick={(d) => navigate(d, 'day')}
                 />
@@ -280,6 +318,37 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         onChanged={refreshData}
         onEdit={startEdit}
       />
+
+      <BlockSlotModal
+        open={blockModal.open}
+        onClose={() => setBlockModal((m) => ({ ...m, open: false }))}
+        professionals={data.professionals}
+        defaultDate={blockModal.defaultDate}
+        defaultTime={blockModal.defaultTime}
+        defaultProfessionalId={blockModal.defaultProfessionalId}
+        onSuccess={() => {
+          setBlockModal((m) => ({ ...m, open: false }));
+          refreshData();
+        }}
+      />
+
+      {removingBlockId && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" onClick={() => !removing && setRemovingBlockId(null)} aria-hidden="true" />
+          <div role="alertdialog" aria-modal="true" aria-labelledby="rm-block-title" className="relative z-10 w-full max-w-sm rounded-t-2xl border border-border bg-surface p-6 shadow-2xl sm:rounded-2xl">
+            <h2 id="rm-block-title" className="text-base font-semibold">Remover bloqueio?</h2>
+            <p className="mt-1 text-sm text-muted-foreground">O horário volta a ficar disponível para agendamento.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={removing} onClick={() => setRemovingBlockId(null)} className="h-10 rounded-md border border-border px-4 text-sm font-medium hover:bg-surface-alt transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                Cancelar
+              </button>
+              <button type="button" disabled={removing} onClick={confirmRemoveBlock} className="h-10 rounded-md bg-destructive px-4 text-sm font-medium text-white hover:bg-destructive/90 transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                {removing ? 'Removendo…' : 'Remover'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

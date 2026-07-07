@@ -11,6 +11,7 @@ import {
   type DayHours,
 } from '../actions';
 import { ProfessionalModal, type ProfessionalModalData } from './professional-modal';
+import { ScheduleModal } from './schedule-modal';
 
 interface Professional {
   id: string;
@@ -264,6 +265,7 @@ function ProfessionalsSection({
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProfessionalModalData | null>(null);
+  const [scheduleFor, setScheduleFor] = useState<{ id: string; name: string } | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -312,7 +314,13 @@ function ProfessionalsSection({
       ) : (
         <ul className="divide-y divide-border">
           {professionals.map((p) => (
-            <ProfessionalRow key={p.id} professional={p} onEdit={() => openEdit(p)} onChanged={() => router.refresh()} />
+            <ProfessionalRow
+              key={p.id}
+              professional={p}
+              onEdit={() => openEdit(p)}
+              onSchedule={() => setScheduleFor({ id: p.id, name: p.name })}
+              onChanged={() => router.refresh()}
+            />
           ))}
         </ul>
       )}
@@ -327,6 +335,17 @@ function ProfessionalsSection({
         professional={editing}
         defaultColor={editing?.color ?? suggestedColor}
       />
+
+      <ScheduleModal
+        open={!!scheduleFor}
+        professionalId={scheduleFor?.id ?? null}
+        professionalName={scheduleFor?.name ?? ''}
+        onClose={() => setScheduleFor(null)}
+        onSaved={() => {
+          setScheduleFor(null);
+          router.refresh();
+        }}
+      />
     </section>
   );
 }
@@ -334,10 +353,12 @@ function ProfessionalsSection({
 function ProfessionalRow({
   professional,
   onEdit,
+  onSchedule,
   onChanged,
 }: {
   professional: Professional;
   onEdit: () => void;
+  onSchedule: () => void;
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -396,6 +417,15 @@ function ProfessionalRow({
         </div>
       ) : (
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onSchedule}
+            aria-label={`Horários de ${professional.name}`}
+            title="Horário de atendimento"
+            className="rounded-md p-2 text-muted-foreground hover:bg-surface-alt hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          </button>
           <button
             type="button"
             onClick={onEdit}

@@ -266,6 +266,112 @@ export async function updateBusinessHours(hours: DayHours[]): Promise<{ ok: bool
   return { ok: true };
 }
 
+// ─── Professional working hours ────────────────────────────────────────────────
+
+export interface ProfessionalDay {
+  dayOfWeek: number; // 0..6 Sunday..Saturday
+  work: boolean;
+  start: string;
+  end: string;
+  lunchStart: string;
+  lunchEnd: string;
+}
+
+const HHMM = /^\d{2}:\d{2}$/;
+
+/** Reads the saved weekly schedule for a professional as a full 7-day array
+ *  (unset days come back as `work: false`), ready for the editor. */
+export async function getProfessionalSchedule(professionalId: string): Promise<ProfessionalDay[]> {
+  const { tenantId } = await requireOwner();
+  // Ensure the professional belongs to the tenant before exposing anything.
+  const prof = await prisma.professional.findFirst({
+    where: { id: professionalId, tenantId },
+    select: { id: true },
+  });
+  if (!prof) return [];
+
+  const rows = await prisma.professionalSchedule.findMany({
+    where: { professionalId },
+  });
+  const byDay = new Map(rows.map((r) => [r.dayOfWeek, r]));
+
+  return Array.from({ length: 7 }, (_, dayOfWeek) => {
+    const r = byDay.get(dayOfWeek);
+    return {
+      dayOfWeek,
+      work: !!r,
+      start: r?.startTime ?? '08:00',
+      end: r?.endTime ?? '18:00',
+      lunchStart: r?.lunchStart ?? '',
+      lunchEnd: r?.lunchEnd ?? '',
+    };
+  });
+}
+
+/** Replaces a professional's weekly schedule: upserts working days, removes the
+ *  rest. Empty result ⇒ the agenda falls back to the clinic business hours. */
+export async function updateProfessionalSchedule(
+  professionalId: string,
+  days: ProfessionalDay[],
+): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const prof = await prisma.professional.findFirst({
+    where: { id: professionalId, tenantId },
+    select: { id: true },
+  });
+  if (!prof) return { ok: false, message: 'Profissional não encontrado.' };
+
+  if (!Array.isArray(days)) return { ok: false, message: 'Dados inválidos.' };
+
+  for (const d of days) {
+    if (!d.work) continue;
+    if (!HHMM.test(d.start) || !HHMM.test(d.end) || d.end <= d.start) {
+      return { ok: false, message: 'Horário de atendimento inválido.' };
+    }
+    const hasLunch = d.lunchStart && d.lunchEnd;
+    if (hasLunch && (!HHMM.test(d.lunchStart) || !HHMM.test(d.lunchEnd) || d.lunchEnd <= d.lunchStart)) {
+      return { ok: false, message: 'Horário de almoço inválido.' };
+    }
+  }
+
+  const working = days.filter((d) => d.work && d.dayOfWeek >= 0 && d.dayOfWeek <= 6);
+  const workingDayNumbers = working.map((d) => d.dayOfWeek);
+
+  await prisma.$transaction([
+    prisma.professionalSchedule.deleteMany({
+      where: { professionalId, dayOfWeek: { notIn: workingDayNumbers.length ? workingDayNumbers : [-1] } },
+    }),
+    ...working.map((d) =>
+      prisma.professionalSchedule.upsert({
+        where: { professionalId_dayOfWeek: { professionalId, dayOfWeek: d.dayOfWeek } },
+        create: {
+          professionalId,
+          dayOfWeek: d.dayOfWeek,
+          startTime: d.start,
+          endTime: d.end,
+          lunchStart: d.lunchStart || null,
+          lunchEnd: d.lunchEnd || null,
+        },
+        update: {
+          startTime: d.start,
+          endTime: d.end,
+          lunchStart: d.lunchStart || null,
+          lunchEnd: d.lunchEnd || null,
+        },
+      }),
+    ),
+  ]);
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'UPDATE_SCHEDULE', entity: 'Professional', entityId: professionalId },
+  });
+
+  revalidatePath('/configuracoes');
+  revalidatePath('/agenda');
+  return { ok: true };
+}
+
 export async function deleteProfessional(
   id: string,
 ): Promise<{ ok: boolean; message?: string }> {

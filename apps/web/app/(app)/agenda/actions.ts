@@ -10,6 +10,7 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
+import type { WeekSchedule } from '@/lib/schedule';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -78,7 +79,80 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     basePrice: Number(p.basePrice),
   }));
 
-  return { appointments, blockedSlots, professionals: professionalsWithColor, procedures: serializedProcedures };
+  const workingHours = await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id));
+
+  return {
+    appointments,
+    blockedSlots,
+    professionals: professionalsWithColor,
+    procedures: serializedProcedures,
+    workingHours,
+  };
+}
+
+// ─── Working hours ─────────────────────────────────────────────────────────────
+
+interface DayHoursLike { open: boolean; start: string; end: string }
+
+function isDayHoursLike(v: unknown): v is DayHoursLike {
+  return (
+    !!v && typeof v === 'object' &&
+    typeof (v as DayHoursLike).open === 'boolean' &&
+    typeof (v as DayHoursLike).start === 'string' &&
+    typeof (v as DayHoursLike).end === 'string'
+  );
+}
+
+/** Reads the clinic-wide business hours (settings JSON) as a 7-day fallback. */
+function readBusinessWeek(settings: Record<string, unknown>): WeekSchedule {
+  const bh = settings.businessHours;
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = Array.isArray(bh) ? bh[i] : undefined;
+    if (isDayHoursLike(day) && day.open) return { start: day.start, end: day.end };
+    return null;
+  });
+}
+
+/**
+ * Effective weekly working hours per professional. A professional with saved
+ * `ProfessionalSchedule` rows uses them (days without a row = closed); otherwise
+ * it falls back to the clinic's business hours. Index 0..6 = Sunday..Saturday.
+ */
+async function buildWorkingHoursMap(
+  tenantId: string,
+  professionalIds: string[],
+): Promise<Record<string, WeekSchedule>> {
+  if (professionalIds.length === 0) return {};
+
+  const [schedules, tenant] = await Promise.all([
+    prisma.professionalSchedule.findMany({
+      where: { professionalId: { in: professionalIds }, professional: { tenantId } },
+    }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
+  ]);
+
+  const businessWeek = readBusinessWeek((tenant?.settings ?? {}) as Record<string, unknown>);
+
+  const byProf = new Map<string, WeekSchedule>();
+  for (const s of schedules) {
+    let week = byProf.get(s.professionalId);
+    if (!week) {
+      week = Array.from({ length: 7 }, () => null);
+      byProf.set(s.professionalId, week);
+    }
+    week[s.dayOfWeek] = {
+      start: s.startTime,
+      end: s.endTime,
+      lunchStart: s.lunchStart,
+      lunchEnd: s.lunchEnd,
+    };
+  }
+
+  const map: Record<string, WeekSchedule> = {};
+  for (const pid of professionalIds) {
+    map[pid] = byProf.get(pid) ?? businessWeek;
+  }
+  return map;
 }
 
 // ─── Search patients (autocomplete) ──────────────────────────────────────────
@@ -162,6 +236,22 @@ async function checkConflict(
   return conflict;
 }
 
+/** Finds a blocked slot overlapping [start, end) for the professional. */
+async function checkBlocked(
+  tenantId: string,
+  professionalId: string,
+  start: Date,
+  end: Date,
+) {
+  return prisma.blockedSlot.findFirst({
+    where: {
+      tenantId,
+      professionalId,
+      AND: [{ startTime: { lt: end } }, { endTime: { gt: start } }],
+    },
+  });
+}
+
 // ─── Create appointment ───────────────────────────────────────────────────────
 
 export async function createAppointment(
@@ -189,6 +279,15 @@ export async function createAppointment(
       success: false,
       errors: {},
       message: `Conflito com agendamento de ${conflict.patient.name} às ${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+    };
+  }
+
+  const blocked = await checkBlocked(tenantId, professionalId, start, end);
+  if (blocked) {
+    return {
+      success: false,
+      errors: {},
+      message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}. Escolha outro horário.`,
     };
   }
 
@@ -271,6 +370,15 @@ export async function updateAppointment(
     };
   }
 
+  const blocked = await checkBlocked(tenantId, professionalId, start, end);
+  if (blocked) {
+    return {
+      success: false,
+      errors: {},
+      message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}. Escolha outro horário.`,
+    };
+  }
+
   await prisma.appointment.update({
     where: { id, tenantId },
     data: {
@@ -308,6 +416,11 @@ export async function moveAppointment(
     return { success: false, message: `Conflito com ${conflict.patient.name}` };
   }
 
+  const blocked = await checkBlocked(tenantId, professionalId, start, end);
+  if (blocked) {
+    return { success: false, message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}` };
+  }
+
   await prisma.appointment.update({
     where: { id, tenantId },
     data: { startTime: start, endTime: end, professionalId, updatedById: userId },
@@ -315,6 +428,64 @@ export async function moveAppointment(
 
   revalidatePath('/agenda');
   return { success: true };
+}
+
+// ─── Blocked slots ───────────────────────────────────────────────────────────
+
+const blockSchema = z.object({
+  professionalId: z.string().min(1, 'Selecione um profissional'),
+  date: z.string().min(1, 'Data obrigatória'),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Hora inválida'),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Hora inválida'),
+  reason: z.string().max(120).optional().or(z.literal('')),
+});
+
+export type BlockFormState =
+  | { success: true }
+  | { success: false; message: string };
+
+export async function createBlockedSlot(
+  _prev: BlockFormState | null,
+  formData: FormData,
+): Promise<BlockFormState> {
+  const { tenantId } = await requireTenant();
+
+  const parsed = blockSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) {
+    const first = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0];
+    return { success: false, message: first ?? 'Dados inválidos.' };
+  }
+  const { professionalId, date, startTime, endTime, reason } = parsed.data;
+
+  const prof = await prisma.professional.findFirst({
+    where: { id: professionalId, tenantId },
+    select: { id: true },
+  });
+  if (!prof) return { success: false, message: 'Profissional inválido.' };
+
+  const { start, end } = buildDateTimes(date, startTime, endTime);
+  if (end <= start) return { success: false, message: 'O fim deve ser após o início.' };
+
+  const appt = await checkConflict(tenantId, professionalId, start, end);
+  if (appt) {
+    return {
+      success: false,
+      message: `Há um agendamento nesse horário (${appt.patient.name}). Cancele-o antes de bloquear.`,
+    };
+  }
+
+  await prisma.blockedSlot.create({
+    data: { tenantId, professionalId, startTime: start, endTime: end, reason: reason || null },
+  });
+
+  revalidatePath('/agenda');
+  return { success: true };
+}
+
+export async function deleteBlockedSlot(id: string) {
+  const { tenantId } = await requireTenant();
+  await prisma.blockedSlot.deleteMany({ where: { id, tenantId } });
+  revalidatePath('/agenda');
 }
 
 // ─── Update status ────────────────────────────────────────────────────────────

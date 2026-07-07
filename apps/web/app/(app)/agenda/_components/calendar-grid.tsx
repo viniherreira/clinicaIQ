@@ -9,6 +9,9 @@ import {
 } from './constants';
 import { AppointmentBlock } from './appointment-block';
 import { CurrentTimeIndicator } from './current-time-indicator';
+import { WorkingHoursOverlay } from './working-hours-overlay';
+import { BlockedSlotBlock, type BlockedSlotItem } from './blocked-slot-block';
+import type { WeekSchedule } from '@/lib/schedule';
 
 interface Professional {
   id: string;
@@ -32,12 +35,20 @@ interface CalendarGridProps {
   view: 'day' | 'week';
   professionals: Professional[];
   appointments: Appointment[];
+  blockedSlots: BlockedSlotItem[];
+  workingHours: Record<string, WeekSchedule>;
   visibleProfessionals: Set<string>;
   mode: 'grouped' | 'sidebyside';
   onAppointmentClick: (id: string) => void;
+  onBlockedSlotClick?: (id: string) => void;
   onSlotClick?: (professionalId: string, dateStr: string, timeStr: string) => void;
   /** Week view: clicking a day header opens that day. */
   onDayClick?: (dateStr: string) => void;
+}
+
+/** Weekday index (0=Sun..6=Sat) for a `yyyy-MM-dd` string. */
+function weekdayOf(iso: string): number {
+  return parseISO(iso).getDay();
 }
 
 const HOUR_PX = (60 / SLOT_MINUTES) * SLOT_HEIGHT_PX;
@@ -100,8 +111,8 @@ function ProfessionalHeader({ prof }: { prof: Professional }) {
 }
 
 export function CalendarGrid({
-  dateStr, view, professionals, appointments, visibleProfessionals, mode,
-  onAppointmentClick, onSlotClick, onDayClick,
+  dateStr, view, professionals, appointments, blockedSlots, workingHours, visibleProfessionals, mode,
+  onAppointmentClick, onBlockedSlotClick, onSlotClick, onDayClick,
 }: CalendarGridProps) {
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -112,6 +123,9 @@ export function CalendarGrid({
       ...apt,
       professionalColor: professionals.find((p) => p.id === apt.professional.id)?.color,
     }));
+
+  const visibleBlocks = blockedSlots.filter((b) => b.professional && visibleProfessionals.has(b.professional.id));
+  const scheduleFor = (profId: string, iso: string) => workingHours[profId]?.[weekdayOf(iso)] ?? null;
 
   const handleSlotClick = useCallback(
     (professionalId: string, slotDate: string, e: React.MouseEvent<HTMLElement>) => {
@@ -173,6 +187,7 @@ export function CalendarGrid({
                 className={`relative border-l border-border ${isToday ? 'bg-primary/[0.03]' : ''}`}
                 style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}
               >
+                {singleProf && <WorkingHoursOverlay day={scheduleFor(singleProf.id, iso)} />}
                 {onSlotClick && singleProf && (
                   <button
                     type="button"
@@ -182,6 +197,9 @@ export function CalendarGrid({
                   />
                 )}
                 {isToday && <CurrentTimeIndicator />}
+                {singleProf && visibleBlocks
+                  .filter((b) => new Date(b.startTime).toISOString().slice(0, 10) === iso)
+                  .map((b) => <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />)}
                 {dayApts.map((apt) => (
                   <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
                 ))}
@@ -210,6 +228,7 @@ export function CalendarGrid({
             <div key={prof.id} className="w-56 min-w-44 flex-1">
               <ProfessionalHeader prof={prof} />
               <div className="relative border-l border-border" style={{ height: TOTAL_HEIGHT_PX, ...GRID_BG }}>
+                <WorkingHoursOverlay day={scheduleFor(prof.id, dateStr)} />
                 {onSlotClick && (
                   <button
                     type="button"
@@ -219,6 +238,9 @@ export function CalendarGrid({
                   />
                 )}
                 {isCurrentDay && <CurrentTimeIndicator />}
+                {visibleBlocks
+                  .filter((b) => b.professional?.id === prof.id)
+                  .map((b) => <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />)}
                 {profApts.map((apt) => (
                   <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
                 ))}
@@ -259,6 +281,9 @@ export function CalendarGrid({
             />
           )}
           {isCurrentDay && <CurrentTimeIndicator />}
+          {visibleBlocks.map((b) => (
+            <BlockedSlotBlock key={b.id} slot={b} onClick={onBlockedSlotClick} />
+          ))}
           {appointmentsWithColor.map((apt) => (
             <AppointmentBlock key={apt.id} appointment={apt} onClick={onAppointmentClick} />
           ))}
