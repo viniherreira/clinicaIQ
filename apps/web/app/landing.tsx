@@ -1,25 +1,25 @@
 /**
  * ClinicaIQ marketing landing page (rendered at `/` for signed-out visitors).
  *
- * Design direction: clean professional health-SaaS. Brand green (hue 152) over
- * warm white surfaces. The hero is a collage in the style of clinic-SaaS
- * references: a solid brand circle with floating dashboard cards (financial
- * summary, appointments bar chart, attendance donut, 12-month trend) and a
- * flat-style illustrated professional on the right (SVG, no stock photos).
+ * Design direction: clean professional health-SaaS with warmth and color. The
+ * hero pairs a real photo (Pexels, free commercial license) of a smiling
+ * professional inside a circle mask with floating dashboard cards and status
+ * pills, over soft multicolor blobs. Feature icons and personas use a varied
+ * pastel palette so the page reads hand-designed rather than monochrome.
  * Display font: Bricolage Grotesque; body stays Geist. Features use an
  * editorial numbered list with hairline dividers instead of cards. Motion:
- * staggered fade-in-up on load and a gentle float on the mockups, CSS-only, so
- * the whole page is a zero-JS server component.
+ * staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
  *
  * Copy is intentionally honest: the product is in early access, so there are no
  * invented testimonials or user counts.
  */
 import Link from 'next/link';
+import Image from 'next/image';
 import { Bricolage_Grotesque } from 'next/font/google';
 import {
   ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
-  Users, Heart, PlusCircle,
+  Users, Heart, PlusCircle, TrendingUp,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from '@/components/logo';
 
@@ -57,7 +57,7 @@ function Header() {
   );
 }
 
-// ─── Hero visual (dashboard-card collage over the brand circle) ──────────────
+// ─── Hero visual (real photo in a circle + floating dashboard cards) ─────────
 
 function CardArrow() {
   return (
@@ -84,7 +84,7 @@ function FinanceCard() {
       <div className="mt-2.5 space-y-1.5 px-1">
         <div className="flex items-center justify-between text-[11px]">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="h-2 w-2 rounded-[3px] bg-slate-300" aria-hidden="true" /> À vencer
+            <span className="h-2 w-2 rounded-[3px] bg-amber-400" aria-hidden="true" /> À vencer
           </span>
           <span className="font-semibold tabular-nums">R$ 8.150</span>
         </div>
@@ -106,7 +106,7 @@ const BARS = [
   { h: 62, c: 'bg-rose-400' },
   { h: 84, c: 'bg-violet-500' },
   { h: 48, c: 'bg-emerald-400' },
-  { h: 66, c: 'bg-slate-700 dark:bg-slate-400' },
+  { h: 66, c: 'bg-sky-500' },
   { h: 90, c: 'bg-amber-500' },
   { h: 58, c: 'bg-emerald-600' },
   { h: 74, c: 'bg-violet-400' },
@@ -120,7 +120,7 @@ function AppointmentsCard() {
         <CardArrow />
       </div>
       <div className="mb-2 flex items-end justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-alt text-muted-foreground" aria-hidden="true">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400" aria-hidden="true">
           <CalendarDays className="h-4 w-4" />
         </span>
         <span className={`${display.className} text-3xl font-bold leading-none`}>450</span>
@@ -143,8 +143,8 @@ function AttendanceCard() {
       </div>
       <div className="flex items-center gap-3">
         <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90" aria-hidden="true">
-          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-slate-200 dark:stroke-slate-700" />
-          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray="24 163" className="stroke-primary" />
+          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-sky-200 dark:stroke-sky-900" />
+          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray="118 163" className="stroke-primary" />
         </svg>
         <div className="flex-1 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold">
@@ -152,13 +152,13 @@ function AttendanceCard() {
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-[3px] bg-slate-300" aria-hidden="true" /> Particular
+              <span className="h-2 w-2 rounded-[3px] bg-primary" aria-hidden="true" /> Particular
             </span>
             <span className="font-semibold tabular-nums text-foreground">1.400</span>
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-[3px] bg-primary" aria-hidden="true" /> Convênios
+              <span className="h-2 w-2 rounded-[3px] bg-sky-400" aria-hidden="true" /> Convênios
             </span>
             <span className="font-semibold tabular-nums text-foreground">100</span>
           </div>
@@ -168,145 +168,77 @@ function AttendanceCard() {
   );
 }
 
-const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-
-function TrendCard() {
+function WhatsPill() {
   return (
-    <div className="w-72 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-bold">Atendimentos · últimos 12 meses</p>
-        <CardArrow />
-      </div>
-      <svg viewBox="0 0 260 80" className="w-full" aria-hidden="true">
-        <polyline
-          points="4,64 26,52 48,58 70,44 92,50 114,34 136,42 158,26 180,34 202,20 224,26 252,10"
-          fill="none"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="stroke-foreground"
-        />
-      </svg>
-      <div className="mt-1 flex justify-between text-[8px] uppercase tracking-wide text-muted-foreground" aria-hidden="true">
-        {MONTHS.map((m) => <span key={m}>{m}</span>)}
-      </div>
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface py-2 pl-2 pr-4 shadow-card-hover">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400" aria-hidden="true">
+        <MessageCircle className="h-3.5 w-3.5" />
+      </span>
+      <span className="text-xs font-semibold">Paciente confirmou<span className="text-muted-foreground"> · WhatsApp</span></span>
     </div>
   );
 }
 
-/** Flat-style illustrated professional (glasses, shirt, tablet), matching the
- *  pose of the reference photo without resorting to stock imagery. */
-function PersonIllustration({ className = '' }: { className?: string }) {
-  const skin = '#E9B48E';
-  const skinShade = '#DDA47D';
-  const hair = '#4A3527';
-  const shirt = '#FFFFFF';
-  const shirtShade = '#ECEAE4';
-  const dark = '#23282F';
+function RevenuePill() {
   return (
-    <svg viewBox="0 0 320 560" className={className} role="presentation" aria-hidden="true" focusable="false">
-      <ellipse cx="160" cy="544" rx="100" ry="12" fill="hsl(var(--foreground) / 0.10)" />
-
-      {/* legs */}
-      <rect x="126" y="364" width="32" height="156" rx="15" fill={dark} />
-      <rect x="162" y="364" width="32" height="156" rx="15" fill={dark} />
-      {/* shoes */}
-      <rect x="112" y="506" width="54" height="24" rx="12" fill="#F4F2ED" />
-      <rect x="158" y="506" width="54" height="24" rx="12" fill="#F4F2ED" />
-      <rect x="112" y="522" width="54" height="8" rx="4" fill="#D8D4CA" />
-      <rect x="158" y="522" width="54" height="8" rx="4" fill="#D8D4CA" />
-
-      {/* shirt */}
-      <path
-        d="M160 156 C202 156 226 182 230 218 L240 352 Q242 376 216 376 L104 376 Q78 376 80 352 L90 218 C94 182 118 156 160 156 Z"
-        fill={shirt}
-      />
-      <path
-        d="M230 218 L240 352 Q242 376 216 376 L204 376 L212 218 C211 196 202 178 186 168 C210 175 227 194 230 218 Z"
-        fill={shirtShade}
-      />
-      {/* collar + placket */}
-      <path d="M144 162 L160 186 L176 162" stroke={shirtShade} strokeWidth="3.5" strokeLinecap="round" fill="none" />
-      <path d="M160 186 L160 372" stroke={shirtShade} strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="160" cy="212" r="2" fill="#D8D4CA" />
-      <circle cx="160" cy="248" r="2" fill="#D8D4CA" />
-      <circle cx="160" cy="284" r="2" fill="#D8D4CA" />
-      <circle cx="160" cy="320" r="2" fill="#D8D4CA" />
-
-      {/* tablet arm (viewer left, holding at waist) */}
-      <path d="M104 206 C90 236 92 268 108 292" stroke={shirtShade} strokeWidth="27" strokeLinecap="round" fill="none" />
-      <g transform="rotate(-8 150 306)">
-        <rect x="104" y="274" width="92" height="64" rx="9" fill={dark} />
-        <rect x="110" y="280" width="80" height="52" rx="5" fill="#FBFAF7" />
-        <circle cx="150" cy="306" r="14" fill="hsl(152 70% 27%)" />
-        <path d="M143 306 L148 311 L158 300" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      </g>
-      <circle cx="112" cy="298" r="11" fill={skin} />
-
-      {/* glasses-adjusting arm (viewer right, raised) */}
-      <path d="M214 208 C244 200 240 150 212 122" stroke={shirtShade} strokeWidth="26" strokeLinecap="round" fill="none" />
-
-      {/* neck */}
-      <rect x="148" y="130" width="24" height="34" rx="10" fill={skin} />
-      <path d="M148 136 Q160 144 172 136 L172 130 L148 130 Z" fill={skinShade} />
-
-      {/* head */}
-      <ellipse cx="160" cy="98" rx="40" ry="44" fill={skin} />
-      <circle cx="119" cy="102" r="8" fill={skin} />
-      <circle cx="201" cy="102" r="8" fill={skin} />
-      {/* hair */}
-      <path
-        d="M120 94 C116 50 138 32 160 32 C182 32 204 50 200 94 C196 64 182 54 160 54 C138 54 124 64 120 94 Z"
-        fill={hair}
-      />
-      {/* beard */}
-      <path d="M126 108 C132 148 188 148 194 108" stroke={hair} strokeWidth="16" strokeLinecap="round" fill="none" />
-      {/* mustache + smile */}
-      <path d="M148 116 Q160 122 172 116" stroke={hair} strokeWidth="5" strokeLinecap="round" fill="none" />
-      <path d="M146 127 Q160 137 174 127" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" />
-      {/* brows */}
-      <path d="M128 82 Q138 77 148 81" stroke={hair} strokeWidth="3.5" strokeLinecap="round" fill="none" />
-      <path d="M192 82 Q182 77 172 81" stroke={hair} strokeWidth="3.5" strokeLinecap="round" fill="none" />
-      {/* eyes */}
-      <circle cx="140" cy="99" r="3.4" fill="#2A2018" />
-      <circle cx="180" cy="99" r="3.4" fill="#2A2018" />
-      {/* glasses */}
-      <circle cx="140" cy="99" r="13" stroke="#2B2620" strokeWidth="3" fill="none" />
-      <circle cx="180" cy="99" r="13" stroke="#2B2620" strokeWidth="3" fill="none" />
-      <path d="M153 99 L167 99" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
-      <path d="M127 95 L119 91" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
-      <path d="M193 95 L201 91" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
-      {/* hand adjusting glasses (drawn over the frame) */}
-      <circle cx="206" cy="112" r="12" fill={skin} />
-      <path d="M200 103 Q206 97 213 102" stroke={skinShade} strokeWidth="3" strokeLinecap="round" fill="none" />
-    </svg>
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface py-2 pl-2 pr-4 shadow-card-hover">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400" aria-hidden="true">
+        <TrendingUp className="h-3.5 w-3.5" />
+      </span>
+      <span className="text-xs font-semibold">R$ 4.820<span className="text-muted-foreground"> recebidos hoje</span></span>
+    </div>
   );
 }
 
 function HeroVisual() {
   return (
     <>
-      {/* Desktop: card collage over the brand circle, like the reference */}
+      {/* Desktop: photo circle + floating cards */}
       <div className="relative hidden h-[560px] lg:block" aria-hidden="true">
-        <div className="absolute right-4 top-12 h-[420px] w-[420px] rounded-full bg-brand-gradient" />
-        <div className="absolute right-0 top-2 h-24 w-24 rounded-full bg-lime-300/60 dark:bg-lime-300/20" />
-        <div className="absolute -bottom-20 -left-8 h-[460px] w-[560px] rounded-full border border-primary/25" />
+        {/* soft color blobs */}
+        <div className="absolute -right-8 top-0 h-44 w-44 rounded-full bg-amber-200/60 blur-2xl dark:bg-amber-400/10" />
+        <div className="absolute bottom-0 left-6 h-48 w-48 rounded-full bg-sky-200/60 blur-2xl dark:bg-sky-400/10" />
+        <div className="absolute bottom-24 right-32 h-40 w-40 rounded-full bg-emerald-200/70 blur-2xl dark:bg-emerald-400/10" />
+        {/* decorative ring */}
+        <div className="absolute -bottom-16 left-0 h-[420px] w-[540px] rounded-full border border-primary/20" />
 
-        <PersonIllustration className="absolute bottom-2 right-0 z-10 w-60" />
+        {/* photo */}
+        <div className="absolute right-0 top-10 h-[430px] w-[430px] overflow-hidden rounded-full border-8 border-surface bg-brand-gradient shadow-2xl">
+          <Image
+            src="/hero-professional.jpg"
+            alt=""
+            fill
+            priority
+            sizes="430px"
+            className="object-cover object-top"
+          />
+        </div>
 
-        <div className="absolute left-16 top-0 z-20 animate-float"><AppointmentsCard /></div>
-        <div className="absolute -left-4 top-32 z-30 animate-float-slow"><FinanceCard /></div>
-        <div className="absolute left-2 top-[302px] z-20 animate-float"><AttendanceCard /></div>
-        <div className="absolute left-40 top-[380px] z-20 animate-float-slow"><TrendCard /></div>
+        {/* floating cards */}
+        <div className="absolute left-0 top-0 z-20 animate-float"><AppointmentsCard /></div>
+        <div className="absolute -left-5 top-[214px] z-30 animate-float-slow"><FinanceCard /></div>
+        <div className="absolute left-9 top-[402px] z-20 animate-float"><AttendanceCard /></div>
+
+        {/* floating pills */}
+        <div className="absolute right-6 top-0 z-20 animate-float-slow"><WhatsPill /></div>
+        <div className="absolute bottom-8 right-56 z-20 animate-float"><RevenuePill /></div>
       </div>
 
-      {/* Mobile: lighter stack of the two key cards */}
-      <div className="relative mx-auto w-full max-w-sm lg:hidden" aria-hidden="true">
-        <div className="absolute -inset-6 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-col items-center gap-4">
-          <div className="animate-float self-end"><AppointmentsCard /></div>
-          <div className="animate-float-slow -mt-10 self-start"><FinanceCard /></div>
+      {/* Mobile: photo + two elements */}
+      <div className="relative mx-auto w-full max-w-sm pb-16 lg:hidden" aria-hidden="true">
+        <div className="absolute -inset-4 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative mx-auto h-64 w-64 overflow-hidden rounded-full border-8 border-surface bg-brand-gradient shadow-2xl">
+          <Image
+            src="/hero-professional.jpg"
+            alt=""
+            fill
+            priority
+            sizes="256px"
+            className="object-cover object-top"
+          />
         </div>
+        <div className="absolute -top-2 right-0 animate-float-slow"><WhatsPill /></div>
+        <div className="absolute -bottom-2 left-0 animate-float"><FinanceCard /></div>
       </div>
     </>
   );
@@ -325,8 +257,8 @@ function Hero() {
       className="relative overflow-hidden"
       style={{
         backgroundImage:
-          'radial-gradient(ellipse 80% 60% at 70% -10%, hsl(var(--primary) / 0.08), transparent), radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
-        backgroundSize: 'auto, 28px 28px',
+          'radial-gradient(ellipse 80% 60% at 70% -10%, hsl(var(--primary) / 0.08), transparent), radial-gradient(ellipse 50% 40% at 5% 105%, hsl(38 92% 55% / 0.07), transparent), radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
+        backgroundSize: 'auto, auto, 28px 28px',
       }}
     >
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-24">
@@ -391,17 +323,17 @@ function Hero() {
 
 function TrustStrip() {
   const items = [
-    { icon: ShieldCheck, label: 'LGPD por padrão' },
-    { icon: Lock, label: 'CPF e telefone criptografados' },
-    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA' },
-    { icon: Heart, label: 'Feito no Brasil' },
+    { icon: ShieldCheck, label: 'LGPD por padrão', color: 'text-emerald-600 dark:text-emerald-400' },
+    { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-sky-600 dark:text-sky-400' },
+    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-violet-600 dark:text-violet-400' },
+    { icon: Heart, label: 'Feito no Brasil', color: 'text-rose-500 dark:text-rose-400' },
   ];
   return (
     <section aria-label="Segurança e conformidade" className="border-y border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-4 py-5 sm:px-6">
-        {items.map(({ icon: Icon, label }) => (
+        {items.map(({ icon: Icon, label, color }) => (
           <span key={label} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+            <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
             {label}
           </span>
         ))}
@@ -418,31 +350,37 @@ function Features() {
       icon: CalendarDays,
       title: 'Agenda inteligente',
       text: 'Visão por dia ou semana com os profissionais lado a lado. Bloqueio de horário, expediente visível na grade e aviso de conflito na hora de marcar.',
+      chip: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
     },
     {
       icon: MessageCircle,
       title: 'WhatsApp automático',
       text: 'O paciente recebe a confirmação assim que o horário é marcado e um lembrete no dia anterior. A recepção não precisa digitar mensagem nenhuma.',
+      chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
     },
     {
       icon: FileText,
       title: 'Orçamentos que fecham',
       text: 'Monte o orçamento em minutos, envie por link ou PDF com a sua marca e acompanhe o status: visualizado, aceito, pago. Com registro de pagamento parcial.',
+      chip: 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
     },
     {
       icon: Smile,
       title: 'Ficha clínica completa',
       text: 'Histórico de atendimentos, odontograma interativo dente a dente e a situação financeira do paciente reunidos em uma única tela.',
+      chip: 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400',
     },
     {
       icon: BarChart3,
       title: 'Financeiro sem planilha',
       text: 'Indicadores do dia, atendimentos da semana e conversão de orçamentos direto no dashboard. Nada de exportar relatório para saber como está o mês.',
+      chip: 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
     },
     {
       icon: Accessibility,
       title: 'Acessibilidade levada a sério',
       text: 'Navegação por teclado, compatibilidade com leitores de tela, alto contraste e modo escuro. Toda a equipe consegue usar o sistema.',
+      chip: 'bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
     },
   ];
   return (
@@ -461,14 +399,16 @@ function Features() {
         </div>
 
         <div className="mt-12 grid gap-x-14 sm:grid-cols-2">
-          {features.map(({ icon: Icon, title, text }, i) => (
+          {features.map(({ icon: Icon, title, text, chip }, i) => (
             <div key={title} className="flex gap-5 border-t border-border py-8 sm:py-9">
-              <span className="font-mono text-sm font-medium tabular-nums text-primary" aria-hidden="true">
+              <span className="font-mono text-sm font-medium tabular-nums text-muted-foreground" aria-hidden="true">
                 {String(i + 1).padStart(2, '0')}
               </span>
               <div>
-                <h3 className={`${display.className} flex items-center gap-2.5 text-lg font-bold tracking-tight`}>
-                  <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <h3 className={`${display.className} flex items-center gap-3 text-lg font-bold tracking-tight`}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
+                    <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                  </span>
                   {title}
                 </h3>
                 <p className="mt-2.5 max-w-md text-sm leading-relaxed text-muted-foreground">{text}</p>
@@ -490,18 +430,24 @@ function Differentiators() {
       who: 'Para a recepção',
       title: 'Agendar deixa de ser malabarismo',
       points: ['Busca de paciente instantânea', 'Conflito de horário avisado na hora', 'Confirmação vai sozinha pelo WhatsApp'],
+      chip: 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
+      accent: 'text-sky-600 dark:text-sky-400',
     },
     {
       icon: Smile,
       who: 'Para o profissional',
       title: 'O prontuário na ponta dos dedos',
       points: ['Odontograma interativo por dente', 'Histórico completo de atendimentos', 'Agenda do dia com um olhar'],
+      chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+      accent: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       icon: Users,
       who: 'Para quem gerencia',
       title: 'O dinheiro deixa de ser mistério',
       points: ['Conversão de orçamentos em tempo real', 'Pagamentos e saldo por paciente', 'Dados protegidos conforme a LGPD'],
+      chip: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
+      accent: 'text-violet-600 dark:text-violet-400',
     },
   ];
   return (
@@ -520,13 +466,15 @@ function Differentiators() {
         </div>
 
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {personas.map(({ icon: Icon, who, title, points }) => (
+          {personas.map(({ icon: Icon, who, title, points, chip, accent }) => (
             <article key={who} className="rounded-2xl border border-border bg-background p-6 shadow-card">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                <Icon className="h-4 w-4" aria-hidden="true" />
+              <p className={`flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider ${accent}`}>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${chip}`}>
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </span>
                 {who}
               </p>
-              <h3 className={`${display.className} mt-3 text-xl font-bold tracking-tight`}>{title}</h3>
+              <h3 className={`${display.className} mt-4 text-xl font-bold tracking-tight`}>{title}</h3>
               <ul className="mt-4 space-y-2.5">
                 {points.map((p) => (
                   <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -672,9 +620,9 @@ function Footer() {
         <div>
           <p className="text-sm font-semibold">Compromissos</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" /> Conformidade com a LGPD</li>
-            <li className="flex items-center gap-2"><Lock className="h-4 w-4 text-primary" aria-hidden="true" /> Dados sensíveis criptografados</li>
-            <li className="flex items-center gap-2"><Accessibility className="h-4 w-4 text-primary" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
+            <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Conformidade com a LGPD</li>
+            <li className="flex items-center gap-2"><Lock className="h-4 w-4 text-sky-600 dark:text-sky-400" aria-hidden="true" /> Dados sensíveis criptografados</li>
+            <li className="flex items-center gap-2"><Accessibility className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
           </ul>
         </div>
       </div>
