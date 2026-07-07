@@ -2,10 +2,12 @@
  * ClinicaIQ marketing landing page (rendered at `/` for signed-out visitors).
  *
  * Design direction: clean professional health-SaaS. Brand green (hue 152) over
- * warm white surfaces, floating CSS-built dashboard mockups in the hero plus a
- * flat-style illustrated professional (SVG, no stock photos), generous
- * whitespace. Display font: Bricolage Grotesque; body stays Geist. Features use
- * an editorial numbered list with hairline dividers instead of cards. Motion:
+ * warm white surfaces. The hero is a collage in the style of clinic-SaaS
+ * references: a solid brand circle with floating dashboard cards (financial
+ * summary, appointments bar chart, attendance donut, 12-month trend) and a
+ * flat-style illustrated professional on the right (SVG, no stock photos).
+ * Display font: Bricolage Grotesque; body stays Geist. Features use an
+ * editorial numbered list with hairline dividers instead of cards. Motion:
  * staggered fade-in-up on load and a gentle float on the mockups, CSS-only, so
  * the whole page is a zero-JS server component.
  *
@@ -17,7 +19,7 @@ import { Bricolage_Grotesque } from 'next/font/google';
 import {
   ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
-  CheckCheck, Users, Heart,
+  Users, Heart, PlusCircle,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from '@/components/logo';
 
@@ -55,211 +57,258 @@ function Header() {
   );
 }
 
-// ─── Hero mockups (pure CSS, mirror the real product) ────────────────────────
+// ─── Hero visual (dashboard-card collage over the brand circle) ──────────────
 
-function AgendaMockup() {
-  const rows = [
-    { time: '09:00', name: 'Maria Fernandes', proc: 'Limpeza', dot: 'bg-emerald-500', status: 'Confirmado' },
-    { time: '10:30', name: 'João Pedro Alves', proc: 'Avaliação', dot: 'bg-slate-400', status: 'Agendado' },
-    { time: '14:00', name: 'Ana Beatriz Rocha', proc: 'Clareamento', dot: 'bg-emerald-500', status: 'Confirmado' },
-  ];
+function CardArrow() {
   return (
-    <div className="w-full max-w-xs rounded-2xl border border-border bg-surface p-4 shadow-card-hover sm:max-w-sm">
+    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-alt text-muted-foreground" aria-hidden="true">
+      <ArrowRight className="h-3 w-3" />
+    </span>
+  );
+}
+
+function FinanceCard() {
+  return (
+    <div className="w-60 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold">Agenda de hoje</p>
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-          <CalendarDays className="h-3 w-3" aria-hidden="true" /> 12 pacientes
+        <p className="text-xs font-bold">Resumo financeiro</p>
+        <CardArrow />
+      </div>
+      <div className="flex items-center justify-between rounded-xl bg-primary/10 px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+          <PlusCircle className="h-4 w-4" aria-hidden="true" />
+          Total a receber
         </span>
+        <span className="text-xs font-bold text-primary">R$ 12.400</span>
       </div>
-      <ul className="space-y-1.5">
-        {rows.map((r) => (
-          <li key={r.time} className="flex items-center gap-2.5 rounded-lg bg-surface-alt/70 px-2.5 py-2">
-            <span className="font-mono text-[11px] font-medium tabular-nums text-muted-foreground">{r.time}</span>
-            <span className="h-6 w-1 rounded-full bg-primary/70" aria-hidden="true" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">{r.name}</span>
-              <span className="block truncate text-[10px] text-muted-foreground">{r.proc}</span>
-            </span>
-            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
-              <span className={`h-1.5 w-1.5 rounded-full ${r.dot}`} aria-hidden="true" />
-              {r.status}
-            </span>
-          </li>
+      <div className="mt-2.5 space-y-1.5 px-1">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="h-2 w-2 rounded-[3px] bg-slate-300" aria-hidden="true" /> À vencer
+          </span>
+          <span className="font-semibold tabular-nums">R$ 8.150</span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="h-2 w-2 rounded-[3px] bg-rose-400" aria-hidden="true" /> Vencidas
+          </span>
+          <span className="font-semibold tabular-nums">R$ 4.250</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const BARS = [
+  { h: 55, c: 'bg-emerald-600' },
+  { h: 30, c: 'bg-slate-800 dark:bg-slate-300' },
+  { h: 72, c: 'bg-amber-400' },
+  { h: 62, c: 'bg-rose-400' },
+  { h: 84, c: 'bg-violet-500' },
+  { h: 48, c: 'bg-emerald-400' },
+  { h: 66, c: 'bg-slate-700 dark:bg-slate-400' },
+  { h: 90, c: 'bg-amber-500' },
+  { h: 58, c: 'bg-emerald-600' },
+  { h: 74, c: 'bg-violet-400' },
+];
+
+function AppointmentsCard() {
+  return (
+    <div className="w-64 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-bold">Agendamentos</p>
+        <CardArrow />
+      </div>
+      <div className="mb-2 flex items-end justify-between">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-alt text-muted-foreground" aria-hidden="true">
+          <CalendarDays className="h-4 w-4" />
+        </span>
+        <span className={`${display.className} text-3xl font-bold leading-none`}>450</span>
+      </div>
+      <div className="flex h-20 items-end gap-1.5" role="presentation">
+        {BARS.map((b, i) => (
+          <span key={i} className={`flex-1 rounded-t ${b.c}`} style={{ height: `${b.h}%` }} />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
 
-function WhatsAppMockup() {
+function AttendanceCard() {
   return (
-    <div className="w-60 rounded-2xl border border-border bg-surface p-3.5 shadow-card-hover">
-      <div className="mb-2 flex items-center gap-1.5">
-        <MessageCircle className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        <p className="text-[11px] font-semibold text-muted-foreground">Confirmação automática</p>
+    <div className="w-60 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-bold">Atendimentos</p>
+        <CardArrow />
       </div>
-      <div className="rounded-xl rounded-tl-sm bg-primary/10 p-3 text-xs leading-relaxed">
-        <p>Olá, <strong>Maria</strong>! 👋</p>
-        <p className="mt-1">Seu agendamento na <strong>Clínica Sorriso</strong> foi registrado:</p>
-        <p className="mt-1">📅 sexta-feira, 10/07 às <strong>14:00</strong></p>
-        <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
-          14:02 <CheckCheck className="h-3 w-3 text-sky-500" aria-hidden="true" />
-        </p>
+      <div className="flex items-center gap-3">
+        <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90" aria-hidden="true">
+          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-slate-200 dark:stroke-slate-700" />
+          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray="24 163" className="stroke-primary" />
+        </svg>
+        <div className="flex-1 space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span>Total</span><span className="tabular-nums">1.500</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-[3px] bg-slate-300" aria-hidden="true" /> Particular
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">1.400</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-[3px] bg-primary" aria-hidden="true" /> Convênios
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">100</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function QuotesMockup() {
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function TrendCard() {
   return (
-    <div className="w-52 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
-      <p className="text-[11px] font-semibold text-muted-foreground">Orçamentos · 30 dias</p>
-      <p className={`${display.className} mt-1 text-3xl font-bold text-primary`}>68%</p>
-      <p className="text-[11px] text-muted-foreground">de conversão</p>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-alt" role="presentation">
-        <div className="h-full w-[68%] rounded-full bg-brand-gradient" />
+    <div className="w-72 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-bold">Atendimentos · últimos 12 meses</p>
+        <CardArrow />
       </div>
-      <div className="mt-3 flex items-center justify-between text-[11px]">
-        <span className="text-muted-foreground">Aceitos</span>
-        <span className="font-semibold">R$ 24.380</span>
+      <svg viewBox="0 0 260 80" className="w-full" aria-hidden="true">
+        <polyline
+          points="4,64 26,52 48,58 70,44 92,50 114,34 136,42 158,26 180,34 202,20 224,26 252,10"
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="stroke-foreground"
+        />
+      </svg>
+      <div className="mt-1 flex justify-between text-[8px] uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+        {MONTHS.map((m) => <span key={m}>{m}</span>)}
       </div>
     </div>
   );
 }
 
-/** Flat-style illustrated clinic professional (keeps the page photo-free while
- *  giving the hero the human touch of the reference sites). Decorative only. */
+/** Flat-style illustrated professional (glasses, shirt, tablet), matching the
+ *  pose of the reference photo without resorting to stock imagery. */
 function PersonIllustration({ className = '' }: { className?: string }) {
-  const green = 'hsl(152 70% 27%)';
-  const greenDark = 'hsl(155 72% 20%)';
   const skin = '#E9B48E';
   const skinShade = '#DDA47D';
-  const hair = '#3B2A21';
-  const coat = '#FFFFFF';
-  const coatShade = '#ECE9E2';
-  const dark = '#262B33';
+  const hair = '#4A3527';
+  const shirt = '#FFFFFF';
+  const shirtShade = '#ECEAE4';
+  const dark = '#23282F';
   return (
-    <svg
-      viewBox="0 0 300 560"
-      className={className}
-      role="presentation"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {/* ground shadow */}
-      <ellipse cx="150" cy="542" rx="92" ry="13" fill="hsl(var(--foreground) / 0.08)" />
+    <svg viewBox="0 0 320 560" className={className} role="presentation" aria-hidden="true" focusable="false">
+      <ellipse cx="160" cy="544" rx="100" ry="12" fill="hsl(var(--foreground) / 0.10)" />
 
       {/* legs */}
-      <rect x="116" y="368" width="31" height="152" rx="15" fill={dark} />
-      <rect x="153" y="368" width="31" height="152" rx="15" fill={dark} />
+      <rect x="126" y="364" width="32" height="156" rx="15" fill={dark} />
+      <rect x="162" y="364" width="32" height="156" rx="15" fill={dark} />
       {/* shoes */}
-      <rect x="103" y="506" width="52" height="24" rx="12" fill="#F4F2ED" />
-      <rect x="150" y="506" width="52" height="24" rx="12" fill="#F4F2ED" />
-      <rect x="103" y="522" width="52" height="8" rx="4" fill="#D8D4CA" />
-      <rect x="150" y="522" width="52" height="8" rx="4" fill="#D8D4CA" />
+      <rect x="112" y="506" width="54" height="24" rx="12" fill="#F4F2ED" />
+      <rect x="158" y="506" width="54" height="24" rx="12" fill="#F4F2ED" />
+      <rect x="112" y="522" width="54" height="8" rx="4" fill="#D8D4CA" />
+      <rect x="158" y="522" width="54" height="8" rx="4" fill="#D8D4CA" />
 
-      {/* coat */}
+      {/* shirt */}
       <path
-        d="M150 166 C188 166 210 191 214 226 L224 368 Q226 392 201 392 L99 392 Q74 392 76 368 L86 226 C90 191 112 166 150 166 Z"
-        fill={coat}
+        d="M160 156 C202 156 226 182 230 218 L240 352 Q242 376 216 376 L104 376 Q78 376 80 352 L90 218 C94 182 118 156 160 156 Z"
+        fill={shirt}
       />
-      {/* coat side shading */}
       <path
-        d="M214 226 L224 368 Q226 392 201 392 L188 392 L196 226 C195 203 186 184 170 173 C193 179 211 200 214 226 Z"
-        fill={coatShade}
+        d="M230 218 L240 352 Q242 376 216 376 L204 376 L212 218 C211 196 202 178 186 168 C210 175 227 194 230 218 Z"
+        fill={shirtShade}
       />
-      {/* scrub v-neck */}
-      <path d="M130 170 L150 214 L170 170 Z" fill={green} />
-      <path d="M150 214 L150 220 L143 206 Z" fill={greenDark} />
-      {/* coat center line */}
-      <path d="M150 220 L150 390" stroke={coatShade} strokeWidth="3" strokeLinecap="round" />
-      {/* id badge */}
-      <path d="M150 220 L173 246" stroke={coatShade} strokeWidth="3" strokeLinecap="round" />
-      <rect x="164" y="244" width="24" height="30" rx="4" fill="#F7F5F0" stroke="#DDD9CF" strokeWidth="1.5" />
-      <rect x="164" y="244" width="24" height="9" rx="4" fill={green} />
-      <rect x="169" y="258" width="14" height="3" rx="1.5" fill="#C9C4B8" />
-      <rect x="169" y="264" width="10" height="3" rx="1.5" fill="#C9C4B8" />
+      {/* collar + placket */}
+      <path d="M144 162 L160 186 L176 162" stroke={shirtShade} strokeWidth="3.5" strokeLinecap="round" fill="none" />
+      <path d="M160 186 L160 372" stroke={shirtShade} strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="160" cy="212" r="2" fill="#D8D4CA" />
+      <circle cx="160" cy="248" r="2" fill="#D8D4CA" />
+      <circle cx="160" cy="284" r="2" fill="#D8D4CA" />
+      <circle cx="160" cy="320" r="2" fill="#D8D4CA" />
 
-      {/* waving arm (viewer right, raised) */}
-      <path
-        d="M204 212 C228 222 242 204 250 172"
-        stroke={coatShade}
-        strokeWidth="27"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="252" cy="160" r="14" fill={skin} />
-      <path d="M247 149 Q252 143 258 148" stroke={skinShade} strokeWidth="3" strokeLinecap="round" fill="none" />
-
-      {/* tablet-holding arm (viewer left, down) */}
-      <path
-        d="M98 210 C86 240 88 274 104 296"
-        stroke={coatShade}
-        strokeWidth="27"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* tablet */}
-      <g transform="rotate(-8 145 306)">
-        <rect x="102" y="276" width="86" height="60" rx="9" fill={dark} />
-        <rect x="108" y="282" width="74" height="48" rx="5" fill="#FDFDFB" />
-        <circle cx="145" cy="306" r="14" fill={green} />
-        <path d="M138 306 L143 311 L153 300" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* tablet arm (viewer left, holding at waist) */}
+      <path d="M104 206 C90 236 92 268 108 292" stroke={shirtShade} strokeWidth="27" strokeLinecap="round" fill="none" />
+      <g transform="rotate(-8 150 306)">
+        <rect x="104" y="274" width="92" height="64" rx="9" fill={dark} />
+        <rect x="110" y="280" width="80" height="52" rx="5" fill="#FBFAF7" />
+        <circle cx="150" cy="306" r="14" fill="hsl(152 70% 27%)" />
+        <path d="M143 306 L148 311 L158 300" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
       </g>
-      <circle cx="106" cy="300" r="11" fill={skin} />
+      <circle cx="112" cy="298" r="11" fill={skin} />
+
+      {/* glasses-adjusting arm (viewer right, raised) */}
+      <path d="M214 208 C244 200 240 150 212 122" stroke={shirtShade} strokeWidth="26" strokeLinecap="round" fill="none" />
 
       {/* neck */}
-      <rect x="140" y="138" width="20" height="30" rx="9" fill={skin} />
-      <path d="M140 144 Q150 152 160 144 L160 138 L140 138 Z" fill={skinShade} />
+      <rect x="148" y="130" width="24" height="34" rx="10" fill={skin} />
+      <path d="M148 136 Q160 144 172 136 L172 130 L148 130 Z" fill={skinShade} />
 
       {/* head */}
-      <circle cx="150" cy="34" r="17" fill={hair} />
-      <ellipse cx="150" cy="102" rx="39" ry="43" fill={skin} />
-      <circle cx="110" cy="106" r="8" fill={skin} />
-      <circle cx="190" cy="106" r="8" fill={skin} />
+      <ellipse cx="160" cy="98" rx="40" ry="44" fill={skin} />
+      <circle cx="119" cy="102" r="8" fill={skin} />
+      <circle cx="201" cy="102" r="8" fill={skin} />
       {/* hair */}
       <path
-        d="M110 102 C104 52 128 36 150 36 C172 36 196 52 190 102 C188 72 172 60 150 60 C128 60 112 72 110 102 Z"
+        d="M120 94 C116 50 138 32 160 32 C182 32 204 50 200 94 C196 64 182 54 160 54 C138 54 124 64 120 94 Z"
         fill={hair}
       />
-      {/* earrings */}
-      <circle cx="110" cy="115" r="3" fill={green} />
-      <circle cx="190" cy="115" r="3" fill={green} />
+      {/* beard */}
+      <path d="M126 108 C132 148 188 148 194 108" stroke={hair} strokeWidth="16" strokeLinecap="round" fill="none" />
+      {/* mustache + smile */}
+      <path d="M148 116 Q160 122 172 116" stroke={hair} strokeWidth="5" strokeLinecap="round" fill="none" />
+      <path d="M146 127 Q160 137 174 127" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" />
       {/* brows */}
-      <path d="M130 90 Q137 85 145 88" stroke={hair} strokeWidth="3" strokeLinecap="round" fill="none" />
-      <path d="M170 90 Q163 85 155 88" stroke={hair} strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path d="M128 82 Q138 77 148 81" stroke={hair} strokeWidth="3.5" strokeLinecap="round" fill="none" />
+      <path d="M192 82 Q182 77 172 81" stroke={hair} strokeWidth="3.5" strokeLinecap="round" fill="none" />
       {/* eyes */}
-      <circle cx="136" cy="101" r="3.6" fill="#2A2018" />
-      <circle cx="164" cy="101" r="3.6" fill="#2A2018" />
-      {/* blush */}
-      <ellipse cx="127" cy="113" rx="5" ry="3" fill="#F2A48C" opacity="0.55" />
-      <ellipse cx="173" cy="113" rx="5" ry="3" fill="#F2A48C" opacity="0.55" />
-      {/* smile */}
-      <path d="M137 118 Q150 132 163 118" stroke="#A85F38" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+      <circle cx="140" cy="99" r="3.4" fill="#2A2018" />
+      <circle cx="180" cy="99" r="3.4" fill="#2A2018" />
+      {/* glasses */}
+      <circle cx="140" cy="99" r="13" stroke="#2B2620" strokeWidth="3" fill="none" />
+      <circle cx="180" cy="99" r="13" stroke="#2B2620" strokeWidth="3" fill="none" />
+      <path d="M153 99 L167 99" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
+      <path d="M127 95 L119 91" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
+      <path d="M193 95 L201 91" stroke="#2B2620" strokeWidth="3" strokeLinecap="round" />
+      {/* hand adjusting glasses (drawn over the frame) */}
+      <circle cx="206" cy="112" r="12" fill={skin} />
+      <path d="M200 103 Q206 97 213 102" stroke={skinShade} strokeWidth="3" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
 
 function HeroVisual() {
   return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-lg" aria-hidden="true">
-      {/* Glow */}
-      <div className="absolute -inset-10 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex items-end justify-center">
-        <div className="relative z-10 -mr-10 flex flex-col items-start gap-4 pb-10 sm:-mr-16">
-          <div className="animate-float-slow z-20 self-end sm:-mr-2">
-            <WhatsAppMockup />
-          </div>
-          <div className="animate-float">
-            <AgendaMockup />
-          </div>
-          <div className="animate-float-slow -mt-6 ml-4">
-            <QuotesMockup />
-          </div>
-        </div>
-        <PersonIllustration className="relative z-0 w-36 shrink-0 sm:w-48 lg:w-56" />
+    <>
+      {/* Desktop: card collage over the brand circle, like the reference */}
+      <div className="relative hidden h-[560px] lg:block" aria-hidden="true">
+        <div className="absolute right-4 top-12 h-[420px] w-[420px] rounded-full bg-brand-gradient" />
+        <div className="absolute right-0 top-2 h-24 w-24 rounded-full bg-lime-300/60 dark:bg-lime-300/20" />
+        <div className="absolute -bottom-20 -left-8 h-[460px] w-[560px] rounded-full border border-primary/25" />
+
+        <PersonIllustration className="absolute bottom-2 right-0 z-10 w-60" />
+
+        <div className="absolute left-16 top-0 z-20 animate-float"><AppointmentsCard /></div>
+        <div className="absolute -left-4 top-32 z-30 animate-float-slow"><FinanceCard /></div>
+        <div className="absolute left-2 top-[302px] z-20 animate-float"><AttendanceCard /></div>
+        <div className="absolute left-40 top-[380px] z-20 animate-float-slow"><TrendCard /></div>
       </div>
-    </div>
+
+      {/* Mobile: lighter stack of the two key cards */}
+      <div className="relative mx-auto w-full max-w-sm lg:hidden" aria-hidden="true">
+        <div className="absolute -inset-6 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-col items-center gap-4">
+          <div className="animate-float self-end"><AppointmentsCard /></div>
+          <div className="animate-float-slow -mt-10 self-start"><FinanceCard /></div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -280,7 +329,7 @@ function Hero() {
         backgroundSize: 'auto, 28px 28px',
       }}
     >
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-24">
         <div>
           <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
