@@ -7,6 +7,7 @@ import { UserButton } from '@clerk/nextjs';
 import { Menu, X } from 'lucide-react';
 import { NAV } from './app-sidebar';
 import { ThemeToggle } from './theme-toggle';
+import { LogoMark, LogoWordmark } from './logo';
 
 export function AppHeader({ clinicName }: { clinicName: string }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +26,7 @@ export function AppHeader({ clinicName }: { clinicName: string }) {
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
         <div className="flex items-center gap-2 md:hidden">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-gradient text-[11px] font-bold text-white">CIQ</div>
+          <LogoMark size="sm" />
         </div>
 
         <div className="flex-1" />
@@ -45,8 +46,8 @@ export function AppHeader({ clinicName }: { clinicName: string }) {
           <nav aria-label="Menu principal" className="absolute inset-y-0 left-0 flex w-64 flex-col bg-surface shadow-2xl animate-fade-in">
             <div className="flex h-16 items-center justify-between px-5">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-sm font-bold text-white">CIQ</div>
-                <span className="text-[15px] font-semibold tracking-tight">ClinicaIQ</span>
+                <LogoMark size="md" />
+                <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar menu" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 <X className="h-5 w-5" aria-hidden="true" />

@@ -19,6 +19,7 @@ import {
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
   CheckCheck, Users, Heart,
 } from 'lucide-react';
+import { LogoMark, LogoWordmark } from '@/components/logo';
 
 const display = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -33,10 +34,8 @@ function Header() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="ClinicaIQ — página inicial">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient shadow-sm">
-            <span className="text-sm font-bold text-white">CIQ</span>
-          </span>
-          <span className={`${display.className} text-lg font-bold tracking-tight`}>ClinicaIQ</span>
+          <LogoMark size="md" />
+          <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
         </Link>
 
         <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
@@ -601,10 +600,8 @@ function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient">
-              <span className="text-sm font-bold text-white">CIQ</span>
-            </span>
-            <span className={`${display.className} text-lg font-bold tracking-tight`}>ClinicaIQ</span>
+            <LogoMark size="md" />
+            <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
             Gestão inteligente para clínicas odontológicas e estéticas.

@@ -1,4 +1,5 @@
 import { CalendarDays, FileText, ShieldCheck, Sparkles } from 'lucide-react';
+import { LogoMark } from '@/components/logo';
 
 const FEATURES = [
   { icon: CalendarDays, title: 'Agenda inteligente', desc: 'Visual, por profissional, com confirmação via WhatsApp.' },
@@ -15,9 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/5 blur-3xl" aria-hidden="true" />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
-            <span className="text-base font-bold">CIQ</span>
-          </div>
+          <LogoMark size="lg" variant="glass" />
           <span className="text-lg font-semibold tracking-tight">ClinicaIQ</span>
         </div>
 

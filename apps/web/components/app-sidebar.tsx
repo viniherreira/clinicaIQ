@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Settings,
 } from 'lucide-react';
+import { LogoMark, LogoWordmark } from './logo';
 
 export const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,11 +23,9 @@ export function AppSidebar({ clinicName }: { clinicName: string }) {
     <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
       {/* Brand */}
       <div className="flex h-16 items-center gap-2.5 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient shadow-sm">
-          <span className="text-sm font-bold text-white">CIQ</span>
-        </div>
+        <LogoMark size="md" />
         <div className="flex flex-col leading-none">
-          <span className="text-[15px] font-semibold tracking-tight">ClinicaIQ</span>
+          <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
           <span className="mt-1 text-[11px] text-muted-foreground">Gestão clínica</span>
         </div>
       </div>
