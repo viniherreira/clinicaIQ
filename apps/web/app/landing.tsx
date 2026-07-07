@@ -1,16 +1,16 @@
 /**
  * ClinicaIQ marketing landing page (rendered at `/` for signed-out visitors).
  *
- * Design direction: clean professional health-SaaS — the brand green (hue 152)
- * over warm white surfaces, floating CSS-built dashboard mockups in the hero
- * (agenda, WhatsApp confirmation, orçamentos) echoing the real product, with
- * generous whitespace. Display font: Bricolage Grotesque; body stays Geist.
- * Motion: staggered fade-in-up on load + gentle float on the mockups, CSS-only
- * so the whole page is a zero-JS server component.
+ * Design direction: clean professional health-SaaS. Brand green (hue 152) over
+ * warm white surfaces, floating CSS-built dashboard mockups in the hero plus a
+ * flat-style illustrated professional (SVG, no stock photos), generous
+ * whitespace. Display font: Bricolage Grotesque; body stays Geist. Features use
+ * an editorial numbered list with hairline dividers instead of cards. Motion:
+ * staggered fade-in-up on load and a gentle float on the mockups, CSS-only, so
+ * the whole page is a zero-JS server component.
  *
- * Copy is intentionally honest: the product is in early access, so there are
- * no invented testimonials or user counts — differentiators and personas
- * carry the social-proof slot instead.
+ * Copy is intentionally honest: the product is in early access, so there are no
+ * invented testimonials or user counts.
  */
 import Link from 'next/link';
 import { Bricolage_Grotesque } from 'next/font/google';
@@ -63,10 +63,9 @@ function AgendaMockup() {
     { time: '09:00', name: 'Maria Fernandes', proc: 'Limpeza', dot: 'bg-emerald-500', status: 'Confirmado' },
     { time: '10:30', name: 'João Pedro Alves', proc: 'Avaliação', dot: 'bg-slate-400', status: 'Agendado' },
     { time: '14:00', name: 'Ana Beatriz Rocha', proc: 'Clareamento', dot: 'bg-emerald-500', status: 'Confirmado' },
-    { time: '15:30', name: 'Carlos Menezes', proc: 'Canal', dot: 'bg-amber-500', status: 'Remarcado' },
   ];
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+    <div className="w-full max-w-xs rounded-2xl border border-border bg-surface p-4 shadow-card-hover sm:max-w-sm">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-semibold">Agenda de hoje</p>
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
@@ -95,7 +94,7 @@ function AgendaMockup() {
 
 function WhatsAppMockup() {
   return (
-    <div className="w-64 rounded-2xl border border-border bg-surface p-3.5 shadow-card-hover">
+    <div className="w-60 rounded-2xl border border-border bg-surface p-3.5 shadow-card-hover">
       <div className="mb-2 flex items-center gap-1.5">
         <MessageCircle className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
         <p className="text-[11px] font-semibold text-muted-foreground">Confirmação automática</p>
@@ -114,7 +113,7 @@ function WhatsAppMockup() {
 
 function QuotesMockup() {
   return (
-    <div className="w-56 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+    <div className="w-52 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
       <p className="text-[11px] font-semibold text-muted-foreground">Orçamentos · 30 dias</p>
       <p className={`${display.className} mt-1 text-3xl font-bold text-primary`}>68%</p>
       <p className="text-[11px] text-muted-foreground">de conversão</p>
@@ -129,21 +128,137 @@ function QuotesMockup() {
   );
 }
 
-function HeroMockups() {
+/** Flat-style illustrated clinic professional (keeps the page photo-free while
+ *  giving the hero the human touch of the reference sites). Decorative only. */
+function PersonIllustration({ className = '' }: { className?: string }) {
+  const green = 'hsl(152 70% 27%)';
+  const greenDark = 'hsl(155 72% 20%)';
+  const skin = '#E9B48E';
+  const skinShade = '#DDA47D';
+  const hair = '#3B2A21';
+  const coat = '#FFFFFF';
+  const coatShade = '#ECE9E2';
+  const dark = '#262B33';
   return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden="true">
+    <svg
+      viewBox="0 0 300 560"
+      className={className}
+      role="presentation"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {/* ground shadow */}
+      <ellipse cx="150" cy="542" rx="92" ry="13" fill="hsl(var(--foreground) / 0.08)" />
+
+      {/* legs */}
+      <rect x="116" y="368" width="31" height="152" rx="15" fill={dark} />
+      <rect x="153" y="368" width="31" height="152" rx="15" fill={dark} />
+      {/* shoes */}
+      <rect x="103" y="506" width="52" height="24" rx="12" fill="#F4F2ED" />
+      <rect x="150" y="506" width="52" height="24" rx="12" fill="#F4F2ED" />
+      <rect x="103" y="522" width="52" height="8" rx="4" fill="#D8D4CA" />
+      <rect x="150" y="522" width="52" height="8" rx="4" fill="#D8D4CA" />
+
+      {/* coat */}
+      <path
+        d="M150 166 C188 166 210 191 214 226 L224 368 Q226 392 201 392 L99 392 Q74 392 76 368 L86 226 C90 191 112 166 150 166 Z"
+        fill={coat}
+      />
+      {/* coat side shading */}
+      <path
+        d="M214 226 L224 368 Q226 392 201 392 L188 392 L196 226 C195 203 186 184 170 173 C193 179 211 200 214 226 Z"
+        fill={coatShade}
+      />
+      {/* scrub v-neck */}
+      <path d="M130 170 L150 214 L170 170 Z" fill={green} />
+      <path d="M150 214 L150 220 L143 206 Z" fill={greenDark} />
+      {/* coat center line */}
+      <path d="M150 220 L150 390" stroke={coatShade} strokeWidth="3" strokeLinecap="round" />
+      {/* id badge */}
+      <path d="M150 220 L173 246" stroke={coatShade} strokeWidth="3" strokeLinecap="round" />
+      <rect x="164" y="244" width="24" height="30" rx="4" fill="#F7F5F0" stroke="#DDD9CF" strokeWidth="1.5" />
+      <rect x="164" y="244" width="24" height="9" rx="4" fill={green} />
+      <rect x="169" y="258" width="14" height="3" rx="1.5" fill="#C9C4B8" />
+      <rect x="169" y="264" width="10" height="3" rx="1.5" fill="#C9C4B8" />
+
+      {/* waving arm (viewer right, raised) */}
+      <path
+        d="M204 212 C228 222 242 204 250 172"
+        stroke={coatShade}
+        strokeWidth="27"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="252" cy="160" r="14" fill={skin} />
+      <path d="M247 149 Q252 143 258 148" stroke={skinShade} strokeWidth="3" strokeLinecap="round" fill="none" />
+
+      {/* tablet-holding arm (viewer left, down) */}
+      <path
+        d="M98 210 C86 240 88 274 104 296"
+        stroke={coatShade}
+        strokeWidth="27"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* tablet */}
+      <g transform="rotate(-8 145 306)">
+        <rect x="102" y="276" width="86" height="60" rx="9" fill={dark} />
+        <rect x="108" y="282" width="74" height="48" rx="5" fill="#FDFDFB" />
+        <circle cx="145" cy="306" r="14" fill={green} />
+        <path d="M138 306 L143 311 L153 300" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+      <circle cx="106" cy="300" r="11" fill={skin} />
+
+      {/* neck */}
+      <rect x="140" y="138" width="20" height="30" rx="9" fill={skin} />
+      <path d="M140 144 Q150 152 160 144 L160 138 L140 138 Z" fill={skinShade} />
+
+      {/* head */}
+      <circle cx="150" cy="34" r="17" fill={hair} />
+      <ellipse cx="150" cy="102" rx="39" ry="43" fill={skin} />
+      <circle cx="110" cy="106" r="8" fill={skin} />
+      <circle cx="190" cy="106" r="8" fill={skin} />
+      {/* hair */}
+      <path
+        d="M110 102 C104 52 128 36 150 36 C172 36 196 52 190 102 C188 72 172 60 150 60 C128 60 112 72 110 102 Z"
+        fill={hair}
+      />
+      {/* earrings */}
+      <circle cx="110" cy="115" r="3" fill={green} />
+      <circle cx="190" cy="115" r="3" fill={green} />
+      {/* brows */}
+      <path d="M130 90 Q137 85 145 88" stroke={hair} strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path d="M170 90 Q163 85 155 88" stroke={hair} strokeWidth="3" strokeLinecap="round" fill="none" />
+      {/* eyes */}
+      <circle cx="136" cy="101" r="3.6" fill="#2A2018" />
+      <circle cx="164" cy="101" r="3.6" fill="#2A2018" />
+      {/* blush */}
+      <ellipse cx="127" cy="113" rx="5" ry="3" fill="#F2A48C" opacity="0.55" />
+      <ellipse cx="173" cy="113" rx="5" ry="3" fill="#F2A48C" opacity="0.55" />
+      {/* smile */}
+      <path d="M137 118 Q150 132 163 118" stroke="#A85F38" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+function HeroVisual() {
+  return (
+    <div className="relative mx-auto w-full max-w-md lg:max-w-lg" aria-hidden="true">
       {/* Glow */}
-      <div className="absolute -inset-8 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex flex-col items-center gap-4">
-        <div className="animate-float-slow self-end lg:-mr-4">
-          <WhatsAppMockup />
+      <div className="absolute -inset-10 rounded-full bg-primary/10 blur-3xl" />
+      <div className="relative flex items-end justify-center">
+        <div className="relative z-10 -mr-10 flex flex-col items-start gap-4 pb-10 sm:-mr-16">
+          <div className="animate-float-slow z-20 self-end sm:-mr-2">
+            <WhatsAppMockup />
+          </div>
+          <div className="animate-float">
+            <AgendaMockup />
+          </div>
+          <div className="animate-float-slow -mt-6 ml-4">
+            <QuotesMockup />
+          </div>
         </div>
-        <div className="animate-float z-10 -mt-16 self-start">
-          <AgendaMockup />
-        </div>
-        <div className="animate-float-slow -mt-10 self-end lg:mr-2">
-          <QuotesMockup />
-        </div>
+        <PersonIllustration className="relative z-0 w-36 shrink-0 sm:w-48 lg:w-56" />
       </div>
     </div>
   );
@@ -181,8 +296,8 @@ function Hero() {
           </h1>
 
           <p className="animate-fade-in-up mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg" style={{ animationDelay: '160ms' }}>
-            Agenda por profissional, confirmação automática pelo WhatsApp, orçamentos com
-            link e PDF, ficha clínica com odontograma e dashboard financeiro — feito para
+            Agenda por profissional, confirmação automática no WhatsApp, orçamentos com
+            link e PDF, ficha clínica com odontograma e dashboard financeiro. Feito para
             clínicas odontológicas e estéticas no Brasil.
           </p>
 
@@ -217,7 +332,7 @@ function Hero() {
         </div>
 
         <div className="animate-fade-in-up" style={{ animationDelay: '280ms' }}>
-          <HeroMockups />
+          <HeroVisual />
         </div>
       </div>
     </section>
@@ -230,7 +345,7 @@ function TrustStrip() {
   const items = [
     { icon: ShieldCheck, label: 'LGPD por padrão' },
     { icon: Lock, label: 'CPF e telefone criptografados' },
-    { icon: Accessibility, label: 'Acessível — WCAG 2.1 AA' },
+    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA' },
     { icon: Heart, label: 'Feito no Brasil' },
   ];
   return (
@@ -253,33 +368,33 @@ function Features() {
   const features = [
     {
       icon: CalendarDays,
-      title: 'Agenda que pensa junto',
-      text: 'Visão por dia ou semana, um profissional ao lado do outro. Bloqueio de horário, expediente visível, detecção de conflito e remarcação por arrastar.',
+      title: 'Agenda inteligente',
+      text: 'Visão por dia ou semana com os profissionais lado a lado. Bloqueio de horário, expediente visível na grade e aviso de conflito na hora de marcar.',
     },
     {
       icon: MessageCircle,
       title: 'WhatsApp automático',
-      text: 'Confirmação na hora do agendamento e lembrete no dia anterior, direto no WhatsApp do paciente. Menos faltas, sem ninguém precisar lembrar.',
+      text: 'O paciente recebe a confirmação assim que o horário é marcado e um lembrete no dia anterior. A recepção não precisa digitar mensagem nenhuma.',
     },
     {
       icon: FileText,
       title: 'Orçamentos que fecham',
-      text: 'Monte em minutos, envie por link ou PDF com a sua marca e acompanhe: visualizado, aceito, pago — com registro de pagamento parcial.',
+      text: 'Monte o orçamento em minutos, envie por link ou PDF com a sua marca e acompanhe o status: visualizado, aceito, pago. Com registro de pagamento parcial.',
     },
     {
       icon: Smile,
       title: 'Ficha clínica completa',
-      text: 'Histórico de atendimentos, odontograma interativo dente a dente e a situação financeira do paciente em uma única tela.',
+      text: 'Histórico de atendimentos, odontograma interativo dente a dente e a situação financeira do paciente reunidos em uma única tela.',
     },
     {
       icon: BarChart3,
       title: 'Financeiro sem planilha',
-      text: 'KPIs do dia, atendimentos da semana e conversão de orçamentos no dashboard. O número que importa, sem caçar em relatórios.',
+      text: 'Indicadores do dia, atendimentos da semana e conversão de orçamentos direto no dashboard. Nada de exportar relatório para saber como está o mês.',
     },
     {
       icon: Accessibility,
-      title: 'Acessível de verdade',
-      text: 'Navegação por teclado, leitores de tela, alto contraste e modo escuro. Um sistema que toda a equipe consegue usar — sem exceção.',
+      title: 'Acessibilidade levada a sério',
+      text: 'Navegação por teclado, compatibilidade com leitores de tela, alto contraste e modo escuro. Toda a equipe consegue usar o sistema.',
     },
   ];
   return (
@@ -288,26 +403,29 @@ function Features() {
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
           <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
-            Tudo que a rotina da clínica pede — e nada que atrapalhe
+            O que sua clínica ganha com o ClinicaIQ
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
-            Cada módulo foi desenhado para o dia a dia real: recepção agenda em segundos,
-            o profissional encontra o prontuário, e o dono enxerga o dinheiro.
+            Cada módulo foi desenhado para o trabalho real de uma clínica: a recepção
+            agenda em segundos, o profissional encontra o prontuário e quem gerencia
+            acompanha o dinheiro.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, title, text }) => (
-            <article
-              key={title}
-              className="group rounded-2xl border border-border bg-surface p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-card-hover"
-            >
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
-                <Icon className="h-5 w-5" aria-hidden="true" />
+        <div className="mt-12 grid gap-x-14 sm:grid-cols-2">
+          {features.map(({ icon: Icon, title, text }, i) => (
+            <div key={title} className="flex gap-5 border-t border-border py-8 sm:py-9">
+              <span className="font-mono text-sm font-medium tabular-nums text-primary" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
               </span>
-              <h3 className={`${display.className} mt-4 text-lg font-bold tracking-tight`}>{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text}</p>
-            </article>
+              <div>
+                <h3 className={`${display.className} flex items-center gap-2.5 text-lg font-bold tracking-tight`}>
+                  <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                  {title}
+                </h3>
+                <p className="mt-2.5 max-w-md text-sm leading-relaxed text-muted-foreground">{text}</p>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -348,7 +466,8 @@ function Differentiators() {
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
             Sistemas de clínica costumam servir bem só uma pessoa. O ClinicaIQ foi
-            desenhado para a recepção, o profissional e o dono — ao mesmo tempo.
+            desenhado para a recepção, para o profissional e para quem gerencia,
+            tudo ao mesmo tempo.
           </p>
         </div>
 
@@ -382,11 +501,11 @@ function FAQ() {
   const faqs = [
     {
       q: 'Quanto custa o ClinicaIQ?',
-      a: 'Durante o acesso antecipado, o ClinicaIQ é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais — e você será avisado com antecedência, sem surpresa na fatura.',
+      a: 'Durante o acesso antecipado, o ClinicaIQ é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais. Você será avisado com antecedência, sem surpresa na fatura.',
     },
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Não. O ClinicaIQ roda no navegador — no computador da recepção, no tablet do consultório e no celular. Basta criar a conta e entrar.',
+      a: 'Não. O ClinicaIQ roda direto no navegador, no computador da recepção, no tablet do consultório e no celular. Basta criar a conta e entrar.',
     },
     {
       q: 'Como funciona a confirmação pelo WhatsApp?',
@@ -398,7 +517,7 @@ function FAQ() {
     },
     {
       q: 'Funciona bem no celular?',
-      a: 'Funciona. A agenda, os pacientes e os orçamentos foram desenhados também para telas pequenas — a recepção pode confirmar um horário do celular sem sofrimento.',
+      a: 'Funciona. A agenda, os pacientes e os orçamentos foram desenhados também para telas pequenas. A recepção consegue confirmar um horário do celular sem sofrimento.',
     },
     {
       q: 'Consigo trazer meus pacientes de outro sistema?',
@@ -459,7 +578,7 @@ function FinalCTA() {
             href="/sign-up"
             className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-primary shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            Começar agora — é grátis
+            Começar agora, é grátis
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
           <Link
@@ -517,7 +636,7 @@ function Footer() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
           <p>© {new Date().getFullYear()} ClinicaIQ. Todos os direitos reservados.</p>
-          <p>Feito com cuidado no Brasil 🇧🇷</p>
+          <p>Feito no Brasil 🇧🇷</p>
         </div>
       </div>
     </footer>
