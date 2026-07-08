@@ -69,7 +69,7 @@ function CardArrow() {
 
 function FinanceCard() {
   return (
-    <div className="w-60 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs font-bold">Resumo financeiro</p>
         <CardArrow />
@@ -114,7 +114,7 @@ const BARS = [
 
 function AppointmentsCard() {
   return (
-    <div className="w-64 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-bold">Agendamentos</p>
         <CardArrow />
@@ -136,7 +136,7 @@ function AppointmentsCard() {
 
 function AttendanceCard() {
   return (
-    <div className="w-60 rounded-2xl border border-border bg-surface p-4 shadow-card-hover">
+    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-bold">Atendimentos</p>
         <CardArrow />
@@ -192,55 +192,29 @@ function RevenuePill() {
 
 function HeroVisual() {
   return (
-    <>
-      {/* Desktop: photo circle + floating cards */}
-      <div className="relative hidden h-[560px] lg:block" aria-hidden="true">
-        {/* soft color blobs */}
-        <div className="absolute -right-8 top-0 h-44 w-44 rounded-full bg-amber-200/60 blur-2xl dark:bg-amber-400/10" />
-        <div className="absolute bottom-0 left-6 h-48 w-48 rounded-full bg-sky-200/60 blur-2xl dark:bg-sky-400/10" />
-        <div className="absolute bottom-24 right-32 h-40 w-40 rounded-full bg-emerald-200/70 blur-2xl dark:bg-emerald-400/10" />
-        {/* decorative ring */}
-        <div className="absolute -bottom-16 left-0 h-[420px] w-[540px] rounded-full border border-primary/20" />
+    <div className="relative mx-auto w-fit" aria-hidden="true">
+      {/* soft color blobs */}
+      <div className="absolute -left-10 -top-8 h-40 w-40 rounded-full bg-amber-200/50 blur-2xl dark:bg-amber-400/10" />
+      <div className="absolute -bottom-10 -right-8 h-44 w-44 rounded-full bg-sky-200/50 blur-2xl dark:bg-sky-400/10" />
+      {/* decorative ring */}
+      <div className="absolute -inset-5 rounded-full border border-primary/15 sm:-inset-7" />
 
-        {/* photo */}
-        <div className="absolute right-0 top-10 h-[430px] w-[430px] overflow-hidden rounded-full border-8 border-surface bg-brand-gradient shadow-2xl">
-          <Image
-            src="/hero-professional.jpg"
-            alt=""
-            fill
-            priority
-            sizes="430px"
-            className="object-cover object-top"
-          />
-        </div>
-
-        {/* floating cards */}
-        <div className="absolute left-0 top-0 z-20 animate-float"><AppointmentsCard /></div>
-        <div className="absolute -left-5 top-[214px] z-30 animate-float-slow"><FinanceCard /></div>
-        <div className="absolute left-9 top-[402px] z-20 animate-float"><AttendanceCard /></div>
-
-        {/* floating pills */}
-        <div className="absolute right-6 top-0 z-20 animate-float-slow"><WhatsPill /></div>
-        <div className="absolute bottom-8 right-56 z-20 animate-float"><RevenuePill /></div>
+      {/* photo */}
+      <div className="relative h-72 w-72 overflow-hidden rounded-full border-8 border-surface shadow-2xl sm:h-80 sm:w-80 lg:h-[400px] lg:w-[400px]">
+        <Image
+          src="/hero-professional.jpg"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 400px, 320px"
+          className="object-cover object-top"
+        />
       </div>
 
-      {/* Mobile: photo + two elements */}
-      <div className="relative mx-auto w-full max-w-sm pb-16 lg:hidden" aria-hidden="true">
-        <div className="absolute -inset-4 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative mx-auto h-64 w-64 overflow-hidden rounded-full border-8 border-surface bg-brand-gradient shadow-2xl">
-          <Image
-            src="/hero-professional.jpg"
-            alt=""
-            fill
-            priority
-            sizes="256px"
-            className="object-cover object-top"
-          />
-        </div>
-        <div className="absolute -top-2 right-0 animate-float-slow"><WhatsPill /></div>
-        <div className="absolute -bottom-2 left-0 animate-float"><FinanceCard /></div>
-      </div>
-    </>
+      {/* pills anchored to the circle */}
+      <div className="absolute -top-3 right-0 animate-float-slow lg:-right-6"><WhatsPill /></div>
+      <div className="absolute -bottom-3 left-0 animate-float lg:-left-8"><RevenuePill /></div>
+    </div>
   );
 }
 
@@ -311,8 +285,20 @@ function Hero() {
           </p>
         </div>
 
-        <div className="animate-fade-in-up" style={{ animationDelay: '280ms' }}>
+        <div className="animate-fade-in-up py-4" style={{ animationDelay: '280ms' }}>
           <HeroVisual />
+        </div>
+      </div>
+
+      {/* Dashboard preview: clean grid, no overlaps */}
+      <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:pb-20">
+        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          O painel da sua clínica
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="animate-fade-in-up" style={{ animationDelay: '360ms' }}><AppointmentsCard /></div>
+          <div className="animate-fade-in-up" style={{ animationDelay: '420ms' }}><FinanceCard /></div>
+          <div className="animate-fade-in-up max-lg:hidden" style={{ animationDelay: '480ms' }}><AttendanceCard /></div>
         </div>
       </div>
     </section>
