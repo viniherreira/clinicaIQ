@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Settings,
+  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 
@@ -13,6 +13,7 @@ export const NAV = [
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope },
   { href: '/orcamentos', label: 'Orçamentos', icon: FileText },
+  { href: '/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
