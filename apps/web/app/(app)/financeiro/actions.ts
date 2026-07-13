@@ -3,6 +3,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { redirect } from 'next/navigation';
+import { valorPorExtenso } from '@/lib/extenso';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -13,51 +14,6 @@ async function requireTenant() {
   });
   if (!tenant) redirect('/onboarding');
   return { tenantId: tenant.id };
-}
-
-// ─── Amount in words (pt-BR, reais) ──────────────────────────────────────────
-
-const UNITS = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-const TENS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-const HUNDREDS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
-
-function under1000(n: number): string {
-  if (n === 100) return 'cem';
-  const parts: string[] = [];
-  const h = Math.floor(n / 100);
-  const rest = n % 100;
-  if (h > 0) parts.push(HUNDREDS[h]);
-  if (rest > 0) {
-    if (rest < 20) parts.push(UNITS[rest]);
-    else {
-      const t = Math.floor(rest / 10);
-      const u = rest % 10;
-      parts.push(u > 0 ? `${TENS[t]} e ${UNITS[u]}` : TENS[t]);
-    }
-  }
-  return parts.join(' e ');
-}
-
-function intToWords(n: number): string {
-  if (n === 0) return 'zero';
-  const millions = Math.floor(n / 1_000_000);
-  const thousands = Math.floor((n % 1_000_000) / 1000);
-  const rest = n % 1000;
-  const parts: string[] = [];
-  if (millions > 0) parts.push(millions === 1 ? 'um milhão' : `${under1000(millions)} milhões`);
-  if (thousands > 0) parts.push(thousands === 1 ? 'mil' : `${under1000(thousands)} mil`);
-  if (rest > 0) parts.push(under1000(rest));
-  return parts.join(parts.length > 1 && rest > 0 && rest < 100 ? ' e ' : ', ').replace(/, ([^,]*)$/, ' e $1');
-}
-
-/** "R$ 1.234,50" spoken as "mil duzentos e trinta e quatro reais e cinquenta centavos". */
-function valorPorExtenso(value: number): string {
-  const reais = Math.floor(value + 1e-6);
-  const cents = Math.round((value - reais) * 100);
-  const reaisText = `${intToWords(reais)} ${reais === 1 ? 'real' : 'reais'}`;
-  if (cents === 0) return reaisText;
-  const centsText = `${intToWords(cents)} ${cents === 1 ? 'centavo' : 'centavos'}`;
-  return `${reaisText} e ${centsText}`;
 }
 
 export interface FinanceParams {
