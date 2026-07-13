@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings,
+  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings, Sparkles,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 
-export const NAV = [
+export const NAV: { href: string; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/assistente', label: 'Assistente', icon: Sparkles, badge: 'IA' },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope },
@@ -52,6 +53,11 @@ export function AppSidebar({ clinicName }: { clinicName: string }) {
                 )}
                 <Icon className="h-[18px] w-[18px] shrink-0 transition-transform group-hover:scale-110" aria-hidden="true" />
                 {item.label}
+                {item.badge && (
+                  <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             </li>
           );

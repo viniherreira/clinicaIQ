@@ -16,7 +16,9 @@
     "WHATSAPP_PHONE_NUMBER_ID",
     "WHATSAPP_VERIFY_TOKEN",
     "NEXT_PUBLIC_APP_URL",
-    "REDIS_URL"
+    "REDIS_URL",
+    "ANTHROPIC_API_KEY",
+    "CRON_SECRET"
   ],
   "tasks": {
     "generate": {
