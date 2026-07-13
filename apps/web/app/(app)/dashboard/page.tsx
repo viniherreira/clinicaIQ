@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getDashboardData } from './actions';
+import { getDashboardData, getSetupStatus } from './actions';
+import { SetupChecklist, type SetupStep } from './_components/setup-checklist';
 
 export const metadata = { title: 'Dashboard · ClinicaIQ' };
 
@@ -17,8 +18,18 @@ const STATUS_META: Record<string, { label: string; dot: string; text: string }> 
 };
 
 export default async function DashboardPage() {
-  const { today, counts, series, quoteStats, dateLabel } = await getDashboardData();
+  const [{ today, counts, series, quoteStats, dateLabel }, setup] = await Promise.all([
+    getDashboardData(),
+    getSetupStatus(),
+  ]);
   const maxBar = Math.max(1, ...series.map((d) => d.total));
+
+  const setupSteps: SetupStep[] = [
+    { key: 'prof', label: 'Cadastrar um profissional', desc: 'A equipe que aparece na agenda', href: '/configuracoes', cta: 'Adicionar', done: setup.professionals > 0 },
+    { key: 'proc', label: 'Cadastrar um procedimento', desc: 'Com valor e duração', href: '/procedimentos', cta: 'Adicionar', done: setup.procedures > 0 },
+    { key: 'appt', label: 'Fazer o primeiro agendamento', desc: 'Marque um horário na agenda', href: '/agenda', cta: 'Agendar', done: setup.appointments > 0 },
+    { key: 'quote', label: 'Criar o primeiro orçamento', desc: 'Envie por link ou PDF', href: '/orcamentos/novo', cta: 'Criar', done: setup.quotes > 0 },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
@@ -26,6 +37,8 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm capitalize text-muted-foreground">{dateLabel}</p>
       </header>
+
+      <SetupChecklist steps={setupSteps} />
 
       {/* KPIs */}
       <section aria-label="Resumo do dia" className="grid grid-cols-2 gap-4 lg:grid-cols-4">

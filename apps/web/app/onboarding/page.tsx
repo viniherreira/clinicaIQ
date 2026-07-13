@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { completeOnboarding } from './actions';
+import { LogoMark } from '@/components/logo';
 
 export default function OnboardingPage() {
   const [isPending, startTransition] = useTransition();
@@ -36,12 +37,12 @@ export default function OnboardingPage() {
     >
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">OF</span>
+          <div className="mx-auto mb-4 w-fit">
+            <LogoMark size="lg" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Configure sua clínica</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Estas informações aparecem nos orçamentos e documentos gerados.
+            Estas informações aparecem nos orçamentos e documentos gerados. Você ajusta tudo depois em Configurações.
           </p>
         </div>
 

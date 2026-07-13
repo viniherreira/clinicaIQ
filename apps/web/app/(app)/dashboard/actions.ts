@@ -20,6 +20,19 @@ async function requireTenant() {
 
 export type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
+/** First-run counts used by the getting-started checklist. */
+export async function getSetupStatus() {
+  const { tenantId } = await requireTenant();
+  const db = getTenantClient(tenantId);
+  const [professionals, procedures, appointments, quotes] = await Promise.all([
+    db.professional.count(),
+    db.procedure.count({ where: { deletedAt: null } }),
+    db.appointment.count(),
+    db.quote.count(),
+  ]);
+  return { professionals, procedures, appointments, quotes };
+}
+
 export async function getDashboardData() {
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
