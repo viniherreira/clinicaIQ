@@ -39,8 +39,24 @@ export interface AppointmentMessageData {
 }
 
 /** First name only — friendlier and avoids overrunning the bubble. */
-function firstName(full: string): string {
+export function firstName(full: string): string {
   return full.trim().split(/\s+/)[0] ?? full;
+}
+
+/**
+ * Ordered body variables for the appointment templates, matching {{1}}..{{5}}
+ * in the approved Meta template. Keys are numeric strings so the provider's
+ * `Object.values(...)` yields them in the right order. Professional + procedure
+ * share {{5}} so there's never an empty variable (Meta rejects those).
+ */
+export function appointmentTemplateParams(d: AppointmentMessageData): Record<string, string> {
+  return {
+    '1': firstName(d.patientName),
+    '2': d.clinicName,
+    '3': d.dateLabel,
+    '4': d.timeLabel,
+    '5': d.procedureName ? `${d.professionalName} (${d.procedureName})` : d.professionalName,
+  };
 }
 
 export function buildAppointmentCreatedBody(d: AppointmentMessageData): string {
@@ -83,4 +99,15 @@ export function buildQuoteSentBody(d: QuoteMessageData): string {
     `Você pode visualizar os detalhes e responder por aqui:\n${d.link}\n\n` +
     `Válido até ${d.validUntilLabel}.`
   );
+}
+
+/** Ordered body variables for the quote_sent template ({{1}}..{{5}}). */
+export function quoteTemplateParams(d: QuoteMessageData): Record<string, string> {
+  return {
+    '1': firstName(d.patientName),
+    '2': d.clinicName,
+    '3': d.totalLabel,
+    '4': d.link,
+    '5': d.validUntilLabel,
+  };
 }

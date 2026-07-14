@@ -6,6 +6,8 @@ import {
   buildAppointmentCreatedBody,
   buildAppointmentConfirmationBody,
   buildQuoteSentBody,
+  appointmentTemplateParams,
+  quoteTemplateParams,
   type SendMessageResult,
   type AppointmentMessageData,
 } from '@clinicaiq/whatsapp';
@@ -100,8 +102,13 @@ export async function dispatchAppointmentMessage(
   const result = await getWhatsAppProvider().sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    templateName: templatesEnabled() ? templateName : undefined,
-    buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined,
+    // With approved templates on, send the structured template + its {{1}}..{{5}}
+    // params (business-initiated, no 24h window). Buttons only ride the free-text
+    // session path — the confirmation template uses plain "CONFIRMAR" replies,
+    // which the webhook already understands.
+    ...(templatesEnabled()
+      ? { templateName, templateParams: appointmentTemplateParams(data) }
+      : { buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined }),
   });
 
   await prisma.whatsAppMessage.create({
@@ -142,18 +149,21 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
   const phone = safeDecrypt(quote.patient.phoneEncrypted, quote.tenantId);
   if (!phone) return { success: false, error: 'patient-without-phone' };
 
-  const body = buildQuoteSentBody({
+  const quoteData = {
     patientName: quote.patient.name,
     clinicName: quote.tenant.name,
     totalLabel: formatBRL(Number(quote.total)),
     validUntilLabel: format(quote.validUntil, 'dd/MM/yyyy'),
     link: `${appUrl()}/orcamento/${quote.publicToken}`,
-  });
+  };
+  const body = buildQuoteSentBody(quoteData);
 
   const result = await getWhatsAppProvider().sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    templateName: templatesEnabled() ? WHATSAPP_TEMPLATES.quoteSent : undefined,
+    ...(templatesEnabled()
+      ? { templateName: WHATSAPP_TEMPLATES.quoteSent, templateParams: quoteTemplateParams(quoteData) }
+      : {}),
   });
 
   await prisma.whatsAppMessage.create({

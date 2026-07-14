@@ -5,9 +5,12 @@ export { getWhatsAppProvider } from './factory';
 export {
   WHATSAPP_TEMPLATES,
   CONFIRMATION_BUTTONS,
+  firstName,
   buildAppointmentCreatedBody,
   buildAppointmentConfirmationBody,
   buildQuoteSentBody,
+  appointmentTemplateParams,
+  quoteTemplateParams,
 } from './templates';
 export type {
   WhatsAppTemplateName,
