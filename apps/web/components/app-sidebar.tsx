@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings, Sparkles,
+  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings, Sparkles, FileBarChart,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 
@@ -15,6 +15,7 @@ export const NAV: { href: string; label: string; icon: typeof LayoutDashboard; b
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope },
   { href: '/orcamentos', label: 'Orçamentos', icon: FileText },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
+  { href: '/relatorios', label: 'Relatórios', icon: FileBarChart },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
@@ -22,7 +23,7 @@ export function AppSidebar({ clinicName }: { clinicName: string }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
+    <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex print:!hidden">
       {/* Brand */}
       <div className="flex h-16 items-center gap-2.5 px-5">
         <LogoMark size="md" />

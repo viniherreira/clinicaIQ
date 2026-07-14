@@ -440,8 +440,16 @@ const blockSchema = z.object({
   reason: z.string().max(120).optional().or(z.literal('')),
 });
 
+export interface BlockedSlotDTO {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  reason: string | null;
+  professional: { id: string; name: string };
+}
+
 export type BlockFormState =
-  | { success: true }
+  | { success: true; slot: BlockedSlotDTO }
   | { success: false; message: string };
 
 export async function createBlockedSlot(
@@ -474,12 +482,24 @@ export async function createBlockedSlot(
     };
   }
 
-  await prisma.blockedSlot.create({
+  const slot = await prisma.blockedSlot.create({
     data: { tenantId, professionalId, startTime: start, endTime: end, reason: reason || null },
+    include: { professional: { select: { id: true, name: true } } },
   });
 
   revalidatePath('/agenda');
-  return { success: true };
+  // Return the created slot so the client can add it to the grid instantly
+  // (optimistic UI) instead of refetching the whole agenda.
+  return {
+    success: true,
+    slot: {
+      id: slot.id,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      reason: slot.reason,
+      professional: slot.professional,
+    },
+  };
 }
 
 export async function deleteBlockedSlot(id: string) {

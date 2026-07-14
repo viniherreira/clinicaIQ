@@ -15,7 +15,7 @@ export function AppHeader({ clinicName }: { clinicName: string }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface/80 px-4 backdrop-blur-md sm:px-6">
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
         {/* Mobile menu + brand */}
         <button
           type="button"

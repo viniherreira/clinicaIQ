@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useId, useState } from 'react';
 import { Lock } from 'lucide-react';
-import { createBlockedSlot, type BlockFormState } from '../actions';
+import { createBlockedSlot, type BlockFormState, type BlockedSlotDTO } from '../actions';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface ProfessionalOption {
@@ -14,7 +14,7 @@ interface ProfessionalOption {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (slot: BlockedSlotDTO) => void;
   professionals: ProfessionalOption[];
   defaultDate: string;
   defaultProfessionalId?: string;
@@ -52,7 +52,7 @@ export function BlockSlotModal({
   }, [open, defaultProfessionalId, defaultTime, professionals]);
 
   useEffect(() => {
-    if (state?.success) onSuccess();
+    if (state?.success) onSuccess(state.slot);
   }, [state, onSuccess]);
 
   useEffect(() => {

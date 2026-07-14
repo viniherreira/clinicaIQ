@@ -50,7 +50,6 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   const [modal, setModal] = useState<ModalState>({ open: false, defaultDate: initialDate });
   const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, defaultDate: initialDate });
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
-  const [removing, setRemoving] = useState(false);
 
   const [visibleProfessionals, setVisibleProfessionals] = useState<Set<string>>(
     () => new Set(initialData.professionals.map((p) => p.id)),
@@ -92,16 +91,17 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
     setModal({ open: true, defaultDate: dateOverride ?? currentDate, defaultTime: timeStr, defaultProfessionalId: professionalId });
   }
 
-  async function confirmRemoveBlock() {
-    if (!removingBlockId) return;
-    setRemoving(true);
-    try {
-      await deleteBlockedSlot(removingBlockId);
-      setRemovingBlockId(null);
-      await refreshData();
-    } finally {
-      setRemoving(false);
-    }
+  function confirmRemoveBlock() {
+    const id = removingBlockId;
+    if (!id) return;
+    // Optimistic: close the dialog and drop the block instantly; roll back if
+    // the server call fails.
+    const previous = data.blockedSlots;
+    setRemovingBlockId(null);
+    setData((prev) => ({ ...prev, blockedSlots: prev.blockedSlots.filter((b) => b.id !== id) }));
+    deleteBlockedSlot(id).catch(() => {
+      setData((prev) => ({ ...prev, blockedSlots: previous }));
+    });
   }
 
   interface EditableDetail {
@@ -326,24 +326,29 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         defaultDate={blockModal.defaultDate}
         defaultTime={blockModal.defaultTime}
         defaultProfessionalId={blockModal.defaultProfessionalId}
-        onSuccess={() => {
+        onSuccess={(slot) => {
           setBlockModal((m) => ({ ...m, open: false }));
-          refreshData();
+          // Optimistic: paint the new block straight into the grid; the DTO has
+          // every field the grid reads.
+          setData((prev) => ({
+            ...prev,
+            blockedSlots: [...prev.blockedSlots, slot as unknown as AgendaData['blockedSlots'][number]],
+          }));
         }}
       />
 
       {removingBlockId && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" onClick={() => !removing && setRemovingBlockId(null)} aria-hidden="true" />
+          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" onClick={() => setRemovingBlockId(null)} aria-hidden="true" />
           <div role="alertdialog" aria-modal="true" aria-labelledby="rm-block-title" className="relative z-10 w-full max-w-sm rounded-t-2xl border border-border bg-surface p-6 shadow-2xl sm:rounded-2xl">
             <h2 id="rm-block-title" className="text-base font-semibold">Remover bloqueio?</h2>
             <p className="mt-1 text-sm text-muted-foreground">O horário volta a ficar disponível para agendamento.</p>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" disabled={removing} onClick={() => setRemovingBlockId(null)} className="h-10 rounded-md border border-border px-4 text-sm font-medium hover:bg-surface-alt transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <button type="button" onClick={() => setRemovingBlockId(null)} className="h-10 rounded-md border border-border px-4 text-sm font-medium hover:bg-surface-alt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 Cancelar
               </button>
-              <button type="button" disabled={removing} onClick={confirmRemoveBlock} className="h-10 rounded-md bg-destructive px-4 text-sm font-medium text-white hover:bg-destructive/90 transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                {removing ? 'Removendo…' : 'Remover'}
+              <button type="button" onClick={confirmRemoveBlock} className="h-10 rounded-md bg-destructive px-4 text-sm font-medium text-white hover:bg-destructive/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                Remover
               </button>
             </div>
           </div>
