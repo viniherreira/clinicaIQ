@@ -30,15 +30,34 @@ export function getTenantClient(tenantId: string) {
         },
         async findUnique({ model, args, query }: { model: string; args: any; query: any }) {
           const result = await query(args);
-          if (
-            !MODELS_WITHOUT_TENANT.has(model) &&
-            result &&
-            'tenantId' in result &&
-            result.tenantId !== tenantId
-          ) {
-            return null;
+          if (MODELS_WITHOUT_TENANT.has(model) || result == null) return result;
+          // findUnique's where only accepts unique fields, so tenantId can't be
+          // injected — we verify ownership on the returned row instead. If a
+          // restrictive `select` stripped tenantId we cannot verify, so fail
+          // closed rather than risk leaking another tenant's record.
+          if (!('tenantId' in result)) {
+            throw new Error(
+              `getTenantClient: findUnique on "${model}" must select tenantId so ownership can be verified.`,
+            );
           }
-          return result;
+          return result.tenantId === tenantId ? result : null;
+        },
+        async upsert({ model, args, query }: { model: string; args: any; query: any }) {
+          if (!MODELS_WITHOUT_TENANT.has(model)) {
+            // upsert's where is a unique selector we can't constrain by tenant,
+            // so a cross-tenant unique-key collision could touch another tenant's
+            // row. Do upserts on the raw client behind an explicit ownership check.
+            throw new Error(
+              `getTenantClient: upsert on "${model}" is not tenant-safe; use raw prisma with an explicit tenant guard.`,
+            );
+          }
+          return query(args);
+        },
+        async groupBy({ model, args, query }: { model: string; args: any; query: any }) {
+          if (!MODELS_WITHOUT_TENANT.has(model)) {
+            args.where = { ...args.where, tenantId };
+          }
+          return query(args);
         },
         async create({ model, args, query }: { model: string; args: any; query: any }) {
           if (!MODELS_WITHOUT_TENANT.has(model)) {
