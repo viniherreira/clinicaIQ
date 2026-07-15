@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setToothRecord } from '../actions';
+import { ToothOutline, OcclusalView, toothTypeOf } from './tooth-shapes';
 
 type ToothStatus = 'TO_TREAT' | 'IN_TREATMENT' | 'TREATED' | 'EXTRACTED' | 'MISSING';
 
@@ -17,42 +18,59 @@ interface Props {
   teeth: ToothData[];
 }
 
-/** FDI notation, displayed as the patient's arches (right side first). */
-const UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-const LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+/** FDI notation, patient's right side first (as seen on a dental chart). */
+const PERM_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+const PERM_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+const DECID_UPPER = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
+const DECID_LOWER = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
-const STATUS_META: Record<ToothStatus, { label: string; tooth: string; chip: string }> = {
+const STATUS_META: Record<
+  ToothStatus,
+  { label: string; outline: string; fill: string; chip: string; number: string }
+> = {
   TO_TREAT: {
     label: 'Precisa tratar',
-    tooth: 'bg-red-100 border-red-400 text-red-800 dark:bg-red-950/60 dark:border-red-500 dark:text-red-200',
+    outline: 'stroke-red-500',
+    fill: 'fill-red-100 dark:fill-red-950/70',
     chip: 'bg-red-500',
+    number: 'text-red-600 dark:text-red-400',
   },
   IN_TREATMENT: {
     label: 'Em tratamento',
-    tooth: 'bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-950/60 dark:border-amber-500 dark:text-amber-200',
+    outline: 'stroke-amber-500',
+    fill: 'fill-amber-100 dark:fill-amber-950/70',
     chip: 'bg-amber-500',
+    number: 'text-amber-600 dark:text-amber-400',
   },
   TREATED: {
     label: 'Tratado',
-    tooth: 'bg-emerald-100 border-emerald-400 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-500 dark:text-emerald-200',
+    outline: 'stroke-emerald-600',
+    fill: 'fill-emerald-100 dark:fill-emerald-950/70',
     chip: 'bg-emerald-500',
+    number: 'text-emerald-700 dark:text-emerald-400',
   },
   EXTRACTED: {
     label: 'Extraído',
-    tooth: 'bg-surface-alt border-border-strong text-muted-foreground line-through',
+    outline: 'stroke-slate-400 dark:stroke-slate-500',
+    fill: 'fill-transparent',
     chip: 'bg-slate-500',
+    number: 'text-muted-foreground line-through',
   },
   MISSING: {
     label: 'Ausente',
-    tooth: 'bg-transparent border-dashed border-border-strong text-muted-foreground/60',
+    outline: 'stroke-slate-300 dark:stroke-slate-600 [stroke-dasharray:3_2]',
+    fill: 'fill-transparent',
     chip: 'bg-slate-300 dark:bg-slate-600',
+    number: 'text-muted-foreground/50',
   },
 };
 
+const DEFAULT_OUTLINE = 'stroke-slate-400 dark:stroke-slate-500';
 const STATUS_ORDER: ToothStatus[] = ['TO_TREAT', 'IN_TREATMENT', 'TREATED', 'EXTRACTED', 'MISSING'];
 
 export function Odontogram({ patientId, teeth }: Props) {
   const router = useRouter();
+  const [dentition, setDentition] = useState<'perm' | 'decid'>('perm');
   const [selected, setSelected] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -75,10 +93,33 @@ export function Odontogram({ patientId, teeth }: Props) {
     });
   }
 
-  function Tooth({ n }: { n: number }) {
+  function Tooth({ n, arch }: { n: number; arch: 'upper' | 'lower' }) {
     const data = byNumber.get(n);
     const meta = data ? STATUS_META[data.status] : null;
     const isSel = selected === n;
+    const outline = meta?.outline ?? DEFAULT_OUTLINE;
+    const fill = meta?.fill ?? 'fill-transparent';
+    const crossed = data?.status === 'EXTRACTED';
+    const type = toothTypeOf(n);
+
+    const number = (
+      <span className={`text-[10px] font-semibold tabular-nums sm:text-[11px] ${meta?.number ?? 'text-muted-foreground'}`}>
+        {n}
+      </span>
+    );
+    const outlineEl = (
+      <ToothOutline
+        type={type}
+        flip={arch === 'lower'}
+        outlineClass={outline}
+        crossed={crossed}
+        className="h-9 w-7 sm:h-11 sm:w-8"
+      />
+    );
+    const occlusalEl = (
+      <OcclusalView outlineClass={outline} fillClass={fill} className="h-5 w-5 sm:h-6 sm:w-6" />
+    );
+
     return (
       <button
         type="button"
@@ -87,40 +128,79 @@ export function Odontogram({ patientId, teeth }: Props) {
         aria-label={`Dente ${n}${meta ? ` — ${meta.label}` : ''}${data?.note ? ` — ${data.note}` : ''}`}
         title={meta ? `${n} · ${meta.label}` : `Dente ${n}`}
         className={[
-          'flex h-9 w-7 shrink-0 items-center justify-center rounded-md rounded-b-xl border text-[11px] font-semibold tabular-nums transition-all sm:h-10 sm:w-8',
-          meta ? meta.tooth : 'border-border bg-surface text-foreground hover:border-primary/50 hover:bg-primary/5',
-          isSel ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface scale-110' : '',
+          'flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 transition-all',
+          isSel ? 'bg-primary/10 ring-2 ring-primary' : 'hover:bg-surface-alt',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         ].join(' ')}
       >
-        {n}
+        {arch === 'upper' ? (
+          <>
+            {number}
+            {outlineEl}
+            {occlusalEl}
+          </>
+        ) : (
+          <>
+            {occlusalEl}
+            {outlineEl}
+            {number}
+          </>
+        )}
       </button>
     );
   }
 
-  function Arch({ label, numbers, flip }: { label: string; numbers: number[]; flip?: boolean }) {
+  function Arch({ numbers, arch }: { numbers: number[]; arch: 'upper' | 'lower' }) {
+    const mid = numbers.length / 2;
     return (
-      <div>
-        <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
-        <div className="overflow-x-auto pb-1">
-          <div className={`flex w-max gap-1 ${flip ? 'items-start' : 'items-end'}`} role="group" aria-label={label}>
-            {numbers.slice(0, 8).map((n) => <Tooth key={n} n={n} />)}
-            <span className="mx-1 h-9 w-px self-center bg-border-strong sm:h-10" aria-hidden="true" />
-            {numbers.slice(8).map((n) => <Tooth key={n} n={n} />)}
-          </div>
+      <div className="overflow-x-auto pb-1">
+        <div
+          className="mx-auto flex w-max items-center gap-0.5 sm:gap-1"
+          role="group"
+          aria-label={arch === 'upper' ? 'Arcada superior' : 'Arcada inferior'}
+        >
+          {numbers.slice(0, mid).map((n) => <Tooth key={n} n={n} arch={arch} />)}
+          <span className="mx-1.5 h-14 w-px self-center bg-border-strong sm:h-16" aria-hidden="true" />
+          {numbers.slice(mid).map((n) => <Tooth key={n} n={n} arch={arch} />)}
         </div>
       </div>
     );
   }
 
+  const upper = dentition === 'perm' ? PERM_UPPER : DECID_UPPER;
+  const lower = dentition === 'perm' ? PERM_LOWER : DECID_LOWER;
+
   return (
     <div className="space-y-4">
-      <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
-        <Arch label="Arcada superior" numbers={UPPER} />
-        <Arch label="Arcada inferior" numbers={LOWER} flip />
+      <div className="space-y-2 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
+        {/* Dentition toggle */}
+        <div className="flex justify-center">
+          <div className="segmented" role="group" aria-label="Dentição">
+            <button
+              type="button"
+              onClick={() => { setDentition('perm'); setSelected(null); }}
+              aria-pressed={dentition === 'perm'}
+              className="segmented-item"
+            >
+              Permanentes
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDentition('decid'); setSelected(null); }}
+              aria-pressed={dentition === 'decid'}
+              className="segmented-item"
+            >
+              Decíduos
+            </button>
+          </div>
+        </div>
+
+        <Arch numbers={upper} arch="upper" />
+        <div className="mx-auto w-4/5 border-t border-dashed border-border" aria-hidden="true" />
+        <Arch numbers={lower} arch="lower" />
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 border-t border-border pt-3">
           {STATUS_ORDER.map((s) => (
             <span key={s} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className={`h-2.5 w-2.5 rounded-full ${STATUS_META[s].chip}`} aria-hidden="true" />
@@ -201,7 +281,7 @@ export function Odontogram({ patientId, teeth }: Props) {
           <p className="text-xs text-muted-foreground">Escolha uma situação acima — a nota é salva junto.</p>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           {marked.length > 0
             ? `${marked.length} dente${marked.length > 1 ? 's' : ''} precisando de atenção: ${marked.map((t) => t.toothNumber).sort((a, b) => a - b).join(', ')}.`
             : 'Clique em um dente para marcar a situação.'}

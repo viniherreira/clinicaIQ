@@ -9,6 +9,9 @@ import { PatientStatusBadge } from '../_components/patient-status-badge';
 import { RecordTabs } from './_components/record-tabs';
 import { Odontogram } from './_components/odontogram';
 import { FinancialSection } from './_components/financial-section';
+import { AnamnesisSection } from './_components/anamnesis-section';
+import { EvolutionsSection } from './_components/evolutions-section';
+import { ImagesSection } from './_components/images-section';
 import { wallClockTime } from '@/lib/tz';
 
 export const metadata = { title: 'Ficha do paciente' };
@@ -297,6 +300,35 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             label: 'Odontograma',
             badge: teethToTreat,
             content: <Odontogram patientId={patient.id} teeth={record.teeth} />,
+          },
+          {
+            id: 'anamnese',
+            label: 'Anamnese',
+            content: <AnamnesisSection patientId={patient.id} initial={record.anamnesis} />,
+          },
+          {
+            id: 'evolucoes',
+            label: 'Evoluções',
+            badge: record.evolutions.length,
+            content: (
+              <EvolutionsSection
+                patientId={patient.id}
+                evolutions={record.evolutions}
+                professionals={record.professionals}
+              />
+            ),
+          },
+          {
+            id: 'imagens',
+            label: 'Imagens',
+            badge: record.files.length,
+            content: (
+              <ImagesSection
+                patientId={patient.id}
+                files={record.files}
+                storageEnabled={record.storageEnabled}
+              />
+            ),
           },
           {
             id: 'financeiro',

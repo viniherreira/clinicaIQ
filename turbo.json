@@ -18,7 +18,9 @@
     "NEXT_PUBLIC_APP_URL",
     "REDIS_URL",
     "ANTHROPIC_API_KEY",
-    "CRON_SECRET"
+    "CRON_SECRET",
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY"
   ],
   "tasks": {
     "generate": {

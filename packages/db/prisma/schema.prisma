@@ -98,6 +98,9 @@ model Tenant {
   patientNotes        PatientNote[]
   toothRecords        ToothRecord[]
   payments            Payment[]
+  anamneses           Anamnesis[]
+  evolutions          Evolution[]
+  patientFiles        PatientFile[]
 
   @@map("tenants")
 }
@@ -159,6 +162,9 @@ model Patient {
   messages     WhatsAppMessage[]
   toothRecords ToothRecord[]
   payments     Payment[]
+  anamnesis    Anamnesis?
+  evolutions   Evolution[]
+  files        PatientFile[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -200,6 +206,7 @@ model Professional {
   appointments Appointment[]
   blockedSlots BlockedSlot[]
   procedures   Procedure[]            @relation("ProcedureProfessionals")
+  evolutions   Evolution[]
 
   @@index([tenantId])
   @@map("professionals")
@@ -416,6 +423,63 @@ model ToothRecord {
   @@unique([patientId, toothNumber])
   @@index([tenantId, patientId])
   @@map("tooth_records")
+}
+
+/** Health questionnaire (one per patient). Answers stored as JSON:
+ *  { items: { [key]: { value: 'yes'|'no', detail?: string } }, obs?: string } */
+model Anamnesis {
+  id          String   @id @default(cuid())
+  tenantId    String
+  patientId   String   @unique
+  answers     Json
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([tenantId])
+  @@map("anamneses")
+}
+
+/** Clinical evolution entry — what was done in a visit/session. */
+model Evolution {
+  id             String   @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String?
+  description    String
+  teeth          Int[]    @default([])
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  professional Professional? @relation(fields: [professionalId], references: [id])
+
+  @@index([tenantId, patientId, createdAt(sort: Desc)])
+  @@map("evolutions")
+}
+
+/** Image/document attached to a patient (stored in Supabase Storage). */
+model PatientFile {
+  id          String   @id @default(cuid())
+  tenantId    String
+  patientId   String
+  bucketPath  String
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  description String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([tenantId, patientId, createdAt(sort: Desc)])
+  @@map("patient_files")
 }
 
 model Payment {
