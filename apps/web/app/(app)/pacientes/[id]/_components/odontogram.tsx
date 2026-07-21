@@ -112,8 +112,9 @@ export function Odontogram({ patientId, teeth }: Props) {
         type={type}
         flip={arch === 'lower'}
         outlineClass={outline}
+        fillClass={fill}
         crossed={crossed}
-        className="h-9 w-7 sm:h-11 sm:w-8"
+        className="h-10 w-7 sm:h-12 sm:w-9"
       />
     );
     const occlusalEl = (

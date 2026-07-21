@@ -44,7 +44,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
         </p>
       </div>
 
-      <QuoteDetailActions quoteId={quote.id} status={quote.status} publicToken={quote.publicToken} />
+      <QuoteDetailActions quoteId={quote.id} status={quote.status} />
 
       {/* Items */}
       <section className="overflow-hidden rounded-xl border border-border bg-surface">

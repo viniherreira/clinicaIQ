@@ -445,13 +445,80 @@ export async function deleteQuotePayment(paymentId: string, quoteId: string) {
   revalidatePath('/orcamentos');
 }
 
+/** Clinic-side approval: marks the quote ACCEPTED so it counts in the financial
+ *  totals (contratado / a receber) and the dashboard. */
+export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireTenant();
+  const quote = await prisma.quote.findFirst({
+    where: { id, tenantId },
+    select: { status: true, patientId: true },
+  });
+  if (!quote) return { ok: false, message: 'Orçamento não encontrado' };
+
+  await prisma.quote.update({
+    where: { id, tenantId },
+    data: { status: 'ACCEPTED', acceptedAt: new Date(), rejectedAt: null, rejectReason: null, updatedById: userId },
+  });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'ACCEPT', entity: 'Quote', entityId: id },
+  });
+
+  revalidatePath('/orcamentos');
+  revalidatePath(`/orcamentos/${id}`);
+  revalidatePath('/financeiro');
+  revalidatePath('/dashboard');
+  revalidatePath(`/pacientes/${quote.patientId}`);
+  return { ok: true };
+}
+
+/** Undo an approval — sends the quote back to DRAFT so it drops out of the
+ *  financial totals and can be edited again. */
+export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
+  const { tenantId, userId } = await requireTenant();
+  const quote = await prisma.quote.findFirst({
+    where: { id, tenantId },
+    select: { patientId: true },
+  });
+  if (!quote) return { ok: false };
+
+  await prisma.quote.update({
+    where: { id, tenantId },
+    data: { status: 'DRAFT', acceptedAt: null, updatedById: userId },
+  });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'REOPEN', entity: 'Quote', entityId: id },
+  });
+
+  revalidatePath('/orcamentos');
+  revalidatePath(`/orcamentos/${id}`);
+  revalidatePath('/financeiro');
+  revalidatePath('/dashboard');
+  revalidatePath(`/pacientes/${quote.patientId}`);
+  return { ok: true };
+}
+
 export async function deleteQuote(id: string) {
   const { tenantId, userId } = await requireTenant();
-  await prisma.quote.delete({ where: { id, tenantId } });
+  const quote = await prisma.quote.findFirst({
+    where: { id, tenantId },
+    select: { patientId: true },
+  });
+  if (!quote) return;
+
+  // Payments reference the quote with SetNull, so a bare delete would leave them
+  // orphaned and still counted in the financial totals. Remove them together.
+  await prisma.$transaction([
+    prisma.payment.deleteMany({ where: { quoteId: id, tenantId } }),
+    prisma.quote.delete({ where: { id, tenantId } }),
+  ]);
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Quote', entityId: id },
   });
+
   revalidatePath('/orcamentos');
+  revalidatePath('/financeiro');
+  revalidatePath('/dashboard');
+  revalidatePath(`/pacientes/${quote.patientId}`);
 }
 
 // ─── PDF data ──────────────────────────────────────────────────────────────────
