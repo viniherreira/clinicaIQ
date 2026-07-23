@@ -44,7 +44,11 @@ export async function getDashboardData() {
   const weekStart = new Date(todayStart.getTime() - 6 * 86400000);
   const monthStart = subDays(now, 30);
 
-  const [todayAppointments, weekAppointments, quotes] = await Promise.all([
+  // Month-to-date window, in clinic dates, for the cash block.
+  const monthFrom = `${today.slice(0, 7)}-01`;
+  const monthPayStart = new Date(`${monthFrom}T00:00:00.000Z`);
+
+  const [todayAppointments, weekAppointments, quotes, monthPayments, openQuotes] = await Promise.all([
     db.appointment.findMany({
       where: { startTime: { gte: todayStart, lte: todayEnd } },
       orderBy: { startTime: 'asc' },
@@ -53,7 +57,7 @@ export async function getDashboardData() {
         status: true,
         startTime: true,
         endTime: true,
-        patient: { select: { name: true } },
+        patient: { select: { id: true, name: true } },
         professional: { select: { name: true, color: true } },
         procedure: { select: { name: true } },
       },
@@ -65,6 +69,14 @@ export async function getDashboardData() {
     db.quote.findMany({
       where: { createdAt: { gte: monthStart } },
       select: { status: true, total: true },
+    }),
+    db.payment.findMany({
+      where: { paidAt: { gte: monthPayStart, lte: todayEnd } },
+      select: { amount: true },
+    }),
+    db.quote.findMany({
+      where: { status: 'ACCEPTED' },
+      select: { total: true, validUntil: true, payments: { select: { amount: true } } },
     }),
   ]);
 
@@ -107,12 +119,29 @@ export async function getDashboardData() {
     acceptedValue: accepted.reduce((sum, q) => sum + Number(q.total), 0),
   };
 
+  // ── Cash (month to date) ────────────────────────────────────────
+  // Same definitions as /financeiro: "recebido" from Payment rows, "a receber"
+  // and "vencido" from accepted quotes with an open balance.
+  const receivedMonth = monthPayments.reduce((s, p) => s + Number(p.amount), 0);
+  let outstanding = 0;
+  let overdue = 0;
+  for (const q of openQuotes) {
+    const paid = q.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const balance = Number(q.total) - paid;
+    if (balance > 0.005) {
+      outstanding += balance;
+      if (q.validUntil < now) overdue += balance;
+    }
+  }
+  const finance = { receivedMonth, outstanding, overdue, monthFrom, monthTo: today };
+
   return {
     today: todayAppointments.map((a) => ({
       id: a.id,
       status: a.status,
       time: wallClockTime(a.startTime),
       patient: a.patient.name,
+      patientId: a.patient.id,
       professional: a.professional.name,
       professionalColor: a.professional.color,
       procedure: a.procedure?.name ?? null,
@@ -120,6 +149,8 @@ export async function getDashboardData() {
     counts,
     series,
     quoteStats,
+    finance,
+    todayIso: today,
     dateLabel: format(new Date(`${today}T12:00:00.000Z`), "EEEE, d 'de' MMMM", { locale: ptBR }),
   };
 }

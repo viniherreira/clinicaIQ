@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowRight, ArrowUpRight, CalendarDays, FileBarChart, Wallet } from 'lucide-react';
 import { getDashboardData, getSetupStatus } from './actions';
 import { SetupChecklist, type SetupStep } from './_components/setup-checklist';
 
@@ -18,11 +19,15 @@ const STATUS_META: Record<string, { label: string; dot: string; text: string }> 
 };
 
 export default async function DashboardPage() {
-  const [{ today, counts, series, quoteStats, dateLabel }, setup] = await Promise.all([
+  const [{ today, counts, series, quoteStats, finance, todayIso, dateLabel }, setup] = await Promise.all([
     getDashboardData(),
     getSetupStatus(),
   ]);
   const maxBar = Math.max(1, ...series.map((d) => d.total));
+  const monthPeriod = `from=${finance.monthFrom}&to=${finance.monthTo}`;
+  const weekFrom = new Date(new Date(`${todayIso}T12:00:00.000Z`).getTime() - 6 * 86400000)
+    .toISOString()
+    .slice(0, 10);
 
   const setupSteps: SetupStep[] = [
     { key: 'prof', label: 'Cadastrar um profissional', desc: 'A equipe que aparece na agenda', href: '/configuracoes', cta: 'Adicionar', done: setup.professionals > 0 },
@@ -33,19 +38,74 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm capitalize text-muted-foreground">{dateLabel}</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm capitalize text-muted-foreground">{dateLabel}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/agenda" className="btn-ghost btn-md">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" /> Agenda
+          </Link>
+          <Link href={`/financeiro?${monthPeriod}`} className="btn-ghost btn-md">
+            <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
+          </Link>
+          <Link href={`/relatorios?type=agendamentos&from=${finance.monthFrom}&to=${finance.monthTo}`} className="btn-outline btn-md">
+            <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatórios
+          </Link>
+        </div>
       </header>
 
       <SetupChecklist steps={setupSteps} />
 
-      {/* KPIs */}
+      {/* KPIs do dia */}
       <section aria-label="Resumo do dia" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label="Agendados hoje" value={counts.total} hint="no total" />
-        <Kpi label="Confirmados" value={counts.confirmed} hint={`${counts.confirmedPct}% do dia`} tone="success" />
-        <Kpi label="A confirmar" value={counts.toConfirm} hint="aguardando" tone="warning" />
-        <Kpi label="Faltas" value={counts.missed} hint="hoje" tone={counts.missed > 0 ? 'danger' : 'muted'} />
+        <Kpi label="Agendados hoje" value={counts.total} hint="no total" href="/agenda" />
+        <Kpi
+          label="Confirmados"
+          value={counts.confirmed}
+          hint={`${counts.confirmedPct}% do dia`}
+          tone="success"
+          href={`/relatorios?type=agendamentos&status=CONFIRMED&from=${todayIso}&to=${todayIso}`}
+        />
+        <Kpi
+          label="A confirmar"
+          value={counts.toConfirm}
+          hint="aguardando"
+          tone="warning"
+          href={`/relatorios?type=agendamentos&status=SCHEDULED&from=${todayIso}&to=${todayIso}`}
+        />
+        <Kpi
+          label="Faltas"
+          value={counts.missed}
+          hint="hoje"
+          tone={counts.missed > 0 ? 'danger' : 'muted'}
+          href={`/relatorios?type=agendamentos&status=MISSED&from=${todayIso}&to=${todayIso}`}
+        />
+      </section>
+
+      {/* Caixa do mês — mesmos números do Financeiro */}
+      <section aria-label="Caixa do mês" className="grid gap-4 sm:grid-cols-3">
+        <Money
+          label="Recebido no mês"
+          value={finance.receivedMonth}
+          hint="pagamentos lançados"
+          href={`/financeiro?${monthPeriod}`}
+          tone="success"
+        />
+        <Money
+          label="A receber"
+          value={finance.outstanding}
+          hint="orçamentos aprovados em aberto"
+          href="/orcamentos?status=ACCEPTED"
+        />
+        <Money
+          label="Vencido"
+          value={finance.overdue}
+          hint="passou da validade"
+          href="/orcamentos?status=ACCEPTED"
+          tone={finance.overdue > 0 ? 'danger' : 'muted'}
+        />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -53,9 +113,15 @@ export default async function DashboardPage() {
         <div className="space-y-6 lg:col-span-2">
           {/* 7-day chart */}
           <section className="rounded-xl border border-border bg-surface shadow-card p-5">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">Atendimentos · últimos 7 dias</h2>
-              <span className="text-xs text-muted-foreground">{series.reduce((s, d) => s + d.total, 0)} no período</span>
+              <Link
+                href={`/relatorios?type=agendamentos&from=${weekFrom}&to=${todayIso}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {series.reduce((s, d) => s + d.total, 0)} no período
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
             </div>
             <div className="flex items-end justify-between gap-2" role="img" aria-label={`Gráfico de atendimentos: ${series.map((d) => `${d.label} ${d.total}`).join(', ')}`}>
               {series.map((d, i) => (
@@ -89,7 +155,11 @@ export default async function DashboardPage() {
                   const meta = STATUS_META[a.status] ?? STATUS_META.SCHEDULED;
                   return (
                     <li key={a.id}>
-                      <Link href="/agenda" className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
+                      <Link
+                        href={`/pacientes/${a.patientId}`}
+                        className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                        title={`Abrir prontuário de ${a.patient}`}
+                      >
                         <span className="w-12 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{a.time}</span>
                         <span className="h-7 w-1 shrink-0 rounded-full" style={{ backgroundColor: a.professionalColor ?? '#94a3b8' }} aria-hidden="true" />
                         <span className="min-w-0 flex-1">
@@ -102,6 +172,7 @@ export default async function DashboardPage() {
                           <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
                           <span className="hidden sm:inline">{meta.label}</span>
                         </span>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
                       </Link>
                     </li>
                   );
@@ -114,7 +185,16 @@ export default async function DashboardPage() {
         {/* Right: quotes */}
         <aside className="space-y-6">
           <section className="rounded-xl border border-border bg-surface shadow-card p-5">
-            <h2 className="text-sm font-semibold">Orçamentos · 30 dias</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">Orçamentos · 30 dias</h2>
+              <Link
+                href={`/relatorios?type=orcamentos&from=${finance.monthFrom}&to=${finance.monthTo}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Relatório
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </div>
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <Stat label="Enviados" value={String(quoteStats.sent)} />
@@ -139,30 +219,70 @@ export default async function DashboardPage() {
   );
 }
 
+type Tone = 'default' | 'success' | 'warning' | 'danger' | 'muted';
+
+const TONE_CLS: Record<Tone, string> = {
+  default: 'text-foreground',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-destructive',
+  muted: 'text-muted-foreground',
+};
+
+const CARD_CLS =
+  'group relative block rounded-xl border border-border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+
 function Kpi({
   label,
   value,
   hint,
   tone = 'default',
+  href,
 }: {
   label: string;
   value: number;
   hint: string;
-  tone?: 'default' | 'success' | 'warning' | 'danger' | 'muted';
+  tone?: Tone;
+  href: string;
 }) {
-  const toneCls = {
-    default: 'text-foreground',
-    success: 'text-success',
-    warning: 'text-warning',
-    danger: 'text-destructive',
-    muted: 'text-muted-foreground',
-  }[tone];
   return (
-    <div className="rounded-xl border border-border bg-surface shadow-card p-4">
+    <Link href={href} className={CARD_CLS}>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-3xl font-semibold tracking-tight ${toneCls}`}>{value}</p>
+      <p className={`mt-1 text-3xl font-semibold tracking-tight ${TONE_CLS[tone]}`}>{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-    </div>
+      <ArrowRight
+        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden="true"
+      />
+    </Link>
+  );
+}
+
+function Money({
+  label,
+  value,
+  hint,
+  href,
+  tone = 'default',
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  href: string;
+  tone?: Tone;
+}) {
+  return (
+    <Link href={href} className={CARD_CLS}>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${TONE_CLS[tone]}`}>
+        {formatCurrency(value)}
+      </p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      <ArrowRight
+        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden="true"
+      />
+    </Link>
   );
 }
 

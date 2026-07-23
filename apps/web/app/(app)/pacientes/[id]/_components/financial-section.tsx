@@ -1,8 +1,9 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2 } from 'lucide-react';
+import { FileText, Plus, Trash2 } from 'lucide-react';
 import { addPayment, deletePayment, type PaymentFormState } from '../actions';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -12,12 +13,21 @@ interface PaymentRow {
   method: string | null;
   notes: string | null;
   paidAt: Date | string;
+  quoteId: string | null;
   quoteNumber: number | null;
 }
 interface AcceptedQuote {
   id: string;
   number: number;
   total: number;
+}
+interface QuoteRow {
+  id: string;
+  number: number;
+  status: string;
+  total: number;
+  paid: number;
+  createdAt: Date | string;
 }
 interface Props {
   patientId: string;
@@ -26,7 +36,17 @@ interface Props {
   balance: number;
   payments: PaymentRow[];
   acceptedQuotes: AcceptedQuote[];
+  quotes: QuoteRow[];
 }
+
+const QUOTE_STATUS_PT: Record<string, { label: string; cls: string }> = {
+  DRAFT: { label: 'Rascunho', cls: 'bg-surface-alt text-muted-foreground' },
+  SENT: { label: 'Enviado', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' },
+  VIEWED: { label: 'Visualizado', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' },
+  ACCEPTED: { label: 'Aprovado', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+  REJECTED: { label: 'Recusado', cls: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
+  EXPIRED: { label: 'Expirado', cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300' },
+};
 
 const METHODS = ['PIX', 'Dinheiro', 'Cartão de crédito', 'Cartão de débito', 'Transferência', 'Boleto', 'Outro'];
 
@@ -40,7 +60,7 @@ function maskBRL(raw: string): string {
   return (Number(digits) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function FinancialSection({ patientId, contracted, paid, balance, payments, acceptedQuotes }: Props) {
+export function FinancialSection({ patientId, contracted, paid, balance, payments, acceptedQuotes, quotes }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
@@ -85,6 +105,49 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
           </p>
         </div>
       </div>
+
+      {/* Quotes for this patient */}
+      <section className="rounded-xl border border-border bg-surface shadow-card" aria-label="Orçamentos do paciente">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-semibold">Orçamentos</h3>
+          <Link href={`/orcamentos/novo?patientId=${patientId}`} className="btn-outline btn-sm">
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Novo orçamento
+          </Link>
+        </div>
+        {quotes.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Nenhum orçamento para este paciente.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {quotes.map((q) => {
+              const meta = QUOTE_STATUS_PT[q.status] ?? QUOTE_STATUS_PT.DRAFT;
+              return (
+                <li key={q.id}>
+                  <Link
+                    href={`/orcamentos/${q.id}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:px-5"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="font-mono text-xs font-medium text-primary">
+                        ORC-{String(q.number).padStart(4, '0')}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {new Date(q.createdAt).toLocaleDateString('pt-BR')}
+                        {q.paid > 0 && ` · pago ${brl(q.paid)}`}
+                      </span>
+                    </span>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.cls}`}>
+                      {meta.label}
+                    </span>
+                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">{brl(q.total)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* Payments */}
       <section className="rounded-xl border border-border bg-surface shadow-card" aria-label="Pagamentos">
@@ -169,10 +232,25 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
                   <p className="truncate text-xs text-muted-foreground">
                     {new Date(p.paidAt).toLocaleDateString('pt-BR')}
                     {p.method && ` · ${p.method}`}
-                    {p.quoteNumber != null && ` · ORC-${String(p.quoteNumber).padStart(4, '0')}`}
+                    {p.quoteId && p.quoteNumber != null && (
+                      <>
+                        {' · '}
+                        <Link href={`/orcamentos/${p.quoteId}`} className="hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                          ORC-{String(p.quoteNumber).padStart(4, '0')}
+                        </Link>
+                      </>
+                    )}
                     {p.notes && ` · ${p.notes}`}
                   </p>
                 </div>
+                <Link
+                  href={`/financeiro/recibo/${p.id}`}
+                  aria-label={`Recibo do pagamento de ${brl(p.amount)}`}
+                  title="Baixar recibo"
+                  className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-alt hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                </Link>
                 <button
                   type="button"
                   disabled={isDeleting}

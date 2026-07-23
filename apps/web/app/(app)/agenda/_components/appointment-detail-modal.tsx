@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useId, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { FileText, User } from 'lucide-react';
 import { wallClockTime } from '@/lib/tz';
 import { getAppointment, updateAppointmentStatus } from '../actions';
 import { STATUS_STYLES, STATUS_LABELS, TYPE_LABELS } from './constants';
@@ -152,6 +154,15 @@ export function AppointmentDetailModal({ open, appointmentId, onClose, onChanged
                   );
                 })}
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 border-t border-border p-4">
+              <Link href={`/pacientes/${detail.patient.id}`} className="btn-outline btn-sm">
+                <User className="h-3.5 w-3.5" aria-hidden="true" /> Prontuário
+              </Link>
+              <Link href={`/orcamentos/novo?patientId=${detail.patient.id}`} className="btn-outline btn-sm">
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Novo orçamento
+              </Link>
             </div>
           </>
         )}

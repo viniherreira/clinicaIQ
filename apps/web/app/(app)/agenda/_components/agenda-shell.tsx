@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -225,6 +225,16 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
                 <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
+
+            <Link
+              href={`/relatorios?type=agendamentos&from=${currentDate}&to=${currentDate}`}
+              className="btn-ghost btn-sm !h-9 sm:px-3"
+              aria-label="Ver relatório deste dia"
+              title="Ver este dia no relatório"
+            >
+              <FileBarChart className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden lg:inline">Relatório</span>
+            </Link>
 
             <button
               type="button"

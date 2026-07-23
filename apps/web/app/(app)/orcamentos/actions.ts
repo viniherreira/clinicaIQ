@@ -86,7 +86,7 @@ export async function listQuotes({
     ...(search ? { patient: { name: { contains: search, mode: 'insensitive' as const } } } : {}),
   };
 
-  const [quotes, total] = await Promise.all([
+  const [quotes, total, valueAgg, paidAgg, acceptedCount] = await Promise.all([
     db.quote.findMany({
       where,
       orderBy: { number: 'desc' },
@@ -99,13 +99,20 @@ export async function listQuotes({
         total: true,
         validUntil: true,
         createdAt: true,
-        patient: { select: { name: true } },
+        patient: { select: { id: true, name: true } },
         _count: { select: { items: true } },
         payments: { select: { amount: true } },
       },
     }),
     db.quote.count({ where }),
+    // Totals below cover the whole filtered set, not just the current page.
+    db.quote.aggregate({ where, _sum: { total: true } }),
+    db.payment.aggregate({ where: { quote: where }, _sum: { amount: true } }),
+    db.quote.count({ where: { ...where, status: 'ACCEPTED' } }),
   ]);
+
+  const totalValue = Number(valueAgg._sum.total ?? 0);
+  const totalPaid = Number(paidAgg._sum.amount ?? 0);
 
   return {
     quotes: quotes.map((q) => ({
@@ -116,6 +123,12 @@ export async function listQuotes({
     })),
     total,
     pages: Math.ceil(total / PAGE_SIZE),
+    totals: {
+      value: totalValue,
+      paid: totalPaid,
+      pending: Math.max(0, totalValue - totalPaid),
+      accepted: acceptedCount,
+    },
   };
 }
 
@@ -188,6 +201,16 @@ export async function listQuoteProcedures() {
     basePrice: Number(p.basePrice),
     maxDiscountPercent: p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : null,
   }));
+}
+
+/** Pre-selects a patient when the quote is started from the agenda or a record. */
+export async function getQuotePatient(patientId: string) {
+  const { tenantId } = await requireTenant();
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, tenantId },
+    select: { id: true, name: true, controlNumber: true },
+  });
+  return patient;
 }
 
 // ─── Create / update ──────────────────────────────────────────────────────────

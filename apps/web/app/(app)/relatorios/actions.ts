@@ -27,10 +27,18 @@ export interface ReportParams {
   status?: string;
 }
 
+export interface ReportRow {
+  /** Pre-formatted display strings (also used for CSV). */
+  cells: string[];
+  /** Where clicking the row goes (patient / quote), when there is a record. */
+  href?: string;
+}
+
 export interface ReportResult {
   columns: string[];
-  /** Pre-formatted display strings, one array per row (also used for CSV). */
-  rows: string[][];
+  rows: ReportRow[];
+  /** Column index → total, rendered in the table footer. */
+  totals?: Record<number, string>;
   summary: { label: string; value: string }[];
   filters: {
     professionals: { id: string; name: string }[];
@@ -95,7 +103,7 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
         ...(status ? { status: status as never } : {}),
       },
       include: {
-        patient: { select: { name: true } },
+        patient: { select: { id: true, name: true } },
         professional: { select: { name: true } },
         procedure: { select: { name: true, basePrice: true } },
       },
@@ -104,9 +112,12 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
 
     const byStatus: Record<string, number> = {};
     let producao = 0;
+    let agendado = 0;
     for (const a of appts) {
       byStatus[a.status] = (byStatus[a.status] ?? 0) + 1;
-      if (a.status === 'ATTENDED' && a.procedure) producao += Number(a.procedure.basePrice);
+      const price = a.procedure ? Number(a.procedure.basePrice) : 0;
+      agendado += price;
+      if (a.status === 'ATTENDED') producao += price;
     }
 
     const summary = [
@@ -118,15 +129,24 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
     ];
 
     return {
-      columns: ['Data', 'Hora', 'Paciente', 'Profissional', 'Procedimento', 'Status'],
-      rows: appts.map((a) => [
-        wallDate(a.startTime),
-        wallClockTime(a.startTime),
-        a.patient.name,
-        a.professional.name,
-        a.procedure?.name ?? '—',
-        APPT_STATUS_PT[a.status] ?? a.status,
-      ]),
+      columns: ['Data', 'Hora', 'Paciente', 'Profissional', 'Procedimento', 'Situação', 'Valor (R$)'],
+      rows: appts.map((a) => ({
+        cells: [
+          wallDate(a.startTime),
+          wallClockTime(a.startTime),
+          a.patient.name,
+          a.professional.name,
+          a.procedure?.name ?? '—',
+          APPT_STATUS_PT[a.status] ?? a.status,
+          fmtNum(a.procedure ? Number(a.procedure.basePrice) : 0),
+        ],
+        href: `/pacientes/${a.patient.id}`,
+      })),
+      totals: {
+        4: `${appts.length} agendamento${appts.length !== 1 ? 's' : ''}`,
+        5: `produção ${fmtBRL(producao)}`,
+        6: fmtNum(agendado),
+      },
       summary,
       filters,
     };
@@ -168,15 +188,19 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
 
     return {
       columns: ['Nº', 'Criado em', 'Paciente', 'Validade', 'Situação', 'Total (R$)', 'Pago (R$)'],
-      rows: quotes.map((q) => [
-        `ORC-${String(q.number).padStart(4, '0')}`,
-        clockDate(q.createdAt),
-        q.patient.name,
-        wallDate(q.validUntil),
-        QUOTE_STATUS_PT[q.status] ?? q.status,
-        fmtNum(Number(q.total)),
-        fmtNum(q.payments.reduce((s, p) => s + Number(p.amount), 0)),
-      ]),
+      rows: quotes.map((q) => ({
+        cells: [
+          `ORC-${String(q.number).padStart(4, '0')}`,
+          clockDate(q.createdAt),
+          q.patient.name,
+          wallDate(q.validUntil),
+          QUOTE_STATUS_PT[q.status] ?? q.status,
+          fmtNum(Number(q.total)),
+          fmtNum(q.payments.reduce((s, p) => s + Number(p.amount), 0)),
+        ],
+        href: `/orcamentos/${q.id}`,
+      })),
+      totals: { 5: fmtNum(total), 6: fmtNum(pago) },
       summary,
       filters,
     };
@@ -189,8 +213,8 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
       ...(proc ? { quote: { items: { some: { procedureId: proc } } } } : {}),
     },
     include: {
-      patient: { select: { name: true } },
-      quote: { select: { number: true } },
+      patient: { select: { id: true, name: true } },
+      quote: { select: { id: true, number: true } },
     },
     orderBy: { paidAt: 'desc' },
   });
@@ -211,13 +235,17 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
 
   return {
     columns: ['Data', 'Paciente', 'Forma de pagamento', 'Orçamento', 'Valor (R$)'],
-    rows: payments.map((p) => [
-      clockDate(p.paidAt),
-      p.patient.name,
-      p.method || 'Não informado',
-      p.quote?.number ? `ORC-${String(p.quote.number).padStart(4, '0')}` : '—',
-      fmtNum(Number(p.amount)),
-    ]),
+    rows: payments.map((p) => ({
+      cells: [
+        clockDate(p.paidAt),
+        p.patient.name,
+        p.method || 'Não informado',
+        p.quote?.number ? `ORC-${String(p.quote.number).padStart(4, '0')}` : '—',
+        fmtNum(Number(p.amount)),
+      ],
+      href: p.quote?.id ? `/orcamentos/${p.quote.id}` : `/pacientes/${p.patient.id}`,
+    })),
+    totals: { 4: fmtNum(totalRecebido) },
     summary,
     filters,
   };

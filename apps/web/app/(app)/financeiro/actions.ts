@@ -16,6 +16,63 @@ async function requireTenant() {
   return { tenantId: tenant.id };
 }
 
+export interface SeriesPoint {
+  /** Bucket key: yyyy-MM-dd (daily) or yyyy-MM (monthly). */
+  key: string;
+  label: string;
+  value: number;
+  grouping: 'day' | 'month';
+}
+
+const CLINIC_TZ = 'America/Sao_Paulo';
+const dayKeyOf = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TZ }).format(d);
+
+/** Buckets received money across the period — daily up to ~45 days, else monthly. */
+function buildSeries(
+  from: string,
+  to: string,
+  payments: { amount: unknown; paidAt: Date }[],
+): SeriesPoint[] {
+  const start = new Date(`${from}T12:00:00.000Z`);
+  const end = new Date(`${to}T12:00:00.000Z`);
+  const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  const grouping: 'day' | 'month' = spanDays > 45 ? 'month' : 'day';
+
+  const totals = new Map<string, number>();
+  for (const p of payments) {
+    const dk = dayKeyOf(p.paidAt);
+    const key = grouping === 'day' ? dk : dk.slice(0, 7);
+    totals.set(key, (totals.get(key) ?? 0) + Number(p.amount));
+  }
+
+  const points: SeriesPoint[] = [];
+  if (grouping === 'day') {
+    for (let i = 0; i < Math.min(spanDays, 92); i++) {
+      const d = new Date(start.getTime() + i * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      points.push({
+        key,
+        label: `${key.slice(8, 10)}/${key.slice(5, 7)}`,
+        value: totals.get(key) ?? 0,
+        grouping,
+      });
+    }
+  } else {
+    const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+    while (cursor <= end && points.length < 24) {
+      const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+      points.push({
+        key,
+        label: new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' }).format(cursor).replace('.', ''),
+        value: totals.get(key) ?? 0,
+        grouping,
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+  }
+  return points;
+}
+
 export interface FinanceParams {
   from: string; // yyyy-MM-dd (clinic date)
   to: string; // yyyy-MM-dd (clinic date, inclusive)
@@ -54,7 +111,7 @@ export async function getFinanceData(params: FinanceParams) {
         method: true,
         paidAt: true,
         patient: { select: { id: true, name: true } },
-        quote: { select: { number: true } },
+        quote: { select: { id: true, number: true } },
       },
       orderBy: { paidAt: 'desc' },
     }),
@@ -135,7 +192,11 @@ export async function getFinanceData(params: FinanceParams) {
   }
   const byProcedure = [...procMap.values()].sort((a, b) => b.value - a.value);
 
+  // ── Received over time (daily buckets, or monthly for long periods) ──
+  const dailySeries = buildSeries(params.from, params.to, payments);
+
   return {
+    dailySeries,
     kpis: {
       received,
       outstanding,
@@ -151,6 +212,7 @@ export async function getFinanceData(params: FinanceParams) {
       paidAt: p.paidAt,
       patient: p.patient.name,
       patientId: p.patient.id,
+      quoteId: p.quote?.id ?? null,
       quoteNumber: p.quote?.number ?? null,
     })),
     byMethod,

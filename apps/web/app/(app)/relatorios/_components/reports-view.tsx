@@ -1,8 +1,9 @@
 'use client';
 
 import { useTransition } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Download, FileBarChart, Printer } from 'lucide-react';
+import { Download, FileBarChart, Printer, Wallet } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import type { ReportResult, ReportType } from '../actions';
 
@@ -32,13 +33,18 @@ const QUOTE_STATUS = [
   ['ACCEPTED', 'Aceito'], ['REJECTED', 'Recusado'], ['EXPIRED', 'Expirado'],
 ] as const;
 
+/** Money columns are right-aligned and get tabular figures. */
+function isNumericCol(label: string | undefined) {
+  return !!label && label.includes('(R$)');
+}
+
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function iso(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
 /** CSV for pt-BR Excel: semicolon separator + BOM, quotes escaped. */
-function toCsv(columns: string[], rows: string[][]): string {
+function toCsv(columns: string[], rows: { cells: string[] }[]): string {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const lines = [columns.map(esc).join(';'), ...rows.map((r) => r.map(esc).join(';'))];
+  const lines = [columns.map(esc).join(';'), ...rows.map((r) => r.cells.map(esc).join(';'))];
   return '﻿' + lines.join('\r\n');
 }
 
@@ -95,9 +101,14 @@ export function ReportsView({ type, from, to, professionalId, procedureId, statu
       <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Monte o relatório do seu jeito e exporte.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Monte o relatório do seu jeito, clique em qualquer linha para abrir o registro e exporte.
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/financeiro?from=${from}&to=${to}`} className="btn-ghost btn-md">
+            <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
+          </Link>
           <button type="button" onClick={() => window.print()} className="btn-outline btn-md">
             <Printer className="h-4 w-4" aria-hidden="true" /> Imprimir
           </button>
@@ -186,6 +197,12 @@ export function ReportsView({ type, from, to, professionalId, procedureId, statu
             </div>
             <p className="text-sm font-medium">Nenhum registro no período</p>
             <p className="mt-1 text-sm text-muted-foreground">Ajuste o período ou os filtros acima.</p>
+            <Link
+              href={type === 'agendamentos' ? '/agenda' : type === 'orcamentos' ? '/orcamentos' : '/financeiro'}
+              className="btn-outline btn-sm mt-4"
+            >
+              Ir para {type === 'agendamentos' ? 'a agenda' : type === 'orcamentos' ? 'os orçamentos' : 'o financeiro'}
+            </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -194,26 +211,65 @@ export function ReportsView({ type, from, to, professionalId, procedureId, statu
               <thead>
                 <tr className="border-b border-border bg-surface-alt text-left text-xs text-muted-foreground">
                   {data.columns.map((c) => (
-                    <th key={c} scope="col" className="whitespace-nowrap px-4 py-3 font-medium">{c}</th>
+                    <th
+                      key={c}
+                      scope="col"
+                      className={`whitespace-nowrap px-4 py-3 font-medium ${isNumericCol(c) ? 'text-right' : ''}`}
+                    >
+                      {c}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((row, i) => (
-                  <tr key={i} className="border-b border-border last:border-0 hover:bg-surface-alt/50">
-                    {row.map((cell, j) => (
-                      <td key={j} className="whitespace-nowrap px-4 py-2.5">{cell}</td>
-                    ))}
+                  <tr key={i} className="border-b border-border last:border-0 transition-colors hover:bg-surface-alt/60">
+                    {row.cells.map((cell, j) => {
+                      const numeric = isNumericCol(data.columns[j]);
+                      const linkFirst = j === 0 && row.href;
+                      return (
+                        <td
+                          key={j}
+                          className={`whitespace-nowrap px-4 py-2.5 ${numeric ? 'text-right tabular-nums' : ''}`}
+                        >
+                          {linkFirst ? (
+                            <Link
+                              href={row.href!}
+                              className="font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring print:text-foreground print:no-underline"
+                            >
+                              {cell}
+                            </Link>
+                          ) : (
+                            cell
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
+              {data.totals && (
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-surface-alt/60 text-sm font-semibold">
+                    {data.columns.map((c, j) => (
+                      <td
+                        key={c}
+                        className={`px-4 py-3 ${isNumericCol(c) ? 'text-right tabular-nums' : ''}`}
+                      >
+                        {j === 0 ? 'Total' : (data.totals?.[j] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         )}
       </div>
 
       <p className="text-xs text-muted-foreground print:hidden">
-        {data.rows.length} registro{data.rows.length !== 1 ? 's' : ''} · o CSV abre direto no Excel.
+        {data.rows.length} registro{data.rows.length !== 1 ? 's' : ''} no período · clique no primeiro campo da linha
+        para abrir {type === 'agendamentos' ? 'o paciente' : 'o orçamento'} · o CSV abre direto no Excel.
       </p>
     </div>
   );

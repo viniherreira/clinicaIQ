@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { Plus, Search, FileText } from 'lucide-react';
+import { Plus, Search, FileText, FileBarChart, Wallet } from 'lucide-react';
 import { QUOTE_STATUS, formatBRL, quoteCode } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -16,7 +16,7 @@ interface QuoteRow {
   paid: number;
   validUntil: Date | string;
   createdAt: Date | string;
-  patient: { name: string };
+  patient: { id: string; name: string };
   _count: { items: number };
 }
 
@@ -27,9 +27,10 @@ interface Props {
   currentPage: number;
   search: string;
   status: string;
+  totals: { value: number; paid: number; pending: number; accepted: number };
 }
 
-export function QuotesView({ quotes, total, pages, currentPage, search, status }: Props) {
+export function QuotesView({ quotes, total, pages, currentPage, search, status, totals }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -59,9 +60,25 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
           <h1 className="text-2xl font-semibold tracking-tight">Orçamentos</h1>
           <p className="mt-1 text-sm text-muted-foreground">{total} orçamento{total !== 1 ? 's' : ''}</p>
         </div>
-        <Link href="/orcamentos/novo" className="btn-primary btn-md">
-          <Plus className="h-4 w-4" aria-hidden="true" /> Novo orçamento
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/financeiro" className="btn-ghost btn-md">
+            <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
+          </Link>
+          <Link href="/relatorios?type=orcamentos" className="btn-outline btn-md">
+            <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatório
+          </Link>
+          <Link href="/orcamentos/novo" className="btn-primary btn-md">
+            <Plus className="h-4 w-4" aria-hidden="true" /> Novo orçamento
+          </Link>
+        </div>
+      </div>
+
+      {/* Totals for the whole filtered set */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Summary label="Valor total" value={formatBRL(totals.value)} />
+        <Summary label="Recebido" value={formatBRL(totals.paid)} tone="success" href="/financeiro" />
+        <Summary label="Em aberto" value={formatBRL(totals.pending)} tone={totals.pending > 0 ? 'warning' : 'muted'} />
+        <Summary label="Aprovados" value={String(totals.accepted)} href="/orcamentos?status=ACCEPTED" />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -157,7 +174,15 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
                         <Link href={`/orcamentos/${q.id}`} className="font-medium hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded">
                           {q.patient.name}
                         </Link>
-                        <p className="text-xs text-muted-foreground">{q._count.items} item{q._count.items !== 1 ? 's' : ''}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {q._count.items} item{q._count.items !== 1 ? 's' : ''} ·{' '}
+                          <Link
+                            href={`/pacientes/${q.patient.id}`}
+                            className="hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                          >
+                            prontuário
+                          </Link>
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{format(new Date(q.createdAt), 'dd/MM/yyyy')}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{format(new Date(q.validUntil), 'dd/MM/yyyy')}</td>
@@ -188,7 +213,7 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
       </div>
 
       {pages > 1 && (
-        <nav aria-label="Paginação" className="flex items-center justify-between text-sm">
+        <nav aria-label="Paginação" className="mt-2 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Página {currentPage} de {pages}</span>
           <div className="flex gap-1">
             <button type="button" disabled={currentPage <= 1} onClick={() => setParam({ page: String(currentPage - 1) }, false)} aria-label="Página anterior" className="rounded-md border border-border px-3 py-1.5 hover:bg-surface-alt disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">←</button>
@@ -197,5 +222,42 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status }
         </nav>
       )}
     </div>
+  );
+}
+
+const SUMMARY_TONE = {
+  default: 'text-foreground',
+  success: 'text-success',
+  warning: 'text-warning',
+  muted: 'text-muted-foreground',
+} as const;
+
+function Summary({
+  label,
+  value,
+  tone = 'default',
+  href,
+}: {
+  label: string;
+  value: string;
+  tone?: keyof typeof SUMMARY_TONE;
+  href?: string;
+}) {
+  const body = (
+    <>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 text-lg font-semibold tracking-tight tabular-nums ${SUMMARY_TONE[tone]}`}>{value}</p>
+    </>
+  );
+  const cls = 'rounded-xl border border-border bg-surface px-4 py-3 shadow-card';
+  return href ? (
+    <Link
+      href={href}
+      className={`${cls} block transition-colors hover:border-primary/40 hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }

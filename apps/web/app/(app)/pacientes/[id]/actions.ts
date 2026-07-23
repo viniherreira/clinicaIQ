@@ -69,7 +69,7 @@ export async function getPatientRecord(patientId: string) {
         method: true,
         notes: true,
         paidAt: true,
-        quote: { select: { number: true } },
+        quote: { select: { id: true, number: true } },
       },
     }),
     db.toothRecord.findMany({
@@ -148,11 +148,22 @@ export async function getPatientRecord(patientId: string) {
         method: p.method,
         notes: p.notes,
         paidAt: p.paidAt,
+        quoteId: p.quote?.id ?? null,
         quoteNumber: p.quote?.number ?? null,
       })),
       acceptedQuotes: quotes
         .filter((q) => q.status === 'ACCEPTED')
         .map((q) => ({ id: q.id, number: q.number, total: Number(q.total) })),
+      quotes: quotes.map((q) => ({
+        id: q.id,
+        number: q.number,
+        status: q.status,
+        total: Number(q.total),
+        createdAt: q.createdAt,
+        paid: payments
+          .filter((p) => p.quote?.id === q.id)
+          .reduce((s, p) => s + Number(p.amount), 0),
+      })),
     },
     teeth: teeth.map((t) => ({ ...t })),
     anamnesis: anamnesis

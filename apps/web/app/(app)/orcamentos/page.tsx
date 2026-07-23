@@ -10,7 +10,7 @@ export default async function OrcamentosPage({
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
-  const { quotes, total, pages } = await listQuotes({ search: sp.q ?? '', status: sp.status, page });
+  const { quotes, total, pages, totals } = await listQuotes({ search: sp.q ?? '', status: sp.status, page });
 
   return (
     <QuotesView
@@ -20,6 +20,7 @@ export default async function OrcamentosPage({
       currentPage={page}
       search={sp.q ?? ''}
       status={sp.status ?? ''}
+      totals={totals}
     />
   );
 }

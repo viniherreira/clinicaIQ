@@ -341,6 +341,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 balance={record.financial.balance}
                 payments={record.financial.payments}
                 acceptedQuotes={record.financial.acceptedQuotes}
+                quotes={record.financial.quotes}
               />
             ),
           },

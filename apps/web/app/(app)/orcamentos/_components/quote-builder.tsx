@@ -42,19 +42,22 @@ interface Props {
     internalNotes: string;
     items: QuoteItemDraft[];
   };
+  /** Pre-selected patient when arriving from the agenda or a patient record. */
+  initialPatient?: Patient;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 let keySeq = 0;
 const newKey = () => `it-${Date.now()}-${keySeq++}`;
 
-export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, initial }: Props) {
+export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, initial, initialPatient }: Props) {
   const router = useRouter();
   const action = mode === 'edit' && quoteId ? updateQuote.bind(null, quoteId) : createQuote;
   const [state, formAction, pending] = useActionState<QuoteFormState | null, FormData>(action, null);
 
-  const [patient, setPatient] = useState<Patient | null>(initial?.patient ?? null);
-  const [query, setQuery] = useState(initial?.patient.name ?? '');
+  const preselected = initial?.patient ?? initialPatient ?? null;
+  const [patient, setPatient] = useState<Patient | null>(preselected);
+  const [query, setQuery] = useState(preselected?.name ?? '');
   const [results, setResults] = useState<Patient[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [searching, startSearch] = useTransition();
