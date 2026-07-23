@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --filter @clinicaiq/web... --frozen-lockfile",
   "crons": [
-    { "path": "/api/cron/reminders", "schedule": "0 12 * * *" }
+    { "path": "/api/cron/reminders", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/aniversarios", "schedule": "0 12 * * *" }
   ]
 }

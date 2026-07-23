@@ -12,6 +12,8 @@ export const WHATSAPP_TEMPLATES = {
   appointmentCreated: 'appointment_created',
   appointmentConfirmation: 'appointment_confirmation',
   quoteSent: 'quote_sent',
+  /** Birthday greetings only go out over a clinic's own paired line. */
+  birthday: 'birthday_greeting',
 } as const;
 
 export type WhatsAppTemplateName =
@@ -99,6 +101,31 @@ export function buildQuoteSentBody(d: QuoteMessageData): string {
     `Você pode visualizar os detalhes e responder por aqui:\n${d.link}\n\n` +
     `Válido até ${d.validUntilLabel}.`
   );
+}
+
+export interface BirthdayMessageData {
+  patientName: string;
+  clinicName: string;
+}
+
+/** Default greeting. Clinics can override it with their own text. */
+export function buildBirthdayBody(d: BirthdayMessageData): string {
+  return (
+    `Feliz aniversário, ${firstName(d.patientName)}! 🎉\n\n` +
+    `Toda a equipe da *${d.clinicName}* deseja um dia muito especial para você. ` +
+    `Que venha um ano cheio de saúde e muitos sorrisos! 😁`
+  );
+}
+
+/**
+ * Applies a clinic's custom birthday text. `{nome}` and `{clinica}` are the two
+ * placeholders offered in the settings UI; anything else is left untouched.
+ */
+export function renderBirthdayTemplate(template: string, d: BirthdayMessageData): string {
+  return template
+    .replace(/\{nome\}/gi, firstName(d.patientName))
+    .replace(/\{clinica\}/gi, d.clinicName)
+    .trim();
 }
 
 /** Ordered body variables for the quote_sent template ({{1}}..{{5}}). */

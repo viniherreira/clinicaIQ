@@ -1,15 +1,19 @@
 import { prisma, decrypt, type AppointmentStatus } from '@clinicaiq/db';
 import {
   getWhatsAppProvider,
+  getGatewayProvider,
   WHATSAPP_TEMPLATES,
   CONFIRMATION_BUTTONS,
   buildAppointmentCreatedBody,
   buildAppointmentConfirmationBody,
   buildQuoteSentBody,
+  buildBirthdayBody,
+  renderBirthdayTemplate,
   appointmentTemplateParams,
   quoteTemplateParams,
   type SendMessageResult,
   type AppointmentMessageData,
+  type WhatsAppProvider,
 } from '@clinicaiq/whatsapp';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -52,6 +56,59 @@ function templatesEnabled(): boolean {
 
 function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+// ─── Provider routing ────────────────────────────────────────────────────────
+
+export type WhatsAppAutomation = 'onCreate' | 'reminder' | 'birthday';
+
+interface ResolvedProvider {
+  provider: WhatsAppProvider;
+  /** True when the clinic's own paired line is sending (plain text, no templates). */
+  ownLine: boolean;
+}
+
+/**
+ * Picks who sends for this clinic. A clinic that paired its own number over the
+ * QR code always wins — that's the number patients recognise. Otherwise we fall
+ * back to the shared provider from the environment (Meta Cloud API, or the mock
+ * in dev).
+ *
+ * Returns null when the requested automation is switched off for the clinic, so
+ * callers skip the send entirely instead of logging a failure.
+ */
+async function resolveProvider(
+  tenantId: string,
+  automation: WhatsAppAutomation,
+): Promise<ResolvedProvider | null> {
+  const session = await prisma.whatsAppSession.findUnique({
+    where: { tenantId },
+    select: {
+      status: true,
+      notifyOnCreate: true,
+      notifyReminder: true,
+      notifyBirthday: true,
+    },
+  });
+
+  const enabled =
+    automation === 'onCreate'
+      ? (session?.notifyOnCreate ?? true)
+      : automation === 'reminder'
+        ? (session?.notifyReminder ?? true)
+        : (session?.notifyBirthday ?? false);
+  if (!enabled) return null;
+
+  if (session?.status === 'CONNECTED') {
+    const gateway = getGatewayProvider(tenantId);
+    if (gateway) return { provider: gateway, ownLine: true };
+  }
+
+  // Birthday greetings are marketing, not transactional — Meta would reject them
+  // without an approved template, so they only ride the clinic's own line.
+  if (automation === 'birthday') return null;
+
+  return { provider: getWhatsAppProvider(), ownLine: false };
 }
 
 // ─── Outbound: appointments ──────────────────────────────────────────────────
@@ -99,16 +156,22 @@ export async function dispatchAppointmentMessage(
     ? buildAppointmentConfirmationBody(data)
     : buildAppointmentCreatedBody(data);
 
-  const result = await getWhatsAppProvider().sendMessage({
+  const resolved = await resolveProvider(appt.tenantId, isReminder ? 'reminder' : 'onCreate');
+  if (!resolved) return { success: false, error: 'automation-disabled' };
+
+  const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    // With approved templates on, send the structured template + its {{1}}..{{5}}
-    // params (business-initiated, no 24h window). Buttons only ride the free-text
-    // session path — the confirmation template uses plain "CONFIRMAR" replies,
-    // which the webhook already understands.
-    ...(templatesEnabled()
-      ? { templateName, templateParams: appointmentTemplateParams(data) }
-      : { buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined }),
+    // The clinic's own line is a normal WhatsApp account: plain text only, no
+    // templates and no interactive buttons. On Meta with approved templates we
+    // send the structured template + its {{1}}..{{5}} params instead
+    // (business-initiated, no 24h window); buttons only ride the free-text
+    // session path, and the webhook also understands a plain "CONFIRMAR" reply.
+    ...(resolved.ownLine
+      ? {}
+      : templatesEnabled()
+        ? { templateName, templateParams: appointmentTemplateParams(data) }
+        : { buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined }),
   });
 
   await prisma.whatsAppMessage.create({
@@ -158,10 +221,15 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
   };
   const body = buildQuoteSentBody(quoteData);
 
-  const result = await getWhatsAppProvider().sendMessage({
+  // A quote is a direct reply to something the patient asked for, so it follows
+  // the same routing as the "created" notification.
+  const resolved = await resolveProvider(quote.tenantId, 'onCreate');
+  if (!resolved) return { success: false, error: 'automation-disabled' };
+
+  const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    ...(templatesEnabled()
+    ...(!resolved.ownLine && templatesEnabled()
       ? { templateName: WHATSAPP_TEMPLATES.quoteSent, templateParams: quoteTemplateParams(quoteData) }
       : {}),
   });
@@ -173,6 +241,67 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
       quoteId: quote.id,
       direction: 'OUTBOUND',
       templateName: WHATSAPP_TEMPLATES.quoteSent,
+      content: body,
+      status: result.success ? 'SENT' : 'FAILED',
+      externalId: result.messageId ?? null,
+      sentAt: result.success ? new Date() : null,
+      errorMessage: result.success ? null : (result.error ?? 'send-failed'),
+    },
+  });
+
+  return result;
+}
+
+// ─── Outbound: birthdays ─────────────────────────────────────────────────────
+
+/**
+ * Sends a birthday greeting from the clinic's own line. Skipped silently when
+ * the clinic hasn't enabled it, hasn't paired a number, or the patient already
+ * got one today (the cron may run more than once).
+ */
+export async function dispatchBirthdayMessage(patientId: string): Promise<SendMessageResult> {
+  const patient = await prisma.patient.findUnique({
+    where: { id: patientId },
+    select: {
+      id: true,
+      tenantId: true,
+      name: true,
+      phoneEncrypted: true,
+      active: true,
+      deletedAt: true,
+      tenant: { select: { name: true } },
+    },
+  });
+  if (!patient || !patient.active || patient.deletedAt) {
+    return { success: false, error: 'patient-unavailable' };
+  }
+
+  const session = await prisma.whatsAppSession.findUnique({
+    where: { tenantId: patient.tenantId },
+    select: { birthdayMessage: true },
+  });
+
+  const resolved = await resolveProvider(patient.tenantId, 'birthday');
+  if (!resolved) return { success: false, error: 'automation-disabled' };
+
+  const phone = safeDecrypt(patient.phoneEncrypted, patient.tenantId);
+  if (!phone) return { success: false, error: 'patient-without-phone' };
+
+  const data = { patientName: patient.name, clinicName: patient.tenant.name };
+  const custom = session?.birthdayMessage?.trim();
+  const body = custom ? renderBirthdayTemplate(custom, data) : buildBirthdayBody(data);
+
+  const result = await resolved.provider.sendMessage({
+    to: normalizeBrazilPhone(phone),
+    body,
+  });
+
+  await prisma.whatsAppMessage.create({
+    data: {
+      tenantId: patient.tenantId,
+      patientId: patient.id,
+      direction: 'OUTBOUND',
+      templateName: WHATSAPP_TEMPLATES.birthday,
       content: body,
       status: result.success ? 'SENT' : 'FAILED',
       externalId: result.messageId ?? null,

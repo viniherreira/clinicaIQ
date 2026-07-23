@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings, Sparkles, FileBarChart,
+  MessageCircle,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 
@@ -16,6 +17,7 @@ export const NAV: { href: string; label: string; icon: typeof LayoutDashboard; b
   { href: '/orcamentos', label: 'Orçamentos', icon: FileText },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/relatorios', label: 'Relatórios', icon: FileBarChart },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 

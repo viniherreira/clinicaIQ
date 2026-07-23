@@ -1,0 +1,28 @@
+{
+  "name": "@clinicaiq/whatsapp-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "start": "node --import tsx/esm src/index.ts",
+    "dev": "node --import tsx/esm --watch src/index.ts",
+    "lint": "echo 'no lint configured'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^6",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "express": "^5.1.0",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "tsx": "^4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^25.9.1",
+    "@types/qrcode": "^1.5.5",
+    "prisma": "^6",
+    "typescript": "^5"
+  }
+}

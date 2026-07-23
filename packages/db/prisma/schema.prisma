@@ -101,6 +101,7 @@ model Tenant {
   anamneses           Anamnesis[]
   evolutions          Evolution[]
   patientFiles        PatientFile[]
+  whatsappSession     WhatsAppSession?
 
   @@map("tenants")
 }
@@ -519,4 +520,62 @@ model AuditLog {
   @@index([tenantId, entity, entityId])
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+/// Lifecycle of a clinic's own WhatsApp line, paired over the WhatsApp Web
+/// protocol (QR code). One line per tenant.
+enum WhatsAppConnectionStatus {
+  DISCONNECTED
+  CONNECTING
+  QR_PENDING
+  CONNECTED
+  ERROR
+}
+
+model WhatsAppSession {
+  id       String                   @id @default(cuid())
+  tenantId String                   @unique
+  status   WhatsAppConnectionStatus @default(DISCONNECTED)
+
+  /// Number the clinic paired, in E.164 digits (no mask). Filled on connect.
+  phoneNumber String?
+  displayName String?
+
+  /// Short-lived pairing payload. Cleared as soon as the socket is open.
+  qrCode      String?
+  qrExpiresAt DateTime?
+
+  lastError      String?
+  connectedAt    DateTime?
+  disconnectedAt DateTime?
+
+  /// Which automations this clinic wants on its own line.
+  notifyOnCreate  Boolean @default(true)
+  notifyReminder  Boolean @default(true)
+  notifyBirthday  Boolean @default(false)
+  birthdayMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([status])
+  @@map("whatsapp_sessions")
+}
+
+/// Baileys credential store. One row per (tenant, key); values are encrypted
+/// with the tenant-scoped master key, never logged.
+model WhatsAppAuthKey {
+  id       String @id @default(cuid())
+  tenantId String
+  key      String
+  value    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("whatsapp_auth_keys")
 }
