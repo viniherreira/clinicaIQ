@@ -10,8 +10,10 @@ WORKDIR /app
 
 # Copy the whole workspace so pnpm can validate the lockfile, then install only
 # the gateway's dependency tree (keeps the image lean — no Next.js, Playwright…).
+# NODE_ENV=development forces devDependencies to install: Railway builds with
+# NODE_ENV=production, which would skip the Prisma CLI needed for `generate`.
 COPY . .
-RUN pnpm install --filter @clinicaiq/whatsapp-gateway --frozen-lockfile
+RUN NODE_ENV=development pnpm install --filter @clinicaiq/whatsapp-gateway --frozen-lockfile
 
 # The gateway talks to Postgres with its own Prisma client, generated from the
 # shared schema.
