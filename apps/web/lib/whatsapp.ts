@@ -162,14 +162,15 @@ export async function dispatchAppointmentMessage(
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    // Both the "created" and reminder messages ask the patient to confirm, so
-    // both carry the Confirmar/Reagendar buttons. On the clinic's own line the
-    // gateway sends them as tappable quick-replies with the numbered fallback
-    // already in the body. On Meta with approved templates we send the
-    // structured template + its {{1}}..{{5}} params instead (business-initiated,
-    // no 24h window); the webhook understands taps and typed "1"/"confirmar".
+    // On the clinic's own line (QR) we send plain text: WhatsApp doesn't reliably
+    // render tappable buttons on that path, and the body already carries the
+    // "responda 1 ou 2" prompt — which works on every device and keeps the number
+    // looking like a normal person, not an automation. On Meta with approved
+    // templates we send the structured template + its {{1}}..{{5}} params
+    // (business-initiated, no 24h window). The webhook/inbound route understands
+    // typed "1"/"2"/"confirmar" either way.
     ...(resolved.ownLine
-      ? { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }
+      ? {}
       : templatesEnabled()
         ? { templateName, templateParams: appointmentTemplateParams(data) }
         : { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }),
