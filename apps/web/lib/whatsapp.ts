@@ -162,16 +162,17 @@ export async function dispatchAppointmentMessage(
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
-    // The clinic's own line is a normal WhatsApp account: plain text only, no
-    // templates and no interactive buttons. On Meta with approved templates we
-    // send the structured template + its {{1}}..{{5}} params instead
-    // (business-initiated, no 24h window); buttons only ride the free-text
-    // session path, and the webhook also understands a plain "CONFIRMAR" reply.
+    // Both the "created" and reminder messages ask the patient to confirm, so
+    // both carry the Confirmar/Reagendar buttons. On the clinic's own line the
+    // gateway sends them as tappable quick-replies with the numbered fallback
+    // already in the body. On Meta with approved templates we send the
+    // structured template + its {{1}}..{{5}} params instead (business-initiated,
+    // no 24h window); the webhook understands taps and typed "1"/"confirmar".
     ...(resolved.ownLine
-      ? {}
+      ? { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }
       : templatesEnabled()
         ? { templateName, templateParams: appointmentTemplateParams(data) }
-        : { buttons: isReminder ? CONFIRMATION_BUTTONS.map((b) => ({ ...b })) : undefined }),
+        : { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }),
   });
 
   await prisma.whatsAppMessage.create({
@@ -321,16 +322,18 @@ const BUTTON_TO_STATUS: Record<string, AppointmentStatus> = {
   cancel: 'CANCELLED',
 };
 
-/** Maps a button id (preferred) or free text to an appointment status. */
+/** Maps a button id (preferred) or free text to an appointment status. The
+ *  numbered replies match the "responda 1 ou 2" prompt in the message body. */
 export function resolveResponseStatus(
   buttonReplyId?: string,
   text?: string,
 ): AppointmentStatus | null {
   if (buttonReplyId && BUTTON_TO_STATUS[buttonReplyId]) return BUTTON_TO_STATUS[buttonReplyId];
-  const t = (text ?? '').toLowerCase();
-  if (/\bconfirm/.test(t)) return 'CONFIRMED';
-  if (/remarc|reagend/.test(t)) return 'RESCHEDULED';
-  if (/cancel/.test(t)) return 'CANCELLED';
+  const t = (text ?? '').trim().toLowerCase();
+  if (/^1\b/.test(t) || /\bconfirm/.test(t)) return 'CONFIRMED';
+  if (/^2\b/.test(t) || /remarc|reagend/.test(t)) return 'RESCHEDULED';
+  // Cancel isn't offered as an option, but an explicit "cancelar" is respected.
+  if (/\bcancel/.test(t)) return 'CANCELLED';
   return null;
 }
 
@@ -340,15 +343,23 @@ export function resolveResponseStatus(
  * webhooks identify the sender only by phone, and phones are encrypted at rest,
  * so we decrypt the small set of candidates rather than querying by plaintext.
  */
-export async function resolveAppointmentByPhone(fromPhone: string): Promise<string | null> {
+export async function resolveAppointmentByPhone(
+  fromPhone: string,
+  tenantId?: string,
+): Promise<string | null> {
   const target = normalizeBrazilPhone(fromPhone);
   if (!target) return null;
 
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  // Match against both the booking and reminder messages, since a patient may
+  // reply to either. A week's window covers appointments booked well ahead.
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const candidates = await prisma.whatsAppMessage.findMany({
     where: {
+      ...(tenantId ? { tenantId } : {}),
       direction: 'OUTBOUND',
-      templateName: WHATSAPP_TEMPLATES.appointmentConfirmation,
+      templateName: {
+        in: [WHATSAPP_TEMPLATES.appointmentConfirmation, WHATSAPP_TEMPLATES.appointmentCreated],
+      },
       createdAt: { gte: since },
       appointment: { status: { in: ['SCHEDULED', 'CONFIRMED', 'RESCHEDULED'] } },
     },

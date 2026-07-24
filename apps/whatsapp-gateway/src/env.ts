@@ -11,4 +11,10 @@ export const env = {
   ENCRYPTION_MASTER_KEY: required('ENCRYPTION_MASTER_KEY'),
   /** How long a pairing QR stays valid before the clinic must ask for a new one. */
   QR_TTL_MS: Number(process.env.WHATSAPP_QR_TTL_MS ?? 60_000),
+  /**
+   * Base URL of the Next.js app. The gateway forwards patients' replies here so
+   * the app can update the appointment. Optional — without it, messages still go
+   * out, but replies won't auto-confirm.
+   */
+  APP_URL: (process.env.APP_URL ?? '').replace(/\/+$/, ''),
 };

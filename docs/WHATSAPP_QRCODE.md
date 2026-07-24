@@ -35,6 +35,7 @@ necessário (o estado vive no Postgres).
 | `DATABASE_URL` | mesmo Postgres do app |
 | `ENCRYPTION_MASTER_KEY` | **a mesma** do app, senão as credenciais não abrem |
 | `WHATSAPP_GATEWAY_TOKEN` | segredo compartilhado com o app |
+| `APP_URL` | URL do app Next (ex.: `https://clinicaiq.vercel.app`) — o gateway usa pra devolver as respostas dos pacientes. Sem ela, as mensagens saem mas a confirmação do paciente não atualiza a agenda sozinha. |
 | `PORT` | porta HTTP (padrão 8080) |
 | `WHATSAPP_QR_TTL_MS` | validade do QR (padrão 60000) |
 
@@ -111,8 +112,12 @@ Isso quer dizer que quem não conectou continua funcionando como antes.
 - **O celular precisa ficar online.** Se ficar muitos dias sem internet, o
   WhatsApp derruba a sessão e a clínica precisa ler o QR de novo. A tela mostra o
   estado e o gateway tenta reconectar sozinho algumas vezes antes de desistir.
-- **Botões de resposta não existem** nesse caminho — o texto pede a resposta
-  escrita ("CONFIRMAR"), que o webhook já entende.
+- **Botões de resposta são "melhor esforço"**. A mensagem de confirmação vai com
+  botões Confirmar / Reagendar E com o texto "responda 1 ou 2" no corpo. Se o
+  botão aparecer no aparelho do paciente, ele toca; se não (a Meta não garante
+  botões fora da API oficial), o número no texto resolve. O gateway escuta as
+  respostas (`messages.upsert`) e devolve pro app, que atualiza a agenda — toque
+  ou "1"/"confirmar" chegam ao mesmo lugar.
 - **Uma sessão por clínica.** Trocar de número exige desconectar e parear de novo.
 
 Se em algum momento você quiser o caminho oficial (sem risco de bloqueio), é o

@@ -20,12 +20,17 @@ export type WhatsAppTemplateName =
   (typeof WHATSAPP_TEMPLATES)[keyof typeof WHATSAPP_TEMPLATES];
 
 /** Reply buttons attached to the confirmation message. Ids are stable and are
- *  what the webhook maps back to an appointment status. */
+ *  what the webhook maps back to an appointment status. The patient is only
+ *  offered Confirmar/Reagendar; a typed "cancelar" is still understood, just
+ *  not advertised. */
 export const CONFIRMATION_BUTTONS = [
   { id: 'confirm', title: 'Confirmar' },
-  { id: 'reschedule', title: 'Remarcar' },
-  { id: 'cancel', title: 'Cancelar' },
+  { id: 'reschedule', title: 'Reagendar' },
 ] as const;
+
+/** Numbered fallback shown in the body, so the message works even when the
+ *  tappable buttons don't render on the patient's device. */
+export const CONFIRMATION_PROMPT = 'Responda *1* para confirmar ou *2* para reagendar.';
 
 export type ConfirmationButtonId = (typeof CONFIRMATION_BUTTONS)[number]['id'];
 
@@ -68,7 +73,7 @@ export function buildAppointmentCreatedBody(d: AppointmentMessageData): string {
     `Seu agendamento na *${d.clinicName}* foi registrado:\n\n` +
     `📅 ${d.dateLabel} às ${d.timeLabel}\n` +
     `👩‍⚕️ ${d.professionalName}${proc}\n\n` +
-    `Em breve enviaremos um lembrete para você confirmar. Até lá!`
+    `Podemos confirmar sua presença?\n${CONFIRMATION_PROMPT}`
   );
 }
 
@@ -79,7 +84,7 @@ export function buildAppointmentConfirmationBody(d: AppointmentMessageData): str
     `*${d.clinicName}*:\n\n` +
     `📅 ${d.dateLabel} às ${d.timeLabel}\n` +
     `👩‍⚕️ ${d.professionalName}${proc}\n\n` +
-    `Podemos confirmar sua presença?`
+    `Podemos confirmar sua presença?\n${CONFIRMATION_PROMPT}`
   );
 }
 

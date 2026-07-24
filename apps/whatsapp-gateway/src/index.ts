@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { env } from './env.js';
-import { connect, disconnect, getStatus, restoreSessions, sendText } from './session-manager.js';
+import { connect, disconnect, getStatus, restoreSessions, send, type QuickReply } from './session-manager.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -59,12 +59,17 @@ app.delete(
 app.post(
   '/sessions/:tenantId/messages',
   asyncRoute(async (req, res) => {
-    const { to, body } = req.body ?? {};
+    const { to, body, buttons } = req.body ?? {};
     if (typeof to !== 'string' || typeof body !== 'string' || !to.trim() || !body.trim()) {
       res.status(400).json({ success: false, error: 'to-and-body-required' });
       return;
     }
-    res.json(await sendText(tenantIdOf(req), to, body));
+    const quickReplies: QuickReply[] | undefined = Array.isArray(buttons)
+      ? buttons
+          .filter((b) => b && typeof b.id === 'string' && typeof b.title === 'string')
+          .map((b) => ({ id: b.id, title: b.title }))
+      : undefined;
+    res.json(await send(tenantIdOf(req), to, { text: body, buttons: quickReplies }));
   }),
 );
 

@@ -82,6 +82,53 @@ async function resolveJid(sock: WASocket, digits: string): Promise<string | null
   return null;
 }
 
+// ─── Inbound replies ──────────────────────────────────────────────────────────
+
+/** Pulls the tapped-button id out of whichever reply shape WhatsApp used. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractButtonId(message: any): string | undefined {
+  if (message?.buttonsResponseMessage?.selectedButtonId) {
+    return message.buttonsResponseMessage.selectedButtonId;
+  }
+  if (message?.templateButtonReplyMessage?.selectedId) {
+    return message.templateButtonReplyMessage.selectedId;
+  }
+  const paramsJson = message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
+  if (paramsJson) {
+    try {
+      return JSON.parse(paramsJson)?.id;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Hands a patient's reply to the Next.js app, which owns the appointment logic.
+ * Best-effort: a failure here must never crash the socket.
+ */
+async function forwardInbound(
+  tenantId: string,
+  payload: { from: string; text: string; buttonId?: string; messageId?: string },
+): Promise<void> {
+  if (!env.APP_URL) return;
+  try {
+    await fetch(`${env.APP_URL}/api/whatsapp/inbound`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${env.GATEWAY_TOKEN}`,
+      },
+      body: JSON.stringify({ tenantId, ...payload }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    // App unreachable or slow — the patient's reply still sits in the clinic's
+    // WhatsApp for a human to read; we just couldn't auto-process it.
+  }
+}
+
 // ─── Socket lifecycle ─────────────────────────────────────────────────────────
 
 /**
@@ -121,6 +168,25 @@ export async function connect(tenantId: string): Promise<Session> {
   await persist(tenantId, { status: 'CONNECTING', lastError: null });
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Patients replying "1"/"Confirmar" (or tapping a button) land here.
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return; // ignore history replayed on connect
+    for (const m of messages) {
+      if (!m.message || m.key.fromMe) continue;
+      const jid = m.key.remoteJid ?? '';
+      if (!jid.endsWith('@s.whatsapp.net')) continue; // private chats only, no groups/status
+      const text = m.message.conversation ?? m.message.extendedTextMessage?.text ?? '';
+      const buttonId = extractButtonId(m.message);
+      if (!text && !buttonId) continue;
+      await forwardInbound(tenantId, {
+        from: jid.split('@')[0],
+        text,
+        buttonId,
+        messageId: m.key.id ?? undefined,
+      });
+    }
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -268,7 +334,24 @@ export interface SendResult {
   error?: string;
 }
 
-export async function sendText(tenantId: string, to: string, body: string): Promise<SendResult> {
+export interface QuickReply {
+  id: string;
+  title: string;
+}
+
+/**
+ * Sends a message, optionally with tappable quick-reply buttons. Buttons over
+ * the WhatsApp Web protocol are unofficial and don't render on every device, so
+ * the caller always bakes a numbered fallback ("responda 1 ou 2") into `body`:
+ * if the buttons show, the patient taps; if not, the text still works. If the
+ * button payload is rejected outright, we retry as plain text so the message
+ * (with its instructions) never fails to arrive.
+ */
+export async function send(
+  tenantId: string,
+  to: string,
+  opts: { text: string; buttons?: QuickReply[] },
+): Promise<SendResult> {
   const session = sessions.get(tenantId);
   if (!session || session.status !== 'CONNECTED') {
     return { success: false, error: 'not-connected' };
@@ -278,10 +361,31 @@ export async function sendText(tenantId: string, to: string, body: string): Prom
   if (!digits) return { success: false, error: 'invalid-number' };
 
   const jid = (await resolveJid(session.sock, digits)) ?? toJid(digits);
+
+  const withButtons =
+    opts.buttons && opts.buttons.length > 0
+      ? {
+          text: opts.text,
+          interactiveButtons: opts.buttons.map((b) => ({
+            name: 'quick_reply',
+            buttonParamsJson: JSON.stringify({ display_text: b.title, id: b.id }),
+          })),
+        }
+      : { text: opts.text };
+
   try {
-    const sent = await session.sock.sendMessage(jid, { text: body });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sent = await session.sock.sendMessage(jid, withButtons as any);
     return { success: true, messageId: sent?.key?.id ?? undefined };
   } catch (error) {
+    if (opts.buttons && opts.buttons.length > 0) {
+      try {
+        const sent = await session.sock.sendMessage(jid, { text: opts.text });
+        return { success: true, messageId: sent?.key?.id ?? undefined };
+      } catch (retry) {
+        return { success: false, error: retry instanceof Error ? retry.message : 'send-failed' };
+      }
+    }
     return { success: false, error: error instanceof Error ? error.message : 'send-failed' };
   }
 }

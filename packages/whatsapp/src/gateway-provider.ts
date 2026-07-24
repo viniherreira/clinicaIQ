@@ -65,7 +65,7 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
     try {
       return await this.request<SendMessageResult>(
         `/sessions/${encodeURIComponent(this.tenantId)}/messages`,
-        { method: 'POST', body: JSON.stringify({ to: params.to, body }) },
+        { method: 'POST', body: JSON.stringify({ to: params.to, body, buttons: params.buttons }) },
       );
     } catch (error) {
       return {

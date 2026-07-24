@@ -15,6 +15,7 @@ export { getWhatsAppProvider } from './factory';
 export {
   WHATSAPP_TEMPLATES,
   CONFIRMATION_BUTTONS,
+  CONFIRMATION_PROMPT,
   firstName,
   buildAppointmentCreatedBody,
   buildAppointmentConfirmationBody,

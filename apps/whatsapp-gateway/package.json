@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "start": "node --import tsx/esm src/index.ts",
-    "dev": "node --import tsx/esm --watch src/index.ts",
+    "dev": "node --import tsx/esm --env-file-if-exists=.env.local --watch src/index.ts",
     "lint": "echo 'no lint configured'",
     "typecheck": "tsc --noEmit"
   },
