@@ -1,0 +1,14 @@
+# Keep the Docker build context small and free of secrets.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+.git
+.github
+**/.env
+**/.env.local
+**/.env.*.local
+**/*.log
+**/.DS_Store
+playwright-report
+test-results

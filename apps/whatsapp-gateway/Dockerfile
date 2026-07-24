@@ -1,22 +1,22 @@
-# Gateway that holds one WhatsApp Web socket per clinic. It must run as a
-# long-lived process — serverless platforms (Vercel/Lambda) cannot host it.
-# Build from the repo root:  docker build -f apps/whatsapp-gateway/Dockerfile .
+# Gateway that holds one WhatsApp Web socket per clinic. Long-lived process —
+# serverless platforms (Vercel/Lambda) can't host it. Build from the repo root:
+#   docker build -f apps/whatsapp-gateway/Dockerfile .
+# On Railway this is selected automatically via railway.json.
 FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 WORKDIR /app
 
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY apps/whatsapp-gateway/package.json apps/whatsapp-gateway/
-COPY packages/db/package.json packages/db/
+# Copy the whole workspace so pnpm can validate the lockfile, then install only
+# the gateway's dependency tree (keeps the image lean — no Next.js, Playwright…).
+COPY . .
 RUN pnpm install --filter @clinicaiq/whatsapp-gateway --frozen-lockfile
 
-# The gateway reads whatsapp_sessions / whatsapp_auth_keys through its own
-# Prisma client, so it needs the schema to generate against.
-COPY packages/db/prisma packages/db/prisma
-COPY apps/whatsapp-gateway apps/whatsapp-gateway
-RUN pnpm --filter @clinicaiq/whatsapp-gateway exec prisma generate --schema ../../packages/db/prisma/schema.prisma
+# The gateway talks to Postgres with its own Prisma client, generated from the
+# shared schema.
+RUN pnpm --filter @clinicaiq/whatsapp-gateway exec \
+    prisma generate --schema ../../packages/db/prisma/schema.prisma
 
 ENV NODE_ENV=production
 WORKDIR /app/apps/whatsapp-gateway
