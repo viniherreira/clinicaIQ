@@ -73,10 +73,13 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     color: p.color ?? PROFESSIONAL_COLORS[i % PROFESSIONAL_COLORS.length],
   }));
 
-  // Serialize Decimal fields — Prisma Decimal is not a plain object
+  // Serialize every Decimal field — Prisma Decimal is not a plain object and
+  // can't cross the Server→Client boundary. Procedure has two: basePrice and
+  // maxDiscountPercent (null until a discount cap is set on the procedure).
   const serializedProcedures = procedures.map((p) => ({
     ...p,
     basePrice: Number(p.basePrice),
+    maxDiscountPercent: p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : null,
   }));
 
   const workingHours = await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id));
