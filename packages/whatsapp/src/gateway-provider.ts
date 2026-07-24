@@ -38,7 +38,10 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
     this.token = config.token;
     this.tenantId = config.tenantId;
-    this.timeoutMs = config.timeoutMs ?? 15_000;
+    // WhatsApp Web can be slow on the first send after a connect (number lookup
+    // + sync), and sends run in the background via after(), so we can afford to
+    // wait. 15s was too tight and marked delivered messages as failed.
+    this.timeoutMs = config.timeoutMs ?? 30_000;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {

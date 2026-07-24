@@ -57,6 +57,14 @@ async function persist(
 /** Baileys jids look like `5511999999999@s.whatsapp.net`. */
 const toJid = (digits: string) => `${digits}@s.whatsapp.net`;
 
+/** Caps a promise so a slow WhatsApp lookup can't eat the whole send budget. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('lookup-timeout')), ms)),
+  ]);
+}
+
 /**
  * Brazilian mobile numbers exist on WhatsApp both with and without the extra
  * "9" after the area code, depending on when the line was registered. Ask the
@@ -73,10 +81,10 @@ async function resolveJid(sock: WASocket, digits: string): Promise<string | null
 
   for (const candidate of candidates) {
     try {
-      const result = (await sock.onWhatsApp(candidate))?.[0];
+      const result = (await withTimeout(sock.onWhatsApp(candidate), 5_000))?.[0];
       if (result?.exists) return result.jid;
     } catch {
-      // Lookup is best-effort; fall through to the next candidate.
+      // Lookup is best-effort (and time-boxed); fall through to the next candidate.
     }
   }
   return null;
