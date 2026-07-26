@@ -1,4 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { prisma } from './db.js';
 import { env, logEnvSummary } from './env.js';
 import { connect, disconnect, getStatus, restoreSessions, send, type QuickReply } from './session-manager.js';
 
@@ -90,10 +91,32 @@ process.on('uncaughtException', (error) => {
   console.error('[gateway] uncaught exception:', error);
 });
 
+/**
+ * Stamps a single row in Postgres on boot and every 30s after. Hosting dashboards
+ * hide runtime logs behind a UI; this makes "is the gateway actually alive, and
+ * on which port?" answerable with a query, and a jumping bootedAt exposes a
+ * crash loop that a green "deployed" badge would hide.
+ */
+function startHeartbeat(): void {
+  const write = (note: string) =>
+    prisma.gatewayHeartbeat
+      .upsert({
+        where: { id: 'gateway' },
+        create: { id: 'gateway', port: env.PORT, note },
+        update: { port: env.PORT, note },
+      })
+      .catch((e) => console.error('[gateway] heartbeat failed:', e?.message ?? e));
+
+  void write('boot');
+  const timer = setInterval(() => void write('alive'), 30_000);
+  timer.unref();
+}
+
 logEnvSummary();
 
 app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`[gateway] listening on :${env.PORT}`);
+  startHeartbeat();
   restoreSessions()
     .then((n) => console.log(`[gateway] restored ${n} session(s)`))
     .catch((e) => console.error('[gateway] restore failed', e));

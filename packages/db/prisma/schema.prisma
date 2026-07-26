@@ -579,3 +579,17 @@ model WhatsAppAuthKey {
   @@index([tenantId])
   @@map("whatsapp_auth_keys")
 }
+
+/// Liveness beacon written by the WhatsApp gateway. Single row: the gateway
+/// stamps it on boot and refreshes it periodically, so the app (and whoever is
+/// debugging a deploy) can tell whether the always-on service is really alive
+/// and which port it bound — without shell access to the host.
+model GatewayHeartbeat {
+  id       String   @id @default("gateway")
+  bootedAt DateTime @default(now())
+  beatAt   DateTime @updatedAt
+  port     Int
+  note     String?
+
+  @@map("gateway_heartbeat")
+}
