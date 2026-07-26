@@ -1,5 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { env } from './env.js';
+import { env, logEnvSummary } from './env.js';
 import { connect, disconnect, getStatus, restoreSessions, send, type QuickReply } from './session-manager.js';
 
 const app = express();
@@ -79,7 +79,20 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: 'internal-error' });
 });
 
-app.listen(env.PORT, () => {
+// A WhatsApp socket can reject from a background event handler (a dropped
+// connection, a malformed frame). Node's default is to kill the process on an
+// unhandled rejection, which would take every other clinic's line down with it.
+// Log and keep serving instead — a single broken session must not be fatal.
+process.on('unhandledRejection', (reason) => {
+  console.error('[gateway] unhandled rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[gateway] uncaught exception:', error);
+});
+
+logEnvSummary();
+
+app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`[gateway] listening on :${env.PORT}`);
   restoreSessions()
     .then((n) => console.log(`[gateway] restored ${n} session(s)`))
