@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './db.js';
-import { env, logEnvSummary } from './env.js';
+import { env, envProblems, logEnvSummary } from './env.js';
 import { connect, disconnect, getStatus, restoreSessions, send, type QuickReply } from './session-manager.js';
 
 const app = express();
@@ -26,8 +26,19 @@ const asyncRoute =
 /** Express 5 types route params as `string | string[]`; ours is always single. */
 const tenantIdOf = (req: Request): string => String(req.params.tenantId);
 
+/**
+ * Public and unauthenticated: it's the one thing reachable when a deploy is
+ * misconfigured, so it reports *why* rather than just failing. Names only —
+ * never the values.
+ */
 app.get('/health', (_req, res) => {
-  res.json({ ok: true });
+  const ok = envProblems.length === 0;
+  res.status(ok ? 200 : 503).json({
+    ok,
+    ...(ok ? {} : { missingEnv: envProblems }),
+    port: env.PORT,
+    uptimeSeconds: Math.round(process.uptime()),
+  });
 });
 
 app.use(requireToken);
@@ -116,6 +127,17 @@ logEnvSummary();
 
 app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`[gateway] listening on :${env.PORT}`);
+
+  if (envProblems.length > 0) {
+    // Stay up so /health can report the problem, but don't touch the database or
+    // open sockets we know can't work.
+    console.error(
+      `[gateway] NAO configurado — faltando: ${envProblems.join(', ')}. ` +
+        `Defina no painel do host e faça redeploy. GET /health lista o que falta.`,
+    );
+    return;
+  }
+
   startHeartbeat();
   restoreSessions()
     .then((n) => console.log(`[gateway] restored ${n} session(s)`))

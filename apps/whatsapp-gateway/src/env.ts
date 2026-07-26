@@ -9,16 +9,13 @@ function clean(raw: string | undefined): string {
 
 const REQUIRED = ['DATABASE_URL', 'WHATSAPP_GATEWAY_TOKEN', 'ENCRYPTION_MASTER_KEY'] as const;
 
-const missing = REQUIRED.filter((name) => !clean(process.env[name]));
-if (missing.length > 0) {
-  // Print the whole picture at once, so one restart tells the operator exactly
-  // what to fix instead of revealing them one at a time.
-  console.error(
-    `[gateway] cannot start — missing env var(s): ${missing.join(', ')}\n` +
-      `[gateway] set them in your host's Variables tab, then redeploy.`,
-  );
-  process.exit(1);
-}
+/**
+ * Config vars that are absent or blank. The process deliberately still boots
+ * with these missing: exiting would crash-loop the container, and a container
+ * that never stays up can't tell anyone *why*. Instead we serve /health, which
+ * reports the list — turning the public URL into the diagnostic.
+ */
+export const envProblems: string[] = REQUIRED.filter((name) => !clean(process.env[name]));
 
 /**
  * A PORT pasted with quotes or a stray space becomes NaN, and Node then binds to
