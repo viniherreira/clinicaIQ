@@ -8,17 +8,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 WORKDIR /app
 
-# Copy the whole workspace so pnpm can validate the lockfile, then install only
-# the gateway's dependency tree (keeps the image lean — no Next.js, Playwright…).
-# NODE_ENV=development forces devDependencies to install: Railway builds with
-# NODE_ENV=production, which would skip the Prisma CLI needed for `generate`.
+# Copy the whole workspace so pnpm can validate the lockfile. Install the gateway
+# AND @clinicaiq/db (which owns the Prisma schema and the Prisma CLI). Keeps the
+# image lean — no Next.js/Playwright. NODE_ENV=development so devDependencies
+# (the Prisma CLI) install: Railway builds with NODE_ENV=production, which skips
+# them by default.
 COPY . .
-RUN NODE_ENV=development pnpm install --filter @clinicaiq/whatsapp-gateway --frozen-lockfile
+RUN NODE_ENV=development pnpm install \
+    --filter @clinicaiq/whatsapp-gateway --filter @clinicaiq/db --frozen-lockfile
 
-# The gateway talks to Postgres with its own Prisma client, generated from the
-# shared schema.
-RUN pnpm --filter @clinicaiq/whatsapp-gateway exec \
-    prisma generate --schema ../../packages/db/prisma/schema.prisma
+# Generate the Prisma client from the db package, where the schema and the CLI
+# live together. Running it from the gateway (with an external --schema) made
+# Prisma try to auto-install its CLI and fail. This is the same command the
+# Vercel build uses, so it's known-good. The generated client is shared through
+# the pnpm store, so the gateway picks it up.
+RUN pnpm --filter @clinicaiq/db run generate
 
 ENV NODE_ENV=production
 WORKDIR /app/apps/whatsapp-gateway
