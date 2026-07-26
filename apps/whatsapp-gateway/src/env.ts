@@ -20,8 +20,21 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+/**
+ * A PORT pasted with quotes or a stray space becomes NaN, and Node then binds to
+ * a random port — the host routes to the expected port and every request 502s.
+ * Fall back to 8080 rather than listening somewhere nobody is looking.
+ */
+function readPort(): number {
+  const raw = clean(process.env.PORT);
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0 && parsed < 65536) return parsed;
+  if (raw) console.warn(`[gateway] PORT inválida (${JSON.stringify(raw)}); usando 8080.`);
+  return 8080;
+}
+
 export const env = {
-  PORT: Number(process.env.PORT ?? 8080),
+  PORT: readPort(),
   /** Shared secret the Next.js app sends as `Authorization: Bearer …`. */
   GATEWAY_TOKEN: clean(process.env.WHATSAPP_GATEWAY_TOKEN),
   ENCRYPTION_MASTER_KEY: clean(process.env.ENCRYPTION_MASTER_KEY),
