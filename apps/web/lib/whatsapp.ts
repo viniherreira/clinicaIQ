@@ -427,6 +427,39 @@ export async function applyAppointmentResponse(
   return true;
 }
 
+/**
+ * Marks the patient behind a phone number as opted out of campaigns. Phones are
+ * encrypted at rest, so we decrypt the tenant's patients to find the match —
+ * bounded by tenant, and only for patients who could actually be messaged.
+ */
+export async function optOutByPhone(fromPhone: string, tenantId: string): Promise<boolean> {
+  const target = normalizeBrazilPhone(fromPhone);
+  if (!target) return false;
+
+  const patients = await prisma.patient.findMany({
+    where: { tenantId, deletedAt: null, whatsappOptOut: false },
+    select: { id: true, phoneEncrypted: true },
+    take: 5000,
+  });
+
+  for (const p of patients) {
+    const phone = safeDecrypt(p.phoneEncrypted, tenantId);
+    if (phone && normalizeBrazilPhone(phone) === target) {
+      await prisma.patient.update({ where: { id: p.id }, data: { whatsappOptOut: true } });
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          action: 'WHATSAPP_OPT_OUT',
+          entity: 'Patient',
+          entityId: p.id,
+        },
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Updates delivery status (delivered/read/failed) for a message by externalId. */
 export async function applyMessageStatus(
   externalId: string,

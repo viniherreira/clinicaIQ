@@ -102,6 +102,7 @@ model Tenant {
   evolutions          Evolution[]
   patientFiles        PatientFile[]
   whatsappSession     WhatsAppSession?
+  campaigns           Campaign[]
 
   @@map("tenants")
 }
@@ -149,6 +150,8 @@ model Patient {
   city            String?
   state           String?
   lgpdConsentAt   DateTime?
+  /// Patient asked to stop receiving campaigns (replied SAIR/PARAR).
+  whatsappOptOut  Boolean   @default(false)
   active          Boolean   @default(true)
   deletedAt       DateTime?
   createdById     String?
@@ -166,6 +169,7 @@ model Patient {
   anamnesis    Anamnesis?
   evolutions   Evolution[]
   files        PatientFile[]
+  campaignRecipients CampaignRecipient[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -592,4 +596,56 @@ model GatewayHeartbeat {
   note     String?
 
   @@map("gateway_heartbeat")
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  DONE
+  CANCELLED
+}
+
+/// A bulk WhatsApp send (promotions, recalls, seasonal greetings). Delivery is
+/// paced by the gateway rather than fired at once: a burst from a QR-paired
+/// number is what gets a clinic's line banned.
+model Campaign {
+  id       String         @id @default(cuid())
+  tenantId String
+  name     String
+  message  String
+  status   CampaignStatus @default(DRAFT)
+
+  total  Int @default(0)
+  sent   Int @default(0)
+  failed Int @default(0)
+
+  createdById String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  recipients CampaignRecipient[]
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id         String        @id @default(cuid())
+  tenantId   String
+  campaignId String
+  patientId  String
+  status     MessageStatus @default(PENDING)
+  error      String?
+  sentAt     DateTime?
+  createdAt  DateTime      @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  @@unique([campaignId, patientId])
+  @@index([campaignId, status])
+  @@map("campaign_recipients")
 }

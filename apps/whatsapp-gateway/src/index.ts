@@ -1,4 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { runCampaign } from './campaigns.js';
 import { prisma } from './db.js';
 import { env, envProblems, logEnvSummary } from './env.js';
 import {
@@ -85,6 +86,24 @@ app.delete(
   asyncRoute(async (req, res) => {
     await disconnect(tenantIdOf(req));
     res.json({ ok: true });
+  }),
+);
+
+/**
+ * Accepts a campaign and returns immediately — delivery is paced over minutes to
+ * hours, far longer than any HTTP request should stay open. Progress is written
+ * to the campaign row, which the app polls.
+ */
+app.post(
+  '/sessions/:tenantId/campaigns',
+  asyncRoute(async (req, res) => {
+    const { campaignId } = req.body ?? {};
+    if (typeof campaignId !== 'string' || !campaignId.trim()) {
+      res.status(400).json({ ok: false, error: 'campaignId-required' });
+      return;
+    }
+    void runCampaign(tenantIdOf(req), campaignId);
+    res.status(202).json({ ok: true });
   }),
 );
 

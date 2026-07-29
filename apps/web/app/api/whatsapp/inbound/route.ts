@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { resolveAppointmentByPhone, applyAppointmentResponse } from '@/lib/whatsapp';
+import { resolveAppointmentByPhone, applyAppointmentResponse, optOutByPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -28,6 +28,15 @@ export async function POST(req: Request) {
   const from = typeof body?.from === 'string' ? body.from : '';
   if (!tenantId || !from) {
     return NextResponse.json({ ok: false, error: 'tenant-and-from-required' }, { status: 400 });
+  }
+
+  const text = typeof body?.text === 'string' ? body.text : '';
+
+  // Opt-out wins over everything else: a patient asking to stop must stop, even
+  // if the same message could be read as an appointment reply.
+  if (/^\s*(sair|parar|descadastrar|remover|stop)\b/i.test(text)) {
+    const opted = await optOutByPhone(from, tenantId);
+    return NextResponse.json({ ok: true, optOut: opted });
   }
 
   const appointmentId = await resolveAppointmentByPhone(from, tenantId);

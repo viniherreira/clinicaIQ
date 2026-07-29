@@ -99,6 +99,25 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
   async disconnect(): Promise<void> {
     await this.request(`/sessions/${encodeURIComponent(this.tenantId)}`, { method: 'DELETE' });
   }
+
+  // ─── Campaigns ──────────────────────────────────────────────────────────────
+
+  /**
+   * Hands a prepared campaign to the gateway, which paces delivery and writes
+   * results back to the database. Returns whether the gateway accepted it —
+   * sending itself continues in the background, long after this resolves.
+   */
+  async startCampaign(campaignId: string): Promise<boolean> {
+    try {
+      await this.request(`/sessions/${encodeURIComponent(this.tenantId)}/campaigns`, {
+        method: 'POST',
+        body: JSON.stringify({ campaignId }),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /** Whether a gateway is configured at all. */
