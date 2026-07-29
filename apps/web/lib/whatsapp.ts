@@ -58,6 +58,20 @@ function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+/** Turns internal send-failure codes into something the clinic can act on. */
+function friendlyError(code: string): string {
+  const map: Record<string, string> = {
+    'numero-sem-whatsapp': 'Número não tem WhatsApp (confira o telefone do paciente)',
+    'patient-without-phone': 'Paciente sem telefone cadastrado',
+    'not-connected': 'WhatsApp da clínica desconectado',
+    'automation-disabled': 'Envio desligado nas configurações',
+    'invalid-number': 'Número de telefone inválido',
+    'gateway-unreachable': 'Serviço de WhatsApp fora do ar no momento',
+    'empty-body': 'Mensagem vazia',
+  };
+  return map[code] ?? code;
+}
+
 // ─── Provider routing ────────────────────────────────────────────────────────
 
 export type WhatsAppAutomation = 'onCreate' | 'reminder' | 'birthday';
@@ -187,7 +201,7 @@ export async function dispatchAppointmentMessage(
       status: result.success ? 'SENT' : 'FAILED',
       externalId: result.messageId ?? null,
       sentAt: result.success ? new Date() : null,
-      errorMessage: result.success ? null : (result.error ?? 'send-failed'),
+      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });
 
@@ -247,7 +261,7 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
       status: result.success ? 'SENT' : 'FAILED',
       externalId: result.messageId ?? null,
       sentAt: result.success ? new Date() : null,
-      errorMessage: result.success ? null : (result.error ?? 'send-failed'),
+      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });
 
@@ -308,7 +322,7 @@ export async function dispatchBirthdayMessage(patientId: string): Promise<SendMe
       status: result.success ? 'SENT' : 'FAILED',
       externalId: result.messageId ?? null,
       sentAt: result.success ? new Date() : null,
-      errorMessage: result.success ? null : (result.error ?? 'send-failed'),
+      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });
 

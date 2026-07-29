@@ -65,12 +65,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+type JidResolution =
+  | { jid: string } // confirmed on WhatsApp
+  | { jid: null; reason: 'not-on-whatsapp' } // server answered: no account
+  | { jid: null; reason: 'lookup-failed' }; // couldn't check (network/timeout)
+
 /**
- * Brazilian mobile numbers exist on WhatsApp both with and without the extra
- * "9" after the area code, depending on when the line was registered. Ask the
- * server which variant actually exists instead of guessing.
+ * Resolves the correct WhatsApp jid for a Brazilian number. The line may exist
+ * with or without the extra "9" after the area code depending on when it was
+ * registered, so we ask the server which variant is real instead of guessing —
+ * sending to the wrong variant looks "sent" but silently reaches no one.
+ *
+ * Distinguishes "the server says this number has no WhatsApp" (a real, reportable
+ * failure) from "we couldn't reach the server to check" (transient — worth a
+ * best-effort attempt rather than a hard failure).
  */
-async function resolveJid(sock: WASocket, digits: string): Promise<string | null> {
+async function resolveJid(sock: WASocket, digits: string): Promise<JidResolution> {
   const candidates = new Set<string>([digits]);
   const m = /^55(\d{2})(\d{8,9})$/.exec(digits);
   if (m) {
@@ -79,15 +89,17 @@ async function resolveJid(sock: WASocket, digits: string): Promise<string | null
     if (rest.length === 8) candidates.add(`55${ddd}9${rest}`);
   }
 
+  let anyAnswered = false;
   for (const candidate of candidates) {
     try {
-      const result = (await withTimeout(sock.onWhatsApp(candidate), 5_000))?.[0];
-      if (result?.exists) return result.jid;
+      const result = (await withTimeout(sock.onWhatsApp(candidate), 8_000))?.[0];
+      anyAnswered = true;
+      if (result?.exists && result.jid) return { jid: result.jid };
     } catch {
-      // Lookup is best-effort (and time-boxed); fall through to the next candidate.
+      // Lookup failed for this candidate — try the next, then decide below.
     }
   }
-  return null;
+  return { jid: null, reason: anyAnswered ? 'not-on-whatsapp' : 'lookup-failed' };
 }
 
 // ─── Inbound replies ──────────────────────────────────────────────────────────
@@ -430,7 +442,15 @@ export async function send(
   const digits = to.replace(/\D/g, '');
   if (!digits) return { success: false, error: 'invalid-number' };
 
-  const jid = (await resolveJid(session.sock, digits)) ?? toJid(digits);
+  // Resolve the real jid. Only send to a number the server confirms exists;
+  // otherwise the message looks "sent" but reaches no one. A confirmed-absent
+  // number is a reportable failure; a failed lookup falls back to a best-effort
+  // attempt so a transient glitch doesn't block a valid contact.
+  const resolution = await resolveJid(session.sock, digits);
+  if (resolution.jid === null && resolution.reason === 'not-on-whatsapp') {
+    return { success: false, error: 'numero-sem-whatsapp' };
+  }
+  const jid = resolution.jid ?? toJid(digits);
 
   const withButtons =
     opts.buttons && opts.buttons.length > 0
