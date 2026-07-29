@@ -532,17 +532,43 @@ export async function updateAppointmentStatus(
   revalidatePath('/agenda');
 }
 
-// ─── Delete appointment ───────────────────────────────────────────────────────
+// ─── Cancel appointment (keeps it on the agenda, greyed) ──────────────────────
 
+export async function cancelAppointment(id: string, cancelReason?: string) {
+  return updateAppointmentStatus(id, 'CANCELLED', cancelReason);
+}
+
+// ─── Delete appointment (removes it entirely) ─────────────────────────────────
+
+/**
+ * Hard-deletes an appointment. Any WhatsApp messages sent for it are kept as
+ * history but detached (appointmentId → null) so the delete isn't blocked by the
+ * foreign key. Tenant-scoped: only the owner's row can be removed.
+ */
 export async function deleteAppointment(id: string) {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
-  await prisma.appointment.update({
+  const appt = await prisma.appointment.findFirst({
     where: { id, tenantId },
-    data: { status: 'CANCELLED', updatedById: userId },
+    select: { id: true, patientId: true },
+  });
+  if (!appt) return { success: false as const, error: 'not-found' };
+
+  await prisma.$transaction([
+    prisma.whatsAppMessage.updateMany({
+      where: { appointmentId: id, tenantId },
+      data: { appointmentId: null },
+    }),
+    prisma.appointment.delete({ where: { id, tenantId } }),
+  ]);
+
+  await prisma.auditLog.create({
+    data: { tenantId, action: 'APPOINTMENT_DELETED', entity: 'Appointment', entityId: id },
   });
 
   revalidatePath('/agenda');
+  revalidatePath('/dashboard');
+  return { success: true as const };
 }
 
 // ─── Get single appointment ───────────────────────────────────────────────────

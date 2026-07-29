@@ -4,9 +4,9 @@ import { useEffect, useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, User } from 'lucide-react';
+import { FileText, Trash2, User } from 'lucide-react';
 import { wallClockTime } from '@/lib/tz';
-import { getAppointment, updateAppointmentStatus } from '../actions';
+import { getAppointment, updateAppointmentStatus, deleteAppointment } from '../actions';
 import { STATUS_STYLES, STATUS_LABELS, TYPE_LABELS } from './constants';
 
 type Detail = Awaited<ReturnType<typeof getAppointment>>;
@@ -58,6 +58,17 @@ export function AppointmentDetailModal({ open, appointmentId, onClose, onChanged
     if (!appointmentId) return;
     startTransition(async () => {
       await updateAppointmentStatus(appointmentId, status);
+      onChanged();
+      onClose();
+    });
+  }
+
+  function remove() {
+    if (!appointmentId) return;
+    const who = detail?.patient.name ? ` de ${detail.patient.name}` : '';
+    if (!confirm(`Excluir o agendamento${who}? Ele some da agenda e não dá para desfazer.`)) return;
+    startTransition(async () => {
+      await deleteAppointment(appointmentId);
       onChanged();
       onClose();
     });
@@ -156,13 +167,21 @@ export function AppointmentDetailModal({ open, appointmentId, onClose, onChanged
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 border-t border-border p-4">
+            <div className="flex flex-wrap items-center gap-2 border-t border-border p-4">
               <Link href={`/pacientes/${detail.patient.id}`} className="btn-outline btn-sm">
                 <User className="h-3.5 w-3.5" aria-hidden="true" /> Prontuário
               </Link>
               <Link href={`/orcamentos/novo?patientId=${detail.patient.id}`} className="btn-outline btn-sm">
                 <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Novo orçamento
               </Link>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={isPending}
+                className="btn-ghost btn-sm ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Excluir
+              </button>
             </div>
           </>
         )}
