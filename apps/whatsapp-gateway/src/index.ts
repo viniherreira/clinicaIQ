@@ -37,6 +37,10 @@ app.get('/health', (_req, res) => {
     ok,
     ...(ok ? {} : { missingEnv: envProblems }),
     port: env.PORT,
+    // Without APP_URL the gateway still sends, but patients' replies go nowhere
+    // — the appointment never flips to Confirmado. Surface it here.
+    appUrl: env.APP_URL || null,
+    repliesWired: Boolean(env.APP_URL),
     uptimeSeconds: Math.round(process.uptime()),
   });
 });
