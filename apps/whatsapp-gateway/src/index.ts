@@ -1,7 +1,15 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { prisma } from './db.js';
 import { env, envProblems, logEnvSummary } from './env.js';
-import { connect, disconnect, getStatus, restoreSessions, send, type QuickReply } from './session-manager.js';
+import {
+  connect,
+  disconnect,
+  getStatus,
+  recentInbound,
+  restoreSessions,
+  send,
+  type QuickReply,
+} from './session-manager.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -46,6 +54,14 @@ app.get('/health', (_req, res) => {
 });
 
 app.use(requireToken);
+
+/**
+ * Last inbound events the gateway saw, for debugging "the patient replied and
+ * nothing happened". Token-protected: it echoes message fragments.
+ */
+app.get('/debug/inbound', (_req, res) => {
+  res.json({ events: recentInbound() });
+});
 
 /** Starts pairing (or reuses a live socket). The QR arrives via GET shortly after. */
 app.post(

@@ -113,16 +113,59 @@ function extractButtonId(message: any): string | undefined {
 }
 
 /**
+ * WhatsApp is migrating chat identifiers from phone-number jids
+ * (`5511…@s.whatsapp.net`) to opaque LIDs (`123…@lid`). A reply can arrive under
+ * either, with the phone-number form carried in an `…Alt` field, so gather every
+ * candidate on the key and keep the one that actually looks like a phone.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function senderPhone(key: any): string | null {
+  const candidates = [
+    key?.remoteJid,
+    key?.remoteJidAlt,
+    key?.senderPn,
+    key?.participant,
+    key?.participantAlt,
+  ].filter((v): v is string => typeof v === 'string');
+
+  for (const jid of candidates) {
+    if (jid.endsWith('@s.whatsapp.net')) {
+      const digits = jid.split('@')[0].split(':')[0];
+      if (/^\d{10,15}$/.test(digits)) return digits;
+    }
+  }
+  return null;
+}
+
+/** Recent inbound events, newest first. Read-only diagnostics for /debug/inbound. */
+export interface InboundTrace {
+  at: string;
+  jid: string;
+  phone: string | null;
+  text: string;
+  buttonId?: string;
+  forwarded: boolean;
+  result: string;
+}
+const inboundTrace: InboundTrace[] = [];
+export const recentInbound = (): InboundTrace[] => inboundTrace.slice(0, 25);
+
+function trace(entry: InboundTrace): void {
+  inboundTrace.unshift(entry);
+  if (inboundTrace.length > 25) inboundTrace.length = 25;
+}
+
+/**
  * Hands a patient's reply to the Next.js app, which owns the appointment logic.
  * Best-effort: a failure here must never crash the socket.
  */
 async function forwardInbound(
   tenantId: string,
   payload: { from: string; text: string; buttonId?: string; messageId?: string },
-): Promise<void> {
-  if (!env.APP_URL) return;
+): Promise<string> {
+  if (!env.APP_URL) return 'no-app-url';
   try {
-    await fetch(`${env.APP_URL}/api/whatsapp/inbound`, {
+    const res = await fetch(`${env.APP_URL}/api/whatsapp/inbound`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -131,9 +174,11 @@ async function forwardInbound(
       body: JSON.stringify({ tenantId, ...payload }),
       signal: AbortSignal.timeout(10_000),
     });
-  } catch {
+    return `${res.status} ${(await res.text()).slice(0, 80)}`;
+  } catch (error) {
     // App unreachable or slow — the patient's reply still sits in the clinic's
     // WhatsApp for a human to read; we just couldn't auto-process it.
+    return `erro: ${error instanceof Error ? error.message : 'desconhecido'}`;
   }
 }
 
@@ -183,15 +228,32 @@ export async function connect(tenantId: string): Promise<Session> {
     for (const m of messages) {
       if (!m.message || m.key.fromMe) continue;
       const jid = m.key.remoteJid ?? '';
-      if (!jid.endsWith('@s.whatsapp.net')) continue; // private chats only, no groups/status
+      // Skip groups, broadcasts and status updates; keep 1:1 chats under either
+      // the phone-number jid or the newer LID form.
+      if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) continue;
+
       const text = m.message.conversation ?? m.message.extendedTextMessage?.text ?? '';
       const buttonId = extractButtonId(m.message);
       if (!text && !buttonId) continue;
-      await forwardInbound(tenantId, {
-        from: jid.split('@')[0],
-        text,
+
+      const phone = senderPhone(m.key);
+      const result = phone
+        ? await forwardInbound(tenantId, {
+            from: phone,
+            text,
+            buttonId,
+            messageId: m.key.id ?? undefined,
+          })
+        : 'sem telefone no jid';
+
+      trace({
+        at: new Date().toISOString(),
+        jid,
+        phone,
+        text: text.slice(0, 40),
         buttonId,
-        messageId: m.key.id ?? undefined,
+        forwarded: Boolean(phone),
+        result,
       });
     }
   });
