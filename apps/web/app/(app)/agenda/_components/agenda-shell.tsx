@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
@@ -259,6 +259,23 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
               <span className="sm:hidden">Novo</span>
             </button>
           </header>
+
+          {/* WhatsApp down: confirmations silently stop, so say so where bookings happen. */}
+          {data.whatsappHealth?.problem && (
+            <div
+              role="status"
+              className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200 sm:px-4"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1">{data.whatsappHealth.problem}</span>
+              <Link
+                href="/whatsapp"
+                className="shrink-0 font-medium underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Reconectar
+              </Link>
+            </div>
+          )}
 
           {/* Grid / empty state */}
           <div className="flex-1 overflow-auto overscroll-contain bg-surface">

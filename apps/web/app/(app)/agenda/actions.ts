@@ -11,6 +11,7 @@ import {
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
 import type { WeekSchedule } from '@/lib/schedule';
+import { getWhatsAppHealth } from '@/lib/whatsapp';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -82,7 +83,13 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     maxDiscountPercent: p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : null,
   }));
 
-  const workingHours = await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id));
+  const [workingHours, whatsappHealth] = await Promise.all([
+    buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)),
+    // Surfaced here because this is where appointments are booked: a silently
+    // dead WhatsApp means confirmations stop going out, and the clinic would
+    // otherwise only notice by visiting the WhatsApp tab.
+    getWhatsAppHealth(tenantId),
+  ]);
 
   return {
     appointments,
@@ -90,6 +97,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     professionals: professionalsWithColor,
     procedures: serializedProcedures,
     workingHours,
+    whatsappHealth,
   };
 }
 

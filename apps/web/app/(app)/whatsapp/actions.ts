@@ -6,6 +6,7 @@ import { getGatewayProvider, gatewayConfigured } from '@clinicaiq/whatsapp';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { getWhatsAppHealth } from '@/lib/whatsapp';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -78,13 +79,29 @@ export async function getWhatsAppPanel(): Promise<WhatsAppPanelData> {
     }),
   ]);
 
+  // The stored status can lie: if the gateway dies without a clean socket close,
+  // it stays CONNECTED forever and the clinic thinks messages are going out. Ask
+  // the gateway directly and reconcile before rendering.
+  let status = session.status;
+  let lastError = session.lastError;
+  if (status === 'CONNECTED') {
+    const health = await getWhatsAppHealth(tenantId);
+    if (!health.connected) {
+      status = 'ERROR';
+      lastError = health.problem;
+      await prisma.whatsAppSession
+        .updateMany({ where: { tenantId }, data: { status: 'ERROR', lastError } })
+        .catch(() => undefined);
+    }
+  }
+
   return {
     gatewayReady: gatewayConfigured(),
-    status: session.status,
+    status,
     phoneNumber: session.phoneNumber,
     displayName: session.displayName,
     connectedAt: session.connectedAt,
-    lastError: session.lastError,
+    lastError,
     settings: {
       notifyOnCreate: session.notifyOnCreate,
       notifyReminder: session.notifyReminder,

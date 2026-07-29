@@ -91,10 +91,14 @@ interface ResolvedProvider {
  * Returns null when the requested automation is switched off for the clinic, so
  * callers skip the send entirely instead of logging a failure.
  */
+type ProviderOutcome =
+  | { kind: 'send'; resolved: ResolvedProvider }
+  | { kind: 'skip'; error: string };
+
 async function resolveProvider(
   tenantId: string,
   automation: WhatsAppAutomation,
-): Promise<ResolvedProvider | null> {
+): Promise<ProviderOutcome> {
   const session = await prisma.whatsAppSession.findUnique({
     where: { tenantId },
     select: {
@@ -111,18 +115,116 @@ async function resolveProvider(
       : automation === 'reminder'
         ? (session?.notifyReminder ?? true)
         : (session?.notifyBirthday ?? false);
-  if (!enabled) return null;
+  if (!enabled) return { kind: 'skip', error: 'automation-disabled' };
 
-  if (session?.status === 'CONNECTED') {
+  // A clinic that paired its own number is committed to that number: patients
+  // recognise it, and replies come back through it. If it's down we surface a
+  // clear failure instead of quietly routing through a different sender — a
+  // message from an unknown number is worse than no message, and the shared
+  // provider's credentials may not even be valid.
+  if (session) {
+    if (session.status !== 'CONNECTED') return { kind: 'skip', error: 'not-connected' };
     const gateway = getGatewayProvider(tenantId);
-    if (gateway) return { provider: gateway, ownLine: true };
+    if (!gateway) return { kind: 'skip', error: 'gateway-unreachable' };
+    return { kind: 'send', resolved: { provider: gateway, ownLine: true } };
   }
 
   // Birthday greetings are marketing, not transactional — Meta would reject them
   // without an approved template, so they only ride the clinic's own line.
-  if (automation === 'birthday') return null;
+  if (automation === 'birthday') return { kind: 'skip', error: 'not-connected' };
 
-  return { provider: getWhatsAppProvider(), ownLine: false };
+  // No line ever paired: fall back to the environment provider (Meta / mock).
+  return { kind: 'send', resolved: { provider: getWhatsAppProvider(), ownLine: false } };
+}
+
+// ─── Health ──────────────────────────────────────────────────────────────────
+
+export interface WhatsAppHealth {
+  /** The clinic has paired a number at some point (uses the own-line path). */
+  paired: boolean;
+  /** Safe to send right now. */
+  connected: boolean;
+  /** Short, actionable sentence when something is wrong. */
+  problem: string | null;
+}
+
+/** The gateway beats every 30s; three minutes of silence means it's not running. */
+const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
+
+/**
+ * Whether this clinic's WhatsApp can actually deliver right now. The session row
+ * alone isn't trustworthy: if the gateway dies without a clean socket close, the
+ * status stays CONNECTED forever. Cross-checking the gateway's heartbeat catches
+ * that, so the UI can warn instead of quietly dropping messages.
+ */
+export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealth> {
+  const [session, heartbeat] = await Promise.all([
+    prisma.whatsAppSession.findUnique({
+      where: { tenantId },
+      select: { status: true, lastError: true },
+    }),
+    prisma.gatewayHeartbeat.findUnique({
+      where: { id: 'gateway' },
+      select: { beatAt: true },
+    }),
+  ]);
+
+  if (!session) return { paired: false, connected: false, problem: null };
+
+  if (session.status !== 'CONNECTED') {
+    return {
+      paired: true,
+      connected: false,
+      problem:
+        session.lastError ??
+        'O WhatsApp da clínica está desconectado — as confirmações não estão sendo enviadas.',
+    };
+  }
+
+  const stale = !heartbeat || Date.now() - heartbeat.beatAt.getTime() > HEARTBEAT_STALE_MS;
+  if (stale) {
+    return {
+      paired: true,
+      connected: false,
+      problem: 'O serviço de WhatsApp não está respondendo. As confirmações estão pausadas.',
+    };
+  }
+
+  return { paired: true, connected: true, problem: null };
+}
+
+/**
+ * Logs a message that was never attempted, so the clinic can see *why* in the
+ * history instead of wondering why a patient got nothing. Deliberately silent
+ * for `automation-disabled`: that's the clinic's own setting, not a fault.
+ */
+async function recordSkip(
+  error: string,
+  entry: {
+    tenantId: string;
+    patientId: string;
+    appointmentId?: string;
+    quoteId?: string;
+    templateName: string;
+    content: string;
+  },
+): Promise<void> {
+  if (error === 'automation-disabled') return;
+  await prisma.whatsAppMessage
+    .create({
+      data: {
+        tenantId: entry.tenantId,
+        patientId: entry.patientId,
+        appointmentId: entry.appointmentId ?? null,
+        quoteId: entry.quoteId ?? null,
+        direction: 'OUTBOUND',
+        templateName: entry.templateName,
+        content: entry.content,
+        status: 'FAILED',
+        errorMessage: friendlyError(error),
+      },
+    })
+    .catch(() => undefined);
 }
 
 // ─── Outbound: appointments ──────────────────────────────────────────────────
@@ -170,8 +272,18 @@ export async function dispatchAppointmentMessage(
     ? buildAppointmentConfirmationBody(data)
     : buildAppointmentCreatedBody(data);
 
-  const resolved = await resolveProvider(appt.tenantId, isReminder ? 'reminder' : 'onCreate');
-  if (!resolved) return { success: false, error: 'automation-disabled' };
+  const outcome = await resolveProvider(appt.tenantId, isReminder ? 'reminder' : 'onCreate');
+  if (outcome.kind === 'skip') {
+    await recordSkip(outcome.error, {
+      tenantId: appt.tenantId,
+      patientId: appt.patient.id,
+      appointmentId: appt.id,
+      templateName,
+      content: body,
+    });
+    return { success: false, error: outcome.error };
+  }
+  const resolved = outcome.resolved;
 
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
@@ -239,8 +351,18 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
 
   // A quote is a direct reply to something the patient asked for, so it follows
   // the same routing as the "created" notification.
-  const resolved = await resolveProvider(quote.tenantId, 'onCreate');
-  if (!resolved) return { success: false, error: 'automation-disabled' };
+  const outcome = await resolveProvider(quote.tenantId, 'onCreate');
+  if (outcome.kind === 'skip') {
+    await recordSkip(outcome.error, {
+      tenantId: quote.tenantId,
+      patientId: quote.patient.id,
+      quoteId: quote.id,
+      templateName: WHATSAPP_TEMPLATES.quoteSent,
+      content: body,
+    });
+    return { success: false, error: outcome.error };
+  }
+  const resolved = outcome.resolved;
 
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
@@ -297,8 +419,9 @@ export async function dispatchBirthdayMessage(patientId: string): Promise<SendMe
     select: { birthdayMessage: true },
   });
 
-  const resolved = await resolveProvider(patient.tenantId, 'birthday');
-  if (!resolved) return { success: false, error: 'automation-disabled' };
+  const outcome = await resolveProvider(patient.tenantId, 'birthday');
+  if (outcome.kind === 'skip') return { success: false, error: outcome.error };
+  const resolved = outcome.resolved;
 
   const phone = safeDecrypt(patient.phoneEncrypted, patient.tenantId);
   if (!phone) return { success: false, error: 'patient-without-phone' };
