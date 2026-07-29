@@ -6,6 +6,7 @@ import {
   connect,
   disconnect,
   getStatus,
+  lookupNumber,
   recentInbound,
   restoreSessions,
   send,
@@ -63,6 +64,18 @@ app.use(requireToken);
 app.get('/debug/inbound', (_req, res) => {
   res.json({ events: recentInbound() });
 });
+
+/**
+ * What does WhatsApp actually say about a number? Answers "it says the patient
+ * has no WhatsApp, but they do" without guessing. Token-protected: it takes a
+ * phone number.
+ */
+app.get(
+  '/debug/lookup/:tenantId/:phone',
+  asyncRoute(async (req, res) => {
+    res.json(await lookupNumber(tenantIdOf(req), String(req.params.phone)));
+  }),
+);
 
 /** Starts pairing (or reuses a live socket). The QR arrives via GET shortly after. */
 app.post(

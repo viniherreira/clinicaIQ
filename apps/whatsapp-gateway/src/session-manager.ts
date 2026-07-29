@@ -89,17 +89,53 @@ async function resolveJid(sock: WASocket, digits: string): Promise<JidResolution
     if (rest.length === 8) candidates.add(`55${ddd}9${rest}`);
   }
 
-  let anyAnswered = false;
+  let explicitlyAbsent = false;
   for (const candidate of candidates) {
     try {
-      const result = (await withTimeout(sock.onWhatsApp(candidate), 8_000))?.[0];
-      anyAnswered = true;
-      if (result?.exists && result.jid) return { jid: result.jid };
+      const results = await withTimeout(sock.onWhatsApp(candidate), 8_000);
+      const hit = results?.find((r) => r?.exists);
+      if (hit?.jid) return { jid: hit.jid };
+      // Only an explicit `exists: false` proves absence. An empty response is
+      // ambiguous — common since the LID migration — and must never condemn a
+      // number that really is on WhatsApp.
+      if (results?.some((r) => r && r.exists === false)) explicitlyAbsent = true;
     } catch {
       // Lookup failed for this candidate — try the next, then decide below.
     }
   }
-  return { jid: null, reason: anyAnswered ? 'not-on-whatsapp' : 'lookup-failed' };
+  return { jid: null, reason: explicitlyAbsent ? 'not-on-whatsapp' : 'lookup-failed' };
+}
+
+/** Raw lookup for diagnostics: what does the server actually say about a number? */
+export async function lookupNumber(
+  tenantId: string,
+  phone: string,
+): Promise<{ ok: boolean; digits: string; tried: string[]; results: unknown; resolved: string | null }> {
+  const session = sessions.get(tenantId);
+  const digits = phone.replace(/\D/g, '');
+  if (!session || session.status !== 'CONNECTED') {
+    return { ok: false, digits, tried: [], results: 'not-connected', resolved: null };
+  }
+
+  const tried = [digits];
+  const m = /^55(\d{2})(\d{8,9})$/.exec(digits);
+  if (m) {
+    const [, ddd, rest] = m;
+    if (rest.length === 9 && rest.startsWith('9')) tried.push(`55${ddd}${rest.slice(1)}`);
+    if (rest.length === 8) tried.push(`55${ddd}9${rest}`);
+  }
+
+  const results: Record<string, unknown> = {};
+  for (const candidate of tried) {
+    try {
+      results[candidate] = await withTimeout(session.sock.onWhatsApp(candidate), 8_000);
+    } catch (e) {
+      results[candidate] = `erro: ${e instanceof Error ? e.message : 'desconhecido'}`;
+    }
+  }
+
+  const resolution = await resolveJid(session.sock, digits);
+  return { ok: true, digits, tried, results, resolved: resolution.jid };
 }
 
 // ─── Inbound replies ──────────────────────────────────────────────────────────
@@ -201,9 +237,32 @@ async function forwardInbound(
  * the socket exists — pairing progress is reported through the session status,
  * which the web app polls.
  */
+/**
+ * Tears a socket down for good. Without this, a replaced socket keeps its event
+ * handlers and its slot on WhatsApp's side; the server then treats the *newer*
+ * connection as a duplicate and quietly drops messages sent through it — which
+ * looks exactly like "marked as sent but never arrived".
+ */
+function destroy(sock: WASocket): void {
+  try {
+    sock.ev.removeAllListeners('connection.update');
+    sock.ev.removeAllListeners('messages.upsert');
+    sock.ev.removeAllListeners('creds.update');
+  } catch {
+    // Already torn down.
+  }
+  try {
+    sock.end(undefined);
+  } catch {
+    // Socket was already closed.
+  }
+}
+
 export async function connect(tenantId: string): Promise<Session> {
   const existing = sessions.get(tenantId);
   if (existing && !existing.closing) return existing;
+  // Replacing a session: make sure the old socket is really gone first.
+  if (existing) destroy(existing.sock);
 
   const { state, saveCreds, clear } = await usePostgresAuthState(tenantId);
   const { version } = await fetchLatestBaileysVersion();
@@ -310,6 +369,7 @@ export async function connect(tenantId: string): Promise<Session> {
         ?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       sessions.delete(tenantId);
+      destroy(sock);
 
       if (session.closing || loggedOut) {
         // Credentials are dead — drop them so the next connect starts a fresh
@@ -363,6 +423,7 @@ export async function disconnect(tenantId: string): Promise<void> {
     } catch {
       // Already gone on WhatsApp's side — the local cleanup below still applies.
     }
+    destroy(session.sock);
     sessions.delete(tenantId);
   }
 
