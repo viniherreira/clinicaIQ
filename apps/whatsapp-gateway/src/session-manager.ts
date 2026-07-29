@@ -89,21 +89,21 @@ async function resolveJid(sock: WASocket, digits: string): Promise<JidResolution
     if (rest.length === 8) candidates.add(`55${ddd}9${rest}`);
   }
 
-  let explicitlyAbsent = false;
+  let queryWorked = false;
   for (const candidate of candidates) {
     try {
       const results = await withTimeout(sock.onWhatsApp(candidate), 8_000);
+      // The call returning at all (even an empty list) proves the query channel
+      // works; an empty list for every variant is then real evidence the number
+      // has no WhatsApp account — usually a typo in the patient record.
+      queryWorked = true;
       const hit = results?.find((r) => r?.exists);
       if (hit?.jid) return { jid: hit.jid };
-      // Only an explicit `exists: false` proves absence. An empty response is
-      // ambiguous — common since the LID migration — and must never condemn a
-      // number that really is on WhatsApp.
-      if (results?.some((r) => r && r.exists === false)) explicitlyAbsent = true;
     } catch {
-      // Lookup failed for this candidate — try the next, then decide below.
+      // This candidate couldn't be checked — try the next, then decide below.
     }
   }
-  return { jid: null, reason: explicitlyAbsent ? 'not-on-whatsapp' : 'lookup-failed' };
+  return { jid: null, reason: queryWorked ? 'not-on-whatsapp' : 'lookup-failed' };
 }
 
 /** Raw lookup for diagnostics: what does the server actually say about a number? */

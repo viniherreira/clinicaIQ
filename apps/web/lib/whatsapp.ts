@@ -61,7 +61,9 @@ function formatBRL(value: number): string {
 /** Turns internal send-failure codes into something the clinic can act on. */
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
-    'numero-sem-whatsapp': 'Número não tem WhatsApp (confira o telefone do paciente)',
+    'numero-sem-whatsapp':
+      'WhatsApp não encontrado neste número — confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
+    'lookup-failed': 'Não foi possível verificar o número agora — tente reenviar',
     'patient-without-phone': 'Paciente sem telefone cadastrado',
     'not-connected': 'WhatsApp da clínica desconectado',
     'automation-disabled': 'Envio desligado nas configurações',
