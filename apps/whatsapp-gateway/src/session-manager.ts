@@ -57,6 +57,23 @@ async function persist(
 /** Baileys jids look like `5511999999999@s.whatsapp.net`. */
 const toJid = (digits: string) => `${digits}@s.whatsapp.net`;
 
+/**
+ * Whether the socket's websocket is genuinely open. Baileys exposes the raw
+ * connection differently across versions, so probe the shapes we know and treat
+ * "can't tell" as open — refusing to send on an unrecognised shape would break
+ * every message.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isSocketOpen(sock: any): boolean {
+  const ws = sock?.ws;
+  if (!ws) return true;
+  if (typeof ws.isOpen === 'boolean') return ws.isOpen;
+  // Node's ws readyState: 1 === OPEN.
+  const state = ws.readyState ?? ws.socket?.readyState;
+  if (typeof state === 'number') return state === 1;
+  return true;
+}
+
 /** Caps a promise so a slow WhatsApp lookup can't eat the whole send budget. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -387,20 +404,24 @@ export async function connect(tenantId: string): Promise<Session> {
         return;
       }
 
-      // Transient drop (network, restart required, replaced session): back off
-      // and retry, giving up after a handful of attempts so we don't hammer.
+      // Transient drop (network, phone offline, restart required). Keep retrying
+      // indefinitely with a capped backoff: giving up would leave the clinic
+      // silently unable to send until a human notices. The stored credentials
+      // stay valid, so a reconnect usually succeeds once the phone is back.
       const retries = session.retries + 1;
-      if (retries > 5) {
-        await persist(tenantId, {
-          status: 'ERROR',
-          qrCode: null,
-          lastError: 'Conexão perdida. Reconecte lendo o QR code novamente.',
-          disconnectedAt: new Date(),
-        });
-        return;
-      }
+      await persist(tenantId, {
+        status: retries > 3 ? 'ERROR' : 'CONNECTING',
+        qrCode: null,
+        // Only claim the QR is needed once reconnecting has clearly stopped
+        // helping — otherwise a 30-second blip would nag the clinic to re-pair.
+        lastError:
+          retries > 3
+            ? 'Conexão instável com o WhatsApp. Se não voltar, reconecte lendo o QR code.'
+            : null,
+        disconnectedAt: new Date(),
+      });
 
-      const delay = Math.min(30_000, 2 ** retries * 1000);
+      const delay = Math.min(60_000, 2 ** Math.min(retries, 6) * 1000);
       setTimeout(() => {
         connect(tenantId)
           .then((s) => {
@@ -497,6 +518,14 @@ export async function send(
 ): Promise<SendResult> {
   const session = sessions.get(tenantId);
   if (!session || session.status !== 'CONNECTED') {
+    return { success: false, error: 'not-connected' };
+  }
+  // The status flag can lag behind reality: if the underlying websocket died
+  // without a close event, Baileys still accepts sendMessage and resolves with a
+  // key, so the message is recorded as sent and silently never arrives. Check the
+  // actual socket before claiming anything.
+  if (!isSocketOpen(session.sock)) {
+    session.status = 'CONNECTING';
     return { success: false, error: 'not-connected' };
   }
 
