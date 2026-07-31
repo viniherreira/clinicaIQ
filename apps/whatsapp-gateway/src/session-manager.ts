@@ -700,22 +700,24 @@ export async function probeSend(
   const startedAt = new Date().toISOString();
 
   // 4 — record acks as they arrive, before sending so nothing is missed.
-  const ackTrail: ProbeReport['ackTrail'] = [];
+  // Buffer *every* ack and filter by message id at the end. Filtering inside the
+  // handler would silently drop the first ack: sendMessage only resolves after
+  // the server responds, so an ack can land while we still don't know our own
+  // message id — and an empty trail would look like evidence instead of a race.
+  const seen: { id: string; status: number; at: number }[] = [];
   let sentMessageId: string | null = null;
   const t0 = Date.now();
   const onUpdate = (updates: { key?: { id?: string | null }; update?: { status?: number | null } }[]) => {
     for (const u of updates) {
-      if (!sentMessageId || u.key?.id !== sentMessageId) continue;
+      const id = u.key?.id;
       const status = u.update?.status;
-      if (typeof status !== 'number') continue;
-      ackTrail.push({
-        status,
-        label: ACK_LABEL[status] ?? String(status),
-        atMsAfterSend: Date.now() - t0,
-      });
+      if (typeof id === 'string' && typeof status === 'number') {
+        seen.push({ id, status, at: Date.now() });
+      }
     }
   };
   sock.ev.on('messages.update', onUpdate);
+  const ackTrail: ProbeReport['ackTrail'] = [];
 
   let sendResult: SendResult;
   try {
@@ -732,12 +734,24 @@ export async function probeSend(
     if (sendResult.success) {
       // Wait for the ack to move past SERVER_ACK — or prove that it doesn't.
       const deadline = Date.now() + watchMs;
-      while (Date.now() < deadline && !ackTrail.some((a) => a.status >= 3)) {
+      while (
+        Date.now() < deadline &&
+        !seen.some((s) => s.id === sentMessageId && s.status >= 3)
+      ) {
         await new Promise((r) => setTimeout(r, 1_000));
       }
     }
   } finally {
     sock.ev.off('messages.update', onUpdate);
+  }
+
+  for (const s of seen) {
+    if (s.id !== sentMessageId) continue;
+    ackTrail.push({
+      status: s.status,
+      label: ACK_LABEL[s.status] ?? String(s.status),
+      atMsAfterSend: s.at - t0,
+    });
   }
 
   const after = await sessionKeys();
@@ -748,9 +762,16 @@ export async function probeSend(
   // re-runs decrypt and the BufferJSON reviver exactly as a restarted process
   // would. This is the difference between "written" and "actually recoverable".
   let sessionPersisted: boolean | null = null;
-  if (newRows.length > 0) {
+  // Check every session touched by this send, not just brand-new rows: a
+  // returning recipient ratchets an existing session, and that write has to
+  // survive the round-trip just as much as a first one.
+  const touched = new Set([
+    ...newRows.map((k) => k.slice('session::'.length)),
+    ...writes.filter((w) => w.type === 'session' && w.op === 'set').map((w) => w.id),
+  ]);
+  if (touched.size > 0) {
     const { state } = await usePostgresAuthState(tenantId);
-    const ids = newRows.map((k) => k.slice('session::'.length));
+    const ids = [...touched];
     const loaded = await state.keys.get('session', ids);
     sessionPersisted = ids.every((id) => {
       const v = loaded[id] as unknown;
@@ -774,10 +795,15 @@ export async function probeSend(
       'A mensagem chegou ao servidor do WhatsApp e nao foi adiante — filtro de plataforma.';
   } else if (sessionPersisted === false) {
     verdict = 'HIPOTESE A: a sessao Signal nao sobreviveu ao round-trip no Postgres.';
-  } else if (newRows.length === 0 && writes.filter((w) => w.type === 'session').length === 0) {
+  } else if (best < 0) {
     verdict =
-      'AMBIGUO: nenhuma sessao Signal nova foi criada para este destinatario. ' +
-      'Pode ser sessao pre-existente (esperado) ou falha na criacao — compare com sessionsBefore.';
+      'INCONCLUSIVO: o WhatsApp nao devolveu nenhum ack, nem SERVER_ACK. ' +
+      'A mensagem nem chegou ao servidor — suspeitar do socket, nao do destinatario. ' +
+      'Confirme se o aparelho recebeu antes de tirar conclusao.';
+  } else if (touched.size === 0) {
+    verdict =
+      'AMBIGUO: nenhuma sessao Signal foi tocada para este destinatario. ' +
+      'Pode ser sessao pre-existente ja ratcheted ou falha na criacao.';
   } else {
     verdict = `AMBIGUO: ack parou em ${finalAck}. Precisa de mais observacao.`;
   }
