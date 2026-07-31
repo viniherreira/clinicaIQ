@@ -7,6 +7,7 @@ import {
   disconnect,
   getStatus,
   lookupNumber,
+  probeSend,
   recentInbound,
   restoreSessions,
   send,
@@ -74,6 +75,35 @@ app.get(
   '/debug/lookup/:tenantId/:phone',
   asyncRoute(async (req, res) => {
     res.json(await lookupNumber(tenantIdOf(req), String(req.params.phone)));
+  }),
+);
+
+/**
+ * The discriminating experiment for "sent but never arrives": one instrumented
+ * send that reports jid resolution, Signal session creation *and* persistence,
+ * and the full ack trajectory. Sends a real message — deliberate use only.
+ *
+ *   POST /debug/probe/:tenantId  { "phone": "5511...", "text": "..." }
+ */
+app.post(
+  '/debug/probe/:tenantId',
+  asyncRoute(async (req, res) => {
+    const { phone, text } = req.body ?? {};
+    if (typeof phone !== 'string' || !phone.trim()) {
+      res.status(400).json({ error: 'phone-required' });
+      return;
+    }
+    try {
+      res.json(
+        await probeSend(
+          tenantIdOf(req),
+          phone,
+          typeof text === 'string' && text.trim() ? text : 'Teste de diagnóstico ClinicaIQ.',
+        ),
+      );
+    } catch (e) {
+      res.status(409).json({ error: e instanceof Error ? e.message : 'probe-failed' });
+    }
   }),
 );
 

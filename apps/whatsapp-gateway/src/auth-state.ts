@@ -11,6 +11,27 @@ import { env } from './env.js';
 
 type SignalKeyType = keyof SignalDataTypeMap;
 
+/**
+ * Ring buffer of recent key writes, so a diagnostic can answer "was a Signal
+ * session actually created for this recipient, at this moment?" without
+ * guessing from the socket's behaviour. Records the type and id only — never
+ * the key material.
+ */
+export interface KeyWrite {
+  at: string;
+  type: string;
+  id: string;
+  op: 'set' | 'delete';
+}
+const keyWrites: KeyWrite[] = [];
+export const recentKeyWrites = (sinceIso?: string): KeyWrite[] =>
+  sinceIso ? keyWrites.filter((w) => w.at >= sinceIso) : keyWrites.slice(0, 100);
+
+function recordWrite(type: string, id: string, op: 'set' | 'delete'): void {
+  keyWrites.unshift({ at: new Date().toISOString(), type, id, op });
+  if (keyWrites.length > 500) keyWrites.length = 500;
+}
+
 /** Baileys key ids can contain characters we'd rather not treat as separators. */
 const rowKey = (type: string, id: string) => `${type}::${id}`;
 
@@ -83,6 +104,7 @@ export async function usePostgresAuthState(tenantId: string): Promise<{
             if (!entries) continue;
             for (const [id, value] of Object.entries(entries)) {
               const key = rowKey(type, id);
+              recordWrite(type, id, value ? 'set' : 'delete');
               jobs.push(value ? writeValue(tenantId, key, value) : removeValue(tenantId, key));
             }
           }

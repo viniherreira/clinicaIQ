@@ -7,7 +7,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import pino from 'pino';
-import { usePostgresAuthState } from './auth-state.js';
+import { recentKeyWrites, usePostgresAuthState } from './auth-state.js';
 import { env } from './env.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'warn' });
@@ -634,6 +634,169 @@ export async function send(
     }
     return { success: false, error: error instanceof Error ? error.message : 'send-failed' };
   }
+}
+
+// ─── Diagnostics ──────────────────────────────────────────────────────────────
+
+export interface ProbeReport {
+  phone: string;
+  /** 1. What the server says about the number, verbatim. */
+  onWhatsApp: unknown;
+  resolvedJid: string | null;
+  resolveReason?: string;
+  /** 3. Signal sessions that appeared in Postgres because of this send. */
+  sessionsBefore: number;
+  sessionsAfter: number;
+  newSessionRows: string[];
+  keyWritesDuringSend: { type: string; id: string; op: string; at: string }[];
+  sessionPersisted: boolean | null;
+  /** 4. Every ack the message received, with timing. */
+  sendResult: SendResult;
+  ackTrail: { status: number; label: string; atMsAfterSend: number }[];
+  finalAck: string;
+  verdict: string;
+}
+
+const ACK_LABEL: Record<number, string> = {
+  0: 'ERROR',
+  1: 'PENDING',
+  2: 'SERVER_ACK',
+  3: 'DELIVERY_ACK',
+  4: 'READ',
+  5: 'PLAYED',
+};
+
+/**
+ * One instrumented send that answers the whole question at once: does the number
+ * resolve, does a Signal session get created *and persisted*, and how far does
+ * the ack actually travel. Sends a real message — call it deliberately.
+ */
+export async function probeSend(
+  tenantId: string,
+  phone: string,
+  text: string,
+  watchMs = 90_000,
+): Promise<ProbeReport> {
+  const session = sessions.get(tenantId);
+  if (!session || session.status !== 'CONNECTED') {
+    throw new Error('not-connected');
+  }
+  const digits = phone.replace(/\D/g, '');
+  const sock = session.sock;
+
+  // 1 — the server's own answer about this number.
+  const raw = await lookupNumber(tenantId, digits);
+  const resolution = await resolveJid(sock, digits);
+
+  const sessionKeys = async (): Promise<Set<string>> => {
+    const rows = await prisma.whatsAppAuthKey.findMany({
+      where: { tenantId, key: { startsWith: 'session::' } },
+      select: { key: true },
+    });
+    return new Set(rows.map((r) => r.key));
+  };
+
+  const before = await sessionKeys();
+  const startedAt = new Date().toISOString();
+
+  // 4 — record acks as they arrive, before sending so nothing is missed.
+  const ackTrail: ProbeReport['ackTrail'] = [];
+  let sentMessageId: string | null = null;
+  const t0 = Date.now();
+  const onUpdate = (updates: { key?: { id?: string | null }; update?: { status?: number | null } }[]) => {
+    for (const u of updates) {
+      if (!sentMessageId || u.key?.id !== sentMessageId) continue;
+      const status = u.update?.status;
+      if (typeof status !== 'number') continue;
+      ackTrail.push({
+        status,
+        label: ACK_LABEL[status] ?? String(status),
+        atMsAfterSend: Date.now() - t0,
+      });
+    }
+  };
+  sock.ev.on('messages.update', onUpdate);
+
+  let sendResult: SendResult;
+  try {
+    if (resolution.jid === null && resolution.reason === 'not-on-whatsapp') {
+      sendResult = { success: false, error: 'numero-sem-whatsapp' };
+    } else {
+      const jid = resolution.jid ?? toJid(digits);
+      await warmUpContact(sock, jid);
+      const sent = await sock.sendMessage(jid, { text });
+      sentMessageId = sent?.key?.id ?? null;
+      sendResult = { success: true, messageId: sentMessageId ?? undefined };
+    }
+
+    if (sendResult.success) {
+      // Wait for the ack to move past SERVER_ACK — or prove that it doesn't.
+      const deadline = Date.now() + watchMs;
+      while (Date.now() < deadline && !ackTrail.some((a) => a.status >= 3)) {
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+    }
+  } finally {
+    sock.ev.off('messages.update', onUpdate);
+  }
+
+  const after = await sessionKeys();
+  const newRows = [...after].filter((k) => !before.has(k));
+  const writes = recentKeyWrites(startedAt).map(({ type, id, op, at }) => ({ type, id, op, at }));
+
+  // 3 — read the new session back from Postgres in a *fresh* auth state, which
+  // re-runs decrypt and the BufferJSON reviver exactly as a restarted process
+  // would. This is the difference between "written" and "actually recoverable".
+  let sessionPersisted: boolean | null = null;
+  if (newRows.length > 0) {
+    const { state } = await usePostgresAuthState(tenantId);
+    const ids = newRows.map((k) => k.slice('session::'.length));
+    const loaded = await state.keys.get('session', ids);
+    sessionPersisted = ids.every((id) => {
+      const v = loaded[id] as unknown;
+      if (Buffer.isBuffer(v) || v instanceof Uint8Array) return v.length > 0;
+      const rec = (v as { _sessions?: object } | undefined)?._sessions;
+      return Boolean(rec && Object.keys(rec).length > 0);
+    });
+  }
+
+  const best = ackTrail.reduce((m, a) => Math.max(m, a.status), -1);
+  const finalAck = best < 0 ? 'nenhum ack recebido' : (ACK_LABEL[best] ?? String(best));
+
+  let verdict: string;
+  if (!sendResult.success) {
+    verdict = `envio recusado: ${sendResult.error}`;
+  } else if (best >= 3) {
+    verdict = 'ENTREGUE — o caminho funciona para este número.';
+  } else if (best === 2 && sessionPersisted !== false) {
+    verdict =
+      'HIPOTESE B: sessao Signal criada e persistida, jid valido, ack parou em SERVER_ACK. ' +
+      'A mensagem chegou ao servidor do WhatsApp e nao foi adiante — filtro de plataforma.';
+  } else if (sessionPersisted === false) {
+    verdict = 'HIPOTESE A: a sessao Signal nao sobreviveu ao round-trip no Postgres.';
+  } else if (newRows.length === 0 && writes.filter((w) => w.type === 'session').length === 0) {
+    verdict =
+      'AMBIGUO: nenhuma sessao Signal nova foi criada para este destinatario. ' +
+      'Pode ser sessao pre-existente (esperado) ou falha na criacao — compare com sessionsBefore.';
+  } else {
+    verdict = `AMBIGUO: ack parou em ${finalAck}. Precisa de mais observacao.`;
+  }
+
+  return {
+    phone: digits,
+    onWhatsApp: raw.results,
+    resolvedJid: resolution.jid,
+    resolveReason: resolution.jid === null ? resolution.reason : undefined,
+    sessionsBefore: before.size,
+    sessionsAfter: after.size,
+    newSessionRows: newRows.map((k) => k.slice('session::'.length)),
+    keyWritesDuringSend: writes,
+    sessionPersisted,
+    sendResult,
+    ackTrail,
+    finalAck,
+    verdict,
+  };
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
