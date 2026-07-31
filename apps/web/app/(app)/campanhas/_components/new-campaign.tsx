@@ -82,6 +82,16 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
 
   const preview = message.replace(/\{nome\}/gi, patients[0]?.name.split(' ')[0] ?? 'Maria');
 
+  /** First unmet requirement, so the disabled button can explain itself. */
+  const missing =
+    selected.size === 0
+      ? 'Selecione ao menos um paciente (passo 2).'
+      : name.trim().length < 2
+        ? 'Falta o nome da campanha (passo 3, primeiro campo).'
+        : message.trim().length < 10
+          ? 'Escreva a mensagem (passo 3, pelo menos 10 caracteres).'
+          : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
@@ -239,13 +249,17 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
               {/* 3. Message */}
               <section>
                 <h3 className="text-sm font-semibold">3. A mensagem</h3>
+                <label htmlFor="campaign-name" className="mt-2 block text-xs font-medium">
+                  Nome da campanha <span className="text-destructive">*</span>{' '}
+                  <span className="font-normal text-muted-foreground">(só você vê)</span>
+                </label>
                 <input
+                  id="campaign-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}
-                  placeholder="Nome da campanha (só você vê) — ex: Promoção de clareamento"
-                  aria-label="Nome da campanha"
-                  className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  placeholder="Ex: Promoção de clareamento"
+                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 />
                 <textarea
                   value={message}
@@ -291,9 +305,11 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-border p-4">
-              <p className="text-xs text-muted-foreground">
-                {selected.size > 0 && `≈ ${Math.ceil((selected.size * 20) / 60)} min de envio`}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
+              {/* A disabled button with no explanation reads as a broken screen —
+                  always say which field is still missing. */}
+              <p className={`text-xs ${missing ? 'text-warning' : 'text-muted-foreground'}`}>
+                {missing ?? (selected.size > 0 ? `≈ ${Math.ceil((selected.size * 20) / 60)} min de envio` : '')}
               </p>
               <div className="flex gap-2">
                 <button type="button" onClick={onClose} className="btn-outline btn-md">
@@ -302,7 +318,8 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   onClick={submit}
-                  disabled={sending || selected.size === 0 || message.trim().length < 10 || name.trim().length < 2}
+                  disabled={sending || missing !== null}
+                  title={missing ?? undefined}
                   className="btn-primary btn-md"
                 >
                   {sending ? (

@@ -74,6 +74,31 @@ function isSocketOpen(sock: any): boolean {
   return true;
 }
 
+/** Contacts already warmed up in this process, so we only pay the cost once. */
+const warmed = new Set<string>();
+
+/**
+ * Prepares a first-time conversation before sending. WhatsApp needs an
+ * end-to-end session with a contact the line has never messaged; without it the
+ * server can accept a message (SERVER_ACK) that the recipient's device can never
+ * decrypt, so it is never delivered — indistinguishable from success. Subscribing
+ * to presence forces that key exchange, and the brief "typing" also makes an
+ * automated send look like a person.
+ */
+async function warmUpContact(sock: WASocket, jid: string): Promise<void> {
+  if (warmed.has(jid)) return;
+  warmed.add(jid);
+  try {
+    await sock.presenceSubscribe(jid);
+    await new Promise((r) => setTimeout(r, 600));
+    await sock.sendPresenceUpdate('composing', jid);
+    await new Promise((r) => setTimeout(r, 900));
+    await sock.sendPresenceUpdate('paused', jid);
+  } catch {
+    // Best effort: never block the send because the warm-up failed.
+  }
+}
+
 /** Caps a promise so a slow WhatsApp lookup can't eat the whole send budget. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -580,6 +605,8 @@ export async function send(
     return { success: false, error: 'numero-sem-whatsapp' };
   }
   const jid = resolution.jid ?? toJid(digits);
+
+  await warmUpContact(session.sock, jid);
 
   const withButtons =
     opts.buttons && opts.buttons.length > 0
