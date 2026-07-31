@@ -58,6 +58,17 @@ function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+/**
+ * Status to record right after handing a message off. On the clinic's own line
+ * the gateway only gets a locally generated id back — WhatsApp hasn't seen the
+ * message yet — so claiming SENT there is a lie that hides non-delivery. Leave
+ * it PENDING and let the real ack promote it. The Meta path reports acceptance
+ * synchronously, so SENT is honest there.
+ */
+function initialStatus(ownLine: boolean): 'PENDING' | 'SENT' {
+  return ownLine ? 'PENDING' : 'SENT';
+}
+
 /** Turns internal send-failure codes into something the clinic can act on. */
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
@@ -312,9 +323,9 @@ export async function dispatchAppointmentMessage(
       direction: 'OUTBOUND',
       templateName,
       content: body,
-      status: result.success ? 'SENT' : 'FAILED',
+      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
       externalId: result.messageId ?? null,
-      sentAt: result.success ? new Date() : null,
+      sentAt: result.success && !resolved.ownLine ? new Date() : null,
       errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });
@@ -382,9 +393,9 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
       direction: 'OUTBOUND',
       templateName: WHATSAPP_TEMPLATES.quoteSent,
       content: body,
-      status: result.success ? 'SENT' : 'FAILED',
+      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
       externalId: result.messageId ?? null,
-      sentAt: result.success ? new Date() : null,
+      sentAt: result.success && !resolved.ownLine ? new Date() : null,
       errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });
@@ -444,9 +455,9 @@ export async function dispatchBirthdayMessage(patientId: string): Promise<SendMe
       direction: 'OUTBOUND',
       templateName: WHATSAPP_TEMPLATES.birthday,
       content: body,
-      status: result.success ? 'SENT' : 'FAILED',
+      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
       externalId: result.messageId ?? null,
-      sentAt: result.success ? new Date() : null,
+      sentAt: result.success && !resolved.ownLine ? new Date() : null,
       errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
     },
   });

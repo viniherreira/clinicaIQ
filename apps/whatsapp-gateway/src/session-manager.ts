@@ -155,6 +155,18 @@ export async function lookupNumber(
   return { ok: true, digits, tried, results, resolved: resolution.jid };
 }
 
+/**
+ * WhatsApp's own delivery states (proto.WebMessageInfo.Status) mapped to ours.
+ * PENDING (1) is skipped: it's the pre-send state we already record ourselves.
+ */
+const ACK_TO_STATUS: Record<number, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = {
+  0: 'FAILED', // ERROR
+  2: 'SENT', // SERVER_ACK — WhatsApp's servers have it
+  3: 'DELIVERED', // DELIVERY_ACK — reached the phone
+  4: 'READ',
+  5: 'READ', // PLAYED
+};
+
 // ─── Inbound replies ──────────────────────────────────────────────────────────
 
 /** Pulls the tapped-button id out of whichever reply shape WhatsApp used. */
@@ -309,6 +321,33 @@ export async function connect(tenantId: string): Promise<Session> {
   await persist(tenantId, { status: 'CONNECTING', lastError: null });
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Real delivery state. sendMessage resolves with a locally generated key long
+  // before WhatsApp has seen the message, so "sent" on its own proves nothing —
+  // these acks are the only evidence a message actually left and landed.
+  sock.ev.on('messages.update', async (updates) => {
+    for (const u of updates) {
+      const id = u.key?.id;
+      const status = u.update?.status;
+      if (!id || typeof status !== 'number') continue;
+      const mapped = ACK_TO_STATUS[status];
+      if (!mapped) continue;
+      await prisma.whatsAppMessage
+        .updateMany({
+          where: { externalId: id, tenantId },
+          data: {
+            status: mapped,
+            ...(mapped === 'SENT' ? { sentAt: new Date() } : {}),
+            ...(mapped === 'DELIVERED' ? { deliveredAt: new Date() } : {}),
+            ...(mapped === 'READ' ? { readAt: new Date() } : {}),
+            ...(mapped === 'FAILED'
+              ? { errorMessage: 'O WhatsApp recusou a mensagem (número pode não existir)' }
+              : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
+  });
 
   // Patients replying "1"/"Confirmar" (or tapping a button) land here.
   sock.ev.on('messages.upsert', async ({ messages, type }) => {

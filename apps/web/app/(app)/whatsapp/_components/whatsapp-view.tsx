@@ -25,13 +25,21 @@ interface Props {
   data: WhatsAppPanelData;
 }
 
+/**
+ * Only DELIVERED/READ prove the patient's phone got it. "Saindo" and "No
+ * servidor" are honest intermediate states — a message stuck there did not
+ * reach anyone, which is exactly what a plain "Enviada" used to hide.
+ */
 const MSG_STATUS: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: 'Na fila', cls: 'bg-surface-alt text-muted-foreground' },
-  SENT: { label: 'Enviada', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' },
-  DELIVERED: { label: 'Entregue', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
-  READ: { label: 'Lida', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+  PENDING: { label: 'Saindo…', cls: 'bg-surface-alt text-muted-foreground' },
+  SENT: { label: 'No servidor', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' },
+  DELIVERED: { label: 'Entregue ✓✓', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+  READ: { label: 'Lida ✓✓', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
   FAILED: { label: 'Falhou', cls: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
 };
+
+/** A message that never left "saindo/no servidor" after this long didn't land. */
+const STUCK_AFTER_MS = 5 * 60 * 1000;
 
 const TEMPLATE_PT: Record<string, string> = {
   appointment_created: 'Agendamento criado',
@@ -181,6 +189,9 @@ export function WhatsAppView({ data }: Props) {
           <ul className="divide-y divide-border">
             {data.recent.map((m) => {
               const meta = MSG_STATUS[m.status] ?? MSG_STATUS.PENDING;
+              const stuck =
+                (m.status === 'PENDING' || m.status === 'SENT') &&
+                Date.now() - new Date(m.createdAt).getTime() > STUCK_AFTER_MS;
               return (
                 <li key={m.id} className="flex items-start gap-3 px-5 py-3">
                   <div className="min-w-0 flex-1">
@@ -202,6 +213,11 @@ export function WhatsAppView({ data }: Props) {
                     </p>
                     {m.errorMessage && (
                       <p className="mt-1 text-xs text-destructive">{m.errorMessage}</p>
+                    )}
+                    {stuck && !m.errorMessage && (
+                      <p className="mt-1 text-xs text-warning">
+                        Sem confirmação de entrega — o WhatsApp não confirmou que chegou.
+                      </p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
