@@ -1,4 +1,4 @@
-import { prisma, type WhatsAppConnectionStatus } from './db.js';
+import { decrypt, prisma, type WhatsAppConnectionStatus } from './db.js';
 import makeWASocket, {
   Browsers,
   DisconnectReason,
@@ -7,7 +7,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import pino from 'pino';
-import { recentKeyWrites, usePostgresAuthState } from './auth-state.js';
+import { purgeContactRouting, recentKeyWrites, usePostgresAuthState } from './auth-state.js';
 import { env } from './env.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'warn' });
@@ -192,6 +192,61 @@ const ACK_TO_STATUS: Record<number, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = 
   5: 'READ', // PLAYED
 };
 
+/** Messages we've already healed once, so a retry can't loop. */
+const healed = new Set<string>();
+
+/**
+ * WhatsApp rejecting a message outright (ack 0) reads like "this number is
+ * gone", but the common cause is our own routing cache: the contact's LID
+ * changed and we kept encrypting for the old one. The number is fine, the
+ * session is fine, and every future send fails the same way because the stale
+ * mapping is exactly what we keep reusing.
+ *
+ * So drop what we cached about the contact and send once more. If the rejection
+ * was genuine the retry fails too and the message stays FAILED — we only ever
+ * pay one extra attempt.
+ */
+async function healRejected(tenantId: string, externalId: string): Promise<void> {
+  if (healed.has(externalId)) return;
+  healed.add(externalId);
+  if (healed.size > 1_000) healed.clear();
+
+  const msg = await prisma.whatsAppMessage
+    .findFirst({
+      where: { tenantId, externalId },
+      select: { id: true, content: true, patient: { select: { phoneEncrypted: true } } },
+    })
+    .catch(() => null);
+  if (!msg?.patient) return;
+
+  let digits: string;
+  try {
+    digits = decrypt(msg.patient.phoneEncrypted, env.ENCRYPTION_MASTER_KEY, tenantId).replace(
+      /\D/g,
+      '',
+    );
+  } catch {
+    return;
+  }
+  if (!digits) return;
+  const full = digits.startsWith('55') ? digits : `55${digits}`;
+
+  const purged = await purgeContactRouting(tenantId, full).catch(() => [] as string[]);
+  if (purged.length === 0) return; // nothing stale to blame; the rejection stands
+
+  console.log(`[gateway] ack 0 em ${externalId}: ${purged.length} chave(s) de rota limpas, reenviando`);
+
+  const retry = await send(tenantId, full, { text: msg.content });
+  if (!retry.success || !retry.messageId) return;
+
+  await prisma.whatsAppMessage
+    .update({
+      where: { id: msg.id },
+      data: { status: 'PENDING', externalId: retry.messageId, errorMessage: null },
+    })
+    .catch(() => undefined);
+}
+
 // ─── Inbound replies ──────────────────────────────────────────────────────────
 
 /** Pulls the tapped-button id out of whichever reply shape WhatsApp used. */
@@ -371,6 +426,9 @@ export async function connect(tenantId: string): Promise<Session> {
           },
         })
         .catch(() => undefined);
+
+      // A rejection is usually stale routing on our side, not a dead number.
+      if (mapped === 'FAILED') void healRejected(tenantId, id);
     }
   });
 

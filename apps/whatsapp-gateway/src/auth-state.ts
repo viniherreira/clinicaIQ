@@ -67,6 +67,62 @@ async function removeValue(tenantId: string, key: string): Promise<void> {
     .catch(() => undefined);
 }
 
+/** Brazilian lines exist with and without the extra 9 after the area code. */
+function phoneVariants(digits: string): string[] {
+  const out = new Set([digits]);
+  const m = /^55(\d{2})(\d{8,9})$/.exec(digits);
+  if (m) {
+    const [, ddd, rest] = m;
+    if (rest.length === 9 && rest.startsWith('9')) out.add(`55${ddd}${rest.slice(1)}`);
+    if (rest.length === 8) out.add(`55${ddd}9${rest}`);
+  }
+  return [...out];
+}
+
+/**
+ * Forgets everything we cached about how to reach one contact: their LID, their
+ * device list, and the Signal sessions keyed under that LID.
+ *
+ * WhatsApp is migrating accounts from phone-number jids to opaque LIDs, and a
+ * contact's LID can change. Our stored mapping never expires, so after a
+ * migration every send is encrypted for an identifier nobody answers to: the
+ * server rejects it instantly (ack 0) even though the number is valid and the
+ * session is healthy. Nothing recovers on its own, because the stale mapping is
+ * what we keep reusing. Dropping these rows forces a fresh resolution on the
+ * next attempt; they are a cache, so losing them costs one round-trip.
+ */
+export async function purgeContactRouting(tenantId: string, digits: string): Promise<string[]> {
+  const variants = phoneVariants(digits);
+
+  // The reverse mappings and sessions are filed under the LID, so read it first.
+  const lids = new Set<string>();
+  for (const v of variants) {
+    const value = await readValue(tenantId, rowKey('lid-mapping', v));
+    if (typeof value === 'string' && value) lids.add(value.split('@')[0].split(':')[0]);
+  }
+
+  const exact: string[] = [];
+  for (const v of variants) exact.push(rowKey('lid-mapping', v), rowKey('device-list', v));
+  for (const lid of lids) {
+    exact.push(rowKey('lid-mapping', `${lid}_reverse`), rowKey('tctoken', `${lid}@lid`));
+  }
+
+  const rows = await prisma.whatsAppAuthKey.findMany({
+    where: {
+      tenantId,
+      OR: [
+        { key: { in: exact } },
+        ...[...lids].map((lid) => ({ key: { startsWith: `session::${lid}` } })),
+      ],
+    },
+    select: { id: true, key: true },
+  });
+  if (rows.length === 0) return [];
+
+  await prisma.whatsAppAuthKey.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  return rows.map((r) => r.key);
+}
+
 /**
  * Baileys auth store backed by Postgres instead of the filesystem, so the
  * gateway can be redeployed or scaled without every clinic having to pair again.
