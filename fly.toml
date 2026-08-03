@@ -1,0 +1,49 @@
+# WhatsApp gateway hosted in São Paulo.
+#
+# WhatsApp's anti-abuse scoring weighs where a linked device connects from. A
+# Brazilian clinic whose WhatsApp Web session appears in a California datacenter
+# is two bad signals at once — wrong country and a datacenter IP range — and the
+# pairing screen says so out loud ("risco de golpe… San Jose"). Running in `gru`
+# removes the country mismatch, which is the half we can actually fix.
+#
+#   fly launch --no-deploy --copy-config   (first time)
+#   fly secrets set DATABASE_URL=… ENCRYPTION_MASTER_KEY=… WHATSAPP_GATEWAY_TOKEN=… APP_URL=…
+#   fly deploy
+#
+# See docs/WHATSAPP_QRCODE.md for the full migration, including re-pairing.
+
+app = "clinicaiq-whatsapp-gateway"
+primary_region = "gru" # São Paulo
+
+[build]
+dockerfile = "apps/whatsapp-gateway/Dockerfile"
+
+[env]
+PORT = "8080"
+
+[http_service]
+internal_port = 8080
+force_https = true
+
+# The gateway holds one long-lived WhatsApp socket per clinic. A suspended
+# machine drops every socket, and clinics silently stop receiving confirmations
+# until someone notices — so it must never scale to zero.
+auto_stop_machines = false
+auto_start_machines = false
+min_machines_running = 1
+
+# Exactly one machine. Two would each open a socket for the same clinic, and
+# WhatsApp treats the older connection as a duplicate and quietly drops messages
+# sent through it — the same "marked as sent but never arrived" symptom we spent
+# days chasing. Scale out only by sharding tenants across separate apps.
+[http_service.concurrency]
+type = "requests"
+hard_limit = 200
+soft_limit = 150
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "512mb"
+
+# Baileys keeps auth state in Postgres, not on disk, so no volume is needed and
+# a redeploy doesn't force clinics to scan the QR again.

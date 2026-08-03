@@ -19,6 +19,7 @@ import {
   sendTestMessage,
   type WhatsAppPanelData,
 } from '../actions';
+import { OptInCard } from './opt-in-card';
 import { PairingModal } from './pairing-modal';
 
 interface Props {
@@ -158,6 +159,9 @@ export function WhatsAppView({ data }: Props) {
 
         {connected && <TestMessage />}
       </section>
+
+      {/* Opt-in: the patient speaking first is what makes delivery work */}
+      {connected && <OptInCard phoneNumber={data.phoneNumber} />}
 
       {/* Automations */}
       <AutomationSettings initial={data.settings} connected={connected} />
