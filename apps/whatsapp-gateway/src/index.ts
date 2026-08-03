@@ -11,6 +11,7 @@ import {
   recentInbound,
   restoreSessions,
   send,
+  sweepStuckMessages,
   type QuickReply,
 } from './session-manager.js';
 
@@ -221,6 +222,14 @@ app.listen(env.PORT, '0.0.0.0', () => {
   }
 
   startHeartbeat();
+
+  // Close out messages whose ack was lost to a restart, so the screen stops
+  // showing "Saindo…" for something that reached nobody.
+  const sweep = () =>
+    void sweepStuckMessages().catch((e) => console.error('[gateway] sweep falhou:', e?.message ?? e));
+  sweep();
+  setInterval(sweep, 5 * 60_000).unref();
+
   restoreSessions()
     .then((n) => console.log(`[gateway] restored ${n} session(s)`))
     .catch((e) => console.error('[gateway] restore failed', e));

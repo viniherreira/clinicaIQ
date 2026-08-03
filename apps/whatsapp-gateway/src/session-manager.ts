@@ -192,6 +192,44 @@ const ACK_TO_STATUS: Record<number, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = 
   5: 'READ', // PLAYED
 };
 
+/**
+ * How long a message may sit without WhatsApp confirming delivery before we
+ * stop calling it "on its way". Generous: a phone that is off or out of signal
+ * legitimately takes minutes.
+ */
+const STUCK_AFTER_MS = 10 * 60 * 1000;
+
+/**
+ * Closes out messages that never got an ack.
+ *
+ * `messages.update` only fires on the socket that sent the message, so a
+ * restart, a dropped connection or a redeploy between send and ack loses it
+ * forever — the row stays PENDING and the screen keeps saying "Saindo…" for a
+ * message that reached nobody. That is the worst possible failure for a clinic:
+ * it looks like the patient was warned when they were not, so nobody calls.
+ *
+ * Undelivered is the honest reading. FAILED with a plain reason lets the
+ * reception act instead of trusting a status that will never change.
+ */
+export async function sweepStuckMessages(): Promise<number> {
+  const cutoff = new Date(Date.now() - STUCK_AFTER_MS);
+  const { count } = await prisma.whatsAppMessage.updateMany({
+    where: {
+      direction: 'OUTBOUND',
+      status: { in: ['PENDING', 'SENT'] },
+      createdAt: { lt: cutoff },
+      deliveredAt: null,
+      readAt: null,
+    },
+    data: {
+      status: 'FAILED',
+      errorMessage: 'Sem confirmação de entrega do WhatsApp — trate como não recebida.',
+    },
+  });
+  if (count > 0) console.log(`[gateway] ${count} mensagem(ns) sem ack marcada(s) como nao entregue`);
+  return count;
+}
+
 /** Messages we've already healed once, so a retry can't loop. */
 const healed = new Set<string>();
 
@@ -743,7 +781,12 @@ export async function probeSend(
   const sock = session.sock;
 
   // 1 — the server's own answer about this number.
-  const raw = await lookupNumber(tenantId, digits);
+  //
+  // Deliberately a *single* resolution pass. An earlier version also called
+  // lookupNumber() here, so every probe fired three or four onWhatsApp queries
+  // back to back moments before sending — which is what number-scraping looks
+  // like. Sends that the app completed fine were rejected under the probe, and
+  // the tool ended up measuring the suspicion it had just created.
   const resolution = await resolveJid(sock, digits);
 
   const sessionKeys = async (): Promise<Set<string>> => {
@@ -868,7 +911,10 @@ export async function probeSend(
 
   return {
     phone: digits,
-    onWhatsApp: raw.results,
+    onWhatsApp:
+      resolution.jid === null
+        ? { resolvido: null, motivo: resolution.reason }
+        : { resolvido: resolution.jid },
     resolvedJid: resolution.jid,
     resolveReason: resolution.jid === null ? resolution.reason : undefined,
     sessionsBefore: before.size,
