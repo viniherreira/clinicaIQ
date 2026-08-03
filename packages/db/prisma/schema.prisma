@@ -103,6 +103,7 @@ model Tenant {
   patientFiles        PatientFile[]
   whatsappSession     WhatsAppSession?
   campaigns           Campaign[]
+  subscription        Subscription?
 
   @@map("tenants")
 }
@@ -664,4 +665,105 @@ model CampaignRecipient {
   @@unique([campaignId, patientId])
   @@index([campaignId, status])
   @@map("campaign_recipients")
+}
+
+// ─── Assinatura (cobrança do ClinicaIQ pelas clínicas) ───────────────────────
+// Distinto de `Payment`, que é o dinheiro que o *paciente* paga para a clínica.
+
+enum PlanTier {
+  ESSENCIAL
+  PROFISSIONAL
+  CLINICA
+}
+
+enum SubscriptionStatus {
+  TRIALING // avaliação gratuita, acesso total
+  ACTIVE // em dia
+  PAST_DUE // venceu, dentro da tolerância — ainda acessa
+  SUSPENDED // tolerância esgotada — somente leitura
+  CANCELLED // encerrada a pedido da clínica
+}
+
+enum ChargeStatus {
+  PENDING
+  PAID
+  OVERDUE
+  REFUNDED
+  CANCELLED
+}
+
+/// Um plano vendável. Os limites moram aqui, e não no código, para que mudar
+/// preço ou liberar um recurso não exija deploy.
+model Plan {
+  tier              PlanTier @id
+  name              String
+  description       String
+  monthlyPriceCents Int
+  /// Teto de profissionais; null = ilimitado.
+  maxProfessionals  Int?
+  whatsappEnabled   Boolean  @default(true)
+  campaignsEnabled  Boolean  @default(false)
+  assistantEnabled  Boolean  @default(false)
+  advancedReports   Boolean  @default(false)
+  /// Ordem de exibição na tela de planos.
+  sortOrder         Int      @default(0)
+  active            Boolean  @default(true)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id       String   @id @default(cuid())
+  tenantId String   @unique
+  tier     PlanTier
+
+  status SubscriptionStatus @default(TRIALING)
+
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime
+  /// Fim da tolerância após o vencimento. Passou disso, vira SUSPENDED.
+  graceEndsAt        DateTime?
+  cancelledAt        DateTime?
+
+  /// Identificadores no Asaas. Nulos enquanto a cobrança for manual.
+  asaasCustomerId     String?
+  asaasSubscriptionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  plan    Plan     @relation(fields: [tier], references: [tier])
+  charges Charge[]
+
+  @@index([status, currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+/// Uma fatura. Guardamos os links do Asaas para a clínica pagar sem sair do
+/// sistema — o boleto e o QR do PIX são o que ela realmente precisa.
+model Charge {
+  id             String       @id @default(cuid())
+  tenantId       String
+  subscriptionId String
+  amountCents    Int
+  status         ChargeStatus @default(PENDING)
+  dueDate        DateTime
+  paidAt         DateTime?
+
+  asaasChargeId String? @unique
+  invoiceUrl    String?
+  bankSlipUrl   String?
+  pixPayload    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dueDate(sort: Desc)])
+  @@map("charges")
 }
