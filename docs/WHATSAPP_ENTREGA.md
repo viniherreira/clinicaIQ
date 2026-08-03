@@ -9,46 +9,60 @@ pode entregar hoje e parar amanhã. O que está aqui são os fatores que o
 comportamento observado e a documentação pública indicam que pesam — cada um
 melhora a probabilidade, nenhum a assegura.
 
-Medição real desta instalação em 03/08/2026, antes das mudanças abaixo:
+Medição real desta instalação em 03/08/2026:
 **8 entregas em 68 envios (12%)**, todas para contatos pessoais do dono da
 clínica. Dos 17 pacientes reais, **nenhum recebeu**.
+
+O que já foi descartado com medição, para ninguém repetir o caminho:
+
+| hipótese | como foi testada | resultado |
+|---|---|---|
+| keys store não persiste sessões | `keys.get` num processo separado | 100% íntegras, round-trip byte-idêntico |
+| sessão Signal não é criada | `keys.set` instrumentado durante o envio | criada e persistida |
+| mapeamento de LID vencido | apagado e refeito do zero | LID correto, sem efeito |
+| número inválido | `onWhatsApp` 6× seguidas | existe, determinístico |
+| IP de datacenter / fora do Brasil | gateway rodado em IP residencial no Brasil | **sem efeito** |
 
 ---
 
 ## Os fatores, em ordem de impacto
 
-### 1. De onde o dispositivo conecta
+### 1. Quem falou primeiro — o fator dominante
 
-O sistema anti-abuso pontua o IP de onde a sessão do WhatsApp Web se conecta.
-Dois sinais ruins somam aqui: **país diferente do celular** e **faixa de IP de
-datacenter**. Uma clínica em São Paulo cuja sessão aparece na Califórnia é o
-caso didático — e o próprio WhatsApp avisa disso na tela de pareamento
-("risco de golpe… San Jose").
+Mensagem automática para quem **nunca contatou o número** é recusada. Não é
+demora nem filtro silencioso: o WhatsApp devolve `ack 0` em segundos, com número
+válido, sessão Signal criada e persistida, e LID correto.
 
-O país dá para consertar. Datacenter não, a menos que se use IP residencial.
+Quem entrega, nesta instalação, é exatamente quem já tinha conversa com a linha.
+Um contato que só passou a receber depois de o dono mandar um "oi" manual é a
+demonstração mais direta: nada mudou no código entre uma tentativa e outra.
 
-- ✅ Hospedar em região brasileira. `fly.toml` na raiz já aponta para `gru`
-  (São Paulo).
-- ❌ Railway não tem região no Brasil — foi onde este gateway rodou até agora.
-- Alternativas com São Paulo: Fly.io `gru`, AWS `sa-east-1`, Oracle Cloud
-  São Paulo, VPS nacional (Magalu, Locaweb, Hostinger).
+Contorno — fazer o paciente iniciar. Depois da primeira mensagem dele, a entrega
+passa a funcionar:
 
-**Depois de migrar, é preciso parear de novo pelo QR.** A sessão antiga fica
-presa ao IP anterior.
-
-### 2. Distância no grafo de contatos
-
-O maior peso isolado, e o que explica o padrão observado aqui: mensagem
-automática para quem **nunca falou com o número** é tratada como abordagem a
-estranho. Foi exatamente o que os dados mostraram — só entregou para contatos
-com conversa prévia.
-
-Contorno: fazer o paciente iniciar. Depois da primeira mensagem dele, a janela
-abre e a entrega passa a funcionar.
-
+- QR code impresso na recepção (a tela do WhatsApp gera um pronto)
 - Link `wa.me` no site, no rodapé do e-mail e na confirmação de agendamento
-- QR code impresso na recepção: "aponte para receber lembretes"
-- Pedir na ficha de cadastro que o paciente salve o número da clínica
+- Primeiro contato manual da recepção com paciente novo — uma vez só
+
+### 2. De onde o dispositivo conecta — **testado, não era a causa**
+
+A hipótese era boa: o anti-abuso pontua o IP da sessão, e rodar no Railway
+(US West) somava dois sinais ruins — país diferente do celular e faixa de
+datacenter. O próprio WhatsApp avisa na tela de pareamento ("risco de golpe…
+San Jose").
+
+**Medido em 03/08/2026 e descartado.** O gateway foi rodado na máquina do dono,
+em IP residencial brasileiro, na mesma cidade do celular. A sessão reconectou
+sem precisar de novo pareamento e o mesmo destinatário continuou recebendo
+`ack 0` — igual ao datacenter americano.
+
+Conclusão: a restrição é **por destinatário**, sobre o relacionamento, não sobre
+o lugar de onde se conecta. Não vale pagar hospedagem no Brasil esperando que
+isso resolva a entrega.
+
+O `fly.toml` na raiz (região `gru`) fica no repositório porque latência e
+estabilidade continuam sendo bons motivos para hospedar no Brasil quando houver
+várias clínicas — só não é solução para este problema.
 
 ### 3. Proporção de resposta
 
