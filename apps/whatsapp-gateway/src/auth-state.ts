@@ -92,9 +92,12 @@ export async function purgeContactRouting(tenantId: string, digits: string): Pro
 
   const exact: string[] = [];
   for (const v of variants) exact.push(rowKey('lid-mapping', v), rowKey('device-list', v));
-  for (const lid of lids) {
-    exact.push(rowKey('lid-mapping', `${lid}_reverse`), rowKey('tctoken', `${lid}@lid`));
-  }
+  // Deliberately *not* the tctoken. It is the trusted-contact token the recipient
+  // issued to us, and it is the one thing here that cannot be re-derived — only
+  // the recipient's device can grant it. Dropping it turned a routing problem
+  // into a permanent 463 on the very next attempt, and the token index Baileys
+  // keeps at `tctoken::__index` would still claim it existed.
+  for (const lid of lids) exact.push(rowKey('lid-mapping', `${lid}_reverse`));
 
   const rows = await prisma.whatsAppAuthKey.findMany({
     where: {
