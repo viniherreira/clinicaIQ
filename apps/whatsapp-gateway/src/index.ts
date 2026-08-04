@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { runCampaign } from './campaigns.js';
 import { prisma } from './db.js';
 import { env, envProblems, logEnvSummary } from './env.js';
+import { retryPendingMessages, sweepStuckMessages } from './outbox.js';
 import {
   connect,
   disconnect,
@@ -9,9 +10,9 @@ import {
   lookupNumber,
   probeSend,
   recentInbound,
+  replayParkedAcks,
   restoreSessions,
   send,
-  sweepStuckMessages,
   type QuickReply,
 } from './session-manager.js';
 
@@ -154,7 +155,7 @@ app.post(
 app.post(
   '/sessions/:tenantId/messages',
   asyncRoute(async (req, res) => {
-    const { to, body, buttons } = req.body ?? {};
+    const { to, body, buttons, ref } = req.body ?? {};
     if (typeof to !== 'string' || typeof body !== 'string' || !to.trim() || !body.trim()) {
       res.status(400).json({ success: false, error: 'to-and-body-required' });
       return;
@@ -164,7 +165,15 @@ app.post(
           .filter((b) => b && typeof b.id === 'string' && typeof b.title === 'string')
           .map((b) => ({ id: b.id, title: b.title }))
       : undefined;
-    res.json(await send(tenantIdOf(req), to, { text: body, buttons: quickReplies }));
+    res.json(
+      await send(tenantIdOf(req), to, {
+        text: body,
+        buttons: quickReplies,
+        // The app's outbox row, stamped with WhatsApp's id the moment the socket
+        // accepts — so a reply this request never receives can't cause a resend.
+        ref: typeof ref === 'string' && ref ? ref : undefined,
+      }),
+    );
   }),
 );
 
@@ -222,6 +231,23 @@ app.listen(env.PORT, '0.0.0.0', () => {
   }
 
   startHeartbeat();
+
+  // An ack can beat the row it belongs to into existence; the replay applies the
+  // ones that arrived early. Frequent and cheap — it only touches memory unless
+  // something is actually parked.
+  setInterval(
+    () => void replayParkedAcks().catch((e) => console.error('[gateway] replay falhou:', e?.message ?? e)),
+    5_000,
+  ).unref();
+
+  // The outbox: anything the app failed to hand over goes out from here. This is
+  // what makes a booking survive a reconnect, a redeploy or a timeout.
+  const retry = () =>
+    void retryPendingMessages().catch((e) =>
+      console.error('[gateway] outbox falhou:', e?.message ?? e),
+    );
+  retry();
+  setInterval(retry, 30_000).unref();
 
   // Close out messages whose ack was lost to a restart, so the screen stops
   // showing "Saindo…" for something that reached nobody.

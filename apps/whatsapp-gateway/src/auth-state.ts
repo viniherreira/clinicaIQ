@@ -8,6 +8,7 @@ import {
   type SignalDataTypeMap,
 } from '@whiskeysockets/baileys';
 import { env } from './env.js';
+import { phoneVariants } from './phone.js';
 
 type SignalKeyType = keyof SignalDataTypeMap;
 
@@ -65,18 +66,6 @@ async function removeValue(tenantId: string, key: string): Promise<void> {
   await prisma.whatsAppAuthKey
     .delete({ where: { tenantId_key: { tenantId, key } } })
     .catch(() => undefined);
-}
-
-/** Brazilian lines exist with and without the extra 9 after the area code. */
-function phoneVariants(digits: string): string[] {
-  const out = new Set([digits]);
-  const m = /^55(\d{2})(\d{8,9})$/.exec(digits);
-  if (m) {
-    const [, ddd, rest] = m;
-    if (rest.length === 9 && rest.startsWith('9')) out.add(`55${ddd}${rest.slice(1)}`);
-    if (rest.length === 8) out.add(`55${ddd}9${rest}`);
-  }
-  return [...out];
 }
 
 /**

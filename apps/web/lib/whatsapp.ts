@@ -11,12 +11,14 @@ import {
   renderBirthdayTemplate,
   appointmentTemplateParams,
   quoteTemplateParams,
+  type SendMessageParams,
   type SendMessageResult,
   type AppointmentMessageData,
   type WhatsAppProvider,
 } from '@clinicaiq/whatsapp';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { normalizeBrazilPhone } from './phone';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,13 +37,7 @@ function safeDecrypt(ciphertext: string | null | undefined, tenantId: string): s
   }
 }
 
-/** Brazilian numbers need the country code for the Meta API. Strips the mask
- *  and prefixes 55 when the operator/country code is absent. */
-export function normalizeBrazilPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) return '';
-  return digits.startsWith('55') ? digits : `55${digits}`;
-}
+export { normalizeBrazilPhone };
 
 function appUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
@@ -59,30 +55,44 @@ function formatBRL(value: number): string {
 }
 
 /**
- * Status to record right after handing a message off. On the clinic's own line
- * the gateway only gets a locally generated id back — WhatsApp hasn't seen the
- * message yet — so claiming SENT there is a lie that hides non-delivery. Leave
- * it PENDING and let the real ack promote it. The Meta path reports acceptance
- * synchronously, so SENT is honest there.
+ * How long the outbox leaves the app's own inline attempt alone. Comfortably
+ * above the gateway client's 45s timeout, so the gateway's retry loop can never
+ * race a send that is still in flight and message a patient twice.
  */
-function initialStatus(ownLine: boolean): 'PENDING' | 'SENT' {
-  return ownLine ? 'PENDING' : 'SENT';
-}
+const INLINE_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * Failures no retry would change. Everything else stays PENDING and belongs to
+ * the gateway's outbox — a disconnected line or a slow gateway is a reason to
+ * wait, not a reason the patient should never hear from the clinic.
+ */
+const PERMANENT_ERRORS = new Set([
+  'numero-sem-whatsapp',
+  'patient-without-phone',
+  'invalid-number',
+  'empty-body',
+  'automation-disabled',
+]);
 
 /** Turns internal send-failure codes into something the clinic can act on. */
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
     'numero-sem-whatsapp':
       'WhatsApp não encontrado neste número — confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
-    'lookup-failed': 'Não foi possível verificar o número agora — tente reenviar',
+    'lookup-failed': 'Não foi possível verificar o número agora — reenviando automaticamente',
     'patient-without-phone': 'Paciente sem telefone cadastrado',
-    'not-connected': 'WhatsApp da clínica desconectado',
+    'not-connected': 'WhatsApp da clínica desconectado — será enviada quando reconectar',
     'automation-disabled': 'Envio desligado nas configurações',
     'invalid-number': 'Número de telefone inválido',
-    'gateway-unreachable': 'Serviço de WhatsApp fora do ar no momento',
+    'gateway-unreachable': 'Serviço de WhatsApp fora do ar — reenviando automaticamente',
+    'gateway-timeout': 'O WhatsApp demorou para responder — reenviando automaticamente',
     'empty-body': 'Mensagem vazia',
   };
-  return map[code] ?? code;
+  if (map[code]) return map[code];
+  if (code.startsWith('gateway-http-')) {
+    return 'Serviço de WhatsApp respondeu com erro — reenviando automaticamente';
+  }
+  return code;
 }
 
 // ─── Provider routing ────────────────────────────────────────────────────────
@@ -206,23 +216,27 @@ export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealt
   return { paired: true, connected: true, problem: null };
 }
 
+interface OutboxEntry {
+  tenantId: string;
+  patientId: string;
+  appointmentId?: string;
+  quoteId?: string;
+  templateName: string;
+  content: string;
+}
+
 /**
  * Logs a message that was never attempted, so the clinic can see *why* in the
- * history instead of wondering why a patient got nothing. Deliberately silent
- * for `automation-disabled`: that's the clinic's own setting, not a fault.
+ * history instead of wondering why a patient got nothing.
+ *
+ * A skip isn't always final: "the line is down right now" is a reason to queue,
+ * not to give up, so those land PENDING and the gateway's outbox sends them once
+ * the socket is back. Deliberately silent for `automation-disabled` — that's the
+ * clinic's own setting, not a fault.
  */
-async function recordSkip(
-  error: string,
-  entry: {
-    tenantId: string;
-    patientId: string;
-    appointmentId?: string;
-    quoteId?: string;
-    templateName: string;
-    content: string;
-  },
-): Promise<void> {
+async function recordSkip(error: string, entry: OutboxEntry): Promise<void> {
   if (error === 'automation-disabled') return;
+  const retryable = !PERMANENT_ERRORS.has(error);
   await prisma.whatsAppMessage
     .create({
       data: {
@@ -233,8 +247,94 @@ async function recordSkip(
         direction: 'OUTBOUND',
         templateName: entry.templateName,
         content: entry.content,
-        status: 'FAILED',
+        status: retryable ? 'PENDING' : 'FAILED',
+        nextAttemptAt: retryable ? new Date() : null,
         errorMessage: friendlyError(error),
+      },
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * Opens an outbox row before anything is attempted.
+ *
+ * Written first on purpose. The send runs inside `after()`, where a timeout or a
+ * function killed mid-flight used to leave no trace at all — the patient got
+ * nothing and the clinic had nothing on screen to tell them so. With the row
+ * already in place, the worst case is a retry instead of a silent loss.
+ */
+async function openOutboxRow(entry: OutboxEntry): Promise<string | null> {
+  const row = await prisma.whatsAppMessage
+    .create({
+      data: {
+        tenantId: entry.tenantId,
+        patientId: entry.patientId,
+        appointmentId: entry.appointmentId ?? null,
+        quoteId: entry.quoteId ?? null,
+        direction: 'OUTBOUND',
+        templateName: entry.templateName,
+        content: entry.content,
+        status: 'PENDING',
+        // This call is attempt one; the grace keeps the gateway's retry loop off
+        // the row while it is still in flight.
+        attempts: 1,
+        lastAttemptAt: new Date(),
+        nextAttemptAt: new Date(Date.now() + INLINE_GRACE_MS),
+      },
+      select: { id: true },
+    })
+    .catch(() => null);
+  return row?.id ?? null;
+}
+
+/**
+ * Records how the inline attempt went.
+ *
+ * On the clinic's own line, success only means the socket accepted it — the
+ * gateway has already stamped the row with WhatsApp's id and the real acks
+ * decide the rest, so there is nothing to settle here. Meta answers about
+ * acceptance synchronously, so SENT is honest on that path.
+ *
+ * Every write is guarded by `externalId: null`: if the gateway stamped the row
+ * while our HTTP call was timing out, that message is on its way and must not be
+ * overwritten with our stale idea of a failure.
+ */
+async function closeAttempt(
+  messageId: string,
+  result: SendMessageResult,
+  ownLine: boolean,
+): Promise<void> {
+  if (result.success) {
+    if (ownLine) return; // gateway stamped it; the acks take over from here
+    await prisma.whatsAppMessage
+      .updateMany({
+        where: { id: messageId, externalId: null },
+        data: {
+          status: 'SENT',
+          externalId: result.messageId ?? null,
+          sentAt: new Date(),
+          nextAttemptAt: null,
+          errorMessage: null,
+        },
+      })
+      .catch(() => undefined);
+    return;
+  }
+
+  const code = result.error ?? 'send-failed';
+  // Only the clinic's own line has an outbox behind it — the gateway's retry
+  // loop sends through its own sockets. A Meta-routed failure has nobody to pick
+  // it up, so leaving it PENDING would be "Saindo…" forever.
+  const retryable = ownLine && !PERMANENT_ERRORS.has(code);
+  await prisma.whatsAppMessage
+    .updateMany({
+      where: { id: messageId, externalId: null },
+      data: {
+        // Left PENDING while a retry could still work: the outbox owns it now,
+        // and calling it FAILED here would stop the one thing that can deliver.
+        status: retryable ? 'PENDING' : 'FAILED',
+        nextAttemptAt: retryable ? new Date(Date.now() + INLINE_GRACE_MS) : null,
+        errorMessage: friendlyError(code),
       },
     })
     .catch(() => undefined);
@@ -242,15 +342,36 @@ async function recordSkip(
 
 // ─── Outbound: appointments ──────────────────────────────────────────────────
 
+/** A send that has been recorded and is ready to hand to its provider. */
+export interface PreparedSend {
+  rowId: string;
+  provider: WhatsAppProvider;
+  ownLine: boolean;
+  params: SendMessageParams;
+}
+
 /**
- * Sends the "created" or "reminder/confirmation" message for an appointment and
- * records the attempt as an OUTBOUND WhatsAppMessage (SENT or FAILED). Never
- * throws — returns the provider result so callers can fire-and-forget.
+ * Either something left to send, or an outcome already settled — the automation
+ * is off, the patient has no phone, the row was queued for the outbox.
  */
-export async function dispatchAppointmentMessage(
+export type Preparation =
+  | { kind: 'send'; send: PreparedSend }
+  | { kind: 'done'; result: SendMessageResult };
+
+/**
+ * Records the "created" or "reminder" message and works out how to send it,
+ * without sending anything yet.
+ *
+ * Split from the send so a caller can do this part *synchronously*, while it
+ * still controls the request. `after()` is an optimisation, not a guarantee: if
+ * the platform never runs the callback, a booking prepared here is still in the
+ * outbox and the gateway delivers it a couple of minutes later. Prepared inside
+ * `after()`, that same booking left no trace at all.
+ */
+export async function prepareAppointmentMessage(
   appointmentId: string,
   kind: 'created' | 'reminder',
-): Promise<SendMessageResult> {
+): Promise<Preparation> {
   const appt = await prisma.appointment.findUnique({
     where: { id: appointmentId },
     select: {
@@ -263,10 +384,10 @@ export async function dispatchAppointmentMessage(
       tenant: { select: { name: true } },
     },
   });
-  if (!appt) return { success: false, error: 'appointment-not-found' };
+  if (!appt) return { kind: 'done', result: { success: false, error: 'appointment-not-found' } };
 
   const phone = safeDecrypt(appt.patient.phoneEncrypted, appt.tenantId);
-  if (!phone) return { success: false, error: 'patient-without-phone' };
+  if (!phone) return { kind: 'done', result: { success: false, error: 'patient-without-phone' } };
 
   const data: AppointmentMessageData = {
     patientName: appt.patient.name,
@@ -294,43 +415,67 @@ export async function dispatchAppointmentMessage(
       templateName,
       content: body,
     });
-    return { success: false, error: outcome.error };
+    return { kind: 'done', result: { success: false, error: outcome.error } };
   }
   const resolved = outcome.resolved;
 
-  const result = await resolved.provider.sendMessage({
-    to: normalizeBrazilPhone(phone),
-    body,
-    // On the clinic's own line (QR) we send plain text: WhatsApp doesn't reliably
-    // render tappable buttons on that path, and the body already carries the
-    // "responda 1 ou 2" prompt — which works on every device and keeps the number
-    // looking like a normal person, not an automation. On Meta with approved
-    // templates we send the structured template + its {{1}}..{{5}} params
-    // (business-initiated, no 24h window). The webhook/inbound route understands
-    // typed "1"/"2"/"confirmar" either way.
-    ...(resolved.ownLine
-      ? {}
-      : templatesEnabled()
-        ? { templateName, templateParams: appointmentTemplateParams(data) }
-        : { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }),
+  // The row exists before the send does — see openOutboxRow.
+  const rowId = await openOutboxRow({
+    tenantId: appt.tenantId,
+    patientId: appt.patient.id,
+    appointmentId: appt.id,
+    templateName,
+    content: body,
   });
+  if (!rowId) return { kind: 'done', result: { success: false, error: 'outbox-write-failed' } };
 
-  await prisma.whatsAppMessage.create({
-    data: {
-      tenantId: appt.tenantId,
-      patientId: appt.patient.id,
-      appointmentId: appt.id,
-      direction: 'OUTBOUND',
-      templateName,
-      content: body,
-      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
-      externalId: result.messageId ?? null,
-      sentAt: result.success && !resolved.ownLine ? new Date() : null,
-      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
+  return {
+    kind: 'send',
+    send: {
+      rowId,
+      provider: resolved.provider,
+      ownLine: resolved.ownLine,
+      params: {
+        to: normalizeBrazilPhone(phone),
+        body,
+        ref: rowId,
+        // On the clinic's own line (QR) we send plain text: WhatsApp doesn't
+        // reliably render tappable buttons on that path, and the body already
+        // carries the "responda 1 ou 2" prompt — which works on every device and
+        // keeps the number looking like a normal person, not an automation. On
+        // Meta with approved templates we send the structured template + its
+        // {{1}}..{{5}} params (business-initiated, no 24h window). The
+        // webhook/inbound route understands typed "1"/"2"/"confirmar" either way.
+        ...(resolved.ownLine
+          ? {}
+          : templatesEnabled()
+            ? { templateName, templateParams: appointmentTemplateParams(data) }
+            : { buttons: CONFIRMATION_BUTTONS.map((b) => ({ ...b })) }),
+      },
     },
-  });
+  };
+}
 
+/**
+ * Hands a prepared send to its provider and settles the outbox row. Never
+ * throws — a failure here leaves the row for the gateway's outbox to retry.
+ */
+export async function deliverPrepared(send: PreparedSend): Promise<SendMessageResult> {
+  const result = await send.provider.sendMessage(send.params);
+  await closeAttempt(send.rowId, result, send.ownLine);
   return result;
+}
+
+/**
+ * Prepare and send in one go, for callers already running in the background —
+ * the reminder cron and the BullMQ worker, where there is no response to race.
+ */
+export async function dispatchAppointmentMessage(
+  appointmentId: string,
+  kind: 'created' | 'reminder',
+): Promise<SendMessageResult> {
+  const prepared = await prepareAppointmentMessage(appointmentId, kind);
+  return prepared.kind === 'done' ? prepared.result : deliverPrepared(prepared.send);
 }
 
 // ─── Outbound: quotes ────────────────────────────────────────────────────────
@@ -377,29 +522,25 @@ export async function dispatchQuoteMessage(quoteId: string): Promise<SendMessage
   }
   const resolved = outcome.resolved;
 
+  const rowId = await openOutboxRow({
+    tenantId: quote.tenantId,
+    patientId: quote.patient.id,
+    quoteId: quote.id,
+    templateName: WHATSAPP_TEMPLATES.quoteSent,
+    content: body,
+  });
+  if (!rowId) return { success: false, error: 'outbox-write-failed' };
+
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
+    ref: rowId,
     ...(!resolved.ownLine && templatesEnabled()
       ? { templateName: WHATSAPP_TEMPLATES.quoteSent, templateParams: quoteTemplateParams(quoteData) }
       : {}),
   });
 
-  await prisma.whatsAppMessage.create({
-    data: {
-      tenantId: quote.tenantId,
-      patientId: quote.patient.id,
-      quoteId: quote.id,
-      direction: 'OUTBOUND',
-      templateName: WHATSAPP_TEMPLATES.quoteSent,
-      content: body,
-      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
-      externalId: result.messageId ?? null,
-      sentAt: result.success && !resolved.ownLine ? new Date() : null,
-      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
-    },
-  });
-
+  await closeAttempt(rowId, result, resolved.ownLine);
   return result;
 }
 
@@ -443,25 +584,21 @@ export async function dispatchBirthdayMessage(patientId: string): Promise<SendMe
   const custom = session?.birthdayMessage?.trim();
   const body = custom ? renderBirthdayTemplate(custom, data) : buildBirthdayBody(data);
 
+  const rowId = await openOutboxRow({
+    tenantId: patient.tenantId,
+    patientId: patient.id,
+    templateName: WHATSAPP_TEMPLATES.birthday,
+    content: body,
+  });
+  if (!rowId) return { success: false, error: 'outbox-write-failed' };
+
   const result = await resolved.provider.sendMessage({
     to: normalizeBrazilPhone(phone),
     body,
+    ref: rowId,
   });
 
-  await prisma.whatsAppMessage.create({
-    data: {
-      tenantId: patient.tenantId,
-      patientId: patient.id,
-      direction: 'OUTBOUND',
-      templateName: WHATSAPP_TEMPLATES.birthday,
-      content: body,
-      status: result.success ? initialStatus(resolved.ownLine) : 'FAILED',
-      externalId: result.messageId ?? null,
-      sentAt: result.success && !resolved.ownLine ? new Date() : null,
-      errorMessage: result.success ? null : friendlyError(result.error ?? 'send-failed'),
-    },
-  });
-
+  await closeAttempt(rowId, result, resolved.ownLine);
   return result;
 }
 

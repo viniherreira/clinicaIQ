@@ -11,7 +11,8 @@ import {
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
 import type { WeekSchedule } from '@/lib/schedule';
-import { getWhatsAppHealth } from '@/lib/whatsapp';
+import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@/lib/whatsapp';
+import type { Preparation } from '@/lib/whatsapp';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -319,15 +320,27 @@ export async function createAppointment(
   });
 
   if (sendWhatsApp) {
-    // Fire the outbound WhatsApp work *after* the response is flushed so a slow
-    // Meta API call never blocks saving the appointment. On Vercel the function
-    // stays alive to finish `after()` callbacks.
+    // Record the message *before* returning, while we still control the request.
+    // `after()` is an optimisation, not a guarantee — if the platform never runs
+    // the callback, a booking recorded here is still in the outbox and the
+    // gateway sends it within a couple of minutes. Recorded inside `after()`, the
+    // same booking would leave no trace and nobody would ever know.
+    let prepared: Preparation | null = null;
+    try {
+      prepared = await prepareAppointmentMessage(appointment.id, 'created');
+    } catch (error) {
+      console.error('[agenda] falha ao registrar WhatsApp de criacao', appointment.id, error);
+    }
+
     after(async () => {
-      // Immediate "created" notice — the dispatcher persists the WhatsAppMessage row.
+      // The network call runs after the response is flushed, so a slow WhatsApp
+      // never delays saving the appointment.
       try {
-        const { dispatchAppointmentMessage } = await import('@/lib/whatsapp');
-        await dispatchAppointmentMessage(appointment.id, 'created');
-      } catch {}
+        if (prepared?.kind === 'send') await deliverPrepared(prepared.send);
+      } catch (error) {
+        // The row is already in the outbox; the gateway will pick it up.
+        console.error('[agenda] falha ao enviar WhatsApp de criacao', appointment.id, error);
+      }
 
       // 24h confirmation reminder — needs scheduling, so it goes through the queue
       // (best-effort: a no-op in dev when Redis/worker are absent).
@@ -342,7 +355,11 @@ export async function createAppointment(
             { delay },
           );
         }
-      } catch {}
+      } catch (error) {
+        // Best effort: /api/cron/reminders covers the same ground without Redis,
+        // so a queue that is down delays nothing. Still worth seeing in the logs.
+        console.error('[agenda] falha ao agendar lembrete 24h', appointment.id, error);
+      }
     });
   }
 
