@@ -1,5 +1,6 @@
 import { prisma, decrypt } from './db.js';
 import { env } from './env.js';
+import { normalizeBrazilPhone } from './phone.js';
 import { send } from './session-manager.js';
 
 /**
@@ -21,9 +22,10 @@ const jitter = () => MIN_GAP_MS + Math.floor(Math.random() * (MAX_GAP_MS - MIN_G
 
 function phoneOf(ciphertext: string, tenantId: string): string | null {
   try {
-    const digits = decrypt(ciphertext, env.ENCRYPTION_MASTER_KEY, tenantId).replace(/\D/g, '');
-    if (digits.length < 10) return null;
-    return digits.startsWith('55') ? digits : `55${digits}`;
+    const digits = normalizeBrazilPhone(
+      decrypt(ciphertext, env.ENCRYPTION_MASTER_KEY, tenantId),
+    );
+    return digits.length >= 12 ? digits : null;
   } catch {
     return null;
   }

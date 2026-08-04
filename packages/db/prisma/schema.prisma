@@ -393,12 +393,26 @@ model WhatsAppMessage {
   templateName  String?
   content       String
   status        MessageStatus    @default(PENDING)
+
+  /// WhatsApp's own id for the message. Doubles as the "this was really handed
+  /// to WhatsApp" marker: the gateway stamps it the moment the socket accepts,
+  /// so a retry can tell an unsent row from one whose HTTP reply we simply lost.
   externalId    String?
+
   sentAt        DateTime?
   deliveredAt   DateTime?
   readAt        DateTime?
   errorMessage  String?
   createdAt     DateTime         @default(now())
+
+  /// Outbox bookkeeping. The row is written *before* the first attempt, so a
+  /// crash, a timeout or a redeploy mid-send leaves something to retry instead
+  /// of a patient who was never told and a clinic that never found out.
+  attempts      Int              @default(0)
+  lastAttemptAt DateTime?
+  /// When the next attempt becomes due. Null once the row is settled — either
+  /// handed to WhatsApp or failed for a reason no retry would fix.
+  nextAttemptAt DateTime?
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   patient     Patient      @relation(fields: [patientId], references: [id])
@@ -408,6 +422,8 @@ model WhatsAppMessage {
   @@index([tenantId, appointmentId])
   @@index([tenantId, patientId, createdAt(sort: Desc)])
   @@index([externalId])
+  /// Drives the gateway's retry scan, which runs on a timer against every tenant.
+  @@index([status, nextAttemptAt])
   @@map("whatsapp_messages")
 }
 

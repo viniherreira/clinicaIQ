@@ -23,6 +23,25 @@ export interface GatewaySessionStatus {
 }
 
 /**
+ * Turns a failed HTTP call into a code the rest of the system can reason about.
+ *
+ * A timeout is the dangerous one: the gateway may well have delivered the
+ * message after we stopped listening, so it must never be reported as a plain
+ * failure that a retry would blindly duplicate. The gateway stamps the outbox
+ * row with WhatsApp's message id before it replies, which is what makes that
+ * retry safe — see `ref` in SendMessageParams.
+ */
+function classifyTransportError(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.name === 'TimeoutError' || /timeout|aborted/i.test(error.message)) {
+      return 'gateway-timeout';
+    }
+    if (error.message.startsWith('gateway-http-')) return error.message;
+  }
+  return 'gateway-unreachable';
+}
+
+/**
  * Talks to the ClinicaIQ WhatsApp gateway — the always-on service that holds one
  * WhatsApp Web socket per clinic. Unlike the Meta Cloud API there are no
  * templates or 24h windows: whatever the clinic would type by hand, we send as
@@ -38,10 +57,11 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
     this.token = config.token;
     this.tenantId = config.tenantId;
-    // WhatsApp Web can be slow on the first send after a connect (number lookup
-    // + sync), and sends run in the background via after(), so we can afford to
-    // wait. 15s was too tight and marked delivered messages as failed.
-    this.timeoutMs = config.timeoutMs ?? 30_000;
+    // Must stay above the gateway's own worst case for a first-time contact
+    // (number lookup, key exchange, first send) or we abort a request the socket
+    // then completes — and the clinic sees a failure for a delivered message.
+    // The gateway caps its lookup at 12s; 45s leaves real headroom above that.
+    this.timeoutMs = config.timeoutMs ?? 45_000;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -56,7 +76,7 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error(`gateway responded ${response.status}`);
+      throw new Error(`gateway-http-${response.status}`);
     }
     return (await response.json()) as T;
   }
@@ -68,13 +88,21 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
     try {
       return await this.request<SendMessageResult>(
         `/sessions/${encodeURIComponent(this.tenantId)}/messages`,
-        { method: 'POST', body: JSON.stringify({ to: params.to, body, buttons: params.buttons }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            to: params.to,
+            body,
+            buttons: params.buttons,
+            ref: params.ref,
+          }),
+        },
       );
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'gateway-unreachable',
-      };
+      // Stable codes, not the runtime's English. These reach the clinic through
+      // friendlyError, and they also decide whether a retry is worth attempting
+      // — a timeout is; a 401 never will be.
+      return { success: false, error: classifyTransportError(error) };
     }
   }
 
