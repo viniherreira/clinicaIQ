@@ -4,14 +4,18 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  ArrowRight,
+  Building2,
   Check,
   Copy,
   ExternalLink,
   Loader2,
   Receipt,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
-import { choosePlan, type BillingData, type PlanOption } from '../actions';
+import { choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
+import { formatDocument, onlyDigits } from '@/lib/document';
 
 const brl = (cents: number) =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -26,13 +30,13 @@ const CHARGE_STATUS: Record<string, { label: string; cls: string }> = {
   CANCELLED: { label: 'Cancelada', cls: 'bg-surface-alt text-muted-foreground' },
 };
 
-/** What each plan includes, in the order a clinic weighs them. */
 function features(plan: PlanOption): string[] {
   return [
     plan.maxProfessionals === null
       ? 'Profissionais ilimitados'
       : `${plan.maxProfessionals} profissional${plan.maxProfessionals > 1 ? 'is' : ''}`,
     'Agenda, pacientes e prontuário',
+    'Orçamentos em PDF',
     plan.whatsappEnabled ? 'Confirmação por WhatsApp' : null,
     plan.campaignsEnabled ? 'Campanhas em massa' : null,
     plan.assistantEnabled ? 'Assistente de IA' : null,
@@ -45,9 +49,13 @@ export function BillingView({ data }: { data: BillingData }) {
   const [pending, startTransition] = useTransition();
   const [choosing, setChoosing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [doc, setDoc] = useState(data.document);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [docSaved, setDocSaved] = useState(false);
 
   const openCharge = data.charges.find((c) => c.status === 'PENDING' || c.status === 'OVERDUE');
+  const needsDocument = !data.document;
 
   function pick(tier: string) {
     setError(null);
@@ -57,6 +65,9 @@ export function BillingView({ data }: { data: BillingData }) {
       setChoosing(null);
       if (!res.ok) {
         setError(res.error ?? 'Não foi possível trocar de plano.');
+        if (res.needsDocument) {
+          document.getElementById('documento')?.focus();
+        }
         return;
       }
       router.refresh();
@@ -64,57 +75,74 @@ export function BillingView({ data }: { data: BillingData }) {
     });
   }
 
-  async function copyPix(payload: string, id: string) {
+  function submitDocument() {
+    setDocError(null);
+    startTransition(async () => {
+      const res = await saveDocument(doc);
+      if (!res.ok) {
+        setDocError(res.error ?? 'Não foi possível salvar.');
+        return;
+      }
+      setDocSaved(true);
+      setError(null);
+      router.refresh();
+    });
+  }
+
+  async function copyPix(payload: string) {
     try {
       await navigator.clipboard.writeText(payload);
-      setCopied(id);
-      setTimeout(() => setCopied(null), 2000);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard blocked — the code is on screen and selectable.
     }
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Planos e cobrança</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sua assinatura do ClinicaIQ. Pague por PIX, boleto ou cartão.
+    <div className="mx-auto max-w-6xl space-y-8 p-6 lg:p-8">
+      <header className="max-w-2xl">
+        <h1 className="text-3xl font-semibold tracking-tight">Planos e cobrança</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+          Escolha o plano que acompanha o tamanho da sua clínica. Pague por PIX, boleto ou cartão,
+          cancele quando quiser.
         </p>
       </header>
 
       {data.sandbox && data.gatewayReady && (
         <p
           role="status"
-          className="rounded-lg border border-dashed border-border bg-surface-alt px-4 py-2.5 text-sm text-muted-foreground"
+          className="rounded-xl border border-dashed border-border bg-surface-alt px-4 py-3 text-sm text-muted-foreground"
         >
           <strong className="font-medium text-foreground">Ambiente de teste.</strong> As cobranças
-          abaixo são fictícias e nenhum valor é debitado.
+          são fictícias e nenhum valor é debitado.
         </p>
       )}
 
-      {/* Current state */}
+      {/* Status + fatura em aberto */}
       <section
         aria-labelledby="situacao"
-        className={`card p-6 ${data.access.level === 'readonly' ? 'border-destructive/40' : ''}`}
+        className={`overflow-hidden rounded-2xl border bg-surface shadow-sm ${
+          data.access.level === 'readonly' ? 'border-destructive/40' : 'border-border'
+        }`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-5 p-6">
           <div className="flex gap-4">
             <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                 data.access.warning
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                  : 'bg-success/10 text-success'
+                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
               }`}
             >
               {data.access.warning ? (
-                <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               ) : (
-                <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+                <ShieldCheck className="h-5 w-5" aria-hidden="true" />
               )}
             </div>
             <div>
-              <h2 id="situacao" className="text-sm font-semibold">
+              <h2 id="situacao" className="font-semibold">
                 {data.access.status === 'TRIALING'
                   ? 'Avaliação gratuita'
                   : data.access.status === 'ACTIVE'
@@ -125,13 +153,16 @@ export function BillingView({ data }: { data: BillingData }) {
                         ? 'Assinatura encerrada'
                         : 'Acesso limitado'}
               </h2>
-              <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
-                {data.access.warning ?? 'Tudo certo. Obrigado por usar o ClinicaIQ.'}
+              <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                {data.access.warning ?? 'Tudo certo por aqui. Obrigado por usar o ClinicaIQ.'}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {data.professionalsInUse} profissional
-                {data.professionalsInUse === 1 ? '' : 'is'} ativo
+              <p className="mt-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground tabular-nums">
+                  {data.professionalsInUse}
+                </span>{' '}
+                profissional{data.professionalsInUse === 1 ? '' : 'is'} ativo
                 {data.professionalsInUse === 1 ? '' : 's'}
+                {data.document && <> · {data.document}</>}
               </p>
             </div>
           </div>
@@ -141,21 +172,21 @@ export function BillingView({ data }: { data: BillingData }) {
               href={openCharge.invoiceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-primary btn-md"
+              className="btn-primary btn-md shadow-sm"
             >
               <Receipt className="h-4 w-4" aria-hidden="true" />
               Pagar {brl(openCharge.amountCents)}
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              <ExternalLink className="h-3.5 w-3.5 opacity-70" aria-hidden="true" />
             </a>
           )}
         </div>
 
         {openCharge?.pixPayload && (
-          <div className="mt-5 rounded-lg border border-border bg-surface-alt p-4">
-            <label htmlFor="pix" className="text-xs font-medium text-muted-foreground">
+          <div className="border-t border-border bg-surface-alt/60 p-6">
+            <label htmlFor="pix" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               PIX copia e cola
             </label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-2 flex gap-2">
               <input
                 id="pix"
                 readOnly
@@ -165,74 +196,163 @@ export function BillingView({ data }: { data: BillingData }) {
               />
               <button
                 type="button"
-                onClick={() => copyPix(openCharge.pixPayload!, openCharge.id)}
+                onClick={() => copyPix(openCharge.pixPayload!)}
                 className="btn-outline btn-md shrink-0"
               >
-                {copied === openCharge.id ? (
+                {copied ? (
                   <Check className="h-4 w-4 text-success" aria-hidden="true" />
                 ) : (
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 )}
-                {copied === openCharge.id ? 'Copiado' : 'Copiar'}
+                {copied ? 'Copiado' : 'Copiar'}
               </button>
             </div>
           </div>
         )}
       </section>
 
+      {/* CPF/CNPJ — pedido aqui porque é aqui que ele faz falta */}
+      {needsDocument && (
+        <section
+          aria-labelledby="doc-title"
+          className="rounded-2xl border border-primary/30 bg-primary/[0.03] p-6"
+        >
+          <div className="flex gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Building2 className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 id="doc-title" className="font-semibold">
+                Falta o CPF ou CNPJ da clínica
+              </h2>
+              <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                É exigido para emitir a nota e gerar o boleto ou o PIX. Pode ser o CNPJ da clínica ou
+                o seu CPF, se você atende como pessoa física.
+              </p>
+
+              <div className="mt-4 flex max-w-md flex-wrap gap-2">
+                <div className="min-w-[220px] flex-1">
+                  <label htmlFor="documento" className="sr-only">
+                    CPF ou CNPJ
+                  </label>
+                  <input
+                    id="documento"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="CNPJ 00.000.000/0000-00 ou CPF 000.000.000-00"
+                    value={doc}
+                    onChange={(e) => {
+                      const digits = onlyDigits(e.target.value).slice(0, 14);
+                      setDoc(digits.length === 11 || digits.length === 14 ? formatDocument(digits) : digits);
+                      setDocError(null);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && submitDocument()}
+                    aria-invalid={docError ? true : undefined}
+                    aria-describedby={docError ? 'doc-erro' : undefined}
+                    className="input w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={submitDocument}
+                  disabled={pending || !doc}
+                  className="btn-primary btn-md shrink-0"
+                >
+                  {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Salvar
+                </button>
+              </div>
+
+              {docError && (
+                <p id="doc-erro" role="alert" className="mt-2 text-sm text-destructive">
+                  {docError}
+                </p>
+              )}
+              {docSaved && !docError && (
+                <p role="status" className="mt-2 text-sm text-success">
+                  Salvo. Agora é só escolher o plano.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {!data.gatewayReady && (
-        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+        <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
           A cobrança automática ainda não foi configurada. Fale com o suporte para ativar seu plano.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+        <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
           {error}
         </p>
       )}
 
-      {/* Plans */}
+      {/* Planos */}
       <section aria-labelledby="planos">
         <h2 id="planos" className="sr-only">
           Planos disponíveis
         </h2>
-        <ul className="grid gap-4 md:grid-cols-3">
-          {data.plans.map((plan) => {
+        <ul className="grid items-start gap-5 lg:grid-cols-3">
+          {data.plans.map((plan, index) => {
             const busy = pending && choosing === plan.tier;
             const tooSmall =
               plan.maxProfessionals !== null && data.professionalsInUse > plan.maxProfessionals;
+            // O do meio é o que serve à maioria das clínicas — destacá-lo poupa
+            // a decisão de quem não quer comparar tabela.
+            const featured = index === 1 && !plan.current;
 
             return (
-              <li key={plan.tier}>
+              <li key={plan.tier} className={featured ? 'lg:-mt-3' : undefined}>
                 <article
-                  className={`card flex h-full flex-col p-6 ${
-                    plan.current ? 'border-primary ring-1 ring-primary' : ''
+                  className={`relative flex h-full flex-col rounded-2xl border bg-surface p-6 transition-shadow hover:shadow-md ${
+                    plan.current
+                      ? 'border-primary ring-2 ring-primary/20'
+                      : featured
+                        ? 'border-primary/50 shadow-sm'
+                        : 'border-border'
                   }`}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-base font-semibold">{plan.name}</h3>
-                    {plan.current && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        Plano atual
-                      </span>
-                    )}
-                  </div>
+                  {(plan.current || featured) && (
+                    <span
+                      className={`absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+                        plan.current
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-primary/10 text-primary ring-1 ring-primary/30'
+                      }`}
+                    >
+                      {plan.current ? (
+                        'Plano atual'
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3" aria-hidden="true" /> Mais escolhido
+                        </>
+                      )}
+                    </span>
+                  )}
 
-                  <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+                  <h3 className="mt-2 text-lg font-semibold">{plan.name}</h3>
+                  <p className="mt-1.5 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">
+                    {plan.description}
+                  </p>
 
-                  <p className="mt-4">
-                    <span className="text-3xl font-semibold tabular-nums">
+                  <p className="mt-5 flex items-baseline gap-1">
+                    <span className="text-4xl font-semibold tracking-tight tabular-nums">
                       {brl(plan.monthlyPriceCents)}
                     </span>
                     <span className="text-sm text-muted-foreground">/mês</span>
                   </p>
 
-                  <ul className="mt-4 flex-1 space-y-2">
+                  <ul className="mt-6 flex-1 space-y-2.5">
                     {features(plan).map((f) => (
-                      <li key={f} className="flex gap-2 text-sm">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
-                        <span>{f}</span>
+                      <li key={f} className="flex gap-2.5 text-sm">
+                        <Check
+                          className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                          aria-hidden="true"
+                        />
+                        <span className="leading-snug">{f}</span>
                       </li>
                     ))}
                   </ul>
@@ -246,22 +366,37 @@ export function BillingView({ data }: { data: BillingData }) {
                         ? `Você tem ${data.professionalsInUse} profissionais ativos; este plano permite ${plan.maxProfessionals}.`
                         : undefined
                     }
-                    className={`${plan.current ? 'btn-outline' : 'btn-primary'} btn-md mt-6 w-full justify-center`}
+                    className={`${
+                      plan.current || !featured ? 'btn-outline' : 'btn-primary'
+                    } btn-md mt-7 w-full justify-center`}
                   >
                     {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                    {plan.current ? 'Plano atual' : tooSmall ? 'Não comporta sua equipe' : 'Escolher'}
+                    {plan.current ? (
+                      'Seu plano'
+                    ) : tooSmall ? (
+                      'Não comporta sua equipe'
+                    ) : (
+                      <>
+                        Escolher {plan.name}
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </>
+                    )}
                   </button>
                 </article>
               </li>
             );
           })}
         </ul>
+
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          Todos os planos incluem acessibilidade WCAG 2.1 AA, backup diário e suporte por WhatsApp.
+        </p>
       </section>
 
-      {/* Invoices */}
+      {/* Faturas */}
       {data.charges.length > 0 && (
-        <section aria-labelledby="faturas" className="card p-6">
-          <h2 id="faturas" className="text-sm font-semibold">
+        <section aria-labelledby="faturas" className="rounded-2xl border border-border bg-surface p-6">
+          <h2 id="faturas" className="font-semibold">
             Faturas
           </h2>
           <div className="mt-4 overflow-x-auto">
@@ -269,11 +404,11 @@ export function BillingView({ data }: { data: BillingData }) {
               <caption className="sr-only">Histórico de faturas da assinatura</caption>
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th scope="col" className="pb-2 font-medium">Vencimento</th>
-                  <th scope="col" className="pb-2 font-medium">Valor</th>
-                  <th scope="col" className="pb-2 font-medium">Situação</th>
-                  <th scope="col" className="pb-2 font-medium">Pagamento</th>
-                  <th scope="col" className="pb-2 text-right font-medium">Fatura</th>
+                  <th scope="col" className="pb-2.5 font-medium">Vencimento</th>
+                  <th scope="col" className="pb-2.5 font-medium">Valor</th>
+                  <th scope="col" className="pb-2.5 font-medium">Situação</th>
+                  <th scope="col" className="pb-2.5 font-medium">Pagamento</th>
+                  <th scope="col" className="pb-2.5 text-right font-medium">Fatura</th>
                 </tr>
               </thead>
               <tbody>
@@ -281,23 +416,23 @@ export function BillingView({ data }: { data: BillingData }) {
                   const s = CHARGE_STATUS[c.status] ?? CHARGE_STATUS.PENDING;
                   return (
                     <tr key={c.id} className="border-b border-border last:border-0">
-                      <td className="py-2.5 tabular-nums">{date(c.dueDate)}</td>
-                      <td className="py-2.5 tabular-nums">{brl(c.amountCents)}</td>
-                      <td className="py-2.5">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>
+                      <td className="py-3 tabular-nums">{date(c.dueDate)}</td>
+                      <td className="py-3 font-medium tabular-nums">{brl(c.amountCents)}</td>
+                      <td className="py-3">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.cls}`}>
                           {s.label}
                         </span>
                       </td>
-                      <td className="py-2.5 tabular-nums text-muted-foreground">
+                      <td className="py-3 tabular-nums text-muted-foreground">
                         {c.paidAt ? date(c.paidAt) : '—'}
                       </td>
-                      <td className="py-2.5 text-right">
+                      <td className="py-3 text-right">
                         {c.invoiceUrl ? (
                           <a
                             href={c.invoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
                           >
                             Abrir
                             <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -316,7 +451,7 @@ export function BillingView({ data }: { data: BillingData }) {
       )}
 
       <p aria-live="polite" className="sr-only">
-        {pending ? 'Processando a troca de plano.' : ''}
+        {pending ? 'Processando.' : ''}
       </p>
     </div>
   );

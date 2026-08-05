@@ -79,6 +79,13 @@ export interface AsaasCustomer {
  * Finds the clinic's customer by our own tenant id (stored as externalReference)
  * before creating one. Asaas happily creates duplicates with the same document,
  * and a duplicate means two subscriptions and two invoices for one clinic.
+ *
+ * Reusing is not enough on its own: Asaas accepts a customer with no document
+ * but refuses to bill one, so a first attempt made before the clinic filled in
+ * its CNPJ leaves an undocumented customer behind. Every later attempt found
+ * that record, reused it as-is, and failed the same way — the clinic fills in
+ * the CNPJ, sees no change, and has no way to tell why. So bring the stored
+ * record up to date whenever we now know something it lacks.
  */
 export async function ensureCustomer(input: {
   tenantId: string;
@@ -87,16 +94,34 @@ export async function ensureCustomer(input: {
   email?: string | null;
   phone?: string | null;
 }): Promise<string> {
+  const document = input.cpfCnpj?.replace(/\D/g, '') || undefined;
+
   const found = await request<{ data: AsaasCustomer[] }>(
     `/customers?externalReference=${encodeURIComponent(input.tenantId)}&limit=1`,
   );
-  if (found.data?.[0]?.id) return found.data[0].id;
+  const existing = found.data?.[0];
+
+  if (existing?.id) {
+    const stored = existing.cpfCnpj?.replace(/\D/g, '') || undefined;
+    if (document && stored !== document) {
+      await request<AsaasCustomer>(`/customers/${existing.id}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: input.name,
+          cpfCnpj: document,
+          email: input.email || undefined,
+          mobilePhone: input.phone?.replace(/\D/g, '') || undefined,
+        }),
+      });
+    }
+    return existing.id;
+  }
 
   const created = await request<AsaasCustomer>('/customers', {
     method: 'POST',
     body: JSON.stringify({
       name: input.name,
-      cpfCnpj: input.cpfCnpj?.replace(/\D/g, '') || undefined,
+      cpfCnpj: document,
       email: input.email || undefined,
       mobilePhone: input.phone?.replace(/\D/g, '') || undefined,
       externalReference: input.tenantId,

@@ -15,6 +15,7 @@ import {
   updateSubscriptionValue,
 } from '@/lib/asaas';
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription';
+import { documentError, formatDocument, isValidDocument } from '@/lib/document';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -62,15 +63,38 @@ export interface BillingData {
   /** True while pointing at the Asaas sandbox — shown so nobody mistakes a test charge for real. */
   sandbox: boolean;
   gatewayReady: boolean;
+  /** CPF or CNPJ on file, already formatted. Empty when the clinic never set one. */
+  document: string;
+  clinicName: string;
+}
+
+/**
+ * Records the clinic's CPF or CNPJ. Lives here, next to the plans, because that
+ * is where the clinic discovers it is needed — sending it to Settings to fill a
+ * field and come back loses people who were ready to pay.
+ */
+export async function saveDocument(value: string): Promise<{ ok: boolean; error?: string }> {
+  const { tenantId } = await requireTenant();
+
+  const problem = documentError(value);
+  if (problem) return { ok: false, error: problem };
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { document: formatDocument(value) },
+  });
+  revalidatePath('/planos');
+  return { ok: true };
 }
 
 export async function getBillingData(): Promise<BillingData> {
   const { tenantId } = await requireTenant();
 
-  const [plans, subscription, professionalsInUse] = await Promise.all([
+  const [plans, subscription, professionalsInUse, tenant] = await Promise.all([
     prisma.plan.findMany({ where: { active: true }, orderBy: { sortOrder: 'asc' } }),
     prisma.subscription.findUnique({ where: { tenantId } }),
     prisma.professional.count({ where: { tenantId, active: true } }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, document: true } }),
   ]);
 
   const access = subscription
@@ -126,6 +150,8 @@ export async function getBillingData(): Promise<BillingData> {
     })),
     sandbox: isSandbox(),
     gatewayReady: isConfigured(),
+    document: tenant?.document && isValidDocument(tenant.document) ? formatDocument(tenant.document) : '',
+    clinicName: tenant?.name ?? '',
   };
 }
 
@@ -176,6 +202,8 @@ export interface ChoosePlanResult {
   ok: boolean;
   error?: string;
   invoiceUrl?: string;
+  /** Tells the screen to ask for the CPF/CNPJ instead of just showing an error. */
+  needsDocument?: boolean;
 }
 
 export async function choosePlan(tier: string): Promise<ChoosePlanResult> {
@@ -204,6 +232,14 @@ export async function choosePlan(tier: string): Promise<ChoosePlanResult> {
     select: { name: true, document: true, email: true, phone: true },
   });
   if (!tenant) return { ok: false, error: 'Clínica não encontrada.' };
+
+  // Asaas accepts a customer without a document but refuses to issue the charge,
+  // so checking here turns a confusing gateway error into one clear sentence —
+  // and avoids leaving a half-created customer behind.
+  const problem = documentError(tenant.document ?? '');
+  if (problem) {
+    return { ok: false, error: problem, needsDocument: true };
+  }
 
   const existing = await prisma.subscription.findUnique({ where: { tenantId } });
 
