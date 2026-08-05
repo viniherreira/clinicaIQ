@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@clinicaiq/db';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
+import { SubscriptionBanner } from '@/components/subscription-banner';
+import { getTenantAccess } from '@/lib/access';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
@@ -14,11 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   });
   if (!tenant) redirect('/onboarding');
 
+  const access = await getTenantAccess(tenant.id);
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar clinicName={tenant.name} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader clinicName={tenant.name} />
+        <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto">
           {children}
         </main>
