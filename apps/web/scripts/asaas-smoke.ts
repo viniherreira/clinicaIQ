@@ -46,6 +46,7 @@ async function main() {
     tenantId,
     priceCents: 19_700,
     planName: 'Profissional',
+    billingType: 'PIX',
   });
   console.log(`   subscription: ${sub.id} · ${brl(sub.value * 100)} · vence ${sub.nextDueDate}`);
 

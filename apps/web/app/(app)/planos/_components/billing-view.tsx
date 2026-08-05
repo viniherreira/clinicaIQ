@@ -1,20 +1,24 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowRight,
+  Barcode,
   Building2,
+  CreditCard,
   Check,
   Copy,
   ExternalLink,
   Loader2,
+  QrCode,
   Receipt,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
 import { choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
+import type { BillingMethod } from '@/lib/asaas';
 import { formatDocument, onlyDigits } from '@/lib/document';
 
 const brl = (cents: number) =>
@@ -53,15 +57,36 @@ export function BillingView({ data }: { data: BillingData }) {
   const [doc, setDoc] = useState(data.document);
   const [docError, setDocError] = useState<string | null>(null);
   const [docSaved, setDocSaved] = useState(false);
+  const [method, setMethod] = useState<BillingMethod>('PIX');
+  const [qr, setQr] = useState<string | null>(null);
 
   const openCharge = data.charges.find((c) => c.status === 'PENDING' || c.status === 'OVERDUE');
   const needsDocument = !data.document;
+
+  // The PIX code is drawn here rather than fetched as an image: Asaas returns a
+  // base64 PNG, and storing or proxying it would be kilobytes per charge for
+  // something the browser renders from the payload we already have.
+  useEffect(() => {
+    const payload = openCharge?.pixPayload;
+    if (!payload) {
+      setQr(null);
+      return;
+    }
+    let alive = true;
+    void import('qrcode').then(async (mod) => {
+      const url = await mod.toDataURL(payload, { margin: 1, width: 320 });
+      if (alive) setQr(url);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [openCharge?.pixPayload]);
 
   function pick(tier: string) {
     setError(null);
     setChoosing(tier);
     startTransition(async () => {
-      const res = await choosePlan(tier);
+      const res = await choosePlan(tier, method);
       setChoosing(null);
       if (!res.ok) {
         setError(res.error ?? 'Não foi possível trocar de plano.');
@@ -183,29 +208,67 @@ export function BillingView({ data }: { data: BillingData }) {
 
         {openCharge?.pixPayload && (
           <div className="border-t border-border bg-surface-alt/60 p-6">
-            <label htmlFor="pix" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              PIX copia e cola
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                id="pix"
-                readOnly
-                value={openCharge.pixPayload}
-                onFocus={(e) => e.currentTarget.select()}
-                className="input flex-1 font-mono text-xs"
-              />
-              <button
-                type="button"
-                onClick={() => copyPix(openCharge.pixPayload!)}
-                className="btn-outline btn-md shrink-0"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-success" aria-hidden="true" />
-                ) : (
-                  <Copy className="h-4 w-4" aria-hidden="true" />
+            <div className="flex flex-wrap items-start gap-6">
+              {qr ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qr}
+                  alt="QR code do PIX para pagar a fatura"
+                  className="h-40 w-40 shrink-0 rounded-xl border border-border bg-white p-2"
+                />
+              ) : (
+                <div
+                  className="h-40 w-40 shrink-0 animate-pulse rounded-xl border border-border bg-surface"
+                  aria-hidden="true"
+                />
+              )}
+
+              <div className="min-w-[260px] flex-1">
+                <h3 className="flex items-center gap-2 font-semibold">
+                  <QrCode className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Pague por PIX
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Aponte a câmera do banco para o código, ou use o copia e cola abaixo.
+                </p>
+
+                <label htmlFor="pix" className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  PIX copia e cola
+                </label>
+                <div className="mt-1.5 flex gap-2">
+                  <input
+                    id="pix"
+                    readOnly
+                    value={openCharge.pixPayload}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="input flex-1 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyPix(openCharge.pixPayload!)}
+                    className="btn-outline btn-md shrink-0"
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                    ) : (
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {copied ? 'Copiado' : 'Copiar'}
+                  </button>
+                </div>
+
+                {openCharge.bankSlipUrl && (
+                  <a
+                    href={openCharge.bankSlipUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                  >
+                    Prefiro o boleto
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  </a>
                 )}
-                {copied ? 'Copiado' : 'Copiar'}
-              </button>
+              </div>
             </div>
           </div>
         )}
@@ -295,6 +358,43 @@ export function BillingView({ data }: { data: BillingData }) {
         <h2 id="planos" className="sr-only">
           Planos disponíveis
         </h2>
+
+        {!openCharge && (
+          <fieldset className="mb-6">
+            <legend className="text-sm font-medium">Como você prefere pagar?</legend>
+            <div className="mt-2.5 inline-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de pagamento">
+              {(
+                [
+                  { id: 'PIX', label: 'PIX', icon: QrCode, hint: 'liberação imediata' },
+                  { id: 'BOLETO', label: 'Boleto', icon: Barcode, hint: 'compensa em 1 dia útil' },
+                  { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard, hint: 'renova sozinho' },
+                ] as const
+              ).map(({ id, label, icon: Icon, hint }) => {
+                const on = method === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setMethod(id)}
+                    className={`flex items-center gap-2.5 rounded-xl border px-4 py-2.5 text-left transition-colors ${
+                      on
+                        ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary/30'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 ${on ? 'text-primary' : ''}`} aria-hidden="true" />
+                    <span>
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
         <ul className="grid items-start gap-5 lg:grid-cols-3">
           {data.plans.map((plan, index) => {
             const busy = pending && choosing === plan.tier;

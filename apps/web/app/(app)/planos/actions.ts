@@ -13,6 +13,8 @@ import {
   listPayments,
   toChargeStatus,
   updateSubscriptionValue,
+  MIN_CHARGE_CENTS,
+  type BillingMethod,
 } from '@/lib/asaas';
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription';
 import { documentError, formatDocument, isValidDocument } from '@/lib/document';
@@ -206,11 +208,23 @@ export interface ChoosePlanResult {
   needsDocument?: boolean;
 }
 
-export async function choosePlan(tier: string): Promise<ChoosePlanResult> {
+export async function choosePlan(
+  tier: string,
+  method: BillingMethod = 'PIX',
+): Promise<ChoosePlanResult> {
   const { tenantId } = await requireTenant();
 
   const plan = await prisma.plan.findUnique({ where: { tier: tier as PlanOption['tier'] } });
   if (!plan || !plan.active) return { ok: false, error: 'Plano indisponível.' };
+
+  // Asaas rejects anything below this, and its own wording ("forma de pagamento
+  // Pergunte ao Cliente") tells whoever set the price nothing useful.
+  if (plan.monthlyPriceCents < MIN_CHARGE_CENTS) {
+    return {
+      ok: false,
+      error: `O valor mínimo de cobrança é ${(MIN_CHARGE_CENTS / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Ajuste o preço do plano ${plan.name}.`,
+    };
+  }
 
   // Downgrading below the professionals already registered would silently put
   // the clinic over its own limit. Say so instead of selling a plan that does
@@ -273,6 +287,7 @@ export async function choosePlan(tier: string): Promise<ChoosePlanResult> {
         tenantId,
         priceCents: plan.monthlyPriceCents,
         planName: plan.name,
+        billingType: method,
         firstDueDate,
       });
 

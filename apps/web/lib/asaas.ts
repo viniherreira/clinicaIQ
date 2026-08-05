@@ -140,16 +140,27 @@ export interface AsaasSubscription {
   value: number;
 }
 
+export type BillingMethod = 'PIX' | 'BOLETO' | 'CREDIT_CARD';
+
 /**
- * `UNDEFINED` lets the clinic pick PIX, boleto or card on the Asaas invoice
- * page. Pinning a single method would be guessing wrong for most of them —
- * clinics overwhelmingly reach for PIX or boleto, but not the same one.
+ * Asaas refuses any charge below this, whatever the method. Worth checking
+ * before the call: the gateway's own message names a "forma de pagamento
+ * Pergunte ao Cliente" that means nothing to whoever set the price.
+ */
+export const MIN_CHARGE_CENTS = 500;
+
+/**
+ * The clinic picks the method up front rather than landing on the gateway's
+ * generic "choose one" page. Same charge either way, but naming it means we can
+ * show the PIX code on our own screen instead of sending people off-site to
+ * find it.
  */
 export async function createSubscription(input: {
   customerId: string;
   tenantId: string;
   priceCents: number;
   planName: string;
+  billingType: BillingMethod;
   /** First due date. Defaults to today so a trial ending today bills today. */
   firstDueDate?: Date;
 }): Promise<AsaasSubscription> {
@@ -158,7 +169,7 @@ export async function createSubscription(input: {
     method: 'POST',
     body: JSON.stringify({
       customer: input.customerId,
-      billingType: 'UNDEFINED',
+      billingType: input.billingType,
       value: input.priceCents / 100,
       nextDueDate: due.toISOString().slice(0, 10),
       cycle: 'MONTHLY',
