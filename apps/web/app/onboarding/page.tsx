@@ -19,7 +19,8 @@ export default function OnboardingPage() {
       try {
         const result = await completeOnboarding(null, formData);
         if (result.success) {
-          window.location.href = '/dashboard';
+          // Straight to the plans: the clinic chooses and pays before it can work.
+          window.location.href = '/planos';
         } else {
           setFieldErrors(result.errors);
         }

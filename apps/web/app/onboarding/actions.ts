@@ -93,6 +93,20 @@ export async function completeOnboarding(
     },
   });
 
+  // Starts without access. The clinic picks a plan and pays before using the
+  // system, so the subscription begins already past due rather than as a trial
+  // that would have to be revoked later. `currentPeriodEnd` in the past is what
+  // resolveAccess reads, so this holds even if no job ever runs.
+  await prisma.subscription.create({
+    data: {
+      tenantId: tenant.id,
+      tier: 'ESSENCIAL',
+      status: 'SUSPENDED',
+      currentPeriodEnd: new Date(),
+      graceEndsAt: new Date(),
+    },
+  });
+
   await clerk.users.updateUserMetadata(userId, {
     publicMetadata: { tenantId: tenant.id, onboardingComplete: true },
   });

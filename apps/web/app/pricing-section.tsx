@@ -36,7 +36,6 @@ function features(plan: PlanRow): string[] {
     'Orçamentos em PDF',
     plan.whatsappEnabled ? 'Confirmação por WhatsApp' : null,
     plan.campaignsEnabled ? 'Campanhas em massa' : null,
-    plan.assistantEnabled ? 'Assistente de IA' : null,
     plan.advancedReports ? 'Relatórios completos' : null,
   ].filter((f): f is string => f !== null);
 }
