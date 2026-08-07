@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
+import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -256,6 +257,9 @@ export async function addPayment(
     select: { id: true },
   });
   if (!patient) return { success: false, errors: { amount: ['Paciente não encontrado'] } };
+
+  const foreign = await refOutsideTenant(tenantId, { quoteId });
+  if (foreign) return { success: false, errors: { amount: [refErrorMessage(foreign)] } };
 
   const payment = await prisma.payment.create({
     data: {

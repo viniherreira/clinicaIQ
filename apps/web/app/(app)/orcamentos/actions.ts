@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
+import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,12 @@ export async function createQuote(
   const data = parsed.data;
   const { subtotal, total, lines } = computeTotals(data.items, data.discountType, data.discountValue);
 
+  const foreign = await refOutsideTenant(tenantId, {
+    patientId: data.patientId,
+    procedureIds: data.items.map((it) => it.procedureId),
+  });
+  if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
+
   const number = await nextQuoteNumber(tenantId);
   const quote = await prisma.quote.create({
     data: {
@@ -325,6 +332,12 @@ export async function updateQuote(
   }
   const data = parsed.data;
   const { subtotal, total, lines } = computeTotals(data.items, data.discountType, data.discountValue);
+
+  const foreign = await refOutsideTenant(tenantId, {
+    patientId: data.patientId,
+    procedureIds: data.items.map((it) => it.procedureId),
+  });
+  if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
 
   await prisma.$transaction([
     prisma.quoteItem.deleteMany({ where: { quoteId: id } }),

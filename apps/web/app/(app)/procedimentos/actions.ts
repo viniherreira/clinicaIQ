@@ -5,6 +5,7 @@ import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -215,6 +216,9 @@ export async function createProcedure(
     return { success: false, errors: { name: ['Já existe um procedimento com este nome'] } };
   }
 
+  const foreign = await refOutsideTenant(tenantId, { professionalIds, categoryId: data.categoryId });
+  if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
+
   const procedure = await prisma.procedure.create({
     data: {
       tenantId,
@@ -267,6 +271,9 @@ export async function updateProcedure(
   if (duplicate) {
     return { success: false, errors: { name: ['Já existe um procedimento com este nome'] } };
   }
+
+  const foreign = await refOutsideTenant(tenantId, { professionalIds, categoryId: data.categoryId });
+  if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
 
   await prisma.procedure.update({
     where: { id, tenantId },

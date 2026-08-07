@@ -13,6 +13,7 @@ import { PROFESSIONAL_COLORS } from './_components/constants';
 import type { WeekSchedule } from '@/lib/schedule';
 import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@/lib/whatsapp';
 import type { Preparation } from '@/lib/whatsapp';
+import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -285,6 +286,11 @@ export async function createAppointment(
     return { success: false, errors: { endTime: ['Horário de término deve ser após o início'] } };
   }
 
+  const foreign = await refOutsideTenant(tenantId, { patientId, professionalId, procedureId });
+  if (foreign) {
+    return { success: false, errors: {}, message: refErrorMessage(foreign) };
+  }
+
   const conflict = await checkConflict(tenantId, professionalId, start, end);
   if (conflict) {
     return {
@@ -389,6 +395,11 @@ export async function updateAppointment(
     return { success: false, errors: { endTime: ['Horário de término deve ser após o início'] } };
   }
 
+  const foreign = await refOutsideTenant(tenantId, { patientId, professionalId, procedureId });
+  if (foreign) {
+    return { success: false, errors: {}, message: refErrorMessage(foreign) };
+  }
+
   const conflict = await checkConflict(tenantId, professionalId, start, end, id);
   if (conflict) {
     return {
@@ -438,6 +449,11 @@ export async function moveAppointment(
 
   const start = new Date(newStartISO);
   const end = new Date(newEndISO);
+
+  const foreign = await refOutsideTenant(tenantId, { professionalId });
+  if (foreign) {
+    return { success: false, message: refErrorMessage(foreign) };
+  }
 
   const conflict = await checkConflict(tenantId, professionalId, start, end, id);
   if (conflict) {
