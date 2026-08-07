@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@clinicaiq/db';
-import { resolveAccess } from '@/lib/subscription';
-import { bearerMatches, secretMatches } from '@/lib/bearer';
+import { reconcileSubscriptions } from '@/lib/subscription-sync';
+import { bearerMatches } from '@/lib/bearer';
 
 /**
- * Daily reconciliation of subscription statuses.
+ * Reconciliação diária dos status de assinatura.
  *
- * The stored status is a convenience, not the source of truth — `resolveAccess`
- * decides from the dates on every request, so a day this job does not run costs
- * nothing in correctness. What it buys is a status column that matches reality
- * for anyone reading the table directly, and a single place to hang reminders.
+ * Continua existindo como rota própria para dar para rodar sob demanda, mas o
+ * agendamento mora no cron de lembretes: o plano Hobby da Vercel só permite dois
+ * crons por projeto, e gastar um slot com isto custaria os aniversários. A
+ * lógica está em `lib/subscription-sync.ts`, chamada pelos dois.
  */
 
 function authorized(req: Request): boolean {
@@ -21,41 +20,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const now = new Date();
-  const subscriptions = await prisma.subscription.findMany({
-    where: { status: { notIn: ['CANCELLED'] } },
-    select: {
-      id: true,
-      tenantId: true,
-      status: true,
-      trialEndsAt: true,
-      currentPeriodEnd: true,
-      graceEndsAt: true,
-      cancelledAt: true,
-    },
-  });
-
-  let changed = 0;
-  const transitions: { tenantId: string; from: string; to: string }[] = [];
-
-  for (const sub of subscriptions) {
-    const access = resolveAccess(sub, now);
-    if (access.status === sub.status) continue;
-
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: {
-        status: access.status,
-        // Pin the grace window the first time we notice the due date passed, so
-        // it cannot drift if the clinic's period end is later edited.
-        ...(access.status === 'PAST_DUE' && !sub.graceEndsAt
-          ? { graceEndsAt: new Date(sub.currentPeriodEnd.getTime() + 7 * 24 * 60 * 60 * 1000) }
-          : {}),
-      },
-    });
-    transitions.push({ tenantId: sub.tenantId, from: sub.status, to: access.status });
-    changed += 1;
-  }
-
-  return NextResponse.json({ ok: true, checked: subscriptions.length, changed, transitions });
+  const result = await reconcileSubscriptions();
+  return NextResponse.json({ ok: true, ...result });
 }

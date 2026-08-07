@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
+import { writeBlocked } from '@/lib/access';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,9 @@ export async function updateClinic(
   formData: FormData,
 ): Promise<ClinicFormState> {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
   const parsed = clinicSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -134,6 +138,9 @@ export async function createProfessional(
   formData: FormData,
 ): Promise<ProfessionalFormState> {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -159,6 +166,9 @@ export async function updateProfessional(
   formData: FormData,
 ): Promise<ProfessionalFormState> {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -181,6 +191,9 @@ export async function updateProfessional(
 
 export async function toggleProfessionalActive(id: string) {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   const professional = await prisma.professional.findFirst({
     where: { id, tenantId },
     select: { active: true },
@@ -248,6 +261,9 @@ export async function getBusinessHours(): Promise<DayHours[]> {
 
 export async function updateBusinessHours(hours: DayHours[]): Promise<{ ok: boolean }> {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false };
   if (!Array.isArray(hours) || hours.length !== 7 || !hours.every(isDayHours)) {
     return { ok: false };
   }
@@ -316,6 +332,9 @@ export async function updateProfessionalSchedule(
 ): Promise<{ ok: boolean; message?: string }> {
   const { tenantId, userId } = await requireOwner();
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
   const prof = await prisma.professional.findFirst({
     where: { id: professionalId, tenantId },
     select: { id: true },
@@ -376,6 +395,9 @@ export async function deleteProfessional(
   id: string,
 ): Promise<{ ok: boolean; message?: string }> {
   const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
 
   const count = await prisma.appointment.count({ where: { tenantId, professionalId: id } });
   if (count > 0) {

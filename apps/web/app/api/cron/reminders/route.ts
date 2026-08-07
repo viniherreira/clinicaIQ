@@ -5,6 +5,7 @@ import { WHATSAPP_TEMPLATES } from '@clinicaiq/whatsapp';
 import { dispatchAppointmentMessage } from '@/lib/whatsapp';
 import { clinicToday } from '@/lib/tz';
 import { bearerMatches } from '@/lib/bearer';
+import { reconcileSubscriptions } from '@/lib/subscription-sync';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -32,6 +33,18 @@ function authorized(req: Request): boolean {
 export async function GET(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  }
+
+  // Pega carona neste cron porque o plano Hobby da Vercel só permite dois por
+  // projeto, e os dois já estão em uso. Roda antes dos lembretes — que podem
+  // levar até um minuto e estourar o tempo — e num try próprio, porque uma
+  // falha na cobrança não pode impedir a clínica de avisar os pacientes.
+  let subscriptions: { checked: number; changed: number } | { error: string };
+  try {
+    const { checked, changed } = await reconcileSubscriptions();
+    subscriptions = { checked, changed };
+  } catch {
+    subscriptions = { error: 'falhou' };
   }
 
   // Appointments are stored as wall-clock-in-UTC, so "tomorrow in the clinic"
@@ -64,5 +77,12 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, date: tomorrow, candidates: appointments.length, sent, failed });
+  return NextResponse.json({
+    ok: true,
+    date: tomorrow,
+    candidates: appointments.length,
+    sent,
+    failed,
+    subscriptions,
+  });
 }

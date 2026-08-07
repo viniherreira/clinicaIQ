@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { clinicToday } from '@/lib/tz';
+import { writeBlocked } from '@/lib/access';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -171,6 +172,9 @@ export async function createAndSendCampaign(input: {
   patientIds: string[];
 }): Promise<CampaignFormState> {
   const { tenantId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, error: bloqueio };
 
   const parsed = campaignSchema.safeParse(input);
   if (!parsed.success) {

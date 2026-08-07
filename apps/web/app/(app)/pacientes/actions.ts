@@ -5,6 +5,7 @@ import { prisma, getTenantClient, encrypt, decrypt } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { writeBlocked } from '@/lib/access';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -265,6 +266,9 @@ export async function createPatient(
 ): Promise<PatientFormState> {
   const { tenantId, userId } = await requireTenant();
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
   const raw = Object.fromEntries(formData.entries());
   const parsed = patientSchema.safeParse(raw);
 
@@ -347,6 +351,9 @@ export async function updatePatient(
 ): Promise<PatientFormState> {
   const { tenantId, userId } = await requireTenant();
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
   const raw = Object.fromEntries(formData.entries());
   const parsed = patientSchema.safeParse(raw);
 
@@ -411,6 +418,9 @@ export async function updatePatient(
 export async function togglePatientActive(id: string) {
   const { tenantId, userId } = await requireTenant();
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
+
   const patient = await prisma.patient.findFirst({ where: { id, tenantId } });
   if (!patient) return;
 
@@ -438,6 +448,9 @@ export async function togglePatientActive(id: string) {
 export async function deletePatient(id: string) {
   const { tenantId, userId } = await requireTenant();
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
+
   await prisma.patient.update({
     where: { id, tenantId },
     data: { deletedAt: new Date(), updatedById: userId },
@@ -454,6 +467,9 @@ export async function deletePatient(id: string) {
 
 export async function addPatientNote(patientId: string, content: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
 
   if (!content.trim()) return;
 

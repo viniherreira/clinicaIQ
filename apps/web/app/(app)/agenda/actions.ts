@@ -10,7 +10,8 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
-import type { WeekSchedule } from '@/lib/schedule';
+import type { WeekSchedule } from '@/lib/schedule';
+import { writeBlocked } from '@/lib/access';
 import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@/lib/whatsapp';
 import type { Preparation } from '@/lib/whatsapp';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
@@ -271,7 +272,10 @@ export async function createAppointment(
   _prev: AppointmentFormState | null,
   formData: FormData,
 ): Promise<AppointmentFormState> {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = appointmentSchema.safeParse(raw);
@@ -380,7 +384,10 @@ export async function updateAppointment(
   _prev: AppointmentFormState | null,
   formData: FormData,
 ): Promise<AppointmentFormState> {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = appointmentSchema.safeParse(raw);
@@ -445,7 +452,10 @@ export async function moveAppointment(
   newEndISO: string,
   professionalId: string,
 ) {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, message: bloqueio };
 
   const start = new Date(newStartISO);
   const end = new Date(newEndISO);
@@ -500,7 +510,10 @@ export async function createBlockedSlot(
   _prev: BlockFormState | null,
   formData: FormData,
 ): Promise<BlockFormState> {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, message: bloqueio };
 
   const parsed = blockSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -547,7 +560,10 @@ export async function createBlockedSlot(
 }
 
 export async function deleteBlockedSlot(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   await prisma.blockedSlot.deleteMany({ where: { id, tenantId } });
   revalidatePath('/agenda');
 }
@@ -559,7 +575,10 @@ export async function updateAppointmentStatus(
   status: 'SCHEDULED' | 'CONFIRMED' | 'RESCHEDULED' | 'CANCELLED' | 'ATTENDED' | 'MISSED',
   cancelReason?: string,
 ) {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
 
   await prisma.appointment.update({
     where: { id, tenantId },
@@ -587,7 +606,10 @@ export async function cancelAppointment(id: string, cancelReason?: string) {
  * foreign key. Tenant-scoped: only the owner's row can be removed.
  */
 export async function deleteAppointment(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false as const, error: 'blocked' as const };
 
   const appt = await prisma.appointment.findFirst({
     where: { id, tenantId },

@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
+import { writeBlocked } from '@/lib/access';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
@@ -262,6 +263,9 @@ export async function createQuote(
   formData: FormData,
 ): Promise<QuoteFormState> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
   const parsed = parseQuoteForm(formData);
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -320,6 +324,9 @@ export async function updateQuote(
   formData: FormData,
 ): Promise<QuoteFormState> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: {}, message: bloqueio };
   const existing = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!existing) return { success: false, errors: {}, message: 'Orçamento não encontrado' };
   if (existing.status !== 'DRAFT') {
@@ -380,6 +387,9 @@ export async function updateQuote(
 
 export async function sendQuote(id: string): Promise<{ ok: boolean; message?: string }> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
   const quote = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!quote) return { ok: false, message: 'Orçamento não encontrado' };
 
@@ -407,6 +417,9 @@ export async function sendQuote(id: string): Promise<{ ok: boolean; message?: st
  *  clinic shares the public link/PDF manually instead of sending via WhatsApp. */
 export async function markQuoteSent(id: string): Promise<{ ok: boolean }> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false };
   const quote = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!quote) return { ok: false };
   if (quote.status !== 'DRAFT') return { ok: true };
@@ -441,6 +454,9 @@ export async function addQuotePayment(
   formData: FormData,
 ): Promise<QuotePaymentState> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: { amount: [bloqueio] } };
   const parsed = quotePaymentSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -476,6 +492,9 @@ export async function addQuotePayment(
 
 export async function deleteQuotePayment(paymentId: string, quoteId: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
@@ -488,6 +507,9 @@ export async function deleteQuotePayment(paymentId: string, quoteId: string) {
  *  totals (contratado / a receber) and the dashboard. */
 export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: string }> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { status: true, patientId: true },
@@ -514,6 +536,9 @@ export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: 
  *  financial totals and can be edited again. */
 export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false };
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { patientId: true },
@@ -538,6 +563,9 @@ export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
 
 export async function deleteQuote(id: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { patientId: true },

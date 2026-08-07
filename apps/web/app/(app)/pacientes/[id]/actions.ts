@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
+import { writeBlocked } from '@/lib/access';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
@@ -192,6 +193,9 @@ export async function setToothRecord(
   note?: string,
 ): Promise<{ ok: boolean }> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false };
   if (!VALID_TEETH.has(toothNumber)) return { ok: false };
 
   // Guard: patient must belong to this tenant.
@@ -246,6 +250,9 @@ export async function addPayment(
   formData: FormData,
 ): Promise<PaymentFormState> {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { success: false, errors: { amount: [bloqueio] } };
   const parsed = paymentSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -283,6 +290,9 @@ export async function addPayment(
 
 export async function deletePayment(paymentId: string, patientId: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
@@ -310,6 +320,9 @@ export async function saveAnamnesis(
   const ctx = await requirePatient(patientId);
   if (!ctx) return { ok: false };
   const { tenantId, userId } = ctx;
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false };
 
   // Keep only known question keys and well-formed answers.
   const items: AnamnesisAnswers['items'] = {};
@@ -356,6 +369,9 @@ export async function addEvolution(
   if (!ctx) return { ok: false, message: 'Paciente não encontrado.' };
   const { tenantId, userId } = ctx;
 
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
   const parsed = evolutionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
@@ -391,6 +407,9 @@ export async function addEvolution(
 
 export async function deleteEvolution(id: string, patientId: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   await prisma.evolution.deleteMany({ where: { id, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Evolution', entityId: id },
@@ -421,6 +440,9 @@ export async function uploadPatientFile(
   const ctx = await requirePatient(patientId);
   if (!ctx) return { ok: false, message: 'Paciente não encontrado.' };
   const { tenantId, userId } = ctx;
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
 
   if (!storageEnabled()) {
     return { ok: false, message: 'O armazenamento de arquivos ainda não foi configurado.' };
@@ -470,6 +492,9 @@ export async function uploadPatientFile(
 
 export async function deletePatientFile(id: string, patientId: string) {
   const { tenantId, userId } = await requireTenant();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return;
   const file = await prisma.patientFile.findFirst({
     where: { id, tenantId },
     select: { id: true, bucketPath: true },
