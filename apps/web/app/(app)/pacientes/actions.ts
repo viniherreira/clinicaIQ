@@ -106,6 +106,47 @@ export type PatientFormState =
 
 // ─── List ────────────────────────────────────────────────────────────────────
 
+/**
+ * Ids whose phone, second phone or CPF contain `digits`.
+ *
+ * Encrypted columns can only be searched by decrypting them, so this reads the
+ * tenant's rows and compares in memory. Two things keep it honest: it runs only
+ * when the term looks numeric, and it selects nothing but the ciphertext it has
+ * to open — never names or records.
+ *
+ * This is linear in the clinic's patient count. At a few thousand it is
+ * imperceptible; if a tenant ever reaches tens of thousands, the fix is a blind
+ * index (a keyed HMAC of the normalised digits, stored beside the ciphertext),
+ * which trades partial matching for an indexed lookup.
+ */
+async function findByEncrypted(
+  tenantId: string,
+  db: ReturnType<typeof getTenantClient>,
+  digits: string,
+): Promise<string[]> {
+  const rows = await db.patient.findMany({
+    where: { deletedAt: null },
+    select: { id: true, phoneEncrypted: true, phone2Encrypted: true, cpfEncrypted: true },
+  });
+
+  const masterKey = getMasterKey();
+  const open = (value: string | null): string => {
+    if (!value) return '';
+    try {
+      return decrypt(value, masterKey, tenantId).replace(/\D/g, '');
+    } catch {
+      // A row we cannot decrypt must not break the whole search.
+      return '';
+    }
+  };
+
+  return rows
+    .filter((r) =>
+      [r.phoneEncrypted, r.phone2Encrypted, r.cpfEncrypted].some((v) => open(v).includes(digits)),
+    )
+    .map((r) => r.id);
+}
+
 export async function listPatients({
   search = '',
   page = 1,
@@ -119,11 +160,30 @@ export async function listPatients({
   const db = getTenantClient(tenantId);
   const PAGE_SIZE = 20;
 
+  const term = search.trim();
+  const digits = term.replace(/\D/g, '');
+
+  // CPF and phone are encrypted with a random IV, so the same number produces
+  // different ciphertext every time — there is nothing for SQL to match on. The
+  // only way to search them is to decrypt and compare, which means reading the
+  // tenant's rows. Done only when the term actually looks like a number, so the
+  // usual search-by-name stays a plain indexed query.
+  const encryptedMatches =
+    digits.length >= 3 ? await findByEncrypted(tenantId, db, digits) : null;
+
   const where = {
     deletedAt: null,
     ...(active !== undefined ? { active } : {}),
-    ...(search
-      ? { name: { contains: search, mode: 'insensitive' as const } }
+    ...(term
+      ? {
+          OR: [
+            { name: { contains: term, mode: 'insensitive' as const } },
+            { nickname: { contains: term, mode: 'insensitive' as const } },
+            { email: { contains: term, mode: 'insensitive' as const } },
+            ...(/^\d+$/.test(term) ? [{ controlNumber: Number(term) }] : []),
+            ...(encryptedMatches?.length ? [{ id: { in: encryptedMatches } }] : []),
+          ],
+        }
       : {}),
   };
 

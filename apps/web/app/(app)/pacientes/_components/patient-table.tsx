@@ -185,8 +185,8 @@ export function PatientTable({
             type="search"
             value={inputValue}
             onChange={(e) => updateSearch(e.target.value)}
-            placeholder="Buscar por nome..."
-            aria-label="Buscar paciente por nome"
+            placeholder="Buscar por nome, telefone, CPF, e-mail ou nº..."
+            aria-label="Buscar paciente por nome, apelido, telefone, CPF, e-mail ou número de controle"
             className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </div>
@@ -202,7 +202,7 @@ export function PatientTable({
             </svg>
             <p className="text-sm font-medium text-muted-foreground">Nenhum paciente encontrado</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {search ? 'Tente uma busca diferente.' : 'Cadastre o primeiro paciente clicando em "+ Adicionar paciente".'}
+              {search ? 'Nada encontrado. Busque por nome, apelido, telefone, CPF, e-mail ou número de controle.' : 'Cadastre o primeiro paciente clicando em "+ Adicionar paciente".'}
             </p>
           </div>
         ) : (
