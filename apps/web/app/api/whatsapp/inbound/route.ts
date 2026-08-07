@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import { bearerMatches, secretMatches } from '@/lib/bearer';
 import { resolveAppointmentByPhone, applyAppointmentResponse, optOutByPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -13,9 +14,7 @@ export const maxDuration = 30;
  * actually flip the appointment to Confirmado in the agenda.
  */
 function authorized(req: Request): boolean {
-  const token = process.env.WHATSAPP_GATEWAY_TOKEN;
-  if (!token) return false;
-  return req.headers.get('authorization') === `Bearer ${token}`;
+  return bearerMatches(req, process.env.WHATSAPP_GATEWAY_TOKEN);
 }
 
 export async function POST(req: Request) {
@@ -50,6 +49,7 @@ export async function POST(req: Request) {
     buttonReplyId: typeof body.buttonId === 'string' ? body.buttonId : undefined,
     text: typeof body.text === 'string' ? body.text : undefined,
     externalId: typeof body.messageId === 'string' ? body.messageId : undefined,
+    tenantId,
   });
 
   if (changed) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@clinicaiq/db';
 import { toChargeStatus } from '@/lib/asaas';
+import { bearerMatches, secretMatches } from '@/lib/bearer';
 
 /**
  * Asaas payment webhook.
@@ -32,9 +33,7 @@ interface AsaasEvent {
  * defaulting to open.
  */
 function authorized(req: Request): boolean {
-  const expected = process.env.ASAAS_WEBHOOK_TOKEN;
-  if (!expected) return false;
-  return req.headers.get('asaas-access-token') === expected;
+  return secretMatches(req.headers.get('asaas-access-token'), process.env.ASAAS_WEBHOOK_TOKEN);
 }
 
 export async function POST(req: Request) {

@@ -674,7 +674,7 @@ export async function resolveAppointmentByPhone(
  */
 export async function applyAppointmentResponse(
   appointmentId: string,
-  opts: { buttonReplyId?: string; text?: string; externalId?: string },
+  opts: { buttonReplyId?: string; text?: string; externalId?: string; tenantId?: string },
 ): Promise<boolean> {
   const status = resolveResponseStatus(opts.buttonReplyId, opts.text);
   if (!status) return false;
@@ -684,6 +684,11 @@ export async function applyAppointmentResponse(
     select: { id: true, tenantId: true, patientId: true },
   });
   if (!appt) return false;
+
+  // O único chamador hoje deriva o id de uma busca já escopada, então nada
+  // vaza. Mas esta função é exportada: conferir o tenant quando ele é conhecido
+  // impede que um chamador futuro confirme o agendamento de outra clínica.
+  if (opts.tenantId && appt.tenantId !== opts.tenantId) return false;
 
   await prisma.appointment.update({
     where: { id: appt.id },

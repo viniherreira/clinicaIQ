@@ -3,15 +3,14 @@ import { prisma } from '@clinicaiq/db';
 import { WHATSAPP_TEMPLATES } from '@clinicaiq/whatsapp';
 import { dispatchBirthdayMessage } from '@/lib/whatsapp';
 import { clinicToday } from '@/lib/tz';
+import { bearerMatches } from '@/lib/bearer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+/** Falha fechada e só pelo cabeçalho — ver a nota em cron/reminders. */
 function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // not configured — allow (set CRON_SECRET to lock down)
-  if (req.headers.get('authorization') === `Bearer ${secret}`) return true;
-  return new URL(req.url).searchParams.get('key') === secret;
+  return bearerMatches(req, process.env.CRON_SECRET);
 }
 
 /**

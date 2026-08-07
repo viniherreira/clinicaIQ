@@ -334,7 +334,7 @@ model Quote {
   tenantId      String
   patientId     String
   number        Int
-  publicToken   String       @unique @default(cuid())
+  publicToken   String       @unique
   status        QuoteStatus  @default(DRAFT)
   discountType  DiscountType @default(PERCENT)
   discountValue Decimal      @default(0) @db.Decimal(10, 2)

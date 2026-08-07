@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
+import { capabilityToken } from '@/lib/tokens';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -274,6 +275,8 @@ export async function createQuote(
       patientId: data.patientId,
       number,
       status: 'DRAFT',
+      // O link do orçamento é a credencial: 256 bits do CSPRNG, não um cuid.
+      publicToken: capabilityToken(),
       discountType: data.discountType,
       discountValue: data.discountValue,
       subtotal,

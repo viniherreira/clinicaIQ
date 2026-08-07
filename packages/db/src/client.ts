@@ -42,6 +42,21 @@ export function getTenantClient(tenantId: string) {
           }
           return result.tenantId === tenantId ? result : null;
         },
+        // `findUniqueOrThrow` e `findFirstOrThrow` não estão nesta lista por
+        // acidente: a extensão só intercepta o que declara, e o que ela não
+        // intercepta passa sem filtro de tenant. Nenhum dos dois está em uso
+        // hoje — recusar agora garante que o primeiro uso apareça como erro no
+        // desenvolvimento, e não como vazamento em produção.
+        async findUniqueOrThrow({ model }: { model: string }) {
+          throw new Error(
+            `getTenantClient: findUniqueOrThrow em "${model}" não é filtrado por tenant; use findUnique e trate o null.`,
+          );
+        },
+        async findFirstOrThrow({ model }: { model: string }) {
+          throw new Error(
+            `getTenantClient: findFirstOrThrow em "${model}" não é filtrado por tenant; use findFirst e trate o null.`,
+          );
+        },
         async upsert({ model, args, query }: { model: string; args: any; query: any }) {
           if (!MODELS_WITHOUT_TENANT.has(model)) {
             // upsert's where is a unique selector we can't constrain by tenant,

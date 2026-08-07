@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@clinicaiq/db';
 import { resolveAccess } from '@/lib/subscription';
+import { bearerMatches, secretMatches } from '@/lib/bearer';
 
 /**
  * Daily reconciliation of subscription statuses.
@@ -12,11 +13,7 @@ import { resolveAccess } from '@/lib/subscription';
  */
 
 function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  // Vercel Cron signs its calls with this header. No secret configured means
-  // the endpoint stays shut rather than open to anyone who guesses the path.
-  if (!secret) return false;
-  return req.headers.get('authorization') === `Bearer ${secret}`;
+  return bearerMatches(req, process.env.CRON_SECRET);
 }
 
 export async function GET(req: Request) {
