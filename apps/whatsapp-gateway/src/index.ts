@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { runCampaign } from './campaigns.js';
 import { prisma } from './db.js';
@@ -19,11 +20,28 @@ import {
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 
+/**
+ * Comparação em tempo constante, igual à do lado do app (`apps/web/lib/bearer.ts`).
+ *
+ * `!==` para de comparar no primeiro byte diferente, então o tempo de resposta
+ * conta quantos bytes iniciais estavam certos. Aqui a exposição é pequena — a
+ * variação fica muito abaixo do ruído da rede — mas os dois lados guardam o
+ * mesmo segredo e não há motivo para um ser mais frouxo que o outro.
+ */
+function tokenMatches(received: string): boolean {
+  const expected = env.GATEWAY_TOKEN;
+  if (!expected || !received) return false;
+  const a = Buffer.from(received);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 /** Every route except /health requires the shared token the web app holds. */
 function requireToken(req: Request, res: Response, next: NextFunction) {
   const header = req.header('authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (token !== env.GATEWAY_TOKEN) {
+  if (!tokenMatches(token)) {
     res.status(401).json({ error: 'unauthorized' });
     return;
   }

@@ -8,7 +8,8 @@
     "start": "node --import tsx/esm src/index.ts",
     "dev": "node --import tsx/esm --env-file-if-exists=.env.local --watch src/index.ts",
     "lint": "echo 'no lint configured'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "^6",
@@ -23,6 +24,7 @@
     "@types/node": "^25.9.1",
     "@types/qrcode": "^1.5.5",
     "prisma": "^6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3"
   }
 }
