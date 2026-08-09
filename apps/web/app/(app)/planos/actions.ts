@@ -18,6 +18,7 @@ import {
 } from '@/lib/asaas';
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription';
 import { documentError, formatDocument, isValidDocument } from '@/lib/document';
+import { capabilityBlocked } from '@/lib/access';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -77,6 +78,9 @@ export interface BillingData {
  */
 export async function saveDocument(value: string): Promise<{ ok: boolean; error?: string }> {
   const { tenantId } = await requireTenant();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'planos');
+  if (semAcesso) return { ok: false, error: semAcesso };
 
   const problem = documentError(value);
   if (problem) return { ok: false, error: problem };
@@ -213,6 +217,9 @@ export async function choosePlan(
   method: BillingMethod = 'PIX',
 ): Promise<ChoosePlanResult> {
   const { tenantId } = await requireTenant();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'planos');
+  if (semAcesso) return { ok: false as const, error: semAcesso };
 
   const plan = await prisma.plan.findUnique({ where: { tier: tier as PlanOption['tier'] } });
   if (!plan || !plan.active) return { ok: false, error: 'Plano indisponível.' };

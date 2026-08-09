@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
@@ -266,6 +266,9 @@ export async function createQuote(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = parseQuoteForm(formData);
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -327,6 +330,9 @@ export async function updateQuote(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const existing = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!existing) return { success: false, errors: {}, message: 'Orçamento não encontrado' };
   if (existing.status !== 'DRAFT') {
@@ -390,6 +396,9 @@ export async function sendQuote(id: string): Promise<{ ok: boolean; message?: st
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { ok: false, message: semAcesso };
   const quote = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!quote) return { ok: false, message: 'Orçamento não encontrado' };
 
@@ -420,6 +429,9 @@ export async function markQuoteSent(id: string): Promise<{ ok: boolean }> {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { ok: false };
   const quote = await prisma.quote.findFirst({ where: { id, tenantId }, select: { status: true } });
   if (!quote) return { ok: false };
   if (quote.status !== 'DRAFT') return { ok: true };
@@ -457,6 +469,9 @@ export async function addQuotePayment(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: { amount: [bloqueio] } };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { success: false, errors: { amount: [semAcesso] } };
   const parsed = quotePaymentSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -495,6 +510,9 @@ export async function deleteQuotePayment(paymentId: string, quoteId: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return;
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
@@ -510,6 +528,9 @@ export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: 
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { ok: false, message: semAcesso };
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { status: true, patientId: true },
@@ -539,6 +560,9 @@ export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { ok: false };
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { patientId: true },
@@ -566,6 +590,9 @@ export async function deleteQuote(id: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return;
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },
     select: { patientId: true },

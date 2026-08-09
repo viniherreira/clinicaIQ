@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 
@@ -131,6 +131,24 @@ export async function getPatientRecord(patientId: string) {
     .reduce((s, q) => s + Number(q.total), 0);
   const paid = payments.reduce((s, p) => s + Number(p.amount), 0);
 
+  // O prontuário é dado sensível de saúde (LGPD art. 11) e a recepcionista não
+  // precisa dele para agendar; o financeiro não é assunto de quem atende. Em vez
+  // de barrar a tela inteira, devolvemos só o que o perfil alcança — a ficha do
+  // paciente continua abrindo para todo mundo, com o conteúdo certo em cada caso.
+  const [veProntuario, veFinanceiro] = await Promise.all([
+    hasCapability(tenantId, 'prontuario'),
+    hasCapability(tenantId, 'financeiro'),
+  ]);
+
+  const semFinanceiro = {
+    contracted: 0,
+    paid: 0,
+    balance: 0,
+    payments: [] as never[],
+    acceptedQuotes: [] as never[],
+    quotes: [] as never[],
+  };
+
   return {
     appointments: appointments.map((a) => ({ ...a })),
     stats: {
@@ -140,7 +158,9 @@ export async function getPatientRecord(patientId: string) {
       lastVisit: attended[0]?.startTime ?? null,
       nextAppointment: upcoming?.startTime ?? null,
     },
-    financial: {
+    canSeeRecord: veProntuario,
+    canSeeFinance: veFinanceiro,
+    financial: !veFinanceiro ? semFinanceiro : {
       contracted,
       paid,
       balance: Math.max(0, contracted - paid),
@@ -167,12 +187,13 @@ export async function getPatientRecord(patientId: string) {
           .reduce((s, p) => s + Number(p.amount), 0),
       })),
     },
-    teeth: teeth.map((t) => ({ ...t })),
-    anamnesis: anamnesis
-      ? { answers: anamnesis.answers as unknown as AnamnesisAnswers, updatedAt: anamnesis.updatedAt }
-      : null,
-    evolutions: evolutions.map((e) => ({ ...e })),
-    files: filesWithUrls,
+    teeth: veProntuario ? teeth.map((t) => ({ ...t })) : [],
+    anamnesis:
+      veProntuario && anamnesis
+        ? { answers: anamnesis.answers as unknown as AnamnesisAnswers, updatedAt: anamnesis.updatedAt }
+        : null,
+    evolutions: veProntuario ? evolutions.map((e) => ({ ...e })) : [],
+    files: veProntuario ? filesWithUrls : [],
     professionals,
     storageEnabled: storageEnabled(),
   };
@@ -196,6 +217,9 @@ export async function setToothRecord(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return { ok: false };
   if (!VALID_TEETH.has(toothNumber)) return { ok: false };
 
   // Guard: patient must belong to this tenant.
@@ -253,6 +277,9 @@ export async function addPayment(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: { amount: [bloqueio] } };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return { success: false, errors: { amount: [semAcesso] } };
   const parsed = paymentSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -293,6 +320,9 @@ export async function deletePayment(paymentId: string, patientId: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
+  if (semAcesso) return;
   await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
@@ -323,6 +353,9 @@ export async function saveAnamnesis(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return { ok: false };
 
   // Keep only known question keys and well-formed answers.
   const items: AnamnesisAnswers['items'] = {};
@@ -372,6 +405,9 @@ export async function addEvolution(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
   const parsed = evolutionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
@@ -410,6 +446,9 @@ export async function deleteEvolution(id: string, patientId: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return;
   await prisma.evolution.deleteMany({ where: { id, tenantId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Evolution', entityId: id },
@@ -443,6 +482,9 @@ export async function uploadPatientFile(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return { ok: false, message: semAcesso };
 
   if (!storageEnabled()) {
     return { ok: false, message: 'O armazenamento de arquivos ainda não foi configurado.' };
@@ -495,6 +537,9 @@ export async function deletePatientFile(id: string, patientId: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
+  if (semAcesso) return;
   const file = await prisma.patientFile.findFirst({
     where: { id, tenantId },
     select: { id: true, bucketPath: true },

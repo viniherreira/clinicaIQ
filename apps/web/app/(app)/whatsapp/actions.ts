@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getWhatsAppHealth } from '@/lib/whatsapp';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -155,6 +155,9 @@ export async function startConnection(): Promise<ConnectionState> {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { status: 'ERROR' as const, qrCode: null, phoneNumber: null, lastError: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { status: 'ERROR' as const, qrCode: null, phoneNumber: null, lastError: semAcesso };
   await ensureSession(tenantId);
 
   const gateway = getGatewayProvider(tenantId);
@@ -194,6 +197,9 @@ export async function disconnectWhatsApp(): Promise<{ ok: boolean }> {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false };
 
   const gateway = getGatewayProvider(tenantId);
   if (gateway) {
@@ -247,6 +253,9 @@ export async function saveWhatsAppSettings(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, error: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, error: semAcesso };
 
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: 'Dados inválidos.' };

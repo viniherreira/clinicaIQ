@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -71,6 +71,9 @@ export async function updateClinic(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = clinicSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -141,6 +144,9 @@ export async function createProfessional(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -169,6 +175,9 @@ export async function updateProfessional(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -194,6 +203,9 @@ export async function toggleProfessionalActive(id: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return;
   const professional = await prisma.professional.findFirst({
     where: { id, tenantId },
     select: { active: true },
@@ -264,6 +276,9 @@ export async function updateBusinessHours(hours: DayHours[]): Promise<{ ok: bool
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false };
   if (!Array.isArray(hours) || hours.length !== 7 || !hours.every(isDayHours)) {
     return { ok: false };
   }
@@ -335,6 +350,9 @@ export async function updateProfessionalSchedule(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
   const prof = await prisma.professional.findFirst({
     where: { id: professionalId, tenantId },
     select: { id: true },
@@ -398,6 +416,9 @@ export async function deleteProfessional(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
 
   const count = await prisma.appointment.count({ where: { tenantId, professionalId: id } });
   if (count > 0) {

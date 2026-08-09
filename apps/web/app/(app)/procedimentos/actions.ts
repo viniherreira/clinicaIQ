@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -205,6 +205,9 @@ export async function createProcedure(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const { parsed, professionalIds } = parseProcedureForm(formData);
 
   if (!parsed.success) {
@@ -264,6 +267,9 @@ export async function updateProcedure(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const { parsed, professionalIds } = parseProcedureForm(formData);
 
   if (!parsed.success) {
@@ -317,6 +323,9 @@ export async function toggleProcedureActive(id: string) {
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
 
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return;
+
   const procedure = await prisma.procedure.findFirst({ where: { id, tenantId } });
   if (!procedure) return;
 
@@ -346,6 +355,9 @@ export async function deleteProcedure(id: string) {
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
 
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return;
+
   await prisma.procedure.update({
     where: { id, tenantId },
     data: { deletedAt: new Date(), active: false, updatedById: userId },
@@ -365,6 +377,9 @@ export async function duplicateProcedure(id: string): Promise<ProcedureFormState
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const db = getTenantClient(tenantId);
 
   const source = await db.procedure.findUnique({
@@ -448,6 +463,9 @@ export async function createCategory(
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: { name: [bloqueio] } };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { success: false, errors: { name: [semAcesso] } };
   const parsed = categorySchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
@@ -474,6 +492,9 @@ export async function updateCategory(id: string, name: string, color?: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return;
   const trimmed = name.trim();
   if (trimmed.length < 2) return;
 
@@ -495,6 +516,9 @@ export async function deleteCategory(id: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return;
 
   // Detach procedures from the category before removing it (categoryId is optional).
   await prisma.procedure.updateMany({

@@ -1,7 +1,15 @@
 import 'server-only';
 import { cache } from 'react';
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from './subscription';
+import {
+  can,
+  capabilityDeniedMessage,
+  LEAST_PRIVILEGE,
+  type Capability,
+  type Role,
+} from './permissions';
 
 /**
  * The clinic's current access level. Cached per request so a page that checks
@@ -66,4 +74,42 @@ export async function writeBlocked(tenantId: string): Promise<string | null> {
   const access = await getTenantAccess(tenantId);
   if (access.level === 'full') return null;
   return access.warning ?? 'Acesso limitado. Regularize o plano para voltar a gravar.';
+}
+
+/**
+ * Papel de quem está chamando, dentro desta clínica. Em cache por requisição:
+ * uma página que confere na leitura e de novo na action paga uma consulta.
+ *
+ * Falha fechada. Sem sessão, sem vínculo com a clínica ou com um valor que não
+ * reconhecemos, devolve o menor privilégio — um erro de consulta não pode virar
+ * acesso total por acidente.
+ */
+export const currentRole = cache(async (tenantId: string): Promise<Role> => {
+  const { userId } = await auth();
+  if (!userId) return LEAST_PRIVILEGE;
+
+  const user = await prisma.user
+    .findFirst({ where: { clerkUserId: userId, tenantId }, select: { role: true } })
+    .catch(() => null);
+
+  return (user?.role as Role | undefined) ?? LEAST_PRIVILEGE;
+});
+
+/** Mesma pergunta sem lançar, para decidir o que renderizar. */
+export async function hasCapability(tenantId: string, capability: Capability): Promise<boolean> {
+  return can(await currentRole(tenantId), capability);
+}
+
+/**
+ * Guarda de papel para as Server Actions. Devolve a mensagem quando o perfil não
+ * alcança, ou `null` quando alcança — mesmo formato do `writeBlocked`, para as
+ * duas guardas se lerem igual no meio de uma action.
+ */
+export async function capabilityBlocked(
+  tenantId: string,
+  capability: Capability,
+): Promise<string | null> {
+  return (await hasCapability(tenantId, capability))
+    ? null
+    : capabilityDeniedMessage(capability);
 }

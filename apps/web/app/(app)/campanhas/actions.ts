@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { clinicToday } from '@/lib/tz';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -175,6 +175,9 @@ export async function createAndSendCampaign(input: {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, error: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'campanhas');
+  if (semAcesso) return { success: false, error: semAcesso };
 
   const parsed = campaignSchema.safeParse(input);
   if (!parsed.success) {
