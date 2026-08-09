@@ -126,6 +126,7 @@ export type PatientFormData = {
   city?: string;
   state?: string;
   lgpdConsentAt?: Date | null;
+  marketingConsentAt?: Date | null;
 };
 
 export function PatientForm({ patient }: { patient?: PatientFormData }) {
@@ -337,6 +338,34 @@ export function PatientForm({ patient }: { patient?: PatientFormData }) {
           )}
         </div>
       )}
+
+      {/* Aceite de campanha — separado, e opcional.
+          Fica fora da caixa acima de propósito: aquela é obrigatória e cobre o
+          atendimento; esta é uma escolha do paciente e ele pode dizer não sem
+          deixar de ser atendido. Aparece também na edição para a recepção
+          registrar o "pode me mandar, sim" dito no balcão. */}
+      <div className="rounded-lg border border-border p-4">
+        <h2 className="mb-3 text-sm font-semibold">Mensagens promocionais</h2>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            name="marketingConsent"
+            value="1"
+            defaultChecked={Boolean(patient?.marketingConsentAt)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          />
+          <span className="text-sm text-muted-foreground">
+            O paciente autoriza receber <strong className="text-foreground">promoções e
+            novidades</strong> da clínica por WhatsApp. Opcional — lembretes de consulta
+            continuam sendo enviados de qualquer forma.
+          </span>
+        </label>
+        {isEdit && patient?.marketingConsentAt && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Autorizado em {new Date(patient.marketingConsentAt).toLocaleString('pt-BR')}
+          </p>
+        )}
+      </div>
 
       {isEdit && patient?.lgpdConsentAt && (
         <p className="text-xs text-muted-foreground px-1">

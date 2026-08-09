@@ -12,8 +12,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "db:generate": "pnpm --filter @clinicaiq/db generate",
     "db:push": "pnpm --filter @clinicaiq/db push",
-    "db:seed": "pnpm --filter @clinicaiq/db seed",
-    "worker": "tsx --env-file=.env apps/web/worker.ts"
+    "db:seed": "pnpm --filter @clinicaiq/db seed"
   },
   "devDependencies": {
     "turbo": "^2",

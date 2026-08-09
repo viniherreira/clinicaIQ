@@ -31,6 +31,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
     city: patient.city ?? '',
     state: patient.state ?? '',
     lgpdConsentAt: patient.lgpdConsentAt,
+    marketingConsentAt: patient.marketingConsentAt,
   };
 
   return (

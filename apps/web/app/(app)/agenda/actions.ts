@@ -352,24 +352,6 @@ export async function createAppointment(
         console.error('[agenda] falha ao enviar WhatsApp de criacao', appointment.id, error);
       }
 
-      // 24h confirmation reminder — needs scheduling, so it goes through the queue
-      // (best-effort: a no-op in dev when Redis/worker are absent).
-      try {
-        const { appointmentQueue } = await import('@/lib/queue');
-        const reminderTime = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-        const delay = Math.max(0, reminderTime.getTime() - Date.now());
-        if (delay > 0) {
-          await appointmentQueue.add(
-            'whatsapp-reminder-24h',
-            { type: 'whatsapp-reminder-24h', appointmentId: appointment.id, tenantId },
-            { delay },
-          );
-        }
-      } catch (error) {
-        // Best effort: /api/cron/reminders covers the same ground without Redis,
-        // so a queue that is down delays nothing. Still worth seeing in the logs.
-        console.error('[agenda] falha ao agendar lembrete 24h', appointment.id, error);
-      }
     });
   }
 

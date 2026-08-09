@@ -56,7 +56,15 @@ export async function runCampaign(tenantId: string, campaignId: string): Promise
       where: { campaignId, status: 'PENDING' },
       select: {
         id: true,
-        patient: { select: { id: true, name: true, phoneEncrypted: true, whatsappOptOut: true } },
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            phoneEncrypted: true,
+            whatsappOptOut: true,
+            marketingConsentAt: true,
+          },
+        },
       },
     });
 
@@ -72,6 +80,18 @@ export async function runCampaign(tenantId: string, campaignId: string): Promise
         await prisma.campaignRecipient.update({
           where: { id: r.id },
           data: { status: 'FAILED', error: 'descadastrado' },
+        });
+        failed += 1;
+        continue;
+      }
+
+      // Última conferência antes da mensagem sair de verdade. O app já filtra na
+      // seleção e no envio, mas uma campanha leva horas: o aceite pode ter sido
+      // retirado no meio, e este é o último ponto em que dá para não mandar.
+      if (!r.patient.marketingConsentAt) {
+        await prisma.campaignRecipient.update({
+          where: { id: r.id },
+          data: { status: 'FAILED', error: 'sem autorização para campanha' },
         });
         failed += 1;
         continue;

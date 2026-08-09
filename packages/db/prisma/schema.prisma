@@ -150,7 +150,16 @@ model Patient {
   neighborhood    String?
   city            String?
   state           String?
+  /// Aceite do tratamento dos dados para o atendimento. Obrigatório no cadastro.
   lgpdConsentAt   DateTime?
+  /// Aceite separado para receber campanha promocional. Nulo = nunca autorizou.
+  ///
+  /// Separado do `lgpdConsentAt` de propósito: aquele cobre tratar o paciente e
+  /// guardar o prontuário, que tem base legal própria e não depende de
+  /// autorização. Disparo promocional em massa é outra finalidade e precisa de
+  /// aceite específico — e é também o que a política do WhatsApp exige para o
+  /// número não ser derrubado por denúncia.
+  marketingConsentAt DateTime?
   /// Patient asked to stop receiving campaigns (replied SAIR/PARAR).
   whatsappOptOut  Boolean   @default(false)
   active          Boolean   @default(true)

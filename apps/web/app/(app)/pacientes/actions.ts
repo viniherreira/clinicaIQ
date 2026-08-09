@@ -97,6 +97,7 @@ const patientSchema = z.object({
   city: z.string().max(80).optional().or(z.literal('')),
   state: z.string().max(2).optional().or(z.literal('')),
   lgpdConsent: z.string().optional(),
+  marketingConsent: z.string().optional(),
 });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -323,6 +324,9 @@ export async function createPatient(
       city: data.city || null,
       state: data.state || null,
       lgpdConsentAt: new Date(),
+      // Só carimba quando a caixa foi marcada. Nulo aqui é a resposta honesta:
+      // "não autorizou", e não "ainda não perguntamos".
+      marketingConsentAt: data.marketingConsent ? new Date() : null,
       createdById: userId,
       updatedById: userId,
     },
@@ -378,9 +382,20 @@ export async function updatePatient(
     }
   }
 
+  // Preserva a data do primeiro aceite. Recarimbar a cada edição do cadastro
+  // apagaria justamente a prova de quando o paciente autorizou — que é a única
+  // coisa que esse campo existe para guardar.
+  const aceiteAtual = await prisma.patient.findFirst({
+    where: { id, tenantId },
+    select: { marketingConsentAt: true },
+  });
+
   await prisma.patient.update({
     where: { id, tenantId },
     data: {
+      marketingConsentAt: data.marketingConsent
+        ? (aceiteAtual?.marketingConsentAt ?? new Date())
+        : null,
       name: data.name,
       nickname: data.nickname || null,
       cpfEncrypted: data.cpf ? encrypt(data.cpf, masterKey, tenantId) : null,

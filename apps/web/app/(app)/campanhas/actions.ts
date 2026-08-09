@@ -57,8 +57,9 @@ export interface AudiencePatient {
 
 export interface AudienceResult {
   patients: AudiencePatient[];
-  /** Patients skipped because they opted out or have no usable phone. */
-  skipped: { optOut: number; noPhone: number };
+  /** Patients skipped because they opted out, have no usable phone, or never
+   *  authorised promotional messages. */
+  skipped: { optOut: number; noPhone: number; semAceite: number };
   procedures: { id: string; name: string }[];
 }
 
@@ -98,6 +99,7 @@ export async function getAudience(
       phoneEncrypted: true,
       birthDate: true,
       whatsappOptOut: true,
+      marketingConsentAt: true,
       appointments: {
         where: { status: 'ATTENDED' },
         orderBy: { startTime: 'desc' },
@@ -111,6 +113,13 @@ export async function getAudience(
 
   let optOut = 0;
   let noPhone = 0;
+  /**
+   * Cadastrado antes de existir o aceite de campanha, ou nunca autorizou.
+   *
+   * Contado à parte do opt-out porque a saída é outra: quem pediu SAIR não deve
+   * ser reabordado, e estes só precisam ser perguntados uma vez, no balcão.
+   */
+  let semAceite = 0;
   const result: AudiencePatient[] = [];
 
   for (const p of patients) {
@@ -133,6 +142,14 @@ export async function getAudience(
       optOut += 1;
       continue;
     }
+    // O aceite do cadastro cobre tratar o paciente e guardar o prontuário, não
+    // receber promoção. Sem autorização específica, fora da campanha — pela lei
+    // e porque mensagem não pedida é o que faz o número da clínica ser
+    // denunciado e derrubado.
+    if (!p.marketingConsentAt) {
+      semAceite += 1;
+      continue;
+    }
 
     result.push({
       id: p.id,
@@ -143,7 +160,7 @@ export async function getAudience(
     });
   }
 
-  return { patients: result, skipped: { optOut, noPhone }, procedures };
+  return { patients: result, skipped: { optOut, noPhone, semAceite }, procedures };
 }
 
 // ─── Create + send ───────────────────────────────────────────────────────────
@@ -193,7 +210,8 @@ export async function createAndSendCampaign(input: {
     return { success: false, error: 'Conecte o WhatsApp da clínica antes de enviar.' };
   }
 
-  // Re-check ownership and opt-out at send time: the browser list could be stale.
+  // Re-check ownership, opt-out and aceite no momento do envio: a lista do
+  // navegador pode estar velha, e é aqui que a mensagem realmente sai.
   const eligible = await prisma.patient.findMany({
     where: {
       id: { in: patientIds },
@@ -201,6 +219,7 @@ export async function createAndSendCampaign(input: {
       active: true,
       deletedAt: null,
       whatsappOptOut: false,
+      marketingConsentAt: { not: null },
     },
     select: { id: true },
   });
