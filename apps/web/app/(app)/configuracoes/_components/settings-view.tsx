@@ -10,8 +10,13 @@ import {
   type ClinicFormState,
   type DayHours,
 } from '../actions';
+import Link from 'next/link';
 import { ProfessionalModal, type ProfessionalModalData } from './professional-modal';
 import { ScheduleModal } from './schedule-modal';
+import { Tabs, type TabDef } from './tabs';
+import { TeamPanel } from './team-panel';
+import { PrivacyPanel } from './privacy-panel';
+import type { AuditEntry, PrivacySummary, TeamMember } from '../actions';
 
 interface Professional {
   id: string;
@@ -27,6 +32,13 @@ interface Clinic {
   phone: string | null;
   email: string | null;
   document: string | null;
+  zipCode: string | null;
+  street: string | null;
+  addressNumber: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
 }
 
 interface Props {
@@ -34,22 +46,209 @@ interface Props {
   professionals: Professional[];
   suggestedColor: string;
   businessHours: DayHours[];
+  team: TeamMember[];
+  privacy: PrivacySummary;
+  audit: AuditEntry[];
+  /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
+   *  do Asaas e não pode virar componente de cliente só para caber numa aba. */
+  billing: React.ReactNode;
+  whatsapp: { status: string; phoneNumber: string | null };
 }
 
-export function SettingsView({ clinic, professionals, suggestedColor, businessHours }: Props) {
+export function SettingsView({
+  clinic,
+  professionals,
+  suggestedColor,
+  businessHours,
+  team,
+  privacy,
+  audit,
+  billing,
+  whatsapp,
+}: Props) {
+  const tabs: TabDef[] = [
+    {
+      id: 'clinica',
+      label: 'Clínica',
+      panel: (
+        <div className="space-y-6">
+          <ClinicSection clinic={clinic} />
+          <AppearanceSection />
+        </div>
+      ),
+    },
+    {
+      id: 'equipe',
+      label: 'Equipe',
+      badge: team.filter((m) => m.active).length,
+      panel: (
+        <div className="space-y-6">
+          <TeamPanel team={team} />
+          <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
+        </div>
+      ),
+    },
+    {
+      id: 'atendimento',
+      label: 'Atendimento',
+      panel: (
+        <div className="space-y-6">
+          <BusinessHoursSection initialHours={businessHours} />
+          <LinkCard
+            title="Procedimentos e preços"
+            description="Duração, valor, categoria e quais profissionais executam cada procedimento."
+            href="/procedimentos"
+            cta="Abrir procedimentos"
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'comunicacao',
+      label: 'Comunicação',
+      panel: <CommunicationPanel whatsapp={whatsapp} />,
+    },
+    { id: 'plano', label: 'Plano', panel: <div className="space-y-6">{billing}</div> },
+    {
+      id: 'privacidade',
+      label: 'Privacidade',
+      panel: <PrivacyPanel summary={privacy} audit={audit} />,
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-6 lg:p-8">
-      <header>
+    <div className="mx-auto max-w-4xl p-6 lg:p-8">
+      <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gerencie os dados da clínica, a equipe e os horários de atendimento.
+          Dados da clínica, equipe, atendimento, comunicação, plano e privacidade.
         </p>
       </header>
 
-      <ClinicSection clinic={clinic} />
-      <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
-      <BusinessHoursSection initialHours={businessHours} />
-      <AppearanceSection />
+      <Tabs tabs={tabs} ariaLabel="Seções das configurações" />
+    </div>
+  );
+}
+
+/** Aponta para uma tela que já existe, em vez de duplicá-la dentro da aba. */
+function LinkCard({
+  title,
+  description,
+  href,
+  cta,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+      <Link
+        href={href}
+        className="mt-3 inline-flex rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        {cta}
+      </Link>
+    </section>
+  );
+}
+
+const STATUS_WHATSAPP: Record<string, { texto: string; tom: string }> = {
+  CONNECTED: { texto: 'Conectado', tom: 'text-success' },
+  CONNECTING: { texto: 'Conectando…', tom: 'text-muted-foreground' },
+  DISCONNECTED: { texto: 'Desconectado', tom: 'text-destructive' },
+  ERROR: { texto: 'Com erro', tom: 'text-destructive' },
+};
+
+function CommunicationPanel({
+  whatsapp,
+}: {
+  whatsapp: { status: string; phoneNumber: string | null };
+}) {
+  const s = STATUS_WHATSAPP[whatsapp.status] ?? {
+    texto: 'Não configurado',
+    tom: 'text-muted-foreground',
+  };
+  const conectado = whatsapp.status === 'CONNECTED';
+
+  return (
+    <div className="space-y-6">
+      <section
+        aria-labelledby="whats-heading"
+        className="rounded-xl border border-border bg-surface shadow-card"
+      >
+        <div className="border-b border-border px-5 py-4">
+          <h2 id="whats-heading" className="text-base font-semibold">
+            WhatsApp da clínica
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Por onde saem confirmações, lembretes e campanhas.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <p className="text-sm">
+            Situação: <span className={`font-medium ${s.tom}`}>{s.texto}</span>
+            {whatsapp.phoneNumber && (
+              <span className="ml-2 tabular-nums text-muted-foreground">
+                · {whatsapp.phoneNumber}
+              </span>
+            )}
+          </p>
+          <Link
+            href="/whatsapp"
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {conectado ? 'Gerenciar conexão' : 'Conectar WhatsApp'}
+          </Link>
+        </div>
+        {!conectado && (
+          <p
+            role="status"
+            className="mx-5 mb-5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            Sem conexão, nenhuma confirmação nem lembrete sai — e o paciente não é avisado disso.
+          </p>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="msg-heading"
+        className="rounded-xl border border-border bg-surface shadow-card"
+      >
+        <div className="border-b border-border px-5 py-4">
+          <h2 id="msg-heading" className="text-base font-semibold">
+            Mensagens automáticas
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            O que o paciente recebe, e quando.
+          </p>
+        </div>
+        <dl className="divide-y divide-border">
+          {[
+            {
+              q: 'Ao marcar a consulta',
+              a: 'Confirmação com data, horário e profissional, na hora em que a recepção salva.',
+            },
+            {
+              q: 'Um dia antes',
+              a: 'Lembrete pedindo confirmação. Quem marcou em cima da hora recebe só a mensagem da marcação.',
+            },
+            { q: 'No aniversário', a: 'Felicitação, uma vez por ano.' },
+            {
+              q: 'Campanhas',
+              a: 'Só para quem autorizou receber promoções na ficha. Enviadas devagar, para o número não ser bloqueado.',
+            },
+          ].map((m) => (
+            <div key={m.q} className="px-5 py-3">
+              <dt className="text-sm font-medium">{m.q}</dt>
+              <dd className="mt-0.5 text-sm text-muted-foreground">{m.a}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </div>
   );
 }
@@ -236,6 +435,50 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
           <label htmlFor="clinic-doc" className="text-sm font-medium">CNPJ</label>
           <input id="clinic-doc" name="document" defaultValue={clinic.document ?? ''} placeholder="00.000.000/0000-00" className={`${inputCls} sm:max-w-xs`} />
         </div>
+
+        {/* Endereço. Estava faltando e não era detalhe: é o campo que o PDF do
+            orçamento imprime, e nenhuma das clínicas tinha como preencher. */}
+        <fieldset className="space-y-4 rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-medium">Endereço</legend>
+          <p className="text-xs text-muted-foreground">
+            Sai impresso no orçamento que o paciente recebe.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label htmlFor="clinic-cep" className="text-sm font-medium">CEP</label>
+              <input id="clinic-cep" name="zipCode" defaultValue={clinic.zipCode ?? ''} placeholder="00000-000" inputMode="numeric" className={inputCls} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="clinic-street" className="text-sm font-medium">Rua</label>
+              <input id="clinic-street" name="street" defaultValue={clinic.street ?? ''} className={inputCls} />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label htmlFor="clinic-number" className="text-sm font-medium">Número</label>
+              <input id="clinic-number" name="addressNumber" defaultValue={clinic.addressNumber ?? ''} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="clinic-complement" className="text-sm font-medium">Complemento</label>
+              <input id="clinic-complement" name="complement" defaultValue={clinic.complement ?? ''} placeholder="Sala 12" className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="clinic-neighborhood" className="text-sm font-medium">Bairro</label>
+              <input id="clinic-neighborhood" name="neighborhood" defaultValue={clinic.neighborhood ?? ''} className={inputCls} />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="clinic-city" className="text-sm font-medium">Cidade</label>
+              <input id="clinic-city" name="city" defaultValue={clinic.city ?? ''} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="clinic-state" className="text-sm font-medium">UF</label>
+              <input id="clinic-state" name="state" defaultValue={clinic.state ?? ''} maxLength={2} placeholder="SP" className={`${inputCls} uppercase`} />
+            </div>
+          </div>
+        </fieldset>
+
         <div className="flex items-center gap-3 pt-1">
           <button
             type="submit"

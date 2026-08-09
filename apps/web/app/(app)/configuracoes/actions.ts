@@ -1,5 +1,6 @@
 'use server';
 
+import { cache } from 'react';
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
@@ -7,10 +8,20 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
+import { can, isRole, type Role } from '@/lib/permissions';
+import { composeAddress } from '@/lib/address';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
-async function requireOwner() {
+/**
+ * Em cache por requisição.
+ *
+ * A tela de configurações passou a montar seis abas de uma vez, e cada busca
+ * chamava isto de novo — duas consultas cada, catorze só para descobrir de quem
+ * é a clínica. `cache` do React resolve na primeira e devolve a mesma promessa
+ * para as outras.
+ */
+const resolveOwner = cache(async () => {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
@@ -26,6 +37,10 @@ async function requireOwner() {
   });
 
   return { tenantId: tenant.id, userId: user!.id, role: user!.role };
+});
+
+async function requireOwner() {
+  return resolveOwner();
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -46,11 +61,20 @@ const professionalSchema = z.object({
   color: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida'),
 });
 
+const opcional = (max: number) => z.string().trim().max(max).optional().or(z.literal(''));
+
 const clinicSchema = z.object({
   name: z.string().trim().min(2, 'Nome da clínica obrigatório').max(120),
-  phone: z.string().trim().max(20).optional().or(z.literal('')),
+  phone: opcional(20),
   email: z.string().trim().email('E-mail inválido').max(120).optional().or(z.literal('')),
-  document: z.string().trim().max(20).optional().or(z.literal('')),
+  document: opcional(20),
+  zipCode: opcional(9),
+  street: opcional(120),
+  addressNumber: opcional(12),
+  complement: opcional(60),
+  neighborhood: opcional(80),
+  city: opcional(80),
+  state: opcional(2),
 });
 
 // ─── Clinic data ─────────────────────────────────────────────────────────────
@@ -59,7 +83,21 @@ export async function getClinic() {
   const { tenantId } = await requireOwner();
   return prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { id: true, name: true, phone: true, email: true, document: true },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      document: true,
+      zipCode: true,
+      street: true,
+      addressNumber: true,
+      complement: true,
+      neighborhood: true,
+      city: true,
+      state: true,
+      logoUrl: true,
+    },
   });
 }
 
@@ -78,15 +116,23 @@ export async function updateClinic(
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
   }
-  const { name, phone, email, document } = parsed.data;
+  const d = parsed.data;
 
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
-      name,
-      phone: phone || null,
-      email: email || null,
-      document: document || null,
+      name: d.name,
+      phone: d.phone || null,
+      email: d.email || null,
+      document: d.document || null,
+      zipCode: d.zipCode || null,
+      street: d.street || null,
+      addressNumber: d.addressNumber || null,
+      complement: d.complement || null,
+      neighborhood: d.neighborhood || null,
+      city: d.city || null,
+      state: d.state ? d.state.toUpperCase() : null,
+      address: composeAddress(d),
     },
   });
 
@@ -436,4 +482,200 @@ export async function deleteProfessional(
   revalidatePath('/configuracoes');
   revalidatePath('/agenda');
   return { ok: true };
+}
+
+// ─── Equipe ────────────────────────────────────────────────────────────────────
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+  createdAt: Date;
+  /** Quem está olhando a tela. Não dá para rebaixar ou desativar a si mesmo. */
+  isSelf: boolean;
+}
+
+export async function listTeam(): Promise<TeamMember[]> {
+  const { tenantId, userId } = await requireOwner();
+  const users = await prisma.user.findMany({
+    where: { tenantId },
+    orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
+    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+  });
+  return users.map((u) => ({ ...u, role: u.role as Role, isSelf: u.id === userId }));
+}
+
+/**
+ * Troca o papel de alguém da equipe.
+ *
+ * Duas travas que existem para a clínica não se trancar para fora: ninguém muda
+ * o próprio papel, e a última pessoa com acesso às configurações não pode
+ * perdê-lo. Sem a segunda, um dono que se rebaixasse a recepcionista deixaria a
+ * clínica sem ninguém capaz de desfazer — e não existe tela de suporte para
+ * resolver isso depois.
+ */
+export async function updateTeamRole(
+  targetUserId: string,
+  role: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  if (!isRole(role)) return { ok: false, message: 'Perfil inválido.' };
+  if (targetUserId === userId) {
+    return { ok: false, message: 'Você não pode alterar o seu próprio perfil.' };
+  }
+
+  const alvo = await prisma.user.findFirst({
+    where: { id: targetUserId, tenantId },
+    select: { id: true, role: true },
+  });
+  if (!alvo) return { ok: false, message: 'Usuário não encontrado.' };
+
+  if (can(alvo.role, 'configuracoes') && !can(role, 'configuracoes')) {
+    const restantes = await prisma.user.count({
+      where: { tenantId, active: true, role: { in: ['OWNER', 'ADMIN'] }, NOT: { id: targetUserId } },
+    });
+    if (restantes === 0) {
+      return { ok: false, message: 'A clínica ficaria sem ninguém com acesso às configurações.' };
+    }
+  }
+
+  await prisma.user.update({ where: { id: targetUserId }, data: { role } });
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: `ROLE_${alvo.role}_TO_${role}`,
+      entity: 'User',
+      entityId: targetUserId,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+/** Tira o acesso sem apagar o histórico: o nome dele continua nas evoluções. */
+export async function setTeamMemberActive(
+  targetUserId: string,
+  active: boolean,
+): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  if (targetUserId === userId) {
+    return { ok: false, message: 'Você não pode desativar o seu próprio acesso.' };
+  }
+
+  const alvo = await prisma.user.findFirst({
+    where: { id: targetUserId, tenantId },
+    select: { id: true, role: true },
+  });
+  if (!alvo) return { ok: false, message: 'Usuário não encontrado.' };
+
+  if (!active && can(alvo.role, 'configuracoes')) {
+    const restantes = await prisma.user.count({
+      where: { tenantId, active: true, role: { in: ['OWNER', 'ADMIN'] }, NOT: { id: targetUserId } },
+    });
+    if (restantes === 0) {
+      return { ok: false, message: 'A clínica ficaria sem ninguém com acesso às configurações.' };
+    }
+  }
+
+  await prisma.user.update({ where: { id: targetUserId }, data: { active } });
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: active ? 'USER_ACTIVATE' : 'USER_DEACTIVATE',
+      entity: 'User',
+      entityId: targetUserId,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+// ─── Privacidade ───────────────────────────────────────────────────────────────
+
+export interface PrivacySummary {
+  pacientes: number;
+  aceitaramTratamento: number;
+  autorizaramCampanha: number;
+  pediramSair: number;
+  excluidosMasNoBanco: number;
+}
+
+export async function getPrivacySummary(): Promise<PrivacySummary> {
+  const { tenantId } = await requireOwner();
+  const [pacientes, aceitaramTratamento, autorizaramCampanha, pediramSair, excluidos] =
+    await Promise.all([
+      prisma.patient.count({ where: { tenantId, deletedAt: null } }),
+      prisma.patient.count({ where: { tenantId, deletedAt: null, lgpdConsentAt: { not: null } } }),
+      prisma.patient.count({
+        where: { tenantId, deletedAt: null, marketingConsentAt: { not: null } },
+      }),
+      prisma.patient.count({ where: { tenantId, deletedAt: null, whatsappOptOut: true } }),
+      prisma.patient.count({ where: { tenantId, deletedAt: { not: null } } }),
+    ]);
+  return {
+    pacientes,
+    aceitaramTratamento,
+    autorizaramCampanha,
+    pediramSair,
+    excluidosMasNoBanco: excluidos,
+  };
+}
+
+export interface AuditEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  createdAt: Date;
+  userName: string | null;
+}
+
+/**
+ * Últimas ações registradas. Existe porque 700 linhas de auditoria estavam sendo
+ * gravadas e nenhuma tela as mostrava — auditoria que ninguém consegue ler não
+ * serve nem para a clínica nem para uma eventual fiscalização.
+ */
+export async function listAudit(limit = 50): Promise<AuditEntry[]> {
+  const { tenantId } = await requireOwner();
+  const rows = await prisma.auditLog.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(limit, 200),
+    select: {
+      id: true,
+      action: true,
+      entity: true,
+      entityId: true,
+      createdAt: true,
+      user: { select: { name: true } },
+    },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    action: r.action,
+    entity: r.entity,
+    entityId: r.entityId,
+    createdAt: r.createdAt,
+    userName: r.user?.name ?? null,
+  }));
 }

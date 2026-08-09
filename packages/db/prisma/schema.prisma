@@ -79,7 +79,17 @@ model Tenant {
   document   String?
   phone      String?
   email      String?
+  /// Endereço em uma linha, montado a partir dos campos abaixo ao salvar.
+  /// Existe porque é o que o PDF do orçamento lê — manter a composição aqui
+  /// evita que a geração do PDF precise saber como se escreve um endereço.
   address    String?
+  zipCode       String?
+  street        String?
+  addressNumber String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
   logoUrl    String?
   settings   Json?
   createdAt  DateTime @default(now())
