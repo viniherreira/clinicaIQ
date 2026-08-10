@@ -624,27 +624,24 @@ export interface PrivacySummary {
   pacientes: number;
   aceitaramTratamento: number;
   autorizaramCampanha: number;
-  pediramSair: number;
   excluidosMasNoBanco: number;
 }
 
 export async function getPrivacySummary(): Promise<PrivacySummary> {
   const { tenantId } = await requireOwner();
-  const [pacientes, aceitaramTratamento, autorizaramCampanha, pediramSair, excluidos] =
+  const [pacientes, aceitaramTratamento, autorizaramCampanha, excluidos] =
     await Promise.all([
       prisma.patient.count({ where: { tenantId, deletedAt: null } }),
       prisma.patient.count({ where: { tenantId, deletedAt: null, lgpdConsentAt: { not: null } } }),
       prisma.patient.count({
         where: { tenantId, deletedAt: null, marketingConsentAt: { not: null } },
       }),
-      prisma.patient.count({ where: { tenantId, deletedAt: null, whatsappOptOut: true } }),
       prisma.patient.count({ where: { tenantId, deletedAt: { not: null } } }),
     ]);
   return {
     pacientes,
     aceitaramTratamento,
     autorizaramCampanha,
-    pediramSair,
     excluidosMasNoBanco: excluidos,
   };
 }
@@ -968,4 +965,54 @@ export async function saveMessageSettings(
   revalidatePath('/configuracoes');
   revalidatePath('/whatsapp');
   return { ok: true };
+}
+
+/**
+ * Registra, de uma vez, que os pacientes já autorizaram receber campanha.
+ *
+ * Existe como botão e não como script porque quem declara isso é o responsável
+ * pela clínica, não nós: a ação fica no registro de auditoria com o nome de quem
+ * clicou, a data e quantos pacientes foram marcados. Se alguém perguntar depois
+ * de onde veio esse aceite, o registro responde.
+ *
+ * Quem pediu SAIR fica de fora. Um "todos aceitaram" não desfaz uma recusa que o
+ * paciente escreveu com as próprias mãos.
+ */
+export async function declararAceiteDeCampanhaParaTodos(): Promise<{
+  ok: boolean;
+  marcados?: number;
+  message?: string;
+}> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const { count } = await prisma.patient.updateMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+      marketingConsentAt: null,
+      whatsappOptOut: false,
+    },
+    data: { marketingConsentAt: new Date() },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: `MARKETING_CONSENT_DECLARADO_EM_BLOCO_${count}`,
+      entity: 'Patient',
+      // A ação é da clínica inteira, não de um paciente — o alvo é o tenant.
+      entityId: tenantId,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  revalidatePath('/campanhas');
+  return { ok: true, marcados: count };
 }

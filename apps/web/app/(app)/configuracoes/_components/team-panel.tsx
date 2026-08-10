@@ -38,6 +38,62 @@ const PAPEIS: { value: Role; label: string; descricao: string }[] = [
 
 const LABEL: Record<string, string> = Object.fromEntries(PAPEIS.map((p) => [p.value, p.label]));
 
+/**
+ * `select` com aparência própria.
+ *
+ * `appearance-none` tira o desenho do sistema operacional — que é o que fazia a
+ * tela parecer montada às pressas, porque a seta do Windows não combina com
+ * nada em volta. A seta volta como SVG por trás do campo, e o `pr-9` reserva o
+ * espaço dela para o texto não passar por cima.
+ */
+function Select({
+  className = '',
+  children,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div className="relative">
+      <select
+        {...props}
+        className={`h-9 w-full appearance-none rounded-md border border-border bg-background pl-3 pr-9 text-sm font-medium transition-colors hover:border-muted-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      >
+        {children}
+      </select>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </div>
+  );
+}
+
+/** Iniciais no lugar de foto — a clínica não sobe avatar, e um círculo vazio
+ *  fica pior do que duas letras. */
+function Avatar({ name }: { name: string }) {
+  const iniciais = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+    >
+      {iniciais || '?'}
+    </span>
+  );
+}
+
 export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: PendingInvite[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -113,17 +169,24 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
 
         <ul className="divide-y divide-border">
           {team.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
+            <li
+              key={m.id}
+              className={`flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-alt/40 ${
+                m.active ? '' : 'opacity-60'
+              }`}
+            >
+              <Avatar name={m.name} />
+
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {m.name}
+                <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                  <span className="truncate">{m.name}</span>
                   {m.isSelf && (
-                    <span className="ml-2 rounded bg-surface-alt px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       você
                     </span>
                   )}
                   {!m.active && (
-                    <span className="ml-2 rounded bg-surface-alt px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                    <span className="rounded-full bg-surface-alt px-2 py-0.5 text-xs font-normal text-muted-foreground">
                       sem acesso
                     </span>
                   )}
@@ -135,40 +198,44 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
                 <label htmlFor={`papel-${m.id}`} className="sr-only">
                   Perfil de {m.name}
                 </label>
-                <select
+                <Select
                   id={`papel-${m.id}`}
                   value={m.role}
                   disabled={m.isSelf || pending}
                   onChange={(e) => trocarPapel(m.id, e.target.value)}
-                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+                  className="w-[10.5rem]"
                 >
                   {PAPEIS.map((p) => (
                     <option key={p.value} value={p.value}>
                       {p.label}
                     </option>
                   ))}
-                </select>
+                </Select>
 
                 <button
                   type="button"
                   disabled={m.isSelf || pending}
                   onClick={() => alternarAcesso(m)}
-                  className="rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+                  className="h-9 shrink-0 rounded-md border border-border px-3 text-sm font-medium transition-colors hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {m.active ? 'Remover acesso' : 'Devolver acesso'}
+                  {m.active ? 'Remover' : 'Devolver'}
                 </button>
               </div>
             </li>
           ))}
         </ul>
 
-        <div className="border-t border-border px-5 py-4">
-          <h3 className="text-sm font-medium">O que cada perfil alcança</h3>
-          <dl className="mt-2 space-y-1.5">
+        <div className="border-t border-border bg-surface-alt/30 px-5 py-4">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            O que cada perfil alcança
+          </h3>
+          <dl className="mt-3 grid gap-2.5 sm:grid-cols-2">
             {PAPEIS.map((p) => (
-              <div key={p.value} className="flex flex-wrap gap-x-2 text-xs">
-                <dt className="font-medium">{LABEL[p.value]}:</dt>
-                <dd className="text-muted-foreground">{p.descricao}</dd>
+              <div key={p.value} className="rounded-lg border border-border bg-background p-3">
+                <dt className="text-sm font-medium">{LABEL[p.value]}</dt>
+                <dd className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                  {p.descricao}
+                </dd>
               </div>
             ))}
           </dl>
@@ -200,27 +267,22 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
               type="email"
               required
               placeholder="recepcao@clinica.com"
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm transition-colors hover:border-muted-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="convite-papel" className="block text-sm font-medium">
               Perfil
             </label>
-            <select
-              id="convite-papel"
-              name="role"
-              defaultValue="RECEPTIONIST"
-              className="h-10 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
+            <Select id="convite-papel" name="role" defaultValue="RECEPTIONIST" className="w-[10.5rem]">
               {PAPEIS.map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <button type="submit" disabled={pending} className="btn-primary btn-md">
+          <button type="submit" disabled={pending} className="btn-primary btn-md h-9">
             {pending ? 'Enviando…' : 'Enviar convite'}
           </button>
         </form>
