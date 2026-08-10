@@ -3,6 +3,7 @@ import { listProcedures, listProfessionals } from './actions';
 import type { ProcedureSort } from './actions';
 import { ProceduresView } from './_components/procedures-view';
 
+import { requireCapability } from '@/lib/guard';
 export const metadata = { title: 'Procedimentos' };
 
 const SORTS: ProcedureSort[] = ['name', 'basePrice', 'durationMinutes'];
@@ -41,6 +42,8 @@ export default async function ProceduresPage({
 }: {
   searchParams: Promise<{ q?: string; categoria?: string; situacao?: string; sort?: string; dir?: string; page?: string }>;
 }) {
+  await requireCapability('configuracoes');
+
   const params = await searchParams;
   const search = params.q ?? '';
   const categoryId = params.categoria ?? '';

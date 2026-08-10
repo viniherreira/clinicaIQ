@@ -1,6 +1,7 @@
 import { listQuotes } from './actions';
 import { QuotesView } from './_components/quotes-view';
 
+import { requireCapability } from '@/lib/guard';
 export const metadata = { title: 'Orçamentos · ClinicaIQ' };
 
 export default async function OrcamentosPage({
@@ -8,6 +9,8 @@ export default async function OrcamentosPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string }>;
 }) {
+  await requireCapability('financeiro');
+
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const { quotes, total, pages, totals } = await listQuotes({ search: sp.q ?? '', status: sp.status, page });

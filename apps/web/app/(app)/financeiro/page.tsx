@@ -8,6 +8,7 @@ import { clinicToday } from '@/lib/tz';
 import { getFinanceData, type SeriesPoint } from './actions';
 import { FinanceFilters } from './_components/finance-filters';
 
+import { requireCapability } from '@/lib/guard';
 export const metadata = { title: 'Financeiro · ClinicaIQ' };
 
 function brl(v: number) {
@@ -25,6 +26,8 @@ interface PageProps {
 }
 
 export default async function FinanceiroPage({ searchParams }: PageProps) {
+  await requireCapability('financeiro');
+
   const sp = await searchParams;
   const today = clinicToday();
   const from = sp.from ?? `${today.slice(0, 8)}01`;

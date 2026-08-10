@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, CalendarDays, FileBarChart, Wallet } from 'lucide-react';
 import { getDashboardData, getSetupStatus } from './actions';
 import { SetupChecklist, type SetupStep } from './_components/setup-checklist';
+import { currentAccess } from '@/lib/guard';
+import { can } from '@/lib/permissions';
 
 export const metadata = { title: 'Dashboard · ClinicaIQ' };
 
@@ -19,22 +21,28 @@ const STATUS_META: Record<string, { label: string; dot: string; text: string }> 
 };
 
 export default async function DashboardPage() {
-  const [{ today, counts, series, quoteStats, finance, todayIso, dateLabel }, setup] = await Promise.all([
-    getDashboardData(),
-    getSetupStatus(),
-  ]);
+  const [{ today, counts, series, quoteStats, finance, todayIso, dateLabel }, setup, acesso] =
+    await Promise.all([getDashboardData(), getSetupStatus(), currentAccess()]);
+
+  // O dashboard é a única tela que todo mundo abre, então é aqui que o caixa da
+  // clínica vazava: o profissional via faturamento do mês sem ter acesso ao
+  // Financeiro, e os atalhos levavam a telas que iam recusá-lo.
+  const veDinheiro = can(acesso?.role, 'financeiro');
+  const veConfig = can(acesso?.role, 'configuracoes');
+  const relatorios = (qs: string) => (veDinheiro ? `/relatorios?${qs}` : undefined);
   const maxBar = Math.max(1, ...series.map((d) => d.total));
   const monthPeriod = `from=${finance.monthFrom}&to=${finance.monthTo}`;
   const weekFrom = new Date(new Date(`${todayIso}T12:00:00.000Z`).getTime() - 6 * 86400000)
     .toISOString()
     .slice(0, 10);
 
+  // A lista de primeiros passos só mostra passos que a pessoa consegue dar.
   const setupSteps: SetupStep[] = [
-    { key: 'prof', label: 'Cadastrar um profissional', desc: 'A equipe que aparece na agenda', href: '/configuracoes', cta: 'Adicionar', done: setup.professionals > 0 },
-    { key: 'proc', label: 'Cadastrar um procedimento', desc: 'Com valor e duração', href: '/procedimentos', cta: 'Adicionar', done: setup.procedures > 0 },
+    veConfig && { key: 'prof', label: 'Cadastrar um profissional', desc: 'A equipe que aparece na agenda', href: '/configuracoes', cta: 'Adicionar', done: setup.professionals > 0 },
+    veConfig && { key: 'proc', label: 'Cadastrar um procedimento', desc: 'Com valor e duração', href: '/procedimentos', cta: 'Adicionar', done: setup.procedures > 0 },
     { key: 'appt', label: 'Fazer o primeiro agendamento', desc: 'Marque um horário na agenda', href: '/agenda', cta: 'Agendar', done: setup.appointments > 0 },
-    { key: 'quote', label: 'Criar o primeiro orçamento', desc: 'Envie por link ou PDF', href: '/orcamentos/novo', cta: 'Criar', done: setup.quotes > 0 },
-  ];
+    veDinheiro && { key: 'quote', label: 'Criar o primeiro orçamento', desc: 'Envie por link ou PDF', href: '/orcamentos/novo', cta: 'Criar', done: setup.quotes > 0 },
+  ].filter((s): s is SetupStep => Boolean(s));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
@@ -47,12 +55,16 @@ export default async function DashboardPage() {
           <Link href="/agenda" className="btn-ghost btn-md">
             <CalendarDays className="h-4 w-4" aria-hidden="true" /> Agenda
           </Link>
-          <Link href={`/financeiro?${monthPeriod}`} className="btn-ghost btn-md">
-            <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
-          </Link>
-          <Link href={`/relatorios?type=agendamentos&from=${finance.monthFrom}&to=${finance.monthTo}`} className="btn-outline btn-md">
-            <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatórios
-          </Link>
+          {veDinheiro && (
+            <>
+              <Link href={`/financeiro?${monthPeriod}`} className="btn-ghost btn-md">
+                <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
+              </Link>
+              <Link href={`/relatorios?type=agendamentos&from=${finance.monthFrom}&to=${finance.monthTo}`} className="btn-outline btn-md">
+                <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatórios
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -66,25 +78,26 @@ export default async function DashboardPage() {
           value={counts.confirmed}
           hint={`${counts.confirmedPct}% do dia`}
           tone="success"
-          href={`/relatorios?type=agendamentos&status=CONFIRMED&from=${todayIso}&to=${todayIso}`}
+          href={relatorios(`type=agendamentos&status=CONFIRMED&from=${todayIso}&to=${todayIso}`)}
         />
         <Kpi
           label="A confirmar"
           value={counts.toConfirm}
           hint="aguardando"
           tone="warning"
-          href={`/relatorios?type=agendamentos&status=SCHEDULED&from=${todayIso}&to=${todayIso}`}
+          href={relatorios(`type=agendamentos&status=SCHEDULED&from=${todayIso}&to=${todayIso}`)}
         />
         <Kpi
           label="Faltas"
           value={counts.missed}
           hint="hoje"
           tone={counts.missed > 0 ? 'danger' : 'muted'}
-          href={`/relatorios?type=agendamentos&status=MISSED&from=${todayIso}&to=${todayIso}`}
+          href={relatorios(`type=agendamentos&status=MISSED&from=${todayIso}&to=${todayIso}`)}
         />
       </section>
 
       {/* Caixa do mês — mesmos números do Financeiro */}
+      {veDinheiro && (
       <section aria-label="Caixa do mês" className="grid gap-4 sm:grid-cols-3">
         <Money
           label="Recebido no mês"
@@ -107,6 +120,7 @@ export default async function DashboardPage() {
           tone={finance.overdue > 0 ? 'danger' : 'muted'}
         />
       </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: chart + today's list */}
@@ -115,13 +129,19 @@ export default async function DashboardPage() {
           <section className="rounded-xl border border-border bg-surface shadow-card p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">Atendimentos · últimos 7 dias</h2>
-              <Link
-                href={`/relatorios?type=agendamentos&from=${weekFrom}&to=${todayIso}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                {series.reduce((s, d) => s + d.total, 0)} no período
-                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
+              {veDinheiro ? (
+                <Link
+                  href={`/relatorios?type=agendamentos&from=${weekFrom}&to=${todayIso}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  {series.reduce((s, d) => s + d.total, 0)} no período
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              ) : (
+                <span className="text-xs font-medium text-muted-foreground">
+                  {series.reduce((s, d) => s + d.total, 0)} no período
+                </span>
+              )}
             </div>
             <div className="flex items-end justify-between gap-2" role="img" aria-label={`Gráfico de atendimentos: ${series.map((d) => `${d.label} ${d.total}`).join(', ')}`}>
               {series.map((d, i) => (
@@ -182,7 +202,8 @@ export default async function DashboardPage() {
           </section>
         </div>
 
-        {/* Right: quotes */}
+        {/* Right: quotes — valor aceito é dinheiro, então segue a mesma regra */}
+        {veDinheiro && (
         <aside className="space-y-6">
           <section className="rounded-xl border border-border bg-surface shadow-card p-5">
             <div className="flex items-center justify-between gap-3">
@@ -214,6 +235,7 @@ export default async function DashboardPage() {
             </div>
           </section>
         </aside>
+        )}
       </div>
     </div>
   );
@@ -232,6 +254,12 @@ const TONE_CLS: Record<Tone, string> = {
 const CARD_CLS =
   'group relative block rounded-xl border border-border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
+/**
+ * Sem `href` o cartão vira número parado.
+ *
+ * É o que acontece para quem não alcança Relatórios: continua vendo quantos
+ * atendimentos tem hoje, mas o clique não leva a uma tela que vai recusá-la.
+ */
 function Kpi({
   label,
   value,
@@ -243,13 +271,27 @@ function Kpi({
   value: number;
   hint: string;
   tone?: Tone;
-  href: string;
+  href?: string;
 }) {
-  return (
-    <Link href={href} className={CARD_CLS}>
+  const miolo = (
+    <>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className={`mt-1 text-3xl font-semibold tracking-tight ${TONE_CLS[tone]}`}>{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div className="relative block rounded-xl border border-border bg-surface p-4 shadow-card">
+        {miolo}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className={CARD_CLS}>
+      {miolo}
       <ArrowRight
         className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
         aria-hidden="true"

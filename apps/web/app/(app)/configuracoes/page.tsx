@@ -13,9 +13,12 @@ import {
 import { SettingsView } from './_components/settings-view';
 import { BillingCard } from './_components/billing-card';
 
+import { requireCapability } from '@/lib/guard';
 export const metadata = { title: 'Configurações · ClinicaIQ' };
 
 export default async function ConfiguracoesPage() {
+  await requireCapability('configuracoes');
+
   const clinic = await getClinic();
   if (!clinic) return null; // requireOwner() redirects when there is no tenant
 

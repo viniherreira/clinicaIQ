@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
-import { NAV } from './app-sidebar';
+import { navFor } from './app-sidebar';
 import { ThemeToggle } from './theme-toggle';
 import { LogoMark, LogoWordmark } from './logo';
 import { UserMenu } from './user-menu';
@@ -13,6 +13,7 @@ export function AppHeader({
   clinicName,
   userName,
   userEmail,
+  role,
   roleLabel,
   canConfig,
   canPlanos,
@@ -21,12 +22,15 @@ export function AppHeader({
   /** Quem está logado agora — não a clínica, não o dono. */
   userName: string;
   userEmail: string;
+  role: string;
   roleLabel: string;
   canConfig: boolean;
   canPlanos: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  // O menu do celular precisa esconder exatamente o mesmo que a lateral.
+  const itens = navFor(role);
 
   return (
     <>
@@ -74,7 +78,7 @@ export function AppHeader({
               </button>
             </div>
             <ul className="flex-1 space-y-1 overflow-y-auto p-3">
-              {NAV.map((item) => {
+              {itens.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (

@@ -2,6 +2,7 @@ import { clinicToday } from '@/lib/tz';
 import { getReportData, type ReportType } from './actions';
 import { ReportsView } from './_components/reports-view';
 
+import { requireCapability } from '@/lib/guard';
 export const metadata = { title: 'Relatórios · ClinicaIQ' };
 
 const TYPES: ReportType[] = ['agendamentos', 'orcamentos', 'recebimentos'];
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export default async function RelatoriosPage({ searchParams }: Props) {
+  await requireCapability('financeiro');
+
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);
 

@@ -37,12 +37,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <AppSidebar clinicName={tenant.name} />
+      <AppSidebar clinicName={tenant.name} role={me?.role ?? ''} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
           clinicName={tenant.name}
           userName={me?.name?.trim() || me?.email || 'Usuário'}
           userEmail={me?.email ?? ''}
+          role={me?.role ?? ''}
           roleLabel={ROLE_LABEL[me?.role ?? ''] ?? 'Sem perfil'}
           canConfig={can(me?.role, 'configuracoes')}
           canPlanos={can(me?.role, 'planos')}

@@ -7,22 +7,44 @@ import {
   FileBarChart, MessageCircle, Megaphone, Settings,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
+import { can, type Capability } from '@/lib/permissions';
 
-export const NAV: { href: string; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
+/**
+ * O menu, com a permissão que cada módulo exige.
+ *
+ * `capability` ausente significa "todo mundo que tem login" — hoje só o
+ * dashboard. O resto some para quem não alcança: a recepção não precisa ver
+ * Configurações para descobrir que não pode entrar nelas.
+ *
+ * Isto é arrumação, não segurança. Quem digitar o endereço direto continua
+ * sendo barrado no servidor, por `requireCapability`.
+ */
+export const NAV: {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badge?: string;
+  capability?: Capability;
+}[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { href: '/pacientes', label: 'Pacientes', icon: Users },
-  { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope },
-  { href: '/orcamentos', label: 'Orçamentos', icon: FileText },
-  { href: '/financeiro', label: 'Financeiro', icon: Wallet },
-  { href: '/relatorios', label: 'Relatórios', icon: FileBarChart },
-  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { href: '/campanhas', label: 'Campanhas', icon: Megaphone },
-  { href: '/configuracoes', label: 'Configurações', icon: Settings },
+  { href: '/agenda', label: 'Agenda', icon: CalendarDays, capability: 'agenda' },
+  { href: '/pacientes', label: 'Pacientes', icon: Users, capability: 'pacientes' },
+  { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope, capability: 'configuracoes' },
+  { href: '/orcamentos', label: 'Orçamentos', icon: FileText, capability: 'financeiro' },
+  { href: '/financeiro', label: 'Financeiro', icon: Wallet, capability: 'financeiro' },
+  { href: '/relatorios', label: 'Relatórios', icon: FileBarChart, capability: 'financeiro' },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, capability: 'configuracoes' },
+  { href: '/campanhas', label: 'Campanhas', icon: Megaphone, capability: 'campanhas' },
+  { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },
 ];
 
-export function AppSidebar({ clinicName }: { clinicName: string }) {
+export function navFor(role: string | null | undefined) {
+  return NAV.filter((item) => !item.capability || can(role, item.capability));
+}
+
+export function AppSidebar({ clinicName, role }: { clinicName: string; role: string }) {
   const pathname = usePathname();
+  const itens = navFor(role);
 
   return (
     <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex print:!hidden">
@@ -36,7 +58,7 @@ export function AppSidebar({ clinicName }: { clinicName: string }) {
       </div>
 
       <ul className="flex-1 space-y-1 overflow-y-auto px-3 pb-3 pt-1">
-        {NAV.map((item) => {
+        {itens.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
