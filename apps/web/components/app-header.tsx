@@ -3,21 +3,27 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
 import { Menu, X } from 'lucide-react';
 import { NAV } from './app-sidebar';
 import { ThemeToggle } from './theme-toggle';
 import { LogoMark, LogoWordmark } from './logo';
+import { UserMenu } from './user-menu';
 
 export function AppHeader({
   clinicName,
   userName,
+  userEmail,
   roleLabel,
+  canConfig,
+  canPlanos,
 }: {
   clinicName: string;
   /** Quem está logado agora — não a clínica, não o dono. */
   userName: string;
+  userEmail: string;
   roleLabel: string;
+  canConfig: boolean;
+  canPlanos: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -43,18 +49,13 @@ export function AppHeader({
         <ThemeToggle />
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
 
-        {/* Quem está logado, por extenso. O avatar do Clerk sozinho não diz nada
-            quando a clínica tem mais de uma pessoa e todas usam o mesmo
-            computador da recepção — é aí que alguém grava uma evolução no nome
-            de outro sem perceber. */}
-        <div className="hidden text-right leading-tight sm:block">
-          <p className="max-w-[12rem] truncate text-sm font-medium">{userName}</p>
-          <p className="text-xs text-muted-foreground">{roleLabel}</p>
-        </div>
-
-        <UserButton
-          appearance={{ elements: { avatarBox: 'h-8 w-8' } }}
-          afterSignOutUrl="/sign-in"
+        <UserMenu
+          userName={userName}
+          userEmail={userEmail}
+          roleLabel={roleLabel}
+          clinicName={clinicName}
+          canConfig={canConfig}
+          canPlanos={canPlanos}
         />
       </header>
 

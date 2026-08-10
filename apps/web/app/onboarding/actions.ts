@@ -125,11 +125,21 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const existing = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
-    select: { id: true },
+  const meu = await prisma.user.findFirst({
+    where: { clerkUserId: userId },
+    select: { tenantId: true, email: true },
   });
-  if (existing) return existing.id;
+  if (meu) {
+    // Já está dentro, mas pode existir um convite pendente para esta mesma
+    // clínica — foi convidado e entrou por outro caminho, ou foi cadastrado à
+    // mão depois. Fechar aqui evita a tela de Equipe dizer "aguardando
+    // resposta" de alguém que já está trabalhando.
+    await prisma.invitation.updateMany({
+      where: { tenantId: meu.tenantId, email: meu.email.toLowerCase(), status: 'PENDING' },
+      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    });
+    return meu.tenantId;
+  }
 
   const clerk = await clerkClient();
   const u = await clerk.users.getUser(userId);

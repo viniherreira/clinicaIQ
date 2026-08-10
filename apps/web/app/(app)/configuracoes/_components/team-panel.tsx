@@ -277,6 +277,12 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
                       {LABEL[c.role] ?? c.role} · enviado em{' '}
                       {new Date(c.createdAt).toLocaleDateString('pt-BR')}
                     </p>
+                    {c.bloqueio && (
+                      <p className="mt-1.5 rounded-md bg-warning/10 px-2 py-1.5 text-xs leading-snug text-foreground">
+                        <strong className="font-medium">Este convite não vai ser aceito.</strong>{' '}
+                        {c.bloqueio}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"

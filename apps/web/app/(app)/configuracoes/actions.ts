@@ -692,6 +692,35 @@ export interface PendingInvite {
   email: string;
   role: Role;
   createdAt: Date;
+  /**
+   * Preenchido quando o convite nunca vai poder ser aceito. Sem isto a tela
+   * dizia "aguardando resposta" para sempre, e ninguém tinha como descobrir que
+   * o problema não era a pessoa ter esquecido de abrir o e-mail.
+   */
+  bloqueio: string | null;
+}
+
+/** O motivo, escrito uma vez só, porque aparece ao convidar e ao listar. */
+const CONTA_EM_OUTRA_CLINICA =
+  'Este e-mail já tem uma conta ClinicaIQ em outra clínica. Cada conta pertence a uma clínica só — convide a pessoa por outro e-mail.';
+
+/**
+ * E-mails desta lista que já têm conta em outra clínica.
+ *
+ * `users.clerkUserId` é único no banco inteiro: uma conta pertence a uma clínica
+ * e só. Quem já tem conta em outro lugar aceita o convite, entra, e cai na
+ * clínica antiga — o vínculo novo é impossível de criar.
+ */
+async function emailsPresosEmOutraClinica(
+  tenantId: string,
+  emails: string[],
+): Promise<Set<string>> {
+  if (emails.length === 0) return new Set();
+  const contas = await prisma.user.findMany({
+    where: { email: { in: emails, mode: 'insensitive' }, NOT: { tenantId } },
+    select: { email: true },
+  });
+  return new Set(contas.map((u) => u.email.toLowerCase()));
 }
 
 export async function listInvites(): Promise<PendingInvite[]> {
@@ -701,7 +730,17 @@ export async function listInvites(): Promise<PendingInvite[]> {
     orderBy: { createdAt: 'desc' },
     select: { id: true, email: true, role: true, createdAt: true },
   });
-  return rows.map((r) => ({ ...r, role: r.role as Role }));
+
+  const presos = await emailsPresosEmOutraClinica(
+    tenantId,
+    rows.map((r) => r.email),
+  );
+
+  return rows.map((r) => ({
+    ...r,
+    role: r.role as Role,
+    bloqueio: presos.has(r.email.toLowerCase()) ? CONTA_EM_OUTRA_CLINICA : null,
+  }));
 }
 
 const inviteSchema = z.object({
@@ -752,6 +791,18 @@ export async function inviteTeamMember(input: {
         ? 'Esta pessoa já faz parte da equipe.'
         : 'Esta pessoa já tem cadastro aqui — devolva o acesso em vez de convidar.',
     };
+  }
+
+  // Recusar aqui é melhor do que mandar um convite que não tem como dar certo:
+  // a pessoa receberia o e-mail, aceitaria, cairia na clínica antiga dela, e o
+  // convite ficaria "aguardando resposta" sem ninguém entender o motivo.
+  //
+  // Isto revela a quem administra uma clínica que um e-mail já está cadastrado
+  // no ClinicaIQ. É informação de menos para valer a pena esconder, e o silêncio
+  // custava caro demais.
+  const presos = await emailsPresosEmOutraClinica(tenantId, [email]);
+  if (presos.size > 0) {
+    return { ok: false, message: CONTA_EM_OUTRA_CLINICA };
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clinica-iq-web.vercel.app';

@@ -5,6 +5,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
 import { SubscriptionBanner } from '@/components/subscription-banner';
 import { getTenantAccess } from '@/lib/access';
+import { can } from '@/lib/permissions';
 
 /** Os mesmos rótulos da tela de Equipe — o perfil precisa se chamar igual nos
  *  dois lugares, senão a pessoa não relaciona um com o outro. */
@@ -41,7 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <AppHeader
           clinicName={tenant.name}
           userName={me?.name?.trim() || me?.email || 'Usuário'}
+          userEmail={me?.email ?? ''}
           roleLabel={ROLE_LABEL[me?.role ?? ''] ?? 'Sem perfil'}
+          canConfig={can(me?.role, 'configuracoes')}
+          canPlanos={can(me?.role, 'planos')}
         />
         <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto">
