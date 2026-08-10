@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { setTeamMemberActive, updateTeamRole, type TeamMember } from '../actions';
+import {
+  inviteTeamMember,
+  revokeInvite,
+  setTeamMemberActive,
+  updateTeamRole,
+  type PendingInvite,
+  type TeamMember,
+} from '../actions';
 import type { Role } from '@/lib/permissions';
 
 /**
@@ -31,10 +38,11 @@ const PAPEIS: { value: Role; label: string; descricao: string }[] = [
 
 const LABEL: Record<string, string> = Object.fromEntries(PAPEIS.map((p) => [p.value, p.label]));
 
-export function TeamPanel({ team }: { team: TeamMember[] }) {
+export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: PendingInvite[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  const [convidado, setConvidado] = useState<string | null>(null);
 
   function trocarPapel(id: string, role: string) {
     setErro(null);
@@ -50,6 +58,33 @@ export function TeamPanel({ team }: { team: TeamMember[] }) {
     startTransition(async () => {
       const r = await setTeamMemberActive(m.id, !m.active);
       if (!r.ok) setErro(r.message ?? 'Não foi possível alterar o acesso.');
+      else router.refresh();
+    });
+  }
+
+  function convidar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const dados = new FormData(form);
+    const email = String(dados.get('email') ?? '');
+    setErro(null);
+    setConvidado(null);
+    startTransition(async () => {
+      const r = await inviteTeamMember({ email, role: String(dados.get('role') ?? '') });
+      if (!r.ok) setErro(r.message ?? 'Não foi possível convidar.');
+      else {
+        setConvidado(email);
+        form.reset();
+        router.refresh();
+      }
+    });
+  }
+
+  function cancelarConvite(id: string) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await revokeInvite(id);
+      if (!r.ok) setErro(r.message ?? 'Não foi possível cancelar.');
       else router.refresh();
     });
   }
@@ -140,20 +175,92 @@ export function TeamPanel({ team }: { team: TeamMember[] }) {
         </div>
       </section>
 
-      {/* Aviso honesto: o convite ainda não existe, e a pessoa precisa saber
-          disso antes de procurar o botão. */}
       <section
         aria-labelledby="convite-heading"
-        className="rounded-xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/40"
+        className="rounded-xl border border-border bg-surface shadow-card"
       >
-        <h2 id="convite-heading" className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-          Convidar alguém ainda não está disponível
-        </h2>
-        <p className="mt-1.5 text-sm text-amber-900/90 dark:text-amber-200/90">
-          Hoje, quem se cadastra pelo site cria uma clínica nova em vez de entrar na sua. Para uma
-          segunda pessoa entrar nesta clínica, o cadastro precisa ser feito por nós. Os perfis
-          acima já funcionam — falta só o caminho de entrada.
-        </p>
+        <div className="border-b border-border px-5 py-4">
+          <h2 id="convite-heading" className="text-base font-semibold">
+            Convidar para a equipe
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            A pessoa recebe um e-mail com o convite e <strong>escolhe a própria senha</strong> no
+            cadastro. Você nunca vê a senha dela.
+          </p>
+        </div>
+
+        <form onSubmit={convidar} className="flex flex-wrap items-end gap-3 px-5 py-4">
+          <div className="min-w-[16rem] flex-1 space-y-1.5">
+            <label htmlFor="convite-email" className="block text-sm font-medium">
+              E-mail
+            </label>
+            <input
+              id="convite-email"
+              name="email"
+              type="email"
+              required
+              placeholder="recepcao@clinica.com"
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="convite-papel" className="block text-sm font-medium">
+              Perfil
+            </label>
+            <select
+              id="convite-papel"
+              name="role"
+              defaultValue="RECEPTIONIST"
+              className="h-10 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {PAPEIS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" disabled={pending} className="btn-primary btn-md">
+            {pending ? 'Enviando…' : 'Enviar convite'}
+          </button>
+        </form>
+
+        {convidado && (
+          <p
+            role="status"
+            className="mx-5 mb-4 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success"
+          >
+            Convite enviado para <strong>{convidado}</strong>. Ele vale por alguns dias — se não
+            chegar, peça para conferir a caixa de spam.
+          </p>
+        )}
+
+        {invites.length > 0 && (
+          <div className="border-t border-border">
+            <h3 className="px-5 pb-2 pt-4 text-sm font-medium">Convites aguardando resposta</h3>
+            <ul className="divide-y divide-border">
+              {invites.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{c.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {LABEL[c.role] ?? c.role} · enviado em{' '}
+                      {new Date(c.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => cancelarConvite(c.id)}
+                    className="rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
     </div>
   );

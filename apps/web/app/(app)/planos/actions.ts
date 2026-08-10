@@ -41,7 +41,6 @@ export interface PlanOption {
   maxProfessionals: number | null;
   whatsappEnabled: boolean;
   campaignsEnabled: boolean;
-  assistantEnabled: boolean;
   advancedReports: boolean;
   current: boolean;
 }
@@ -137,7 +136,6 @@ export async function getBillingData(): Promise<BillingData> {
       maxProfessionals: p.maxProfessionals,
       whatsappEnabled: p.whatsappEnabled,
       campaignsEnabled: p.campaignsEnabled,
-      assistantEnabled: p.assistantEnabled,
       advancedReports: p.advancedReports,
       current: subscription?.tier === p.tier,
     })),

@@ -16,7 +16,7 @@ import { ScheduleModal } from './schedule-modal';
 import { Tabs, type TabDef } from './tabs';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
-import type { AuditEntry, PrivacySummary, TeamMember } from '../actions';
+import type { AuditEntry, PendingInvite, PrivacySummary, TeamMember } from '../actions';
 
 interface Professional {
   id: string;
@@ -47,6 +47,7 @@ interface Props {
   suggestedColor: string;
   businessHours: DayHours[];
   team: TeamMember[];
+  invites: PendingInvite[];
   privacy: PrivacySummary;
   audit: AuditEntry[];
   /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
@@ -61,6 +62,7 @@ export function SettingsView({
   suggestedColor,
   businessHours,
   team,
+  invites,
   privacy,
   audit,
   billing,
@@ -83,7 +85,7 @@ export function SettingsView({
       badge: team.filter((m) => m.active).length,
       panel: (
         <div className="space-y-6">
-          <TeamPanel team={team} />
+          <TeamPanel team={team} invites={invites} />
           <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
         </div>
       ),

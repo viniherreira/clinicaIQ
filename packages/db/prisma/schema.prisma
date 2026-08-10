@@ -19,6 +19,12 @@ enum Role {
   PROFESSIONAL
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
 enum AppointmentStatus {
   SCHEDULED
   CONFIRMED
@@ -114,6 +120,7 @@ model Tenant {
   whatsappSession     WhatsAppSession?
   campaigns           Campaign[]
   subscription        Subscription?
+  invitations         Invitation[]
 
   @@map("tenants")
 }
@@ -785,4 +792,32 @@ model Charge {
 
   @@index([tenantId, dueDate(sort: Desc)])
   @@map("charges")
+}
+
+/// Convite para alguém entrar numa clínica que já existe.
+///
+/// O Clerk manda o e-mail e a pessoa define a própria senha no cadastro — o que
+/// guardamos aqui é a intenção: quem foi convidado, para qual clínica e com qual
+/// perfil. Guardar do nosso lado também é o que faz o vínculo funcionar mesmo se
+/// o metadata do convite não chegar ao usuário: no onboarding procuramos um
+/// convite pendente para o e-mail já verificado pelo Clerk.
+model Invitation {
+  id                String           @id @default(cuid())
+  tenantId          String
+  /// Sempre em minúsculas — é a chave de busca no onboarding.
+  email             String
+  role              Role
+  status            InvitationStatus @default(PENDING)
+  /// Id do convite no Clerk, para conseguir revogar lá também.
+  clerkInvitationId String?
+  invitedById       String?
+  createdAt         DateTime         @default(now())
+  acceptedAt        DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Um convite pendente por e-mail por clínica. Reconvidar atualiza o que existe.
+  @@unique([tenantId, email])
+  @@index([email, status])
+  @@map("invitations")
 }

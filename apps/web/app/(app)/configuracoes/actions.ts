@@ -1,7 +1,7 @@
 'use server';
 
 import { cache } from 'react';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -681,4 +681,155 @@ export async function listAudit(limit = 50): Promise<AuditEntry[]> {
     createdAt: r.createdAt,
     userName: r.user?.name ?? null,
   }));
+}
+
+// ─── Convites ──────────────────────────────────────────────────────────────────
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  role: Role;
+  createdAt: Date;
+}
+
+export async function listInvites(): Promise<PendingInvite[]> {
+  const { tenantId } = await requireOwner();
+  const rows = await prisma.invitation.findMany({
+    where: { tenantId, status: 'PENDING' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, email: true, role: true, createdAt: true },
+  });
+  return rows.map((r) => ({ ...r, role: r.role as Role }));
+}
+
+const inviteSchema = z.object({
+  email: z.string().trim().toLowerCase().email('E-mail inválido').max(160),
+  role: z.string().refine(isRole, 'Perfil inválido'),
+});
+
+/**
+ * Convida alguém para esta clínica.
+ *
+ * Quem manda o e-mail é o Clerk (`notify: true`) — não temos provedor de e-mail
+ * e não precisamos de um. A pessoa recebe o link, se cadastra e **define a
+ * própria senha**; nós nunca vemos nem guardamos senha nenhuma.
+ *
+ * O convite fica gravado dos dois lados de propósito. O `publicMetadata` leva a
+ * clínica e o perfil até o usuário novo, mas o vínculo não depende disso: no
+ * onboarding procuramos um convite pendente pelo e-mail que o Clerk já
+ * verificou. Se o metadata não vier, o convite ainda vale.
+ */
+export async function inviteTeamMember(input: {
+  email: string;
+  role: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const parsed = inviteSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  }
+  const { email, role } = parsed.data;
+
+  // Já é da equipe? Convidar de novo criaria uma segunda conta para a mesma
+  // pessoa, e ela entraria sem o histórico que já tem.
+  const jaExiste = await prisma.user.findFirst({
+    where: { tenantId, email: { equals: email, mode: 'insensitive' } },
+    select: { id: true, active: true },
+  });
+  if (jaExiste) {
+    return {
+      ok: false,
+      message: jaExiste.active
+        ? 'Esta pessoa já faz parte da equipe.'
+        : 'Esta pessoa já tem cadastro aqui — devolva o acesso em vez de convidar.',
+    };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clinica-iq-web.vercel.app';
+
+  let clerkInvitationId: string | null = null;
+  try {
+    const clerk = await clerkClient();
+    const invite = await clerk.invitations.createInvitation({
+      emailAddress: email,
+      // Reconvidar depois de um convite expirado não pode virar erro.
+      ignoreExisting: true,
+      notify: true,
+      publicMetadata: { tenantId, role },
+      redirectUrl: `${appUrl}/sign-up`,
+    });
+    clerkInvitationId = invite.id;
+  } catch (error) {
+    // Sem o e-mail do Clerk o convite não chega a lugar nenhum. Falhar aqui é
+    // melhor do que gravar um convite que ninguém vai receber.
+    console.error('[convite] Clerk recusou', error);
+    return {
+      ok: false,
+      message: 'Não foi possível enviar o convite agora. Confira o e-mail e tente de novo.',
+    };
+  }
+
+  await prisma.invitation.upsert({
+    where: { tenantId_email: { tenantId, email } },
+    create: { tenantId, email, role, clerkInvitationId, invitedById: userId },
+    update: {
+      role,
+      clerkInvitationId,
+      status: 'PENDING',
+      invitedById: userId,
+      createdAt: new Date(),
+      acceptedAt: null,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: `INVITE_${role}`, entity: 'Invitation', entityId: email },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+export async function revokeInvite(id: string): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const convite = await prisma.invitation.findFirst({
+    where: { id, tenantId, status: 'PENDING' },
+    select: { id: true, email: true, clerkInvitationId: true },
+  });
+  if (!convite) return { ok: false, message: 'Convite não encontrado.' };
+
+  if (convite.clerkInvitationId) {
+    try {
+      const clerk = await clerkClient();
+      await clerk.invitations.revokeInvitation(convite.clerkInvitationId);
+    } catch {
+      // Já aceito ou já revogado no Clerk. Marcar do nosso lado ainda impede
+      // que o onboarding aceite este convite.
+    }
+  }
+
+  await prisma.invitation.update({ where: { id: convite.id }, data: { status: 'REVOKED' } });
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: 'INVITE_REVOKED',
+      entity: 'Invitation',
+      entityId: convite.email,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
 }

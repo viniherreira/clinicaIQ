@@ -42,6 +42,109 @@ export type OnboardingState =
   | { success: true; tenantId: string }
   | { success: false; errors: Record<string, string[]> };
 
+/**
+ * Quem foi convidado entra na clínica existente em vez de abrir uma nova.
+ *
+ * O e-mail é a chave, e dá para confiar nele porque quem verifica é o Clerk —
+ * chegamos aqui já autenticados, com o endereço confirmado por ele. O
+ * `publicMetadata` do convite viaja junto e é conferido primeiro, mas o convite
+ * gravado no nosso banco é o que decide: se o metadata não vier, o convite
+ * continua valendo.
+ *
+ * Devolve o tenant quando houve convite, ou `null` quando é gente nova abrindo
+ * a própria clínica.
+ */
+async function acceptPendingInvite(
+  clerkUserId: string,
+  email: string | null,
+  metadata: Record<string, unknown> | undefined,
+): Promise<string | null> {
+  const normalizado = email?.trim().toLowerCase() ?? '';
+  const doMetadata = typeof metadata?.tenantId === 'string' ? metadata.tenantId : null;
+
+  const convite = await prisma.invitation.findFirst({
+    where: {
+      status: 'PENDING',
+      ...(normalizado
+        ? { email: normalizado }
+        : doMetadata
+          ? { tenantId: doMetadata }
+          : { id: '__sem_chave__' }),
+      ...(doMetadata ? { tenantId: doMetadata } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, tenantId: true, role: true, email: true },
+  });
+  if (!convite) return null;
+
+  const clerk = await clerkClient();
+  const clerkUser = await clerk.users.getUser(clerkUserId);
+  const nome =
+    `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() ||
+    convite.email.split('@')[0];
+
+  await prisma.$transaction([
+    prisma.user.create({
+      data: {
+        tenantId: convite.tenantId,
+        clerkUserId,
+        name: nome,
+        email: convite.email,
+        role: convite.role,
+      },
+    }),
+    prisma.invitation.update({
+      where: { id: convite.id },
+      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    }),
+    prisma.auditLog.create({
+      data: {
+        tenantId: convite.tenantId,
+        action: `INVITE_ACCEPTED_${convite.role}`,
+        entity: 'Invitation',
+        entityId: convite.email,
+      },
+    }),
+  ]);
+
+  await clerk.users.updateUserMetadata(clerkUserId, {
+    publicMetadata: { tenantId: convite.tenantId, onboardingComplete: true },
+  });
+
+  return convite.tenantId;
+}
+
+/**
+ * Já pertence a alguma clínica, ou tem convite pendente? Devolve o tenant.
+ *
+ * Chamado pela própria página de onboarding antes de renderizar o formulário, e
+ * de novo pelo `completeOnboarding` — a segunda vez cobre quem chegou ao envio
+ * por outro caminho.
+ */
+export async function joinFromInviteIfAny(): Promise<string | null> {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  const existing = await prisma.tenant.findFirst({
+    where: { users: { some: { clerkUserId: userId } } },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const clerk = await clerkClient();
+  const u = await clerk.users.getUser(userId);
+  const emailPrincipal =
+    u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ??
+    u.emailAddresses[0]?.emailAddress ??
+    null;
+
+  return acceptPendingInvite(
+    userId,
+    emailPrincipal,
+    u.publicMetadata as Record<string, unknown> | undefined,
+  );
+}
+
 export async function completeOnboarding(
   _prev: OnboardingState | null,
   formData: FormData,
@@ -49,10 +152,11 @@ export async function completeOnboarding(
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  const existing = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
-  });
-  if (existing) return { success: true, tenantId: existing.id };
+  // Convidado entra na clínica que o chamou; só quem não tem convite abre uma
+  // clínica nova. Vem antes de validar o formulário porque o convidado nunca
+  // preencheu nome de clínica nenhum.
+  const jaTem = await joinFromInviteIfAny();
+  if (jaTem) return { success: true, tenantId: jaTem };
 
   const raw = {
     name: formData.get('name'),

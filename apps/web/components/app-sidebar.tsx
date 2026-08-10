@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet, Settings, Sparkles, FileBarChart,
-  MessageCircle, Megaphone,
+  LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
+  FileBarChart, MessageCircle, Megaphone, Settings,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 
 export const NAV: { href: string; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/assistente', label: 'Assistente', icon: Sparkles, badge: 'IA' },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope },

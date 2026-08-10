@@ -23,7 +23,6 @@ interface PlanRow {
   maxProfessionals: number | null;
   whatsappEnabled: boolean;
   campaignsEnabled: boolean;
-  assistantEnabled: boolean;
   advancedReports: boolean;
 }
 
@@ -54,7 +53,6 @@ export async function Pricing() {
         maxProfessionals: true,
         whatsappEnabled: true,
         campaignsEnabled: true,
-        assistantEnabled: true,
         advancedReports: true,
       },
     });
