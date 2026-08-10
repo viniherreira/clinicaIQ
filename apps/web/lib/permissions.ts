@@ -22,26 +22,46 @@ export type Capability =
   | 'prontuario'
   /** Dinheiro: pagamentos, orçamentos, relatórios financeiros. */
   | 'financeiro'
-  /** Configuração da clínica: profissionais, horários, procedimentos, WhatsApp. */
+  /** Configuração do dia a dia: horários, procedimentos, WhatsApp, mensagens. */
   | 'configuracoes'
+  /** Disparo de mensagem em massa. */
+  | 'campanhas'
+  /** Quem entra na clínica: convidar, trocar perfil, tirar acesso, excluir
+   *  profissional. É a chave da porta — quem tem isto pode dar isto a si mesmo. */
+  | 'equipe'
   /** Assinatura e cobrança do SaaS. */
   | 'planos'
-  /** Disparo de mensagem em massa. */
-  | 'campanhas';
+  /** LGPD: consentimentos, exclusão de dados e o registro de quem fez o quê. */
+  | 'privacidade';
 
 /**
  * O que cada papel alcança.
  *
- * A recepcionista marca consulta e recebe pagamento, mas não abre prontuário —
- * histórico de saúde não é necessário para agendar, e o acesso mínimo é o que a
- * LGPD espera. O profissional é o inverso: precisa do prontuário inteiro e não
- * tem nada que fazer no financeiro nem na assinatura.
+ * A clínica trabalha junto: quem atende precisa ver a agenda cheia, o cadastro,
+ * o prontuário e quanto o paciente deve, sem depender do dono estar por perto.
+ * Repartir isso em quatro perfis fazia a recepcionista bater numa parede no meio
+ * do atendimento — e o dono acabaria dando o login dele para ela, que é o pior
+ * dos dois mundos.
+ *
+ * O que fica trancado é o que não dá para desfazer nem faz parte de atender:
+ * mexer em quem tem acesso, na cobrança e nos dados pessoais sob a LGPD.
  */
+const ADMIN_ONLY: readonly Capability[] = ['equipe', 'planos', 'privacidade'];
+
+const DIA_A_DIA: readonly Capability[] = [
+  'agenda',
+  'pacientes',
+  'prontuario',
+  'financeiro',
+  'configuracoes',
+  'campanhas',
+];
+
 const GRANTS: Record<Role, readonly Capability[]> = {
-  OWNER: ['agenda', 'pacientes', 'prontuario', 'financeiro', 'configuracoes', 'planos', 'campanhas'],
-  ADMIN: ['agenda', 'pacientes', 'prontuario', 'financeiro', 'configuracoes', 'planos', 'campanhas'],
-  RECEPTIONIST: ['agenda', 'pacientes', 'financeiro', 'campanhas'],
-  PROFESSIONAL: ['agenda', 'pacientes', 'prontuario'],
+  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY],
+  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY],
+  RECEPTIONIST: DIA_A_DIA,
+  PROFESSIONAL: DIA_A_DIA,
 };
 
 /**
@@ -66,8 +86,10 @@ const LABEL: Record<Capability, string> = {
   prontuario: 'o prontuário clínico',
   financeiro: 'o financeiro',
   configuracoes: 'as configurações da clínica',
-  planos: 'o plano e a cobrança',
   campanhas: 'as campanhas',
+  equipe: 'a gestão de quem tem acesso',
+  planos: 'o plano e a cobrança',
+  privacidade: 'os dados de privacidade e o histórico de alterações',
 };
 
 export function capabilityDeniedMessage(capability: Capability): string {

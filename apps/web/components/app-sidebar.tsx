@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  FileBarChart, MessageCircle, Megaphone, Settings,
+  FileBarChart, MessageCircle, Megaphone, Settings, CreditCard,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { can, type Capability } from '@/lib/permissions';
@@ -12,9 +12,8 @@ import { can, type Capability } from '@/lib/permissions';
 /**
  * O menu, com a permissão que cada módulo exige.
  *
- * `capability` ausente significa "todo mundo que tem login" — hoje só o
- * dashboard. O resto some para quem não alcança: a recepção não precisa ver
- * Configurações para descobrir que não pode entrar nelas.
+ * Quase tudo é do dia a dia da clínica e aparece para quem tem login. Some só
+ * o que é de administração — hoje, Plano e cobrança.
  *
  * Isto é arrumação, não segurança. Quem digitar o endereço direto continua
  * sendo barrado no servidor, por `requireCapability`.
@@ -36,6 +35,7 @@ export const NAV: {
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, capability: 'configuracoes' },
   { href: '/campanhas', label: 'Campanhas', icon: Megaphone, capability: 'campanhas' },
   { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },
+  { href: '/planos', label: 'Plano', icon: CreditCard, capability: 'planos' },
 ];
 
 export function navFor(role: string | null | undefined) {

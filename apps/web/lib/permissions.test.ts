@@ -7,9 +7,15 @@ const TODAS: Capability[] = [
   'prontuario',
   'financeiro',
   'configuracoes',
-  'planos',
   'campanhas',
+  'equipe',
+  'planos',
+  'privacidade',
 ];
+
+/** O que só o dono e o administrador alcançam. */
+const SO_ADMIN: Capability[] = ['equipe', 'planos', 'privacidade'];
+const PAPEIS = ['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL'] as const;
 
 describe('can', () => {
   it('dono e admin alcançam tudo', () => {
@@ -19,49 +25,46 @@ describe('can', () => {
     }
   });
 
-  it('recepcionista marca consulta e recebe pagamento', () => {
-    expect(can('RECEPTIONIST', 'agenda')).toBe(true);
-    expect(can('RECEPTIONIST', 'pacientes')).toBe(true);
-    expect(can('RECEPTIONIST', 'financeiro')).toBe(true);
+  it('quem atende trabalha sem pedir licença', () => {
+    // A clínica funciona junto: travar a recepção no meio do atendimento acaba
+    // com o dono emprestando o login dele, que é pior do que não travar nada.
+    for (const papel of ['RECEPTIONIST', 'PROFESSIONAL'] as const) {
+      expect(can(papel, 'agenda')).toBe(true);
+      expect(can(papel, 'pacientes')).toBe(true);
+      expect(can(papel, 'prontuario')).toBe(true);
+      expect(can(papel, 'financeiro')).toBe(true);
+      expect(can(papel, 'configuracoes')).toBe(true);
+      expect(can(papel, 'campanhas')).toBe(true);
+    }
   });
 
-  it('recepcionista não abre prontuário', () => {
-    // Histórico de saúde não é necessário para agendar, e é dado sensível
-    // (LGPD art. 11). Acesso mínimo.
-    expect(can('RECEPTIONIST', 'prontuario')).toBe(false);
-  });
-
-  it('recepcionista não mexe em configuração nem no plano', () => {
-    expect(can('RECEPTIONIST', 'configuracoes')).toBe(false);
-    expect(can('RECEPTIONIST', 'planos')).toBe(false);
-  });
-
-  it('profissional atende: agenda e prontuário sim, dinheiro não', () => {
-    expect(can('PROFESSIONAL', 'agenda')).toBe(true);
-    expect(can('PROFESSIONAL', 'prontuario')).toBe(true);
-    expect(can('PROFESSIONAL', 'financeiro')).toBe(false);
-    expect(can('PROFESSIONAL', 'planos')).toBe(false);
-    expect(can('PROFESSIONAL', 'configuracoes')).toBe(false);
-  });
-
-  it('só dono e admin tocam no plano', () => {
-    const podem = (['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL'] as const).filter((r) =>
-      can(r, 'planos'),
-    );
+  it('mexer em quem tem acesso é só do dono e do admin', () => {
+    // O que isto trava: a recepcionista se promover a dona, ou tirar o acesso
+    // de quem a convidou.
+    const podem = PAPEIS.filter((r) => can(r, 'equipe'));
     expect(podem).toEqual(['OWNER', 'ADMIN']);
   });
 
-  it('papel desconhecido cai no menor privilégio, não no maior', () => {
-    // O que isso trava: um valor novo no enum, ou uma consulta que falhou e
-    // devolveu null, não pode virar acesso total por acidente.
+  it('cobrança e privacidade seguem a mesma trava', () => {
+    for (const cap of SO_ADMIN) {
+      expect(PAPEIS.filter((r) => can(r, cap))).toEqual(['OWNER', 'ADMIN']);
+    }
+  });
+
+  it('papel desconhecido não vira admin por acidente', () => {
+    // Uma consulta que falhou e devolveu null, ou um valor novo no enum, não
+    // pode abrir a porta da equipe nem da cobrança.
+    for (const cap of SO_ADMIN) {
+      expect(can(null, cap)).toBe(false);
+      expect(can(undefined, cap)).toBe(false);
+      expect(can('SUPERUSUARIO', cap)).toBe(false);
+      expect(can('', cap)).toBe(false);
+    }
     expect(can(null, 'prontuario')).toBe(can(LEAST_PRIVILEGE, 'prontuario'));
-    expect(can(undefined, 'configuracoes')).toBe(false);
-    expect(can('SUPERUSUARIO', 'planos')).toBe(false);
-    expect(can('', 'financeiro')).toBe(false);
   });
 
   it('todo papel enxerga a agenda — é o mínimo para trabalhar', () => {
-    for (const r of ['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL'] as const) {
+    for (const r of PAPEIS) {
       expect(can(r, 'agenda')).toBe(true);
     }
   });
@@ -69,7 +72,7 @@ describe('can', () => {
 
 describe('isRole', () => {
   it('reconhece os quatro do schema', () => {
-    for (const r of ['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL']) {
+    for (const r of PAPEIS) {
       expect(isRole(r)).toBe(true);
     }
   });
@@ -83,8 +86,8 @@ describe('isRole', () => {
 
 describe('capabilityDeniedMessage', () => {
   it('diz o que fazer, não só que não pode', () => {
-    const msg = capabilityDeniedMessage('prontuario');
-    expect(msg).toContain('prontuário');
+    const msg = capabilityDeniedMessage('equipe');
+    expect(msg).toContain('acesso');
     expect(msg).toContain('responsável pela clínica');
   });
 

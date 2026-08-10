@@ -10,8 +10,10 @@ const MODULOS: Record<string, Capability> = {
   prontuario: 'prontuario',
   financeiro: 'financeiro',
   configuracoes: 'configuracoes',
-  planos: 'planos',
   campanhas: 'campanhas',
+  equipe: 'equipe',
+  planos: 'planos',
+  privacidade: 'privacidade',
 };
 
 /**

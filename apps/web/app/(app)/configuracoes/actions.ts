@@ -199,7 +199,7 @@ export async function createProfessional(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -230,7 +230,7 @@ export async function updateProfessional(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { success: false, errors: {}, message: semAcesso };
   const parsed = professionalSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -258,7 +258,7 @@ export async function toggleProfessionalActive(id: string) {
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return;
   const professional = await prisma.professional.findFirst({
     where: { id, tenantId },
@@ -404,7 +404,7 @@ export async function updateProfessionalSchedule(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   const prof = await prisma.professional.findFirst({
@@ -471,7 +471,7 @@ export async function deleteProfessional(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   const count = await prisma.appointment.count({ where: { tenantId, professionalId: id } });
@@ -506,7 +506,10 @@ export interface TeamMember {
 }
 
 export async function listTeam(): Promise<TeamMember[]> {
-  const { tenantId, userId } = await requireOwner();
+  const { tenantId, userId, role } = await requireOwner();
+  // Toda função marcada 'use server' é um endereço que dá para chamar de fora,
+  // não só um dado que a página busca. Esconder a aba não esconde isto.
+  if (!can(role, 'equipe')) return [];
   const users = await prisma.user.findMany({
     where: { tenantId },
     orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
@@ -533,7 +536,7 @@ export async function updateTeamRole(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   if (!isRole(role)) return { ok: false, message: 'Perfil inválido.' };
@@ -581,7 +584,7 @@ export async function setTeamMemberActive(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   if (targetUserId === userId) {
@@ -628,7 +631,10 @@ export interface PrivacySummary {
 }
 
 export async function getPrivacySummary(): Promise<PrivacySummary> {
-  const { tenantId } = await requireOwner();
+  const { tenantId, role } = await requireOwner();
+  if (!can(role, 'privacidade')) {
+    return { pacientes: 0, aceitaramTratamento: 0, autorizaramCampanha: 0, excluidosMasNoBanco: 0 };
+  }
   const [pacientes, aceitaramTratamento, autorizaramCampanha, excluidos] =
     await Promise.all([
       prisma.patient.count({ where: { tenantId, deletedAt: null } }),
@@ -661,7 +667,10 @@ export interface AuditEntry {
  * serve nem para a clínica nem para uma eventual fiscalização.
  */
 export async function listAudit(limit = 50): Promise<AuditEntry[]> {
-  const { tenantId } = await requireOwner();
+  const { tenantId, role } = await requireOwner();
+  // O registro diz quem fez o quê e quando. É a última coisa que alguém deveria
+  // conseguir ler — ou apagar — sem responder pela clínica.
+  if (!can(role, 'privacidade')) return [];
   const rows = await prisma.auditLog.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },
@@ -724,7 +733,8 @@ async function emailsPresosEmOutraClinica(
 }
 
 export async function listInvites(): Promise<PendingInvite[]> {
-  const { tenantId } = await requireOwner();
+  const { tenantId, role } = await requireOwner();
+  if (!can(role, 'equipe')) return [];
   const rows = await prisma.invitation.findMany({
     where: { tenantId, status: 'PENDING' },
     orderBy: { createdAt: 'desc' },
@@ -769,7 +779,7 @@ export async function inviteTeamMember(input: {
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   const parsed = inviteSchema.safeParse(input);
@@ -853,7 +863,7 @@ export async function inviteTeamMember(input: {
 export async function revokeInvite(id: string): Promise<{ ok: boolean; message?: string }> {
   const { tenantId, userId } = await requireOwner();
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   const convite = await prisma.invitation.findFirst({
@@ -1039,7 +1049,7 @@ export async function declararAceiteDeCampanhaParaTodos(): Promise<{
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
 
-  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  const semAcesso = await capabilityBlocked(tenantId, 'privacidade');
   if (semAcesso) return { ok: false, message: semAcesso };
 
   const { count } = await prisma.patient.updateMany({

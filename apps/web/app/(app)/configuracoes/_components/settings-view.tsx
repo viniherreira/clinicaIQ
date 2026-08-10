@@ -56,12 +56,16 @@ interface Props {
   team: TeamMember[];
   invites: PendingInvite[];
   messages: MessageSettings;
-  privacy: PrivacySummary;
+  privacy: PrivacySummary | null;
   audit: AuditEntry[];
   /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
    *  do Asaas e não pode virar componente de cliente só para caber numa aba. */
   billing: React.ReactNode;
   whatsapp: { status: string; phoneNumber: string | null };
+  /** As três abas de administração. Quem não alcança não recebe nem os dados. */
+  podeEquipe: boolean;
+  podePlano: boolean;
+  podePrivacidade: boolean;
 }
 
 export function SettingsView({
@@ -76,6 +80,9 @@ export function SettingsView({
   audit,
   billing,
   whatsapp,
+  podeEquipe,
+  podePlano,
+  podePrivacidade,
 }: Props) {
   const tabs: TabDef[] = [
     {
@@ -88,17 +95,26 @@ export function SettingsView({
         </div>
       ),
     },
-    {
-      id: 'equipe',
-      label: 'Equipe',
-      badge: team.filter((m) => m.active).length,
-      panel: (
-        <div className="space-y-6">
-          <TeamPanel team={team} invites={invites} />
-          <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} />
-        </div>
-      ),
-    },
+    // Profissionais é cadastro de quem atende — fica com quem cuida da equipe,
+    // junto com convidar e tirar acesso.
+    ...(podeEquipe
+      ? [
+          {
+            id: 'equipe',
+            label: 'Equipe',
+            badge: team.filter((m) => m.active).length,
+            panel: (
+              <div className="space-y-6">
+                <TeamPanel team={team} invites={invites} />
+                <ProfessionalsSection
+                  professionals={professionals}
+                  suggestedColor={suggestedColor}
+                />
+              </div>
+            ),
+          } satisfies TabDef,
+        ]
+      : []),
     {
       id: 'atendimento',
       label: 'Atendimento',
@@ -119,12 +135,24 @@ export function SettingsView({
       label: 'Comunicação',
       panel: <CommunicationPanel whatsapp={whatsapp} messages={messages} />,
     },
-    { id: 'plano', label: 'Plano', panel: <div className="space-y-6">{billing}</div> },
-    {
-      id: 'privacidade',
-      label: 'Privacidade',
-      panel: <PrivacyPanel summary={privacy} audit={audit} />,
-    },
+    ...(podePlano
+      ? [
+          {
+            id: 'plano',
+            label: 'Plano',
+            panel: <div className="space-y-6">{billing}</div>,
+          } satisfies TabDef,
+        ]
+      : []),
+    ...(podePrivacidade && privacy
+      ? [
+          {
+            id: 'privacidade',
+            label: 'Privacidade',
+            panel: <PrivacyPanel summary={privacy} audit={audit} />,
+          } satisfies TabDef,
+        ]
+      : []),
   ];
 
   return (
@@ -132,7 +160,9 @@ export function SettingsView({
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Dados da clínica, equipe, atendimento, comunicação, plano e privacidade.
+          {podeEquipe
+            ? 'Dados da clínica, equipe, atendimento, comunicação, plano e privacidade.'
+            : 'Dados da clínica, atendimento e comunicação.'}
         </p>
       </header>
 
