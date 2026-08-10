@@ -11,6 +11,7 @@ import {
   type TeamMember,
 } from '../actions';
 import type { Role } from '@/lib/permissions';
+import { SelectField } from '@/components/select-field';
 
 /**
  * Quem tem acesso ao sistema, e até onde.
@@ -38,42 +39,10 @@ const PAPEIS: { value: Role; label: string; descricao: string }[] = [
 
 const LABEL: Record<string, string> = Object.fromEntries(PAPEIS.map((p) => [p.value, p.label]));
 
-/**
- * `select` com aparência própria.
- *
- * `appearance-none` tira o desenho do sistema operacional — que é o que fazia a
- * tela parecer montada às pressas, porque a seta do Windows não combina com
- * nada em volta. A seta volta como SVG por trás do campo, e o `pr-9` reserva o
- * espaço dela para o texto não passar por cima.
- */
-function Select({
-  className = '',
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative">
-      <select
-        {...props}
-        className={`h-9 w-full appearance-none rounded-md border border-border bg-background pl-3 pr-9 text-sm font-medium transition-colors hover:border-muted-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-      >
-        {children}
-      </select>
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-    </div>
-  );
-}
+/** As opções no formato do SelectField, com a descrição virando linha de apoio
+ *  dentro da própria lista — assim a explicação de cada perfil aparece na hora
+ *  de escolher, não só num quadro separado embaixo. */
+const OPCOES_PAPEL = PAPEIS.map((p) => ({ value: p.value, label: p.label, hint: p.descricao }));
 
 /** Iniciais no lugar de foto — a clínica não sobe avatar, e um círculo vazio
  *  fica pior do que duas letras. */
@@ -99,6 +68,9 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [convidado, setConvidado] = useState<string | null>(null);
+  // O perfil do convite virou estado porque o SelectField nao e um <select>
+  // nativo e portanto nao entra sozinho no FormData.
+  const [papelConvite, setPapelConvite] = useState<string>('RECEPTIONIST');
 
   function trocarPapel(id: string, role: string) {
     setErro(null);
@@ -126,7 +98,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
     setErro(null);
     setConvidado(null);
     startTransition(async () => {
-      const r = await inviteTeamMember({ email, role: String(dados.get('role') ?? '') });
+      const r = await inviteTeamMember({ email, role: papelConvite });
       if (!r.ok) setErro(r.message ?? 'Não foi possível convidar.');
       else {
         setConvidado(email);
@@ -195,22 +167,15 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
               </div>
 
               <div className="flex items-center gap-2">
-                <label htmlFor={`papel-${m.id}`} className="sr-only">
-                  Perfil de {m.name}
-                </label>
-                <Select
+                <SelectField
                   id={`papel-${m.id}`}
+                  ariaLabel={`Perfil de ${m.name}`}
                   value={m.role}
+                  options={OPCOES_PAPEL}
                   disabled={m.isSelf || pending}
-                  onChange={(e) => trocarPapel(m.id, e.target.value)}
+                  onChange={(v) => trocarPapel(m.id, v)}
                   className="w-[10.5rem]"
-                >
-                  {PAPEIS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </Select>
+                />
 
                 <button
                   type="button"
@@ -251,8 +216,9 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
             Convidar para a equipe
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            A pessoa recebe um e-mail com o convite e <strong>escolhe a própria senha</strong> no
-            cadastro. Você nunca vê a senha dela.
+            A pessoa recebe um e-mail com um link, cria o acesso dela e{' '}
+            <strong>define a própria senha</strong> — você nunca vê essa senha. Ela entra direto
+            nesta clínica, com o perfil que você escolher aqui.
           </p>
         </div>
 
@@ -271,16 +237,18 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="convite-papel" className="block text-sm font-medium">
+            <span id="convite-papel-rotulo" className="block text-sm font-medium">
               Perfil
-            </label>
-            <Select id="convite-papel" name="role" defaultValue="RECEPTIONIST" className="w-[10.5rem]">
-              {PAPEIS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
+            </span>
+            <SelectField
+              id="convite-papel"
+              ariaLabel="Perfil de quem está sendo convidado"
+              value={papelConvite}
+              options={OPCOES_PAPEL}
+              onChange={setPapelConvite}
+              disabled={pending}
+              className="w-[10.5rem]"
+            />
           </div>
           <button type="submit" disabled={pending} className="btn-primary btn-md h-9">
             {pending ? 'Enviando…' : 'Enviar convite'}
