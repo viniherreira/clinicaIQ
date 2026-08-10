@@ -6,14 +6,14 @@ import { getGatewayProvider, gatewayConfigured } from '@clinicaiq/whatsapp';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { getWhatsAppHealth } from '@/lib/whatsapp';
+import { getWhatsAppHealth } from '@/lib/whatsapp';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 
 async function requireTenant() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
   const tenant = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
+    where: { users: { some: { clerkUserId: userId, active: true } } },
     select: { id: true },
   });
   if (!tenant) redirect('/onboarding');
@@ -151,7 +151,7 @@ async function readState(tenantId: string): Promise<ConnectionState> {
 
 /** Asks the gateway to open a socket. The QR arrives on the next poll. */
 export async function startConnection(): Promise<ConnectionState> {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { status: 'ERROR' as const, qrCode: null, phoneNumber: null, lastError: bloqueio };
@@ -193,7 +193,7 @@ export async function getConnectionState(): Promise<ConnectionState> {
 }
 
 export async function disconnectWhatsApp(): Promise<{ ok: boolean }> {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false };
@@ -249,7 +249,7 @@ export type SettingsFormState =
 export async function saveWhatsAppSettings(
   input: z.infer<typeof settingsSchema>,
 ): Promise<SettingsFormState> {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, error: bloqueio };

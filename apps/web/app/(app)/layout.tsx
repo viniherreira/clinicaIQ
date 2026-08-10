@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!userId) redirect('/sign-in');
 
   const tenant = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
+    where: { users: { some: { clerkUserId: userId, active: true } } },
     select: { id: true, name: true },
   });
   if (!tenant) redirect('/onboarding');

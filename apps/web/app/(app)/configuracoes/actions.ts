@@ -26,17 +26,20 @@ const resolveOwner = cache(async () => {
   if (!userId) redirect('/sign-in');
 
   const tenant = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
+    where: { users: { some: { clerkUserId: userId, active: true } } },
     select: { id: true },
   });
   if (!tenant) redirect('/onboarding');
 
   const user = await prisma.user.findFirst({
-    where: { clerkUserId: userId, tenantId: tenant.id },
+    where: { clerkUserId: userId, tenantId: tenant.id, active: true },
     select: { id: true, role: true },
   });
 
-  return { tenantId: tenant.id, userId: user!.id, role: user!.role };
+  if (!user) redirect('/sign-in');
+
+
+  return { tenantId: tenant.id, userId: user.id, role: user.role };
 });
 
 async function requireOwner() {

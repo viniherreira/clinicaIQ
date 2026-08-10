@@ -89,7 +89,7 @@ export const currentRole = cache(async (tenantId: string): Promise<Role> => {
   if (!userId) return LEAST_PRIVILEGE;
 
   const user = await prisma.user
-    .findFirst({ where: { clerkUserId: userId, tenantId }, select: { role: true } })
+    .findFirst({ where: { clerkUserId: userId, tenantId, active: true }, select: { role: true } })
     .catch(() => null);
 
   return (user?.role as Role | undefined) ?? LEAST_PRIVILEGE;

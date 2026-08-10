@@ -12,7 +12,7 @@ async function requireTenant() {
   if (!userId) redirect('/sign-in');
 
   const tenant = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId } } },
+    where: { users: { some: { clerkUserId: userId, active: true } } },
     select: { id: true },
   });
   if (!tenant) redirect('/onboarding');
