@@ -22,6 +22,8 @@ export {
   buildQuoteSentBody,
   buildBirthdayBody,
   renderBirthdayTemplate,
+  renderAppointmentTemplate,
+  APPOINTMENT_PLACEHOLDERS,
   appointmentTemplateParams,
   quoteTemplateParams,
 } from './templates';

@@ -133,6 +133,39 @@ export function renderBirthdayTemplate(template: string, d: BirthdayMessageData)
     .trim();
 }
 
+/** As variáveis que a clínica pode usar nos textos de agendamento. */
+export const APPOINTMENT_PLACEHOLDERS = [
+  { key: 'nome', desc: 'primeiro nome do paciente' },
+  { key: 'clinica', desc: 'nome da clínica' },
+  { key: 'data', desc: 'ex.: quinta-feira, 28/05' },
+  { key: 'hora', desc: 'ex.: 14:30' },
+  { key: 'profissional', desc: 'quem vai atender' },
+  { key: 'procedimento', desc: 'procedimento marcado, se houver' },
+] as const;
+
+/**
+ * Aplica o texto que a clínica escreveu para as mensagens de agendamento.
+ *
+ * Só substitui as variáveis conhecidas; qualquer outra chave entre chaves fica
+ * como está, porque apagar silenciosamente o que a pessoa digitou é pior do que
+ * mostrar o texto literal e ela perceber o engano.
+ *
+ * `{procedimento}` some junto com o separador que vier antes dele quando não há
+ * procedimento marcado — senão sobra " - " pendurado no fim da frase.
+ */
+export function renderAppointmentTemplate(template: string, d: AppointmentMessageData): string {
+  const semProcedimento = !d.procedureName?.trim();
+
+  return template
+    .replace(/\s*[-–—·|]?\s*\{procedimento\}/gi, semProcedimento ? '' : ` ${d.procedureName}`)
+    .replace(/\{nome\}/gi, firstName(d.patientName))
+    .replace(/\{clinica\}/gi, d.clinicName)
+    .replace(/\{data\}/gi, d.dateLabel)
+    .replace(/\{hora\}/gi, d.timeLabel)
+    .replace(/\{profissional\}/gi, d.professionalName)
+    .trim();
+}
+
 /** Ordered body variables for the quote_sent template ({{1}}..{{5}}). */
 export function quoteTemplateParams(d: QuoteMessageData): Record<string, string> {
   return {

@@ -9,6 +9,7 @@ import {
   buildQuoteSentBody,
   buildBirthdayBody,
   renderBirthdayTemplate,
+  renderAppointmentTemplate,
   appointmentTemplateParams,
   quoteTemplateParams,
   type SendMessageParams,
@@ -402,9 +403,23 @@ export async function prepareAppointmentMessage(
   const templateName = isReminder
     ? WHATSAPP_TEMPLATES.appointmentConfirmation
     : WHATSAPP_TEMPLATES.appointmentCreated;
-  const body = isReminder
-    ? buildAppointmentConfirmationBody(data)
-    : buildAppointmentCreatedBody(data);
+
+  // Texto escolhido pela clínica, quando houver. O padrão continua valendo para
+  // quem nunca editou — e é o que aparece pré-preenchido na tela, para editar
+  // ser mudar uma frase e não escrever do zero.
+  const escolhido = await prisma.whatsAppSession.findUnique({
+    where: { tenantId: appt.tenantId },
+    select: { createdMessage: true, reminderMessage: true },
+  });
+  const personalizado = (
+    isReminder ? escolhido?.reminderMessage : escolhido?.createdMessage
+  )?.trim();
+
+  const body = personalizado
+    ? renderAppointmentTemplate(personalizado, data)
+    : isReminder
+      ? buildAppointmentConfirmationBody(data)
+      : buildAppointmentCreatedBody(data);
 
   const outcome = await resolveProvider(appt.tenantId, isReminder ? 'reminder' : 'onCreate');
   if (outcome.kind === 'skip') {

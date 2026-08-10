@@ -10,6 +10,11 @@ import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { composeAddress } from '@/lib/address';
+import {
+  buildAppointmentConfirmationBody,
+  buildAppointmentCreatedBody,
+  buildBirthdayBody,
+} from '@clinicaiq/whatsapp';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -831,5 +836,136 @@ export async function revokeInvite(id: string): Promise<{ ok: boolean; message?:
   });
 
   revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+// ─── Mensagens automáticas ─────────────────────────────────────────────────────
+
+export interface MessageSettings {
+  notifyOnCreate: boolean;
+  notifyReminder: boolean;
+  notifyBirthday: boolean;
+  /** Nulo = a clínica nunca editou e usa o texto padrão do sistema. */
+  createdMessage: string | null;
+  reminderMessage: string | null;
+  birthdayMessage: string | null;
+  /** Os padrões, para mostrar como ponto de partida na tela. */
+  defaults: { created: string; reminder: string; birthday: string };
+}
+
+/**
+ * O que a clínica manda hoje, e os textos padrão ao lado.
+ *
+ * Os padrões viajam junto de propósito: editar tem que ser mudar uma frase, não
+ * escrever do zero numa caixa vazia. A tela pré-preenche com eles.
+ */
+export async function getMessageSettings(): Promise<MessageSettings> {
+  const { tenantId } = await requireOwner();
+  const [session, tenant] = await Promise.all([
+    prisma.whatsAppSession.findUnique({
+      where: { tenantId },
+      select: {
+        notifyOnCreate: true,
+        notifyReminder: true,
+        notifyBirthday: true,
+        createdMessage: true,
+        reminderMessage: true,
+        birthdayMessage: true,
+      },
+    }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
+  ]);
+
+  // Exemplo com dados fictícios só para a clínica ver o formato.
+  const exemplo = {
+    patientName: 'Maria Aparecida',
+    clinicName: tenant?.name ?? 'sua clínica',
+    professionalName: 'Dra. Michele',
+    procedureName: 'Limpeza',
+    dateLabel: 'quinta-feira, 28/05',
+    timeLabel: '14:30',
+  };
+
+  return {
+    notifyOnCreate: session?.notifyOnCreate ?? true,
+    notifyReminder: session?.notifyReminder ?? true,
+    notifyBirthday: session?.notifyBirthday ?? false,
+    createdMessage: session?.createdMessage ?? null,
+    reminderMessage: session?.reminderMessage ?? null,
+    birthdayMessage: session?.birthdayMessage ?? null,
+    defaults: {
+      created: buildAppointmentCreatedBody(exemplo),
+      reminder: buildAppointmentConfirmationBody(exemplo),
+      birthday: buildBirthdayBody({
+        patientName: exemplo.patientName,
+        clinicName: exemplo.clinicName,
+      }),
+    },
+  };
+}
+
+const messagesSchema = z.object({
+  notifyOnCreate: z.boolean(),
+  notifyReminder: z.boolean(),
+  notifyBirthday: z.boolean(),
+  createdMessage: z.string().trim().max(900),
+  reminderMessage: z.string().trim().max(900),
+  birthdayMessage: z.string().trim().max(600),
+});
+
+export async function saveMessageSettings(
+  input: z.infer<typeof messagesSchema>,
+): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const parsed = messagesSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  }
+  const d = parsed.data;
+
+  // Vazio volta a ser nulo, não string vazia: nulo quer dizer "usa o padrão", e
+  // string vazia mandaria mensagem em branco para o paciente.
+  const existe = await prisma.whatsAppSession.findUnique({
+    where: { tenantId },
+    select: { tenantId: true },
+  });
+  if (!existe) {
+    return {
+      ok: false,
+      message: 'Conecte o WhatsApp da clínica antes de configurar as mensagens.',
+    };
+  }
+
+  await prisma.whatsAppSession.update({
+    where: { tenantId },
+    data: {
+      notifyOnCreate: d.notifyOnCreate,
+      notifyReminder: d.notifyReminder,
+      notifyBirthday: d.notifyBirthday,
+      createdMessage: d.createdMessage || null,
+      reminderMessage: d.reminderMessage || null,
+      birthdayMessage: d.birthdayMessage || null,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: 'UPDATE',
+      entity: 'WhatsAppSession',
+      entityId: tenantId,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  revalidatePath('/whatsapp');
   return { ok: true };
 }

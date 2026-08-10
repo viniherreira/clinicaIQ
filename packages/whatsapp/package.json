@@ -7,10 +7,12 @@
   "scripts": {
     "build": "tsc",
     "lint": "echo 'no lint configured'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3"
   }
 }

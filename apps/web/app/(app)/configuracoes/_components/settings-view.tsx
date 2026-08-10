@@ -16,7 +16,14 @@ import { ScheduleModal } from './schedule-modal';
 import { Tabs, type TabDef } from './tabs';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
-import type { AuditEntry, PendingInvite, PrivacySummary, TeamMember } from '../actions';
+import type {
+  AuditEntry,
+  MessageSettings,
+  PendingInvite,
+  PrivacySummary,
+  TeamMember,
+} from '../actions';
+import { MessagesPanel } from './messages-panel';
 
 interface Professional {
   id: string;
@@ -48,6 +55,7 @@ interface Props {
   businessHours: DayHours[];
   team: TeamMember[];
   invites: PendingInvite[];
+  messages: MessageSettings;
   privacy: PrivacySummary;
   audit: AuditEntry[];
   /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
@@ -63,6 +71,7 @@ export function SettingsView({
   businessHours,
   team,
   invites,
+  messages,
   privacy,
   audit,
   billing,
@@ -108,7 +117,7 @@ export function SettingsView({
     {
       id: 'comunicacao',
       label: 'Comunicação',
-      panel: <CommunicationPanel whatsapp={whatsapp} />,
+      panel: <CommunicationPanel whatsapp={whatsapp} messages={messages} />,
     },
     { id: 'plano', label: 'Plano', panel: <div className="space-y-6">{billing}</div> },
     {
@@ -167,8 +176,10 @@ const STATUS_WHATSAPP: Record<string, { texto: string; tom: string }> = {
 
 function CommunicationPanel({
   whatsapp,
+  messages,
 }: {
   whatsapp: { status: string; phoneNumber: string | null };
+  messages: MessageSettings;
 }) {
   const s = STATUS_WHATSAPP[whatsapp.status] ?? {
     texto: 'Não configurado',
@@ -216,40 +227,20 @@ function CommunicationPanel({
         )}
       </section>
 
-      <section
-        aria-labelledby="msg-heading"
-        className="rounded-xl border border-border bg-surface shadow-card"
-      >
-        <div className="border-b border-border px-5 py-4">
-          <h2 id="msg-heading" className="text-base font-semibold">
-            Mensagens automáticas
-          </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            O que o paciente recebe, e quando.
-          </p>
-        </div>
-        <dl className="divide-y divide-border">
-          {[
-            {
-              q: 'Ao marcar a consulta',
-              a: 'Confirmação com data, horário e profissional, na hora em que a recepção salva.',
-            },
-            {
-              q: 'Um dia antes',
-              a: 'Lembrete pedindo confirmação. Quem marcou em cima da hora recebe só a mensagem da marcação.',
-            },
-            { q: 'No aniversário', a: 'Felicitação, uma vez por ano.' },
-            {
-              q: 'Campanhas',
-              a: 'Só para quem autorizou receber promoções na ficha. Enviadas devagar, para o número não ser bloqueado.',
-            },
-          ].map((m) => (
-            <div key={m.q} className="px-5 py-3">
-              <dt className="text-sm font-medium">{m.q}</dt>
-              <dd className="mt-0.5 text-sm text-muted-foreground">{m.a}</dd>
-            </div>
-          ))}
-        </dl>
+      <MessagesPanel settings={messages} />
+
+      <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
+        <h2 className="text-base font-semibold">Campanhas</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Vão só para quem autorizou receber promoções na ficha, e saem devagar para o número da
+          clínica não ser bloqueado. O texto é escrito a cada campanha.
+        </p>
+        <Link
+          href="/campanhas"
+          className="mt-3 inline-flex rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Abrir campanhas
+        </Link>
       </section>
     </div>
   );

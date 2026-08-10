@@ -600,7 +600,11 @@ model WhatsAppSession {
   notifyOnCreate  Boolean @default(true)
   notifyReminder  Boolean @default(true)
   notifyBirthday  Boolean @default(false)
+  /// Textos escolhidos pela clínica. Nulo = usa o texto padrão do sistema.
+  /// Aceitam {nome}, {clinica}, {data}, {hora}, {profissional} e {procedimento}.
   birthdayMessage String?
+  createdMessage  String?
+  reminderMessage String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
