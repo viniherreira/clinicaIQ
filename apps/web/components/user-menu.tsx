@@ -57,7 +57,7 @@ export function UserMenu({
           { label: 'Equipe', href: '/configuracoes#equipe', icon: Users },
         ]
       : []),
-    ...(canPlanos ? [{ label: 'Plano e cobrança', href: '/planos', icon: CreditCard }] : []),
+    ...(canPlanos ? [{ label: 'Plano e cobrança', href: '/configuracoes#plano', icon: CreditCard }] : []),
     { label: 'Sair', icon: LogOut, onSelect: () => signOut({ redirectUrl: '/sign-in' }), aparta: true },
   ];
 

@@ -88,7 +88,7 @@ export async function saveDocument(value: string): Promise<{ ok: boolean; error?
     where: { id: tenantId },
     data: { document: formatDocument(value) },
   });
-  revalidatePath('/planos');
+  revalidatePath('/configuracoes');
   return { ok: true };
 }
 
@@ -325,7 +325,7 @@ export async function choosePlan(
       select: { invoiceUrl: true },
     });
 
-    revalidatePath('/planos');
+    revalidatePath('/configuracoes');
     return { ok: true, invoiceUrl: openCharge?.invoiceUrl ?? undefined };
   } catch (error) {
     return {

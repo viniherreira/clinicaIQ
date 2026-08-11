@@ -28,7 +28,7 @@ export function SubscriptionBanner({ access }: { access: Access }) {
         <span>{access.warning}</span>
       </p>
       <Link
-        href="/planos"
+        href="/configuracoes#plano"
         className={`shrink-0 rounded-md px-3 py-1 font-medium underline-offset-2 hover:underline ${
           blocked ? 'bg-destructive text-destructive-foreground no-underline hover:opacity-90' : ''
         }`}

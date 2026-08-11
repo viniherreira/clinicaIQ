@@ -10,7 +10,9 @@ import { navFor, NAV } from './app-sidebar';
  */
 
 const hrefs = (role: string) => navFor(role).map((i) => i.href);
-const SO_ADMIN = ['/planos'];
+
+/** Só existem dentro de Configurações, nunca como item de menu. */
+const NUNCA_NO_MENU = ['equipe', 'planos', 'privacidade'];
 
 describe('navFor', () => {
   it('dono e administrador enxergam tudo', () => {
@@ -38,19 +40,20 @@ describe('navFor', () => {
     }
   });
 
-  it('plano e cobrança só aparecem para dono e admin', () => {
-    for (const rota of SO_ADMIN) {
-      expect(hrefs('RECEPTIONIST')).not.toContain(rota);
-      expect(hrefs('PROFESSIONAL')).not.toContain(rota);
-      expect(hrefs('OWNER')).toContain(rota);
+  it('o menu é o mesmo para todo mundo — o que é de dono mora nas Configurações', () => {
+    // Plano, equipe e privacidade são abas dentro de Configurações, e é lá que a
+    // trava age. Botar qualquer uma delas no menu seria um segundo lugar para a
+    // mesma coisa, com uma segunda chance de esquecer a trava.
+    const declaradas = NAV.map((i) => i.capability).filter(Boolean);
+    for (const proibida of NUNCA_NO_MENU) {
+      expect(declaradas).not.toContain(proibida);
     }
+    expect(hrefs('RECEPTIONIST')).toEqual(hrefs('OWNER'));
+    expect(hrefs('PROFESSIONAL')).toEqual(hrefs('OWNER'));
   });
 
-  it('papel desconhecido não vira admin', () => {
-    for (const rota of SO_ADMIN) {
-      expect(hrefs('DONO_SUPREMO')).not.toContain(rota);
-      expect(hrefs('')).not.toContain(rota);
-    }
+  it('não existe rota de plano solta no menu', () => {
+    expect(NAV.map((i) => i.href)).not.toContain('/planos');
   });
 
   it('o dashboard fica para todo mundo que tem login', () => {

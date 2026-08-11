@@ -47,7 +47,14 @@ function features(plan: PlanOption): string[] {
   ].filter((f): f is string => f !== null);
 }
 
-export function BillingView({ data }: { data: BillingData }) {
+export function BillingView({
+  data,
+  embutido = false,
+}: {
+  data: BillingData;
+  /** Renderizado dentro da aba de Configurações, não como página inteira. */
+  embutido?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [choosing, setChoosing] = useState<string | null>(null);
@@ -124,14 +131,24 @@ export function BillingView({ data }: { data: BillingData }) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6 lg:p-8">
-      <header className="max-w-2xl">
-        <h1 className="text-3xl font-semibold tracking-tight">Planos e cobrança</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+    // Dentro da aba de Configurações a moldura já existe: a página tem o próprio
+    // título, a largura e o respiro. Repetir tudo aqui empurraria o conteúdo
+    // para dentro duas vezes e colocaria dois <h1> na mesma tela.
+    <div className={embutido ? 'space-y-8' : 'mx-auto max-w-6xl space-y-8 p-6 lg:p-8'}>
+      {embutido ? (
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Escolha o plano que acompanha o tamanho da sua clínica. Pague por PIX, boleto ou cartão,
           cancele quando quiser.
         </p>
-      </header>
+      ) : (
+        <header className="max-w-2xl">
+          <h1 className="text-3xl font-semibold tracking-tight">Planos e cobrança</h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+            Escolha o plano que acompanha o tamanho da sua clínica. Pague por PIX, boleto ou cartão,
+            cancele quando quiser.
+          </p>
+        </header>
+      )}
 
       {data.sandbox && data.gatewayReady && (
         <p

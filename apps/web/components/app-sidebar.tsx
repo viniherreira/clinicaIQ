@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  FileBarChart, MessageCircle, Megaphone, Settings, CreditCard,
+  FileBarChart, MessageCircle, Megaphone, Settings,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { can, type Capability } from '@/lib/permissions';
@@ -35,7 +35,6 @@ export const NAV: {
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, capability: 'configuracoes' },
   { href: '/campanhas', label: 'Campanhas', icon: Megaphone, capability: 'campanhas' },
   { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },
-  { href: '/planos', label: 'Plano', icon: CreditCard, capability: 'planos' },
 ];
 
 export function navFor(role: string | null | undefined) {

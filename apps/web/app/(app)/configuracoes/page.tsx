@@ -10,8 +10,9 @@ import {
   listInvites,
   getMessageSettings,
 } from './actions';
+import { Suspense } from 'react';
 import { SettingsView } from './_components/settings-view';
-import { BillingCard } from './_components/billing-card';
+import { BillingPanel } from './_components/billing-panel';
 
 import { requireCapability } from '@/lib/guard';
 import { can } from '@/lib/permissions';
@@ -59,9 +60,18 @@ export default async function ConfiguracoesPage() {
       podeEquipe={podeEquipe}
       podePlano={podePlano}
       podePrivacidade={podePrivacidade}
-      // Renderizado aqui, no servidor, e entregue pronto para a aba: o cartão
-      // busca dados do Asaas e não pode virar componente de cliente.
-      billing={podePlano ? <BillingCard tenantId={clinic.id} /> : null}
+      // Renderizado aqui, no servidor, e entregue pronto para a aba: busca
+      // cobranças no Asaas e não pode virar componente de cliente. O Suspense
+      // impede que a rede do Asaas segure as outras cinco abas.
+      billing={
+        podePlano ? (
+          <Suspense
+            fallback={<p className="text-sm text-muted-foreground">Carregando plano…</p>}
+          >
+            <BillingPanel />
+          </Suspense>
+        ) : null
+      }
       whatsapp={{
         status: session?.status ?? 'DISCONNECTED',
         phoneNumber: session?.phoneNumber ?? null,

@@ -20,7 +20,7 @@ export function CreateClinicForm() {
         const result = await completeOnboarding(null, formData);
         if (result.success) {
           // Straight to the plans: the clinic chooses and pays before it can work.
-          window.location.href = '/planos';
+          window.location.href = '/configuracoes#plano';
         } else {
           setFieldErrors(result.errors);
         }
