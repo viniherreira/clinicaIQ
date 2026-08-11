@@ -60,6 +60,10 @@ export interface BillingData {
   plans: PlanOption[];
   access: Access;
   currentTier: string | null;
+  /** Até quando a assinatura está paga. Nulo quando não há assinatura. */
+  currentPeriodEnd: string | null;
+  /** True quando o Asaas cobra sozinho todo mês, sem a clínica fazer nada. */
+  renewsAutomatically: boolean;
   professionalsInUse: number;
   charges: ChargeRow[];
   /** True while pointing at the Asaas sandbox — shown so nobody mistakes a test charge for real. */
@@ -141,6 +145,11 @@ export async function getBillingData(): Promise<BillingData> {
     })),
     access,
     currentTier: subscription?.tier ?? null,
+    // A data que a clínica procura primeiro quando abre esta tela: até quando
+    // está paga. Sem ela, a única pista era um aviso que só aparecia perto do
+    // vencimento — ou seja, tarde.
+    currentPeriodEnd: subscription?.currentPeriodEnd.toISOString() ?? null,
+    renewsAutomatically: Boolean(subscription?.asaasSubscriptionId),
     professionalsInUse,
     charges: charges.map((c) => ({
       id: c.id,

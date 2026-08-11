@@ -20,11 +20,22 @@ import {
 import { choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
 import type { BillingMethod } from '@/lib/asaas';
 import { formatDocument, onlyDigits } from '@/lib/document';
+import { clinicToday } from '@/lib/tz';
 
 const brl = (cents: number) =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const date = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+/**
+ * Vencimento e pagamento são guardados como dia "de parede", à meia-noite UTC —
+ * a mesma convenção da agenda (ver lib/tz.ts).
+ *
+ * Formatar isso no fuso do navegador jogava a data um dia para trás no Brasil:
+ * a cobrança que vence dia 11 aparecia como dia 10, no histórico e no aviso de
+ * vencimento. Numa tela de cobrança, um dia de erro é a diferença entre "pago"
+ * e "vencido".
+ */
+const diaDe = (iso: string) => iso.slice(0, 10);
+const date = (iso: string) => diaDe(iso).split('-').reverse().join('/');
 
 const CHARGE_STATUS: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'Em aberto', cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
@@ -33,6 +44,130 @@ const CHARGE_STATUS: Record<string, { label: string; cls: string }> = {
   REFUNDED: { label: 'Estornada', cls: 'bg-surface-alt text-muted-foreground' },
   CANCELLED: { label: 'Cancelada', cls: 'bg-surface-alt text-muted-foreground' },
 };
+
+/** "em 31 dias", "amanhã", "hoje", "há 3 dias" — a data sozinha obriga a
+ *  clínica a fazer a conta de cabeça. */
+function quando(iso: string): string {
+  // Meio-dia dos dois lados para o horário de verão não comer um dia na conta.
+  const alvo = Date.parse(`${diaDe(iso)}T12:00:00Z`);
+  const hoje = Date.parse(`${clinicToday()}T12:00:00Z`);
+  const dias = Math.round((alvo - hoje) / 86_400_000);
+  if (dias === 0) return 'hoje';
+  if (dias === 1) return 'amanhã';
+  if (dias === -1) return 'ontem';
+  return dias > 0 ? `em ${dias} dias` : `há ${Math.abs(dias)} dias`;
+}
+
+/** A forma de pagamento não é gravada; a própria cobrança denuncia qual foi. */
+function formaDaCobranca(c: {
+  pixPayload: string | null;
+  bankSlipUrl: string | null;
+}): string {
+  if (c.pixPayload) return 'PIX';
+  if (c.bankSlipUrl) return 'Boleto';
+  return 'Cartão';
+}
+
+/**
+ * O quadro que responde "estou em dia, e até quando?" sem clique nenhum.
+ *
+ * Antes a tela dizia a situação por extenso mas escondia a data: para saber até
+ * quando estava paga, a clínica tinha que descer até o histórico e inferir pelo
+ * vencimento da última cobrança. Numa tela de cobrança, a data é o dado.
+ */
+function ResumoAssinatura({ data }: { data: BillingData }) {
+  const plano = data.plans.find((p) => p.current);
+  const paga = data.charges
+    .filter((c) => c.status === 'PAID' && c.paidAt)
+    .sort((a, b) => (a.paidAt! < b.paidAt! ? 1 : -1))[0];
+
+  const atrasada = data.access.status === 'PAST_DUE' || data.access.level === 'readonly';
+  const emTeste = data.access.status === 'TRIALING';
+
+  const itens: { rotulo: string; valor: React.ReactNode }[] = [];
+
+  itens.push({
+    rotulo: 'Plano',
+    valor: plano ? (
+      <>
+        {plano.name}
+        <span className="text-muted-foreground"> · {brl(plano.monthlyPriceCents)}/mês</span>
+      </>
+    ) : (
+      <span className="text-muted-foreground">Nenhum</span>
+    ),
+  });
+
+  if (data.currentPeriodEnd) {
+    itens.push({
+      rotulo: emTeste ? 'Avaliação termina em' : atrasada ? 'Venceu em' : 'Pago até',
+      valor: (
+        <>
+          <span className={`tabular-nums ${atrasada ? 'text-destructive' : ''}`}>
+            {date(data.currentPeriodEnd)}
+          </span>
+          <span className="text-muted-foreground"> · {quando(data.currentPeriodEnd)}</span>
+        </>
+      ),
+    });
+  }
+
+  itens.push({
+    rotulo: 'Renovação',
+    valor: data.renewsAutomatically ? (
+      <>
+        Automática
+        <span className="text-muted-foreground"> · cobrança gerada sozinha todo mês</span>
+      </>
+    ) : (
+      <span className="text-muted-foreground">Manual — escolha um plano para ativar</span>
+    ),
+  });
+
+  if (paga) {
+    itens.push({
+      rotulo: 'Último pagamento',
+      valor: (
+        <>
+          <span className="tabular-nums">{brl(paga.amountCents)}</span>
+          <span className="text-muted-foreground">
+            {' '}
+            em {date(paga.paidAt!)} · {formaDaCobranca(paga)}
+          </span>
+        </>
+      ),
+    });
+  }
+
+  itens.push({
+    rotulo: 'Profissionais ativos',
+    valor: (
+      <>
+        <span className="tabular-nums">{data.professionalsInUse}</span>
+        {plano?.maxProfessionals != null && (
+          <span className="text-muted-foreground"> de {plano.maxProfessionals} no plano</span>
+        )}
+      </>
+    ),
+  });
+
+  if (data.document) {
+    itens.push({ rotulo: 'CPF/CNPJ na cobrança', valor: data.document });
+  }
+
+  return (
+    <dl className="grid gap-x-8 gap-y-3 border-t border-border bg-surface-alt/40 px-6 py-5 sm:grid-cols-2">
+      {itens.map((i) => (
+        <div key={i.rotulo} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {i.rotulo}
+          </dt>
+          <dd className="text-sm font-medium">{i.valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 function features(plan: PlanOption): string[] {
   return [
@@ -197,14 +332,6 @@ export function BillingView({
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                 {data.access.warning ?? 'Tudo certo por aqui. Obrigado por usar o ClinicaIQ.'}
               </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground tabular-nums">
-                  {data.professionalsInUse}
-                </span>{' '}
-                profissional{data.professionalsInUse === 1 ? '' : 'is'} ativo
-                {data.professionalsInUse === 1 ? '' : 's'}
-                {data.document && <> · {data.document}</>}
-              </p>
             </div>
           </div>
 
@@ -221,6 +348,8 @@ export function BillingView({
             </a>
           )}
         </div>
+
+        <ResumoAssinatura data={data} />
 
         {openCharge?.pixPayload && (
           <div className="border-t border-border bg-surface-alt/60 p-6">
