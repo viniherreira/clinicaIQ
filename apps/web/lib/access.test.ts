@@ -90,13 +90,26 @@ describe('writeBlocked', () => {
     expect(await writeBlocked('t1')).toBeTruthy();
   });
 
-  it('bloqueia assinatura cancelada', async () => {
+  it('quem cancelou continua gravando até o fim do que já pagou', async () => {
+    // Cancelou ontem, mas o mês está pago até daqui a 30 dias. Cortar na hora do
+    // clique seria cobrar o mês inteiro e entregar meio.
     assinatura = {
       status: 'CANCELLED',
       trialEndsAt: null,
       currentPeriodEnd: daqui(30),
       graceEndsAt: null,
       cancelledAt: daqui(-1),
+    };
+    expect(await writeBlocked('t1')).toBeNull();
+  });
+
+  it('bloqueia assinatura cancelada depois que o período pago acaba', async () => {
+    assinatura = {
+      status: 'CANCELLED',
+      trialEndsAt: null,
+      currentPeriodEnd: daqui(-2),
+      graceEndsAt: null,
+      cancelledAt: daqui(-32),
     };
     expect(await writeBlocked('t1')).toBeTruthy();
   });

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@clinicaiq/db';
 import {
+  cancelSubscription,
   createSubscription,
   ensureCustomer,
   getPixCode,
@@ -342,4 +343,70 @@ export async function choosePlan(
       error: error instanceof Error ? error.message : 'Não foi possível criar a assinatura.',
     };
   }
+}
+
+/**
+ * Cancela a assinatura da clínica.
+ *
+ * Toda tela de cobrança precisa de uma saída visível. Quando não tem, a pessoa
+ * cancela ligando, reclamando, ou simplesmente parando de pagar — e nenhum dos
+ * três é bom para ninguém.
+ *
+ * Duas decisões que importam aqui:
+ *
+ * 1. O acesso continua até o fim do período já pago. Quem pagou o mês tem o mês.
+ * 2. Se o Asaas recusar o cancelamento, não marcamos nada do nosso lado. Uma
+ *    tela dizendo "cancelado" enquanto a cobrança continua saindo todo mês é o
+ *    pior defeito possível numa tela de cobrança.
+ *
+ * Não passa por `writeBlocked`: quem está com acesso limitado por falta de
+ * pagamento é justamente quem mais precisa conseguir cancelar.
+ */
+export async function cancelPlan(): Promise<{ ok: boolean; error?: string; until?: string }> {
+  const { tenantId } = await requireTenant();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'planos');
+  if (semAcesso) return { ok: false, error: semAcesso };
+
+  const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
+  if (!subscription) return { ok: false, error: 'Não há assinatura para cancelar.' };
+  if (subscription.cancelledAt) {
+    return { ok: false, error: 'Esta assinatura já está cancelada.' };
+  }
+
+  if (subscription.asaasSubscriptionId && isConfigured()) {
+    try {
+      await cancelSubscription(subscription.asaasSubscriptionId);
+    } catch (error) {
+      console.error('[cobranca] Asaas recusou o cancelamento', error);
+      return {
+        ok: false,
+        error:
+          'Não foi possível cancelar a cobrança agora. Tente de novo em alguns minutos — nada foi alterado.',
+      };
+    }
+  }
+
+  await prisma.subscription.update({
+    where: { tenantId },
+    data: {
+      status: 'CANCELLED',
+      cancelledAt: new Date(),
+      // A assinatura não existe mais no Asaas. Zerar aqui faz o "reativar"
+      // abrir uma nova em vez de tentar mexer numa que morreu.
+      asaasSubscriptionId: null,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      action: `SUBSCRIPTION_CANCELLED_${subscription.tier}`,
+      entity: 'Subscription',
+      entityId: subscription.id,
+    },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true, until: subscription.currentPeriodEnd.toISOString() };
 }

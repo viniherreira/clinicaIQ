@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
+import { cancelPlan, choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
 import type { BillingMethod } from '@/lib/asaas';
 import { formatDocument, onlyDigits } from '@/lib/document';
 import { clinicToday } from '@/lib/tz';
@@ -326,7 +326,11 @@ export function BillingView({
                     : data.access.status === 'PAST_DUE'
                       ? 'Pagamento em atraso'
                       : data.access.status === 'CANCELLED'
-                        ? 'Assinatura encerrada'
+                        ? // Cancelada ainda tem o período pago pela frente;
+                          // "encerrada" só depois que ele acaba.
+                          data.access.level === 'full'
+                          ? 'Assinatura cancelada'
+                          : 'Assinatura encerrada'
                         : 'Acesso limitado'}
               </h2>
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
@@ -695,9 +699,140 @@ export function BillingView({
         </section>
       )}
 
+      <CancelarAssinatura data={data} />
+
       <p aria-live="polite" className="sr-only">
         {pending ? 'Processando.' : ''}
       </p>
     </div>
+  );
+}
+
+/**
+ * A saída.
+ *
+ * Toda tela de cobrança precisa de uma, visível — quando não tem, a clínica
+ * cancela ligando, reclamando, ou parando de pagar, e nenhum dos três é bom. Ela
+ * fica discreta e no fim da tela, sem competir com os planos, mas sem esconder.
+ *
+ * A confirmação não é um "tem certeza?" genérico: diz a data até quando o acesso
+ * continua e o que acontece com os dados. É a dúvida real de quem está com o
+ * dedo no botão.
+ */
+function CancelarAssinatura({ data }: { data: BillingData }) {
+  const router = useRouter();
+  const [confirmando, setConfirmando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [pendente, iniciar] = useTransition();
+
+  const jaCancelada = data.access.status === 'CANCELLED';
+  const semAssinatura = !data.currentTier;
+  if (semAssinatura) return null;
+
+  if (jaCancelada) {
+    return (
+      <section className="rounded-2xl border border-border bg-surface-alt/40 p-6">
+        <h2 className="font-semibold">Assinatura cancelada</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          {data.currentPeriodEnd && new Date(data.currentPeriodEnd) > new Date() ? (
+            <>
+              Não haverá nova cobrança. Você continua com acesso completo até{' '}
+              <strong className="text-foreground">{date(data.currentPeriodEnd)}</strong> — depois
+              disso a clínica fica em modo consulta, e nada é apagado.
+            </>
+          ) : (
+            <>
+              A clínica está em modo consulta: dá para ver e imprimir tudo, mas não gravar. Seus
+              dados continuam aqui. Escolha um plano acima para voltar a usar.
+            </>
+          )}
+        </p>
+      </section>
+    );
+  }
+
+  function cancelar() {
+    setErro(null);
+    iniciar(async () => {
+      const r = await cancelPlan();
+      if (!r.ok) {
+        setErro(r.error ?? 'Não foi possível cancelar.');
+        return;
+      }
+      setConfirmando(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <section
+      aria-labelledby="cancelar-titulo"
+      className="rounded-2xl border border-border bg-surface p-6"
+    >
+      <h2 id="cancelar-titulo" className="font-semibold">
+        Cancelar assinatura
+      </h2>
+
+      {!confirmando ? (
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Você pode cancelar quando quiser, sem multa e sem precisar falar com ninguém.
+          </p>
+          <button
+            type="button"
+            onClick={() => setConfirmando(true)}
+            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Cancelar assinatura
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <p className="text-sm font-medium">Confirmar o cancelamento?</p>
+          <ul className="mt-2 space-y-1 text-sm leading-relaxed text-muted-foreground">
+            <li>
+              • Nenhuma cobrança nova será gerada
+              {data.currentPeriodEnd && (
+                <>
+                  , e você <strong className="text-foreground">continua usando tudo até {date(data.currentPeriodEnd)}</strong>
+                </>
+              )}
+              .
+            </li>
+            <li>• Depois dessa data, a clínica fica em modo consulta: dá para ver e imprimir, não gravar.</li>
+            <li>• Nenhum paciente, agendamento ou prontuário é apagado.</li>
+            <li>• Dá para voltar a qualquer momento escolhendo um plano aqui.</li>
+          </ul>
+
+          {erro && (
+            <p role="alert" className="mt-3 text-sm font-medium text-destructive">
+              {erro}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pendente}
+              onClick={cancelar}
+              className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {pendente ? 'Cancelando…' : 'Sim, cancelar'}
+            </button>
+            <button
+              type="button"
+              disabled={pendente}
+              onClick={() => {
+                setConfirmando(false);
+                setErro(null);
+              }}
+              className="btn-outline btn-md"
+            >
+              Manter assinatura
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

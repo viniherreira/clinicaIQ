@@ -95,8 +95,25 @@ describe('resolveAccess', () => {
     expect(access.status).toBe('SUSPENDED');
   });
 
-  it('preserva a consulta aos dados após o cancelamento', () => {
+  it('quem cancela fica com o que já pagou até o fim', () => {
+    // Cancelou ontem, pagou até daqui a 20 dias: os 20 dias são dela. Cortar no
+    // clique seria cobrar o mês inteiro e entregar meio.
     const access = resolveAccess(snapshot({ status: 'CANCELLED', cancelledAt: at(-1) }), NOW);
+    expect(access.level).toBe('full');
+    expect(canWrite(access)).toBe(true);
+    expect(access.status).toBe('CANCELLED');
+    expect(access.daysLeft).toBe(20);
+    // A data precisa aparecer: "até quando ainda funciona" é a dúvida de quem
+    // acabou de cancelar.
+    expect(access.warning).toContain('23/08/2026');
+    expect(access.warning).toContain('não haverá nova cobrança');
+  });
+
+  it('preserva a consulta aos dados depois que o período pago acaba', () => {
+    const access = resolveAccess(
+      snapshot({ status: 'CANCELLED', cancelledAt: at(-30), currentPeriodEnd: at(-1) }),
+      NOW,
+    );
     expect(access.level).toBe('readonly');
     expect(access.warning).toContain('disponíveis');
   });

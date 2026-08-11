@@ -57,6 +57,11 @@ const daysBetween = (from: Date, to: Date) => Math.ceil((to.getTime() - from.get
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
+/** dd/mm/aaaa lido dos componentes UTC, como o resto do app faz com datas de
+ *  parede — formatar no fuso local volta um dia no Brasil. */
+const diaBR = (d: Date) =>
+  `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+
 export function graceEnd(snapshot: SubscriptionSnapshot): Date {
   if (snapshot.graceEndsAt) return snapshot.graceEndsAt;
   return new Date(snapshot.currentPeriodEnd.getTime() + GRACE_DAYS * DAY_MS);
@@ -67,6 +72,18 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
   // nothing to chase — but the records stay readable. Their patient history is
   // theirs, and locking them out of it would be indefensible.
   if (snapshot.status === 'CANCELLED' || snapshot.cancelledAt) {
+    // Cancelou no dia 12 e já tinha pago até o 30: os 18 dias são dela. Cortar
+    // na hora do clique seria cobrar por um mês e entregar meio — e é o que
+    // fazia a clínica adiar o cancelamento até o último dia, com medo.
+    if (now < snapshot.currentPeriodEnd) {
+      return {
+        level: 'full',
+        status: 'CANCELLED',
+        daysLeft: daysBetween(now, snapshot.currentPeriodEnd),
+        warning: `Assinatura cancelada. Você continua com acesso completo até ${diaBR(snapshot.currentPeriodEnd)}, e não haverá nova cobrança.`,
+        inGrace: false,
+      };
+    }
     return {
       level: 'readonly',
       status: 'CANCELLED',
