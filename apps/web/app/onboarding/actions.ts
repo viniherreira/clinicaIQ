@@ -83,16 +83,44 @@ async function acceptPendingInvite(
     `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() ||
     convite.email.split('@')[0];
 
+  // Já trabalhou aqui e foi removida? Reativar a linha antiga em vez de abrir
+  // outra mantém a linha do tempo inteira: as evoluções, os agendamentos e os
+  // orçamentos que ela criou continuam apontando para o mesmo cadastro. Duas
+  // linhas para a mesma pessoa partiriam esse histórico em dois, e ninguém
+  // conseguiria remontá-lo depois.
+  const anterior = await prisma.user.findFirst({
+    where: {
+      tenantId: convite.tenantId,
+      active: false,
+      email: { equals: convite.email, mode: 'insensitive' },
+    },
+    orderBy: { deactivatedAt: 'desc' },
+    select: { id: true },
+  });
+
   await prisma.$transaction([
-    prisma.user.create({
-      data: {
-        tenantId: convite.tenantId,
-        clerkUserId,
-        name: nome,
-        email: convite.email,
-        role: convite.role,
-      },
-    }),
+    anterior
+      ? prisma.user.update({
+          where: { id: anterior.id },
+          data: {
+            clerkUserId,
+            name: nome,
+            role: convite.role,
+            active: true,
+            deactivatedAt: null,
+            deactivatedById: null,
+            deactivationReason: null,
+          },
+        })
+      : prisma.user.create({
+          data: {
+            tenantId: convite.tenantId,
+            clerkUserId,
+            name: nome,
+            email: convite.email,
+            role: convite.role,
+          },
+        }),
     prisma.invitation.update({
       where: { id: convite.id },
       data: { status: 'ACCEPTED', acceptedAt: new Date() },
@@ -100,7 +128,7 @@ async function acceptPendingInvite(
     prisma.auditLog.create({
       data: {
         tenantId: convite.tenantId,
-        action: `INVITE_ACCEPTED_${convite.role}`,
+        action: anterior ? `INVITE_REACCEPTED_${convite.role}` : `INVITE_ACCEPTED_${convite.role}`,
         entity: 'Invitation',
         entityId: convite.email,
       },
@@ -125,8 +153,12 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
   const { userId } = await auth();
   if (!userId) return null;
 
+  // `active: true` não é detalhe: sem ele, quem foi removido da equipe ainda
+  // era encontrado aqui, mandado para /dashboard, recusado pelo layout (que
+  // exige acesso ativo), mandado de volta para cá — e o navegador desistia com
+  // ERR_TOO_MANY_REDIRECTS em vez de dizer que o acesso acabou.
   const meu = await prisma.user.findFirst({
-    where: { clerkUserId: userId },
+    where: { clerkUserId: userId, active: true },
     select: { tenantId: true, email: true },
   });
   if (meu) {
@@ -153,6 +185,30 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
     emailPrincipal,
     u.publicMetadata as Record<string, unknown> | undefined,
   );
+}
+
+/**
+ * Esta conta já teve acesso a uma clínica e foi removida?
+ *
+ * Sem isto, quem é removido cai direto no formulário de "crie sua clínica" —
+ * uma tela que não explica nada para quem só quer entender por que perdeu o
+ * acesso, e que ainda por cima convida a abrir uma clínica vazia por engano.
+ *
+ * A busca é por `previousClerkUserId` porque a remoção libera o `clerkUserId`
+ * para o e-mail poder ser reconvidado.
+ */
+export async function acessoEncerrado(): Promise<{ clinica: string; em: Date | null } | null> {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  const linha = await prisma.user.findFirst({
+    where: { previousClerkUserId: userId, active: false },
+    orderBy: { deactivatedAt: 'desc' },
+    select: { deactivatedAt: true, tenant: { select: { name: true } } },
+  });
+  if (!linha) return null;
+
+  return { clinica: linha.tenant.name, em: linha.deactivatedAt };
 }
 
 export async function completeOnboarding(

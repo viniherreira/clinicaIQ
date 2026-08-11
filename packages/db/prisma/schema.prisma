@@ -126,21 +126,43 @@ model Tenant {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  tenantId    String
-  clerkUserId String   @unique
-  name        String
-  email       String
-  role        Role     @default(RECEPTIONIST)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id String @id @default(cuid())
+
+  tenantId String
+
+  /// Conta do Clerk ligada a este acesso.
+  ///
+  /// Fica nulo quando a pessoa é removida da equipe: `clerkUserId` é único no
+  /// banco inteiro, então segurá-lo numa linha desativada impediria a mesma
+  /// pessoa de voltar — e voltar tem que ser possível, é o fluxo normal de quem
+  /// sai e é recontratado.
+  clerkUserId String? @unique
+
+  /// A conta que estava aqui antes da remoção. Só para auditoria: responde
+  /// "era a mesma pessoa?" quando alguém é reconvidado meses depois.
+  previousClerkUserId String?
+
+  name   String
+  email  String
+  role   Role    @default(RECEPTIONIST)
+  /// Bandeira operacional: é ela que todas as consultas filtram.
+  /// `deactivatedAt` é o registro do fato; as duas são escritas juntas.
+  active Boolean @default(true)
+
+  /// Quando o acesso foi encerrado, por quem e por quê. Nulo enquanto ativo.
+  deactivatedAt      DateTime?
+  deactivatedById    String?
+  deactivationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   patientNotes PatientNote[]
   auditLogs    AuditLog[]
 
   @@index([tenantId])
+  @@index([tenantId, deactivatedAt])
   @@map("users")
 }
 

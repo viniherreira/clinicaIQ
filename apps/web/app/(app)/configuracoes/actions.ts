@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
+import { podeRemover } from '@/lib/team';
 import { composeAddress } from '@/lib/address';
 import {
   buildAppointmentConfirmationBody,
@@ -501,7 +502,9 @@ export interface TeamMember {
   role: Role;
   active: boolean;
   createdAt: Date;
-  /** Quem está olhando a tela. Não dá para rebaixar ou desativar a si mesmo. */
+  /** Quando o acesso foi encerrado. Nulo enquanto a pessoa está na equipe. */
+  deactivatedAt: Date | null;
+  /** Quem está olhando a tela. Não dá para rebaixar ou remover a si mesmo. */
   isSelf: boolean;
 }
 
@@ -513,7 +516,15 @@ export async function listTeam(): Promise<TeamMember[]> {
   const users = await prisma.user.findMany({
     where: { tenantId },
     orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
-    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      active: true,
+      createdAt: true,
+      deactivatedAt: true,
+    },
   });
   return users.map((u) => ({ ...u, role: u.role as Role, isSelf: u.id === userId }));
 }
@@ -574,48 +585,140 @@ export async function updateTeamRole(
   return { ok: true };
 }
 
-/** Tira o acesso sem apagar o histórico: o nome dele continua nas evoluções. */
-export async function setTeamMemberActive(
-  targetUserId: string,
-  active: boolean,
-): Promise<{ ok: boolean; message?: string }> {
-  const { tenantId, userId } = await requireOwner();
+const removeSchema = z
+  .object({
+    targetUserId: z.string().min(1, 'Usuário inválido.').max(60),
+    reason: z.string().trim().max(200).optional(),
+  })
+  .strict();
 
-  const bloqueio = await writeBlocked(tenantId);
-  if (bloqueio) return { ok: false, message: bloqueio };
+/**
+ * Tira alguém da equipe.
+ *
+ * Remoção é lógica, nunca física: quem sai criou agendamento, evolução e
+ * orçamento, e essas linhas apontam para `users.id`. Apagar levaria a autoria
+ * junto — e prontuário sem autor não serve nem para a clínica nem para uma
+ * fiscalização.
+ *
+ * ## Clerk e Postgres não compartilham transação
+ *
+ * A ordem é deliberada: primeiro o Clerk, depois o nosso banco.
+ *
+ * - Se o Clerk falhar, nada mudou aqui. O admin tenta de novo e a operação
+ *   inteira se repete sem efeito colateral.
+ * - Se o nosso banco falhar depois do Clerk, a pessoa já está deslogada e sem
+ *   convite pendente, mas continua aparecendo como ativa. O admin vê que não
+ *   saiu e clica de novo; a segunda passada completa.
+ *
+ * Nenhum dos dois estados intermediários concede acesso a mais ninguém — a
+ * falha sempre erra para o lado de menos acesso, não de mais. É por isso que a
+ * ordem é essa e não a inversa.
+ *
+ * Idempotente: remover duas vezes devolve sucesso na segunda, sem erro.
+ */
+export async function removeTeamMember(input: {
+  targetUserId: string;
+  reason?: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId, role } = await requireOwner();
+
+  const parsed = removeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  }
+  const { targetUserId, reason } = parsed.data;
 
   const semAcesso = await capabilityBlocked(tenantId, 'equipe');
   if (semAcesso) return { ok: false, message: semAcesso };
 
-  if (targetUserId === userId) {
-    return { ok: false, message: 'Você não pode desativar o seu próprio acesso.' };
+  const equipe = await prisma.user.findMany({
+    where: { tenantId },
+    select: { id: true, name: true, role: true, active: true, clerkUserId: true, email: true },
+  });
+
+  // Já saiu numa tentativa anterior que morreu no meio: completar em silêncio é
+  // melhor do que devolver erro para quem está só repetindo o clique.
+  const alvo = equipe.find((m) => m.id === targetUserId);
+  if (alvo && !alvo.active) {
+    revalidatePath('/configuracoes');
+    return { ok: true };
   }
 
-  const alvo = await prisma.user.findFirst({
-    where: { id: targetUserId, tenantId },
-    select: { id: true, role: true },
+  const veredito = podeRemover({
+    atorId: userId,
+    atorRole: role,
+    alvoId: targetUserId,
+    equipe: equipe.map((m) => ({ id: m.id, nome: m.name, role: m.role, ativo: m.active })),
   });
-  if (!alvo) return { ok: false, message: 'Usuário não encontrado.' };
+  if (!veredito.ok) return { ok: false, message: veredito.motivo };
+  if (!alvo) return { ok: false, message: 'Pessoa não encontrada nesta clínica.' };
 
-  if (!active && can(alvo.role, 'configuracoes')) {
-    const restantes = await prisma.user.count({
-      where: { tenantId, active: true, role: { in: ['OWNER', 'ADMIN'] }, NOT: { id: targetUserId } },
+  const email = alvo.email.toLowerCase();
+
+  // ─── Clerk primeiro ────────────────────────────────────────────────────────
+  try {
+    const clerk = await clerkClient();
+
+    // 1. Convites pendentes deste e-mail. Um convite vivo deixaria a pessoa
+    //    reentrar sozinha depois de removida.
+    const pendentes = await prisma.invitation.findMany({
+      where: { tenantId, email, status: 'PENDING' },
+      select: { id: true, clerkInvitationId: true },
     });
-    if (restantes === 0) {
-      return { ok: false, message: 'A clínica ficaria sem ninguém com acesso às configurações.' };
+    for (const convite of pendentes) {
+      if (!convite.clerkInvitationId) continue;
+      await clerk.invitations.revokeInvitation(convite.clerkInvitationId).catch(() => {
+        // Já aceito ou já revogado lá. Marcar do nosso lado ainda basta.
+      });
     }
+
+    // 2. Sessões abertas. Sem isto o acesso só morreria quando o token
+    //    expirasse — "removido" que continua trabalhando por horas.
+    if (alvo.clerkUserId) {
+      const sessoes = await clerk.sessions.getSessionList({ userId: alvo.clerkUserId });
+      for (const sessao of sessoes.data) {
+        if (sessao.status !== 'active') continue;
+        await clerk.sessions.revokeSession(sessao.id).catch(() => undefined);
+      }
+    }
+  } catch (error) {
+    console.error('[equipe] Clerk falhou ao remover', error);
+    return {
+      ok: false,
+      message: 'Não foi possível encerrar o acesso agora. Tente de novo — nada foi alterado.',
+    };
   }
 
-  await prisma.user.update({ where: { id: targetUserId }, data: { active } });
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      userId,
-      action: active ? 'USER_ACTIVATE' : 'USER_DEACTIVATE',
-      entity: 'User',
-      entityId: targetUserId,
-    },
-  });
+  // ─── Nosso banco depois ────────────────────────────────────────────────────
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        active: false,
+        deactivatedAt: new Date(),
+        deactivatedById: userId,
+        deactivationReason: reason || null,
+        // Liberar a conta do Clerk é o que permite reconvidar este e-mail
+        // depois: `clerkUserId` é único no banco inteiro.
+        clerkUserId: null,
+        previousClerkUserId: alvo.clerkUserId,
+      },
+    }),
+    prisma.invitation.updateMany({
+      where: { tenantId, email, status: 'PENDING' },
+      data: { status: 'REVOKED' },
+    }),
+    prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: `USER_REMOVED_${alvo.role}`,
+        entity: 'User',
+        entityId: targetUserId,
+        metadata: reason ? { motivo: reason } : undefined,
+      },
+    }),
+  ]);
 
   revalidatePath('/configuracoes');
   return { ok: true };
@@ -726,7 +829,9 @@ async function emailsPresosEmOutraClinica(
 ): Promise<Set<string>> {
   if (emails.length === 0) return new Set();
   const contas = await prisma.user.findMany({
-    where: { email: { in: emails, mode: 'insensitive' }, NOT: { tenantId } },
+    // Só conta quem está *ativo* em outra clínica. Quem foi removido de lá
+    // liberou a conta do Clerk ao sair e pode perfeitamente entrar aqui.
+    where: { email: { in: emails, mode: 'insensitive' }, active: true, NOT: { tenantId } },
     select: { email: true },
   });
   return new Set(contas.map((u) => u.email.toLowerCase()));
@@ -788,19 +893,18 @@ export async function inviteTeamMember(input: {
   }
   const { email, role } = parsed.data;
 
-  // Já é da equipe? Convidar de novo criaria uma segunda conta para a mesma
-  // pessoa, e ela entraria sem o histórico que já tem.
-  const jaExiste = await prisma.user.findFirst({
-    where: { tenantId, email: { equals: email, mode: 'insensitive' } },
-    select: { id: true, active: true },
+  // Já está na equipe agora? Convidar de novo criaria uma segunda conta para a
+  // mesma pessoa, e ela entraria sem o histórico que já tem.
+  //
+  // Quem foi *removido* é outro caso: convidar de novo é justamente o jeito de
+  // trazer a pessoa de volta. A linha antiga continua no banco por causa da
+  // autoria, e é ela que será reativada quando o convite for aceito.
+  const jaAtivo = await prisma.user.findFirst({
+    where: { tenantId, active: true, email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
   });
-  if (jaExiste) {
-    return {
-      ok: false,
-      message: jaExiste.active
-        ? 'Esta pessoa já faz parte da equipe.'
-        : 'Esta pessoa já tem cadastro aqui — devolva o acesso em vez de convidar.',
-    };
+  if (jaAtivo) {
+    return { ok: false, message: 'Esta pessoa já faz parte da equipe.' };
   }
 
   // Recusar aqui é melhor do que mandar um convite que não tem como dar certo:
@@ -820,6 +924,18 @@ export async function inviteTeamMember(input: {
   let clerkInvitationId: string | null = null;
   try {
     const clerk = await clerkClient();
+
+    // Reenviar tem que matar o link anterior. Dois convites válidos para o mesmo
+    // e-mail significam que um link que a clínica acha revogado continua
+    // abrindo a porta.
+    const anterior = await prisma.invitation.findUnique({
+      where: { tenantId_email: { tenantId, email } },
+      select: { clerkInvitationId: true, status: true },
+    });
+    if (anterior?.status === 'PENDING' && anterior.clerkInvitationId) {
+      await clerk.invitations.revokeInvitation(anterior.clerkInvitationId).catch(() => undefined);
+    }
+
     const invite = await clerk.invitations.createInvitation({
       emailAddress: email,
       // Reconvidar depois de um convite expirado não pode virar erro.
