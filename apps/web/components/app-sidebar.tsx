@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  FileBarChart, MessageCircle, Megaphone, Settings,
+  FileBarChart, MessageCircle, Megaphone, Settings, PhoneCall,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { can, type Capability } from '@/lib/permissions';
@@ -28,6 +28,7 @@ export const NAV: {
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays, capability: 'agenda' },
   { href: '/pacientes', label: 'Pacientes', icon: Users, capability: 'pacientes' },
+  { href: '/retorno', label: 'Retorno', icon: PhoneCall, capability: 'pacientes' },
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope, capability: 'configuracoes' },
   { href: '/orcamentos', label: 'Orçamentos', icon: FileText, capability: 'financeiro' },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet, capability: 'financeiro' },

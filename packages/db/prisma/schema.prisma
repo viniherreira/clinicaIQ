@@ -312,6 +312,17 @@ model Procedure {
   materials          String?
   allowsDiscount     Boolean  @default(false)
   maxDiscountPercent Decimal? @db.Decimal(5, 2)
+
+  /// De quantos em quantos dias este procedimento se repete.
+  ///
+  /// Nulo quando não se repete: restauração, endodontia e implante são feitos
+  /// uma vez e acabou. Limpeza volta a cada 6 meses, manutenção de aparelho
+  /// todo mês — é isso que diz quando o paciente está "vencido" para voltar.
+  recurrenceIntervalDays Int?
+  /// Quantos dias além do vencimento ainda contam como normal. Passou disso, a
+  /// pessoa está atrasada de verdade.
+  recurrenceGraceDays    Int? @default(120)
+
   active             Boolean  @default(true)
   deletedAt          DateTime?
   createdById        String?
