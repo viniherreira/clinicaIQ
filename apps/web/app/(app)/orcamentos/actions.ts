@@ -1,7 +1,8 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient, decrypt } from '@clinicaiq/db';
+import { prisma, getTenantClient } from '@clinicaiq/db';
+import type { ContractDocumentProps, QuoteDocumentProps } from '@clinicaiq/pdf';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -9,6 +10,18 @@ import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
+import { describePayment, isPaymentMethod, MAX_INSTALLMENTS } from '@/lib/payment-terms';
+import { loadClinicInfo, loadPatientDocData } from '@/lib/documents';
+import {
+  contractGaps,
+  contractTitle,
+  DEFAULT_QUOTE_TERMS,
+  isMinor,
+  maritalStatusText,
+  type DocumentGap,
+} from '@/lib/document-content';
+import { valorPorExtenso } from '@/lib/extenso';
+import { clinicToday, instantDateBR, instantDateLongBR, instantDateTimeBR, wallDateBR } from '@/lib/tz';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -146,6 +159,7 @@ export async function getQuote(id: string) {
     where: { id },
     include: {
       patient: { select: { id: true, name: true, controlNumber: true } },
+      professional: { select: { id: true, name: true, registration: true } },
       items: { orderBy: { id: 'asc' } },
       payments: { orderBy: { paidAt: 'desc' } },
     },
@@ -156,6 +170,7 @@ export async function getQuote(id: string) {
     discountValue: Number(quote.discountValue),
     subtotal: Number(quote.subtotal),
     total: Number(quote.total),
+    downPayment: Number(quote.downPayment),
     items: quote.items.map((it) => ({
       ...it,
       unitPrice: Number(it.unitPrice),
@@ -208,6 +223,16 @@ export async function listQuoteProcedures() {
   }));
 }
 
+/** Quem pode ser o responsável pelo tratamento: profissionais ativos. */
+export async function listQuoteProfessionals() {
+  const { tenantId } = await requireTenant();
+  return prisma.professional.findMany({
+    where: { tenantId, active: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, registration: true },
+  });
+}
+
 /** Pre-selects a patient when the quote is started from the agenda or a record. */
 export async function getQuotePatient(patientId: string) {
   const { tenantId } = await requireTenant();
@@ -222,7 +247,9 @@ export async function getQuotePatient(patientId: string) {
 
 const itemSchema = z.object({
   procedureId: z.string().nullable().optional(),
-  name: z.string().trim().min(1).max(160),
+  name: z.string().trim().min(1, 'Dê um nome a cada item').max(160),
+  /** Dente, região ou detalhe do item. */
+  description: z.string().trim().max(160).optional().or(z.literal('')),
   unitPrice: z.coerce.number().min(0),
   quantity: z.coerce.number().int().min(1).max(999),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
@@ -230,9 +257,17 @@ const itemSchema = z.object({
 
 const quoteSchema = z.object({
   patientId: z.string().min(1, 'Selecione um paciente'),
+  professionalId: z.string().max(60).optional().or(z.literal('')),
   discountType: z.enum(['PERCENT', 'FIXED']).default('PERCENT'),
   discountValue: z.coerce.number().min(0).default(0),
-  validUntil: z.string().min(1),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de validade inválida'),
+  paymentMethod: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || isPaymentMethod(v), 'Forma de pagamento inválida'),
+  downPayment: z.coerce.number().min(0).default(0),
+  installments: z.coerce.number().int().min(1).max(MAX_INSTALLMENTS).default(1),
   notes: z.string().max(2000).optional().or(z.literal('')),
   internalNotes: z.string().max(2000).optional().or(z.literal('')),
   items: z.array(itemSchema).min(1, 'Adicione ao menos um item'),
@@ -251,13 +286,37 @@ function parseQuoteForm(formData: FormData) {
   }
   return quoteSchema.safeParse({
     patientId: formData.get('patientId'),
+    professionalId: formData.get('professionalId') || '',
     discountType: formData.get('discountType') || 'PERCENT',
     discountValue: parseBRL(String(formData.get('discountValue') ?? '0')),
     validUntil: formData.get('validUntil'),
+    paymentMethod: formData.get('paymentMethod') || '',
+    downPayment: Number(formData.get('downPayment') ?? 0) || 0,
+    installments: formData.get('installments') || 1,
     notes: formData.get('notes') || '',
     internalNotes: formData.get('internalNotes') || '',
     items,
   });
+}
+
+/**
+ * Entrada maior que o total não é erro de digitação inofensivo: o contrato
+ * sairia dizendo que o paciente paga de entrada mais do que deve. Melhor
+ * recusar com a frase certa do que imprimir isso.
+ */
+function paymentError(downPayment: number, total: number): string | null {
+  if (downPayment > total + 0.004) return 'A entrada não pode ser maior que o total do orçamento.';
+  return null;
+}
+
+/** Campos de pagamento e responsável, iguais na criação e na edição. */
+function termsData(data: z.infer<typeof quoteSchema>) {
+  return {
+    professionalId: data.professionalId || null,
+    paymentMethod: data.paymentMethod || null,
+    downPayment: Math.round(data.downPayment * 100) / 100,
+    installments: data.installments,
+  };
 }
 
 export async function createQuote(
@@ -278,8 +337,12 @@ export async function createQuote(
   const data = parsed.data;
   const { subtotal, total, lines } = computeTotals(data.items, data.discountType, data.discountValue);
 
+  const pagamento = paymentError(data.downPayment, total);
+  if (pagamento) return { success: false, errors: { downPayment: [pagamento] }, message: pagamento };
+
   const foreign = await refOutsideTenant(tenantId, {
     patientId: data.patientId,
+    professionalId: data.professionalId || null,
     procedureIds: data.items.map((it) => it.procedureId),
   });
   if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
@@ -298,6 +361,7 @@ export async function createQuote(
       subtotal,
       total,
       validUntil: new Date(data.validUntil),
+      ...termsData(data),
       notes: data.notes || null,
       internalNotes: data.internalNotes || null,
       createdById: userId,
@@ -306,6 +370,7 @@ export async function createQuote(
         create: data.items.map((it, i) => ({
           procedureId: it.procedureId || null,
           name: it.name,
+          description: it.description || null,
           unitPrice: it.unitPrice,
           quantity: it.quantity,
           discountPercent: it.discountPercent,
@@ -348,8 +413,12 @@ export async function updateQuote(
   const data = parsed.data;
   const { subtotal, total, lines } = computeTotals(data.items, data.discountType, data.discountValue);
 
+  const pagamento = paymentError(data.downPayment, total);
+  if (pagamento) return { success: false, errors: { downPayment: [pagamento] }, message: pagamento };
+
   const foreign = await refOutsideTenant(tenantId, {
     patientId: data.patientId,
+    professionalId: data.professionalId || null,
     procedureIds: data.items.map((it) => it.procedureId),
   });
   if (foreign) return { success: false, errors: {}, message: refErrorMessage(foreign) };
@@ -365,6 +434,7 @@ export async function updateQuote(
         subtotal,
         total,
         validUntil: new Date(data.validUntil),
+        ...termsData(data),
         notes: data.notes || null,
         internalNotes: data.internalNotes || null,
         updatedById: userId,
@@ -372,6 +442,7 @@ export async function updateQuote(
           create: data.items.map((it, i) => ({
             procedureId: it.procedureId || null,
             name: it.name,
+            description: it.description || null,
             unitPrice: it.unitPrice,
             quantity: it.quantity,
             discountPercent: it.discountPercent,
@@ -617,72 +688,177 @@ export async function deleteQuote(id: string) {
   revalidatePath(`/pacientes/${quote.patientId}`);
 }
 
-// ─── PDF data ──────────────────────────────────────────────────────────────────
+// ─── Documentos (PDF) ──────────────────────────────────────────────────────────
 
-function getMasterKey(): string {
-  const key = process.env.ENCRYPTION_MASTER_KEY;
-  if (!key) throw new Error('ENCRYPTION_MASTER_KEY not set');
-  return key;
-}
+const pad4 = (n: number) => String(n).padStart(4, '0');
 
-export async function getQuotePdfData(id: string) {
+/**
+ * O orçamento com tudo o que os documentos precisam. Exige o perfil financeiro:
+ * o PDF leva CPF e valores, e a rota que o serve é um GET que qualquer pessoa
+ * logada na clínica consegue abrir pela barra de endereço.
+ */
+async function loadQuoteForDocument(id: string) {
   const { tenantId } = await requireTenant();
-  const db = getTenantClient(tenantId);
-  const quote = await db.quote.findUnique({
-    where: { id },
+  if (await capabilityBlocked(tenantId, 'financeiro')) return null;
+
+  const quote = await prisma.quote.findFirst({
+    where: { id, tenantId },
     include: {
       items: { orderBy: { id: 'asc' } },
-      patient: { select: { name: true, phoneEncrypted: true, email: true } },
-      tenant: { select: { name: true, phone: true, email: true, address: true } },
+      professional: { select: { name: true, registration: true } },
     },
   });
   if (!quote) return null;
 
-  let phone = '';
-  try {
-    phone = quote.patient.phoneEncrypted ? decrypt(quote.patient.phoneEncrypted, getMasterKey(), tenantId) : '';
-  } catch {
-    phone = '';
-  }
+  const [clinic, patient, terms] = await Promise.all([
+    loadClinicInfo(tenantId),
+    loadPatientDocData(quote.patientId, tenantId),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { quoteTerms: true, contractTerms: true } }),
+  ]);
+  if (!patient) return null;
 
-  const discountLabel =
-    quote.discountType === 'PERCENT'
-      ? `${Number(quote.discountValue)}%`
-      : `R$ ${Number(quote.discountValue).toFixed(2)}`;
+  const subtotal = Number(quote.subtotal);
+  const total = Number(quote.total);
+  const discountValue = Number(quote.discountValue);
 
   return {
-    clinic: {
-      name: quote.tenant.name,
-      address: quote.tenant.address ?? undefined,
-      phone: quote.tenant.phone ?? undefined,
-      email: quote.tenant.email ?? undefined,
-    },
+    tenantId,
+    quote,
+    clinic,
+    patient,
+    terms,
+    professional: quote.professional
+      ? { name: quote.professional.name, registration: quote.professional.registration ?? undefined }
+      : undefined,
+    items: quote.items.map((it) => ({
+      name: it.name,
+      description: it.description ?? undefined,
+      quantity: it.quantity,
+      unitPrice: Number(it.unitPrice),
+      discountPercent: Number(it.discountPercent ?? 0),
+      total: Number(it.total),
+    })),
+    subtotal,
+    total,
+    discountAmount: Math.max(0, Math.round((subtotal - total) * 100) / 100),
+    discountLabel:
+      discountValue > 0
+        ? quote.discountType === 'PERCENT'
+          ? `${discountValue.toLocaleString('pt-BR')}%`
+          : undefined
+        : undefined,
+    payment: describePayment({
+      total,
+      downPayment: Number(quote.downPayment),
+      installments: quote.installments,
+      method: quote.paymentMethod,
+    }),
+  };
+}
+
+export async function getQuotePdfData(id: string): Promise<QuoteDocumentProps | null> {
+  const d = await loadQuoteForDocument(id);
+  if (!d) return null;
+
+  return {
+    clinic: d.clinic,
     patient: {
-      name: quote.patient.name,
-      phone: phone || undefined,
-      email: quote.patient.email ?? undefined,
+      name: d.patient.name,
+      document: d.patient.cpf,
+      phone: d.patient.phone,
+      email: d.patient.email,
+      controlNumber: d.patient.controlNumber,
     },
+    professional: d.professional,
     quote: {
-      id: quote.id,
-      number: quote.number,
-      items: quote.items.map((it) => ({
-        name: it.name,
-        quantity: it.quantity,
-        unitPrice: Number(it.unitPrice),
-        discountPercent: Number(it.discountPercent ?? 0),
-        total: Number(it.total),
-      })),
-      subtotal: Number(quote.subtotal),
-      discountLabel,
-      total: Number(quote.total),
-      validUntil: quote.validUntil.toLocaleDateString('pt-BR'),
-      createdAt: quote.createdAt.toLocaleDateString('pt-BR'),
-      notes: quote.notes ?? undefined,
+      code: `ORC-${pad4(d.quote.number)}`,
+      issuedAt: instantDateBR(d.quote.createdAt),
+      validUntil: wallDateBR(d.quote.validUntil),
+      items: d.items,
+      subtotal: d.subtotal,
+      discountAmount: d.discountAmount,
+      discountLabel: d.discountLabel,
+      total: d.total,
+      payment: d.payment,
+      notes: d.quote.notes ?? undefined,
+      terms: d.terms?.quoteTerms?.trim() || DEFAULT_QUOTE_TERMS,
+      generatedAt: instantDateTimeBR(new Date()),
     },
   };
 }
 
+export async function getContractPdfData(id: string): Promise<ContractDocumentProps | null> {
+  const d = await loadQuoteForDocument(id);
+  if (!d) return null;
+
+  const now = new Date();
+  const registroDoTitulo = d.professional?.registration ?? d.clinic.technicalRegistration;
+
+  return {
+    clinic: d.clinic,
+    patient: {
+      name: d.patient.name,
+      document: d.patient.cpf,
+      maritalStatus: maritalStatusText(d.patient.maritalStatus),
+      profession: d.patient.profession ?? undefined,
+      birthDate: d.patient.birthDate ? wallDateBR(d.patient.birthDate) : undefined,
+      address: d.patient.address,
+      phone: d.patient.phone,
+      email: d.patient.email,
+      isMinor: isMinor(d.patient.birthDate, now),
+    },
+    professional: d.professional,
+    contract: {
+      // Mesmo número do orçamento: CTR-0042 é o contrato do ORC-0042, e
+      // ninguém precisa de uma tabela para achar um a partir do outro.
+      code: `CTR-${pad4(d.quote.number)}`,
+      quoteCode: `ORC-${pad4(d.quote.number)}`,
+      title: contractTitle(registroDoTitulo),
+      items: d.items,
+      subtotal: d.subtotal,
+      discountAmount: d.discountAmount,
+      discountLabel: d.discountLabel,
+      total: d.total,
+      totalText: valorPorExtenso(d.total),
+      payment: d.payment,
+      extraTerms: d.terms?.contractTerms ?? undefined,
+      dateLong: instantDateLongBR(now),
+      issuedAt: instantDateBR(now),
+      generatedAt: instantDateTimeBR(now),
+    },
+  };
+}
+
+/** O que falta no cadastro para o contrato deste orçamento sair completo. */
+export async function getContractGaps(id: string): Promise<DocumentGap[]> {
+  const { tenantId } = await requireTenant();
+  const quote = await prisma.quote.findFirst({
+    where: { id, tenantId },
+    select: { patientId: true },
+  });
+  if (!quote) return [];
+
+  const [tenant, patient] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { document: true, address: true, city: true, technicalResponsible: true },
+    }),
+    prisma.patient.findFirst({
+      where: { id: quote.patientId, tenantId },
+      select: { cpfEncrypted: true, street: true },
+    }),
+  ]);
+
+  return contractGaps({
+    patientId: quote.patientId,
+    clinic: tenant ?? {},
+    patient: { hasCpf: Boolean(patient?.cpfEncrypted), hasAddress: Boolean(patient?.street) },
+  });
+}
+
 const DEFAULT_VALID_DAYS = 30;
+/** Hoje no fuso da clínica + 30 dias. Usar o dia UTC daria amanhã depois das 21h. */
 export async function defaultValidUntil(): Promise<string> {
-  return addDays(new Date(), DEFAULT_VALID_DAYS).toISOString().slice(0, 10);
+  const hoje = new Date(`${clinicToday()}T00:00:00Z`);
+  return addDays(hoje, DEFAULT_VALID_DAYS).toISOString().slice(0, 10);
 }

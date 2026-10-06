@@ -1,5 +1,29 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { clinicToday, wallClockTime, wallClockMinutes } from './tz';
+import {
+  clinicToday,
+  instantDateBR,
+  instantDateLongBR,
+  instantDateTimeBR,
+  wallClockTime,
+  wallClockMinutes,
+  wallDateBR,
+} from './tz';
+
+describe('datas em documentos', () => {
+  it('data de parede não volta um dia', () => {
+    // Validade escolhida como 30/10 é gravada à meia-noite UTC. Formatar no
+    // fuso de São Paulo daria 29/10 — o bug que este helper existe para evitar.
+    expect(wallDateBR(new Date('2026-10-30T00:00:00.000Z'))).toBe('30/10/2026');
+  });
+
+  it('instante é lido no fuso da clínica', () => {
+    // 01:30 UTC do dia 4 ainda é 22:30 do dia 3 em São Paulo.
+    const d = new Date('2026-10-04T01:30:00.000Z');
+    expect(instantDateBR(d)).toBe('03/10/2026');
+    expect(instantDateLongBR(d)).toBe('3 de outubro de 2026');
+    expect(instantDateTimeBR(d)).toBe('03/10/2026 às 22:30');
+  });
+});
 
 describe('wallClockTime', () => {
   it('reads the wall-clock from UTC components, not local tz', () => {

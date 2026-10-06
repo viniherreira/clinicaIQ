@@ -8,6 +8,7 @@ export interface ProfessionalModalData {
   id: string;
   name: string;
   specialty: string | null;
+  registration: string | null;
   color: string | null;
 }
 
@@ -135,6 +136,25 @@ export function ProfessionalModal({ open, onClose, onSuccess, professional, defa
               placeholder="Ex: Ortodontia"
               className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="prof-registration" className="text-sm font-medium">
+              Registro no conselho
+            </label>
+            <input
+              id="prof-registration"
+              name="registration"
+              type="text"
+              maxLength={40}
+              defaultValue={professional?.registration ?? ''}
+              placeholder="Ex: CRO-SP 12345"
+              aria-describedby="prof-registration-help"
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            />
+            <p id="prof-registration-help" className="text-xs text-muted-foreground">
+              Sai nos orçamentos, contratos e recibos em que este profissional é o responsável.
+            </p>
           </div>
 
           <fieldset className="space-y-2">

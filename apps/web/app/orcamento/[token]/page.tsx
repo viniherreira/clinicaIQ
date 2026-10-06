@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getPublicQuote } from './actions';
 import { PublicQuoteActions } from './public-quote';
+import { wallDateBR } from '@/lib/tz';
 
 export const metadata = { title: 'Seu orçamento', robots: { index: false } };
 
@@ -13,7 +14,8 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const quote = await getPublicQuote(token);
   if (!quote) notFound();
 
-  const validUntil = new Date(quote.validUntil).toLocaleDateString('pt-BR');
+  // Data de parede: no fuso do navegador do paciente ela voltaria um dia.
+  const validUntil = wallDateBR(quote.validUntil);
   const discountAmount = quote.subtotal - quote.total;
   const discountLabel = quote.discountType === 'PERCENT' ? `${quote.discountValue}%` : brl(quote.discountValue);
   const actionable = quote.status === 'VIEWED';
@@ -50,7 +52,12 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
             <tbody>
               {quote.items.map((it) => (
                 <tr key={it.id} className="border-b border-border last:border-0">
-                  <td className="px-5 py-3 font-medium sm:px-6">{it.name}</td>
+                  <td className="px-5 py-3 sm:px-6">
+                    <span className="font-medium">{it.name}</span>
+                    {it.description && (
+                      <span className="block text-xs text-muted-foreground">{it.description}</span>
+                    )}
+                  </td>
                   <td className="px-2 py-3 text-center tabular-nums text-muted-foreground">{it.quantity}</td>
                   <td className="px-5 py-3 text-right font-medium tabular-nums sm:px-6">{brl(it.total)}</td>
                 </tr>
@@ -66,6 +73,19 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
             <div className="flex justify-between border-t border-border pt-2 text-lg font-semibold"><span>Total</span><span className="tabular-nums text-primary">{brl(quote.total)}</span></div>
           </div>
         </div>
+
+        <dl className="grid gap-3 rounded-xl border border-border bg-surface p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium text-muted-foreground">Pagamento</dt>
+            <dd className="mt-0.5">{quote.payment}</dd>
+          </div>
+          {quote.professional && (
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">Profissional responsável</dt>
+              <dd className="mt-0.5">{quote.professional}</dd>
+            </div>
+          )}
+        </dl>
 
         {quote.notes && (
           <div className="rounded-xl border border-border bg-surface p-4 text-sm">

@@ -3,6 +3,7 @@
 import { prisma } from '@clinicaiq/db';
 import { headers } from 'next/headers';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
+import { describePayment } from '@/lib/payment-terms';
 
 export type PublicResult = { ok: boolean; message?: string };
 
@@ -18,6 +19,7 @@ export async function getPublicQuote(token: string) {
       items: { orderBy: { id: 'asc' } },
       patient: { select: { name: true } },
       tenant: { select: { name: true, phone: true, email: true } },
+      professional: { select: { name: true, registration: true } },
     },
   });
   if (!quote) return null;
@@ -49,9 +51,19 @@ export async function getPublicQuote(token: string) {
     total: Number(quote.total),
     discountType: quote.discountType,
     discountValue: Number(quote.discountValue),
+    payment: describePayment({
+      total: Number(quote.total),
+      downPayment: Number(quote.downPayment),
+      installments: quote.installments,
+      method: quote.paymentMethod,
+    }),
+    professional: quote.professional
+      ? [quote.professional.name, quote.professional.registration].filter(Boolean).join(' · ')
+      : null,
     items: quote.items.map((it) => ({
       id: it.id,
       name: it.name,
+      description: it.description,
       quantity: it.quantity,
       unitPrice: Number(it.unitPrice),
       discountPercent: Number(it.discountPercent ?? 0),

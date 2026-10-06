@@ -69,6 +69,26 @@ export async function signObject(path: string, expiresInSeconds = 3600): Promise
   return data.signedURL ? `${SUPABASE_URL}/storage/v1${data.signedURL}` : null;
 }
 
+/**
+ * Baixa os bytes de um objeto privado, no servidor. Para o que vai embutido num
+ * PDF (o logotipo da clínica): um link assinado obrigaria o gerador de PDF a
+ * fazer uma requisição de rede no meio da renderização.
+ */
+export async function downloadObject(
+  path: string,
+): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  if (!serviceKey()) return null;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
+    headers: headers(),
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  return {
+    bytes: await res.arrayBuffer(),
+    contentType: res.headers.get('content-type') ?? 'application/octet-stream',
+  };
+}
+
 export async function deleteObject(path: string): Promise<void> {
   await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`, {
     method: 'DELETE',

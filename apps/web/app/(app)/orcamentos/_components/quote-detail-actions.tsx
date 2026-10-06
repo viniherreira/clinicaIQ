@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Pencil, Download, Trash2, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Pencil, Download, Trash2, CheckCircle2, RotateCcw, FileSignature } from 'lucide-react';
 import { acceptQuote, reopenQuote, deleteQuote } from '../actions';
 
 interface Props {
@@ -62,8 +62,20 @@ export function QuoteDetailActions({ quoteId, status }: Props) {
       )}
 
       <a href={`/orcamentos/${quoteId}/pdf`} target="_blank" rel="noopener noreferrer" className="btn-outline btn-md">
-        <Download className="h-4 w-4" aria-hidden="true" /> PDF
+        <Download className="h-4 w-4" aria-hidden="true" /> PDF do orçamento
       </a>
+
+      {/* Contrato de um orçamento recusado ou vencido não tem o que formalizar. */}
+      {!isRejected && status !== 'EXPIRED' && (
+        <a
+          href={`/orcamentos/${quoteId}/contrato`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={isAccepted ? 'btn-primary btn-md' : 'btn-outline btn-md'}
+        >
+          <FileSignature className="h-4 w-4" aria-hidden="true" /> Contrato
+        </a>
+      )}
 
       {isDraft && (
         <Link href={`/orcamentos/${quoteId}/editar`} className="btn-outline btn-md">

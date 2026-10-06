@@ -3,7 +3,11 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { redirect } from 'next/navigation';
+import type { ReceiptDocumentProps } from '@clinicaiq/pdf';
 import { valorPorExtenso } from '@/lib/extenso';
+import { capabilityBlocked } from '@/lib/access';
+import { loadClinicInfo, loadPatientDocData } from '@/lib/documents';
+import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -224,22 +228,13 @@ export async function getFinanceData(params: FinanceParams) {
 
 // ─── Receipt (PDF data) ──────────────────────────────────────────────────────
 
-interface ReceiptData {
-  clinic: { name: string; phone?: string; email?: string; document?: string };
-  receipt: {
-    number: string;
-    patientName: string;
-    amount: number;
-    amountText: string;
-    method?: string;
-    paidAt: string;
-    reference: string;
-  };
-}
-
-/** Builds the props for a payment receipt PDF (tenant-scoped by id). */
-export async function getReceiptData(paymentId: string): Promise<ReceiptData | null> {
+/**
+ * Props do recibo. Leva o CPF de quem pagou e o registro de quem recebeu porque
+ * é o que a Receita exige para o paciente deduzir a despesa no Imposto de Renda.
+ */
+export async function getReceiptData(paymentId: string): Promise<ReceiptDocumentProps | null> {
   const { tenantId } = await requireTenant();
+  if (await capabilityBlocked(tenantId, 'financeiro')) return null;
 
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, tenantId },
@@ -248,31 +243,49 @@ export async function getReceiptData(paymentId: string): Promise<ReceiptData | n
       amount: true,
       method: true,
       paidAt: true,
-      patient: { select: { name: true } },
-      quote: { select: { number: true } },
-      tenant: { select: { name: true, phone: true, email: true, document: true } },
+      patientId: true,
+      quote: {
+        select: {
+          number: true,
+          items: { orderBy: { id: 'asc' }, select: { name: true, description: true } },
+          professional: { select: { name: true, registration: true } },
+        },
+      },
     },
   });
   if (!payment) return null;
 
+  const [clinic, patient] = await Promise.all([
+    loadClinicInfo(tenantId),
+    loadPatientDocData(payment.patientId, tenantId),
+  ]);
+
+  const signer = payment.quote?.professional
+    ? {
+        name: payment.quote.professional.name,
+        registration: payment.quote.professional.registration ?? undefined,
+      }
+    : undefined;
+  const registro = signer?.registration ?? clinic.technicalRegistration ?? '';
+  const servico = /\bCRO\b/i.test(registro) ? 'tratamento odontológico' : 'serviços prestados';
   const amount = Number(payment.amount);
+
   return {
-    clinic: {
-      name: payment.tenant.name,
-      phone: payment.tenant.phone ?? undefined,
-      email: payment.tenant.email ?? undefined,
-      document: payment.tenant.document ?? undefined,
-    },
+    clinic,
+    signer,
     receipt: {
       number: `REC-${payment.id.slice(-8).toUpperCase()}`,
-      patientName: payment.patient.name,
+      payer: { name: patient?.name ?? 'Paciente', document: patient?.cpf },
       amount,
       amountText: valorPorExtenso(amount),
       method: payment.method ?? undefined,
-      paidAt: payment.paidAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      paidAt: instantDateBR(payment.paidAt),
+      paidAtLong: instantDateLongBR(payment.paidAt),
       reference: payment.quote?.number
-        ? `Orçamento ORC-${String(payment.quote.number).padStart(4, '0')}`
-        : 'atendimento na clínica',
+        ? `${servico} — Orçamento ORC-${String(payment.quote.number).padStart(4, '0')}`
+        : servico,
+      services: payment.quote?.items.map((it) => (it.description ? `${it.name} (${it.description})` : it.name)),
+      generatedAt: instantDateTimeBR(new Date()),
     },
   };
 }

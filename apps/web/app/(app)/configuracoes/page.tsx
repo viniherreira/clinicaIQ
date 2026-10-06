@@ -9,6 +9,7 @@ import {
   listAudit,
   listInvites,
   getMessageSettings,
+  getDocumentSettings,
 } from './actions';
 import { Suspense } from 'react';
 import { SettingsView } from './_components/settings-view';
@@ -30,7 +31,7 @@ export default async function ConfiguracoesPage() {
 
   // As abas de administração nem são buscadas para quem não vai vê-las. Esconder
   // a aba mas mandar a lista da equipe junto no HTML seria esconder com a mão.
-  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session] =
+  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents] =
     await Promise.all([
       listProfessionals(),
       suggestColor(),
@@ -44,6 +45,7 @@ export default async function ConfiguracoesPage() {
         where: { tenantId: clinic.id },
         select: { status: true, phoneNumber: true },
       }),
+      getDocumentSettings(),
     ]);
 
   return (
@@ -57,6 +59,7 @@ export default async function ConfiguracoesPage() {
       audit={audit}
       invites={invites}
       messages={messages}
+      documents={documents}
       podeEquipe={podeEquipe}
       podePlano={podePlano}
       podePrivacidade={podePrivacidade}

@@ -1,23 +1,36 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { format } from 'date-fns';
-import { ChevronLeft } from 'lucide-react';
-import { getQuote } from '../actions';
+import { AlertCircle, ChevronLeft } from 'lucide-react';
+import { getContractGaps, getQuote } from '../actions';
 import { QuoteDetailActions } from '../_components/quote-detail-actions';
 import { QuotePayments } from '../_components/quote-payments';
 import { QUOTE_STATUS, formatBRL, quoteCode } from '../_components/constants';
+import { requireCapability } from '@/lib/guard';
+import { describePayment } from '@/lib/payment-terms';
+import { wallDateBR } from '@/lib/tz';
 
 export const metadata = { title: 'Orçamento · ClinicaIQ' };
 
 export default async function OrcamentoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  // Mesma régua da listagem: orçamento é dinheiro, e esta página leva ao PDF e
+  // ao contrato, que trazem CPF e valores.
+  await requireCapability('financeiro');
+
   const { id } = await params;
-  const quote = await getQuote(id);
+  const [quote, gaps] = await Promise.all([getQuote(id), getContractGaps(id)]);
   if (!quote) notFound();
 
   const meta = QUOTE_STATUS[quote.status] ?? QUOTE_STATUS.DRAFT;
   const discountLabel =
     quote.discountType === 'PERCENT' ? `${quote.discountValue}%` : formatBRL(quote.discountValue);
   const discountAmount = Number(quote.subtotal) - Number(quote.total);
+  const payment = describePayment({
+    total: quote.total,
+    downPayment: quote.downPayment,
+    installments: quote.installments,
+    method: quote.paymentMethod,
+  });
 
   const timeline = [
     quote.sentAt && { label: 'Enviado', at: quote.sentAt },
@@ -40,11 +53,47 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {quote.patient.name} · Nº {quote.patient.controlNumber} · criado em {format(new Date(quote.createdAt), 'dd/MM/yyyy')}
+          <Link href={`/pacientes/${quote.patient.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+            {quote.patient.name}
+          </Link>{' '}
+          · Nº {quote.patient.controlNumber} · criado em {format(new Date(quote.createdAt), 'dd/MM/yyyy')}
+          {quote.professional && (
+            <>
+              {' '}
+              · responsável: {quote.professional.name}
+              {quote.professional.registration ? ` (${quote.professional.registration})` : ''}
+            </>
+          )}
         </p>
       </div>
 
       <QuoteDetailActions quoteId={quote.id} status={quote.status} />
+
+      {gaps.length > 0 && quote.status !== 'REJECTED' && quote.status !== 'EXPIRED' && (
+        <aside
+          aria-labelledby="gaps-title"
+          className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p id="gaps-title" className="font-medium">
+              Para o contrato sair completo, falta preencher:
+            </p>
+            <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+              {gaps.map((g) => (
+                <li key={g.label}>
+                  <Link href={g.href} className="underline underline-offset-2 hover:no-underline">
+                    {g.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-xs opacity-80">
+              Dá para gerar mesmo assim — o que faltar sai como linha em branco para completar à caneta.
+            </p>
+          </div>
+        </aside>
+      )}
 
       {/* Items */}
       <section className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -62,7 +111,10 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
           <tbody>
             {quote.items.map((it) => (
               <tr key={it.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-medium">{it.name}</td>
+                <td className="px-4 py-3">
+                  <span className="font-medium">{it.name}</span>
+                  {it.description && <span className="block text-xs text-muted-foreground">{it.description}</span>}
+                </td>
                 <td className="px-4 py-3 text-center tabular-nums">{it.quantity}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatBRL(it.unitPrice)}</td>
                 <td className="px-4 py-3 text-center tabular-nums hidden sm:table-cell">{it.discountPercent > 0 ? `${it.discountPercent}%` : '—'}</td>
@@ -84,11 +136,15 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-4 text-sm">
+          <p className="text-xs font-medium text-muted-foreground">Condições de pagamento</p>
+          <p className="mt-1 font-medium">{payment}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 text-sm">
           <p className="text-xs font-medium text-muted-foreground">Validade</p>
-          <p className="mt-1 font-medium">{format(new Date(quote.validUntil), 'dd/MM/yyyy')}</p>
+          <p className="mt-1 font-medium tabular-nums">{wallDateBR(quote.validUntil)}</p>
         </div>
         {timeline.length > 0 && (
-          <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-2">
             <p className="mb-2 text-xs font-medium text-muted-foreground">Histórico</p>
             <ul className="space-y-1.5 text-sm">
               {timeline.map((t, i) => (

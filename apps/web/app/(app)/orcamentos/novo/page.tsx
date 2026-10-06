@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
-import { listQuoteProcedures, defaultValidUntil, getQuotePatient } from '../actions';
+import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient } from '../actions';
 import { QuoteBuilder } from '../_components/quote-builder';
 
 export const metadata = { title: 'Novo orçamento · ClinicaIQ' };
@@ -11,8 +11,9 @@ export default async function NovoOrcamentoPage({
   searchParams: Promise<{ patientId?: string }>;
 }) {
   const sp = await searchParams;
-  const [procedures, validUntil, patient] = await Promise.all([
+  const [procedures, professionals, validUntil, patient] = await Promise.all([
     listQuoteProcedures(),
+    listQuoteProfessionals(),
     defaultValidUntil(),
     sp.patientId ? getQuotePatient(sp.patientId) : Promise.resolve(null),
   ]);
@@ -36,6 +37,7 @@ export default async function NovoOrcamentoPage({
       <QuoteBuilder
         mode="create"
         procedures={procedures}
+        professionals={professionals}
         defaultValidUntil={validUntil}
         initialPatient={patient ?? undefined}
       />

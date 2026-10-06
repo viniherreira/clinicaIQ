@@ -18,17 +18,20 @@ import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
 import type {
   AuditEntry,
+  DocumentSettings,
   MessageSettings,
   PendingInvite,
   PrivacySummary,
   TeamMember,
 } from '../actions';
 import { MessagesPanel } from './messages-panel';
+import { DocumentsPanel } from './documents-panel';
 
 interface Professional {
   id: string;
   name: string;
   specialty: string | null;
+  registration: string | null;
   color: string | null;
   active: boolean;
   _count: { appointments: number };
@@ -56,6 +59,7 @@ interface Props {
   team: TeamMember[];
   invites: PendingInvite[];
   messages: MessageSettings;
+  documents: DocumentSettings;
   privacy: PrivacySummary | null;
   audit: AuditEntry[];
   /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
@@ -76,6 +80,7 @@ export function SettingsView({
   team,
   invites,
   messages,
+  documents,
   privacy,
   audit,
   billing,
@@ -131,6 +136,11 @@ export function SettingsView({
       ),
     },
     {
+      id: 'documentos',
+      label: 'Documentos',
+      panel: <DocumentsPanel settings={documents} />,
+    },
+    {
       id: 'comunicacao',
       label: 'Comunicação',
       panel: <CommunicationPanel whatsapp={whatsapp} messages={messages} />,
@@ -161,8 +171,8 @@ export function SettingsView({
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {podeEquipe
-            ? 'Dados da clínica, equipe, atendimento, comunicação, plano e privacidade.'
-            : 'Dados da clínica, atendimento e comunicação.'}
+            ? 'Dados da clínica, equipe, atendimento, documentos, comunicação, plano e privacidade.'
+            : 'Dados da clínica, atendimento, documentos e comunicação.'}
         </p>
       </header>
 
@@ -433,7 +443,9 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
     <section aria-labelledby="clinic-heading" className="rounded-xl border border-border bg-surface shadow-card">
       <div className="border-b border-border px-5 py-4">
         <h2 id="clinic-heading" className="text-base font-semibold">Dados da clínica</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">Aparecem nos orçamentos e mensagens.</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Aparecem nos orçamentos, contratos, recibos e mensagens.
+        </p>
       </div>
       <form action={formAction} className="space-y-4 p-5">
         <div className="space-y-1.5">
@@ -455,8 +467,21 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
           </div>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="clinic-doc" className="text-sm font-medium">CNPJ</label>
-          <input id="clinic-doc" name="document" defaultValue={clinic.document ?? ''} placeholder="00.000.000/0000-00" className={`${inputCls} sm:max-w-xs`} />
+          <label htmlFor="clinic-doc" className="text-sm font-medium">CNPJ ou CPF</label>
+          <input
+            id="clinic-doc"
+            name="document"
+            defaultValue={clinic.document ?? ''}
+            placeholder="00.000.000/0000-00"
+            inputMode="numeric"
+            aria-invalid={!!err('document')}
+            aria-describedby="clinic-doc-help"
+            className={`${inputCls} sm:max-w-xs`}
+          />
+          <p id="clinic-doc-help" className="text-xs text-muted-foreground">
+            Sai no contrato e no recibo — é o que o paciente usa para deduzir a despesa no Imposto de Renda.
+          </p>
+          {err('document') && <p className="text-xs text-destructive">{err('document')}</p>}
         </div>
 
         {/* Endereço. Estava faltando e não era detalhe: é o campo que o PDF do
@@ -538,7 +563,7 @@ function ProfessionalsSection({
     setModalOpen(true);
   }
   function openEdit(p: Professional) {
-    setEditing({ id: p.id, name: p.name, specialty: p.specialty, color: p.color });
+    setEditing({ id: p.id, name: p.name, specialty: p.specialty, registration: p.registration, color: p.color });
     setModalOpen(true);
   }
 
@@ -670,6 +695,7 @@ function ProfessionalRow({
         </div>
         <p className="truncate text-sm text-muted-foreground">
           {professional.specialty || 'Sem especialidade'}
+          {professional.registration && ` · ${professional.registration}`}
           {professional._count.appointments > 0 && ` · ${professional._count.appointments} agendamento${professional._count.appointments !== 1 ? 's' : ''}`}
         </p>
         {error && <p className="mt-1 text-xs text-destructive">{error}</p>}

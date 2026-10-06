@@ -6,6 +6,10 @@ import { Search, Plus, Trash2, Loader2 } from 'lucide-react';
 import { createQuote, updateQuote, searchQuotePatients, type QuoteFormState } from '../actions';
 import { formatBRL, maskBRLInput, brlToNumber } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { describePayment, MAX_INSTALLMENTS, PAYMENT_METHODS } from '@/lib/payment-terms';
+
+/** O Select do Radix não aceita valor vazio; isto faz o papel de "nenhum". */
+const NENHUM = 'none';
 
 interface ProcedureOption {
   id: string;
@@ -23,21 +27,33 @@ export interface QuoteItemDraft {
   key: string;
   procedureId: string | null;
   name: string;
+  /** Dente, região ou detalhe. */
+  description: string;
   unitPrice: number;
   quantity: number;
   discountPercent: number;
   maxDiscount: number | null;
 }
+interface ProfessionalOption {
+  id: string;
+  name: string;
+  registration: string | null;
+}
 interface Props {
   mode: 'create' | 'edit';
   quoteId?: string;
   procedures: ProcedureOption[];
+  professionals: ProfessionalOption[];
   defaultValidUntil: string;
   initial?: {
     patient: Patient;
+    professionalId: string | null;
     discountType: 'PERCENT' | 'FIXED';
     discountValue: number;
     validUntil: string;
+    paymentMethod: string | null;
+    downPayment: number;
+    installments: number;
     notes: string;
     internalNotes: string;
     items: QuoteItemDraft[];
@@ -50,7 +66,15 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 let keySeq = 0;
 const newKey = () => `it-${Date.now()}-${keySeq++}`;
 
-export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, initial, initialPatient }: Props) {
+export function QuoteBuilder({
+  mode,
+  quoteId,
+  procedures,
+  professionals,
+  defaultValidUntil,
+  initial,
+  initialPatient,
+}: Props) {
   const router = useRouter();
   const action = mode === 'edit' && quoteId ? updateQuote.bind(null, quoteId) : createQuote;
   const [state, formAction, pending] = useActionState<QuoteFormState | null, FormData>(action, null);
@@ -70,6 +94,13 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [internalNotes, setInternalNotes] = useState(initial?.internalNotes ?? '');
   const [procToAdd, setProcToAdd] = useState('');
+  // Com um profissional só, ele é o responsável — perguntar seria burocracia.
+  const [professionalId, setProfessionalId] = useState<string>(
+    initial ? (initial.professionalId ?? NENHUM) : professionals.length === 1 ? professionals[0].id : NENHUM,
+  );
+  const [paymentMethod, setPaymentMethod] = useState<string>(initial?.paymentMethod ?? NENHUM);
+  const [downPayment, setDownPayment] = useState(initial?.downPayment ?? 0);
+  const [installments, setInstallments] = useState(initial?.installments ?? 1);
 
   useEffect(() => {
     if (state?.success) router.push(`/orcamentos/${state.quoteId}`);
@@ -104,6 +135,7 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
         key: newKey(),
         procedureId: proc.id,
         name: proc.name,
+        description: '',
         unitPrice: proc.basePrice,
         quantity: 1,
         discountPercent: 0,
@@ -114,7 +146,7 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
   }
 
   function addCustom() {
-    setItems((prev) => [...prev, { key: newKey(), procedureId: null, name: '', unitPrice: 0, quantity: 1, discountPercent: 0, maxDiscount: 100 }]);
+    setItems((prev) => [...prev, { key: newKey(), procedureId: null, name: '', description: '', unitPrice: 0, quantity: 1, discountPercent: 0, maxDiscount: 100 }]);
   }
 
   function updateItem(key: string, patch: Partial<QuoteItemDraft>) {
@@ -130,6 +162,17 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
     setShowResults(false);
   }
 
+  // A entrada nunca passa do total na prévia — o servidor recusa se passar, mas
+  // a frase de pagamento não deve mostrar um absurdo enquanto se digita.
+  const effectiveDown = Math.min(downPayment, totals.total);
+  const paymentPreview = describePayment({
+    total: totals.total,
+    downPayment: effectiveDown,
+    installments,
+    method: paymentMethod === NENHUM ? null : paymentMethod,
+  });
+  const downTooBig = downPayment > totals.total + 0.004 && totals.total > 0;
+
   const fieldErr = (k: string) => (state && !state.success ? state.errors?.[k]?.[0] : undefined);
   const inputCls = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
@@ -140,7 +183,11 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
     formData.set('validUntil', validUntil);
     formData.set('notes', notes);
     formData.set('internalNotes', internalNotes);
-    formData.set('items', JSON.stringify(items.map(({ procedureId, name, unitPrice, quantity, discountPercent }) => ({ procedureId, name, unitPrice, quantity, discountPercent }))));
+    formData.set('professionalId', professionalId === NENHUM ? '' : professionalId);
+    formData.set('paymentMethod', paymentMethod === NENHUM ? '' : paymentMethod);
+    formData.set('downPayment', String(effectiveDown));
+    formData.set('installments', String(installments));
+    formData.set('items', JSON.stringify(items.map(({ procedureId, name, description, unitPrice, quantity, discountPercent }) => ({ procedureId, name, description, unitPrice, quantity, discountPercent }))));
     formAction(formData);
   }
 
@@ -222,7 +269,17 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
                       onChange={(e) => updateItem(it.key, { name: e.target.value })}
                       placeholder="Nome do item"
                       aria-label="Nome do item"
+                      maxLength={160}
                       className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    />
+                    <input
+                      type="text"
+                      value={it.description}
+                      onChange={(e) => updateItem(it.key, { description: e.target.value })}
+                      placeholder="Dente / região"
+                      aria-label={`Dente ou região de ${it.name || 'item'}`}
+                      maxLength={160}
+                      className="h-9 w-36 shrink-0 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-44"
                     />
                     <button type="button" onClick={() => removeItem(it.key)} aria-label={`Remover ${it.name || 'item'}`} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -262,7 +319,7 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
         <section className="rounded-xl border border-border bg-surface p-5 space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="q-notes" className="text-sm font-medium">Observações <span className="text-xs font-normal text-muted-foreground">(o paciente vê)</span></label>
-            <textarea id="q-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={2000} className="w-full rounded-md border border-border bg-background p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" placeholder="Condições, formas de pagamento..." />
+            <textarea id="q-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={2000} className="w-full rounded-md border border-border bg-background p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" placeholder="Ex.: tratamento em 4 sessões; a coroa é feita depois do canal." />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="q-internal" className="text-sm font-medium">Nota interna <span className="text-xs font-normal text-muted-foreground">(só a equipe vê)</span></label>
@@ -280,6 +337,28 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
             <label htmlFor="q-valid" className="text-xs font-medium text-muted-foreground">Válido até</label>
             <input id="q-valid" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inputCls} />
           </div>
+
+          {professionals.length > 0 && (
+            <div className="space-y-1.5">
+              <span id="q-prof-label" className="text-xs font-medium text-muted-foreground">
+                Profissional responsável
+              </span>
+              <Select value={professionalId} onValueChange={setProfessionalId}>
+                <SelectTrigger aria-labelledby="q-prof-label">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NENHUM}>Não definir</SelectItem>
+                  {professionals.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.registration ? ` · ${p.registration}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Desconto geral</span>
@@ -306,6 +385,73 @@ export function QuoteBuilder({ mode, quoteId, procedures, defaultValidUntil, ini
             )}
             <div className="flex justify-between border-t border-border pt-2 text-base font-semibold"><dt>Total</dt><dd className="tabular-nums text-primary">{formatBRL(totals.total)}</dd></div>
           </dl>
+
+          <fieldset className="space-y-3 border-t border-border pt-4">
+            <legend className="mb-1 text-sm font-semibold">Pagamento</legend>
+
+            <div className="space-y-1.5">
+              <span id="q-method-label" className="text-xs font-medium text-muted-foreground">Forma</span>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger aria-labelledby="q-method-label">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NENHUM}>A combinar</SelectItem>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label htmlFor="q-down" className="text-xs font-medium text-muted-foreground">Entrada</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                  <input
+                    id="q-down"
+                    inputMode="numeric"
+                    value={downPayment ? maskBRLInput(String(Math.round(downPayment * 100))) : ''}
+                    onChange={(e) => setDownPayment(brlToNumber(e.target.value))}
+                    placeholder="0,00"
+                    aria-invalid={downTooBig || !!fieldErr('downPayment')}
+                    aria-describedby="q-payment-preview"
+                    className={`${inputCls} pl-8 tabular-nums`}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="q-inst" className="text-xs font-medium text-muted-foreground">
+                  {effectiveDown > 0 ? 'Parcelas do saldo' : 'Parcelas'}
+                </label>
+                <input
+                  id="q-inst"
+                  type="number"
+                  min={1}
+                  max={MAX_INSTALLMENTS}
+                  value={installments}
+                  onChange={(e) =>
+                    setInstallments(Math.min(MAX_INSTALLMENTS, Math.max(1, Math.floor(Number(e.target.value) || 1))))
+                  }
+                  aria-describedby="q-payment-preview"
+                  className={`${inputCls} tabular-nums`}
+                />
+              </div>
+            </div>
+
+            <p
+              id="q-payment-preview"
+              aria-live="polite"
+              className={`rounded-md px-3 py-2 text-xs leading-relaxed ${
+                downTooBig ? 'bg-destructive/10 text-destructive' : 'bg-surface-alt text-muted-foreground'
+              }`}
+            >
+              {downTooBig ? 'A entrada é maior que o total do orçamento.' : paymentPreview}
+            </p>
+          </fieldset>
 
           <button type="submit" disabled={pending} className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             {pending ? 'Salvando...' : mode === 'edit' ? 'Salvar alterações' : 'Criar orçamento'}

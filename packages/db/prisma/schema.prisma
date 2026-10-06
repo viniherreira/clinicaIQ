@@ -96,7 +96,20 @@ model Tenant {
   neighborhood  String?
   city          String?
   state         String?
+  /// Caminho do logotipo no storage privado (não é URL pública). Os PDFs
+  /// baixam os bytes no servidor; a tela de configurações assina um link curto.
   logoUrl    String?
+
+  /// Responsável técnico e o registro dele no conselho (ex.: "CRO-SP 12345").
+  /// O conselho exige os dois nos documentos da clínica — saem no rodapé de
+  /// assinatura do orçamento, do recibo e do contrato.
+  technicalResponsible  String?
+  technicalRegistration String?
+  /// Condições gerais impressas no fim de todo orçamento. Nulo = texto padrão.
+  quoteTerms            String?
+  /// Cláusulas próprias da clínica, acrescentadas ao contrato padrão.
+  contractTerms         String?
+
   settings   Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -250,6 +263,9 @@ model Professional {
   userId    String?  @unique
   name      String
   specialty String?
+  /// Registro no conselho de classe (ex.: "CRO-SP 12345"). Sai nos documentos
+  /// em que este profissional é o responsável pelo tratamento.
+  registration String?
   color     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -261,6 +277,7 @@ model Professional {
   blockedSlots BlockedSlot[]
   procedures   Procedure[]            @relation("ProcedureProfessionals")
   evolutions   Evolution[]
+  quotes       Quote[]
 
   @@index([tenantId])
   @@map("professionals")
@@ -408,14 +425,25 @@ model Quote {
   rejectedAt    DateTime?
   rejectReason  String?
   pdfUrl        String?
+
+  /// Quem vai executar o tratamento. Sai no orçamento e no contrato.
+  professionalId String?
+  /// Condições de pagamento. `installments` conta as parcelas do saldo, depois
+  /// da entrada; entrada igual ao total é pagamento à vista. Método nulo = a
+  /// combinar. Ver `lib/payment-terms.ts`.
+  paymentMethod  String?
+  downPayment    Decimal @default(0) @db.Decimal(10, 2)
+  installments   Int     @default(1)
+
   createdById   String?
   updatedById   String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  tenant   Tenant            @relation(fields: [tenantId], references: [id])
-  patient  Patient           @relation(fields: [patientId], references: [id])
-  items    QuoteItem[]
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  patient      Patient           @relation(fields: [patientId], references: [id])
+  professional Professional?     @relation(fields: [professionalId], references: [id])
+  items        QuoteItem[]
   messages WhatsAppMessage[]
   payments Payment[]
 

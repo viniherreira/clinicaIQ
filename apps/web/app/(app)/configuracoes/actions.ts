@@ -11,6 +11,14 @@ import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { podeRemover } from '@/lib/team';
 import { composeAddress } from '@/lib/address';
+import { documentError, formatDocument, onlyDigits } from '@/lib/document';
+import { contractTitle, DEFAULT_QUOTE_TERMS } from '@/lib/document-content';
+import { loadClinicInfo } from '@/lib/documents';
+import { valorPorExtenso } from '@/lib/extenso';
+import { describePayment } from '@/lib/payment-terms';
+import { deleteObject, signObject, storageEnabled, uploadObject } from '@/lib/storage';
+import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
+import type { ContractDocumentProps, QuoteDocumentProps, ReceiptDocumentProps } from '@clinicaiq/pdf';
 import {
   buildAppointmentConfirmationBody,
   buildAppointmentCreatedBody,
@@ -67,6 +75,7 @@ export type ClinicFormState =
 const professionalSchema = z.object({
   name: z.string().trim().min(2, 'Nome deve ter ao menos 2 caracteres').max(100),
   specialty: z.string().trim().max(80).optional().or(z.literal('')),
+  registration: z.string().trim().max(40).optional().or(z.literal('')),
   color: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida'),
 });
 
@@ -127,13 +136,20 @@ export async function updateClinic(
   }
   const d = parsed.data;
 
+  // O documento sai impresso no contrato e no recibo que o paciente usa no
+  // Imposto de Renda. Um CNPJ com dígito errado ali invalida o comprovante.
+  if (d.document && onlyDigits(d.document)) {
+    const problema = documentError(d.document);
+    if (problema) return { success: false, errors: { document: [problema] } };
+  }
+
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
       name: d.name,
       phone: d.phone || null,
       email: d.email || null,
-      document: d.document || null,
+      document: d.document && onlyDigits(d.document) ? formatDocument(d.document) : null,
       zipCode: d.zipCode || null,
       street: d.street || null,
       addressNumber: d.addressNumber || null,
@@ -165,6 +181,7 @@ export async function listProfessionals() {
       id: true,
       name: true,
       specialty: true,
+      registration: true,
       color: true,
       active: true,
       _count: { select: { appointments: true } },
@@ -206,10 +223,10 @@ export async function createProfessional(
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
   }
-  const { name, specialty, color } = parsed.data;
+  const { name, specialty, registration, color } = parsed.data;
 
   const professional = await prisma.professional.create({
-    data: { tenantId, name, specialty: specialty || null, color },
+    data: { tenantId, name, specialty: specialty || null, registration: registration || null, color },
   });
 
   await prisma.auditLog.create({
@@ -237,11 +254,11 @@ export async function updateProfessional(
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
   }
-  const { name, specialty, color } = parsed.data;
+  const { name, specialty, registration, color } = parsed.data;
 
   await prisma.professional.update({
     where: { id, tenantId },
-    data: { name, specialty: specialty || null, color },
+    data: { name, specialty: specialty || null, registration: registration || null, color },
   });
 
   await prisma.auditLog.create({
@@ -1192,4 +1209,294 @@ export async function declararAceiteDeCampanhaParaTodos(): Promise<{
   revalidatePath('/configuracoes');
   revalidatePath('/campanhas');
   return { ok: true, marcados: count };
+}
+
+// ─── Documentos (orçamento, contrato, recibo) ─────────────────────────────────
+
+export interface DocumentSettings {
+  technicalResponsible: string;
+  technicalRegistration: string;
+  /** Vazio = usa o texto padrão. */
+  quoteTerms: string;
+  contractTerms: string;
+  /** Link assinado e curto para pré-visualizar. Nulo sem logotipo. */
+  logoPreviewUrl: string | null;
+  /** Sem storage configurado, o upload é desativado com explicação. */
+  storageReady: boolean;
+  defaultQuoteTerms: string;
+  /** O que já está pronto e o que falta para os papéis saírem completos. */
+  checklist: { label: string; ok: boolean; href: string }[];
+}
+
+export async function getDocumentSettings(): Promise<DocumentSettings> {
+  const { tenantId } = await requireOwner();
+  const t = await prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
+    select: {
+      document: true,
+      address: true,
+      city: true,
+      phone: true,
+      logoUrl: true,
+      technicalResponsible: true,
+      technicalRegistration: true,
+      quoteTerms: true,
+      contractTerms: true,
+    },
+  });
+
+  const storageReady = storageEnabled();
+  const logoPreviewUrl = t.logoUrl && storageReady ? await signObject(t.logoUrl, 600).catch(() => null) : null;
+
+  return {
+    technicalResponsible: t.technicalResponsible ?? '',
+    technicalRegistration: t.technicalRegistration ?? '',
+    quoteTerms: t.quoteTerms ?? '',
+    contractTerms: t.contractTerms ?? '',
+    logoPreviewUrl,
+    storageReady,
+    defaultQuoteTerms: DEFAULT_QUOTE_TERMS,
+    checklist: [
+      { label: 'CNPJ ou CPF da clínica', ok: Boolean(t.document), href: '#clinica' },
+      { label: 'Endereço com cidade', ok: Boolean(t.address && t.city), href: '#clinica' },
+      { label: 'Telefone', ok: Boolean(t.phone), href: '#clinica' },
+      { label: 'Responsável técnico e registro', ok: Boolean(t.technicalResponsible && t.technicalRegistration), href: '#documentos' },
+      { label: 'Logotipo', ok: Boolean(t.logoUrl), href: '#documentos' },
+    ],
+  };
+}
+
+const documentSettingsSchema = z.object({
+  technicalResponsible: z.string().trim().max(120),
+  technicalRegistration: z.string().trim().max(40),
+  quoteTerms: z.string().trim().max(2000, 'Condições gerais: no máximo 2.000 caracteres.'),
+  contractTerms: z.string().trim().max(4000, 'Cláusulas adicionais: no máximo 4.000 caracteres.'),
+});
+
+export async function saveDocumentSettings(
+  input: z.infer<typeof documentSettingsSchema>,
+): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const parsed = documentSettingsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  }
+  const d = parsed.data;
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      technicalResponsible: d.technicalResponsible || null,
+      technicalRegistration: d.technicalRegistration || null,
+      // Igual ao padrão é o mesmo que não ter escrito nada: guardar nulo faz a
+      // clínica receber as melhorias futuras do texto padrão.
+      quoteTerms: d.quoteTerms && d.quoteTerms !== DEFAULT_QUOTE_TERMS ? d.quoteTerms : null,
+      contractTerms: d.contractTerms || null,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'UPDATE_DOCUMENTS', entity: 'Tenant', entityId: tenantId },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+const LOGO_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg' };
+const LOGO_MAX_BYTES = 1024 * 1024;
+
+/**
+ * Troca o logotipo dos documentos.
+ *
+ * Só PNG e JPEG: é o que o gerador de PDF sabe desenhar. Um nome novo a cada
+ * envio, para nenhum cache servir o logotipo antigo, e o anterior é apagado
+ * depois que o novo já está gravado — nunca o contrário.
+ */
+export async function uploadClinicLogo(formData: FormData): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  if (!storageEnabled()) {
+    return { ok: false, message: 'O armazenamento de arquivos ainda não foi configurado.' };
+  }
+
+  const file = formData.get('logo');
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Selecione uma imagem.' };
+  const ext = LOGO_TYPES[file.type];
+  if (!ext) return { ok: false, message: 'Use uma imagem PNG ou JPG.' };
+  if (file.size > LOGO_MAX_BYTES) return { ok: false, message: 'Imagem muito grande (máx. 1 MB).' };
+
+  const anterior = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { logoUrl: true } });
+  const path = `${tenantId}/_clinica/logo-${crypto.randomUUID()}.${ext}`;
+
+  try {
+    await uploadObject(path, file);
+  } catch {
+    return { ok: false, message: 'Não foi possível enviar a imagem. Tente de novo.' };
+  }
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { logoUrl: path } });
+  if (anterior?.logoUrl) await deleteObject(anterior.logoUrl).catch(() => undefined);
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'UPDATE_LOGO', entity: 'Tenant', entityId: tenantId },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+export async function removeClinicLogo(): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+
+  const atual = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { logoUrl: true } });
+  if (!atual?.logoUrl) return { ok: true };
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { logoUrl: null } });
+  if (storageEnabled()) await deleteObject(atual.logoUrl).catch(() => undefined);
+
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'REMOVE_LOGO', entity: 'Tenant', entityId: tenantId },
+  });
+
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+export type SampleDocument =
+  | { kind: 'orcamento'; props: QuoteDocumentProps }
+  | { kind: 'contrato'; props: ContractDocumentProps }
+  | { kind: 'recibo'; props: ReceiptDocumentProps };
+
+/**
+ * Os três documentos com os dados reais da clínica e um paciente fictício.
+ *
+ * Existe para a clínica ver o efeito do logotipo e do responsável técnico antes
+ * de mandar o primeiro papel para um paciente de verdade — sem precisar criar
+ * um orçamento de mentira que depois fica na lista e na numeração.
+ */
+export async function getSampleDocument(kind: string): Promise<SampleDocument | null> {
+  const { tenantId } = await requireOwner();
+  const clinic = await loadClinicInfo(tenantId);
+  const terms = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { quoteTerms: true, contractTerms: true },
+  });
+
+  const now = new Date();
+  const items = [
+    { name: 'Restauração em resina composta', description: 'Dentes 16 e 26', quantity: 2, unitPrice: 280, discountPercent: 0, total: 560 },
+    { name: 'Tratamento de canal (endodontia)', description: 'Dente 36', quantity: 1, unitPrice: 1200, discountPercent: 0, total: 1200 },
+    { name: 'Limpeza e profilaxia', quantity: 1, unitPrice: 250, discountPercent: 0, total: 250 },
+  ];
+  const subtotal = 2010;
+  const total = 1909.5;
+  const payment = describePayment({ total, downPayment: 500, installments: 3, method: 'CARTAO_CREDITO' });
+  const patient = {
+    name: 'Paciente de Exemplo',
+    document: '123.456.789-09',
+    phone: '(11) 90000-0000',
+  };
+  const professional = clinic.technicalResponsible
+    ? { name: clinic.technicalResponsible, registration: clinic.technicalRegistration }
+    : undefined;
+
+  if (kind === 'orcamento') {
+    return {
+      kind,
+      props: {
+        clinic,
+        patient: { ...patient, controlNumber: 1 },
+        professional,
+        quote: {
+          code: 'ORC-EXEMPLO',
+          issuedAt: instantDateBR(now),
+          validUntil: instantDateBR(new Date(now.getTime() + 30 * 86_400_000)),
+          items,
+          subtotal,
+          discountAmount: subtotal - total,
+          discountLabel: '5%',
+          total,
+          payment,
+          notes: 'Exemplo de observação: tratamento previsto em 3 sessões.',
+          terms: terms?.quoteTerms?.trim() || DEFAULT_QUOTE_TERMS,
+          generatedAt: instantDateTimeBR(now),
+        },
+      },
+    };
+  }
+
+  if (kind === 'contrato') {
+    return {
+      kind,
+      props: {
+        clinic,
+        patient: {
+          ...patient,
+          maritalStatus: 'casado(a)',
+          profession: 'professor(a)',
+          birthDate: '15/05/1985',
+          address: 'Rua de Exemplo, 100 · Centro · São Paulo/SP · CEP 01000-000',
+          isMinor: false,
+        },
+        professional,
+        contract: {
+          code: 'CTR-EXEMPLO',
+          quoteCode: 'ORC-EXEMPLO',
+          title: contractTitle(clinic.technicalRegistration),
+          items,
+          subtotal,
+          discountAmount: subtotal - total,
+          discountLabel: '5%',
+          total,
+          totalText: valorPorExtenso(total),
+          payment,
+          extraTerms: terms?.contractTerms ?? undefined,
+          dateLong: instantDateLongBR(now),
+          issuedAt: instantDateBR(now),
+          generatedAt: instantDateTimeBR(now),
+        },
+      },
+    };
+  }
+
+  if (kind === 'recibo') {
+    return {
+      kind,
+      props: {
+        clinic,
+        signer: professional,
+        receipt: {
+          number: 'REC-EXEMPLO',
+          payer: { name: patient.name, document: patient.document },
+          amount: 500,
+          amountText: valorPorExtenso(500),
+          method: 'PIX',
+          paidAt: instantDateBR(now),
+          paidAtLong: instantDateLongBR(now),
+          reference: `${/\bCRO\b/i.test(clinic.technicalRegistration ?? '') ? 'tratamento odontológico' : 'serviços prestados'} — Orçamento ORC-EXEMPLO`,
+          services: items.map((it) => (it.description ? `${it.name} (${it.description})` : it.name)),
+          generatedAt: instantDateTimeBR(now),
+        },
+      },
+    };
+  }
+
+  return null;
 }
