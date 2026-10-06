@@ -126,4 +126,40 @@ describe('resolveAccess', () => {
   it('clínica sem plano nenhum não escreve', () => {
     expect(canWrite(NO_SUBSCRIPTION)).toBe(false);
   });
+
+  describe('cortesia', () => {
+    it('libera tudo, sem aviso e sem prazo', () => {
+      const access = resolveAccess(snapshot({ complimentary: true }), NOW);
+      expect(access.level).toBe('full');
+      expect(access.complimentary).toBe(true);
+      expect(access.warning).toBeNull();
+      expect(access.daysLeft).toBeNull();
+    });
+
+    it('vence datas vencidas há meses', () => {
+      // O caso real: a clínica pagava, parou porque ganhou a cortesia, e a linha
+      // continua com o vencimento antigo. Não pode virar bloqueio.
+      const access = resolveAccess(
+        snapshot({ complimentary: true, status: 'SUSPENDED', currentPeriodEnd: at(-90) }),
+        NOW,
+      );
+      expect(access.level).toBe('full');
+      expect(canWrite(access)).toBe(true);
+    });
+
+    it('vence até um cancelamento antigo', () => {
+      const access = resolveAccess(
+        snapshot({ complimentary: true, status: 'CANCELLED', cancelledAt: at(-200), currentPeriodEnd: at(-180) }),
+        NOW,
+      );
+      expect(access.level).toBe('full');
+      expect(access.warning).toBeNull();
+    });
+
+    it('não vale para quem não tem a bandeira', () => {
+      const access = resolveAccess(snapshot({ currentPeriodEnd: at(-60) }), NOW);
+      expect(access.complimentary).toBe(false);
+      expect(access.level).toBe('readonly');
+    });
+  });
 });

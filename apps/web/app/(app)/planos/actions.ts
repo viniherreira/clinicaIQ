@@ -20,6 +20,9 @@ import {
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription';
 import { documentError, formatDocument, isValidDocument } from '@/lib/document';
 import { capabilityBlocked } from '@/lib/access';
+import { stopComplimentaryBilling } from '@/lib/complimentary';
+
+const EM_CORTESIA = 'Sua clínica está em cortesia: acesso completo, sem cobrança. Não há plano a contratar ou cancelar.';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -115,14 +118,21 @@ export async function getBillingData(): Promise<BillingData> {
           currentPeriodEnd: subscription.currentPeriodEnd,
           graceEndsAt: subscription.graceEndsAt,
           cancelledAt: subscription.cancelledAt,
+          complimentary: subscription.complimentary,
         },
         new Date(),
       )
     : NO_SUBSCRIPTION;
 
-  // Pull fresh charges from Asaas when linked, so a payment made minutes ago is
-  // visible even if the webhook has not landed yet.
-  if (subscription?.asaasSubscriptionId && isConfigured()) {
+  if (subscription?.complimentary) {
+    // Quem abre a tela de plano de uma clínica em cortesia é o momento certo de
+    // garantir que o Asaas parou de cobrar — sem esperar a reconciliação diária.
+    await stopComplimentaryBilling(subscription).catch((e) =>
+      console.error('[cortesia] falha ao encerrar cobrança', tenantId, e),
+    );
+  } else if (subscription?.asaasSubscriptionId && isConfigured()) {
+    // Pull fresh charges from Asaas when linked, so a payment made minutes ago
+    // is visible even if the webhook has not landed yet.
     await syncCharges(tenantId, subscription.id, subscription.asaasSubscriptionId);
   }
 
@@ -228,6 +238,15 @@ export async function choosePlan(
 
   const semAcesso = await capabilityBlocked(tenantId, 'planos');
   if (semAcesso) return { ok: false as const, error: semAcesso };
+
+  // A tela nem oferece o botão, mas a action é um endereço que dá para chamar
+  // direto. Abrir uma assinatura paga por cima de uma cortesia cobraria quem
+  // não deve nada.
+  const cortesia = await prisma.subscription.findUnique({
+    where: { tenantId },
+    select: { complimentary: true },
+  });
+  if (cortesia?.complimentary) return { ok: false, error: EM_CORTESIA };
 
   const plan = await prisma.plan.findUnique({ where: { tier: tier as PlanOption['tier'] } });
   if (!plan || !plan.active) return { ok: false, error: 'Plano indisponível.' };
@@ -370,6 +389,7 @@ export async function cancelPlan(): Promise<{ ok: boolean; error?: string; until
 
   const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
   if (!subscription) return { ok: false, error: 'Não há assinatura para cancelar.' };
+  if (subscription.complimentary) return { ok: false, error: EM_CORTESIA };
   if (subscription.cancelledAt) {
     return { ok: false, error: 'Esta assinatura já está cancelada.' };
   }

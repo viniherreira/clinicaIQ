@@ -38,6 +38,8 @@ export interface SubscriptionSnapshot {
   /** Explicit grace end. When absent it is derived from the due date. */
   graceEndsAt: Date | null;
   cancelledAt: Date | null;
+  /** Cortesia concedida por nós: acesso completo, nenhuma data importa. */
+  complimentary?: boolean;
 }
 
 export interface Access {
@@ -50,6 +52,8 @@ export interface Access {
   warning: string | null;
   /** True while payment is overdue but access continues. */
   inGrace: boolean;
+  /** Cortesia: a tela de cobrança não oferece plano, pagamento nem cancelamento. */
+  complimentary: boolean;
 }
 
 /** Rounds up: half a day left still reads as "1 dia". */
@@ -68,6 +72,21 @@ export function graceEnd(snapshot: SubscriptionSnapshot): Date {
 }
 
 export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Date()): Access {
+  // Primeiro de tudo. A cortesia não vence, não entra em atraso e não depende
+  // de status: as datas da linha podem continuar as de quando a clínica pagava,
+  // e o webhook do Asaas ainda pode reescrever o status depois que ela foi
+  // concedida. Nada disso pode tirar o acesso de quem não deve nada.
+  if (snapshot.complimentary) {
+    return {
+      level: 'full',
+      status: 'ACTIVE',
+      daysLeft: null,
+      warning: null,
+      inGrace: false,
+      complimentary: true,
+    };
+  }
+
   // Cancelling is the clinic's own decision, so there is no warning to give and
   // nothing to chase — but the records stay readable. Their patient history is
   // theirs, and locking them out of it would be indefensible.
@@ -82,6 +101,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
         daysLeft: daysBetween(now, snapshot.currentPeriodEnd),
         warning: `Assinatura cancelada. Você continua com acesso completo até ${diaBR(snapshot.currentPeriodEnd)}, e não haverá nova cobrança.`,
         inGrace: false,
+        complimentary: false,
       };
     }
     return {
@@ -90,6 +110,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       daysLeft: null,
       warning: 'Assinatura encerrada. Seus dados seguem disponíveis para consulta.',
       inGrace: false,
+      complimentary: false,
     };
   }
 
@@ -106,6 +127,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
             ? `Seu teste termina em ${left} ${plural(left, 'dia', 'dias')}. Escolha um plano para não perder o acesso.`
             : null,
         inGrace: false,
+        complimentary: false,
       };
     }
     // Trial ran out: same treatment as an unpaid invoice, grace included.
@@ -114,7 +136,14 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
   const due = snapshot.status === 'TRIALING' ? (snapshot.trialEndsAt ?? snapshot.currentPeriodEnd) : snapshot.currentPeriodEnd;
 
   if (now < due) {
-    return { level: 'full', status: 'ACTIVE', daysLeft: daysBetween(now, due), warning: null, inGrace: false };
+    return {
+      level: 'full',
+      status: 'ACTIVE',
+      daysLeft: daysBetween(now, due),
+      warning: null,
+      inGrace: false,
+      complimentary: false,
+    };
   }
 
   const limit =
@@ -130,6 +159,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       daysLeft: left,
       warning: `Pagamento em atraso. O acesso será limitado em ${left} ${plural(left, 'dia', 'dias')}.`,
       inGrace: true,
+      complimentary: false,
     };
   }
 
@@ -139,6 +169,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
     daysLeft: null,
     warning: 'Acesso limitado por falta de pagamento. Regularize para voltar a usar o sistema.',
     inGrace: false,
+    complimentary: false,
   };
 }
 
@@ -149,6 +180,7 @@ export const NO_SUBSCRIPTION: Access = {
   daysLeft: null,
   warning: 'Nenhum plano ativo. Escolha um plano para usar o sistema.',
   inGrace: false,
+  complimentary: false,
 };
 
 export const canWrite = (access: Access): boolean => access.level === 'full';

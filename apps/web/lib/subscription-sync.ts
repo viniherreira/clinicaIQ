@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@clinicaiq/db';
 import { GRACE_DAYS, resolveAccess } from './subscription';
+import { stopComplimentaryBilling } from './complimentary';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -29,12 +30,22 @@ export async function reconcileSubscriptions(now: Date = new Date()): Promise<Re
       currentPeriodEnd: true,
       graceEndsAt: true,
       cancelledAt: true,
+      complimentary: true,
+      asaasSubscriptionId: true,
     },
   });
 
   const transitions: ReconcileResult['transitions'] = [];
 
   for (const sub of subscriptions) {
+    // Cortesia que ainda tem cobrança viva no Asaas: encerrar lá. Falha aqui
+    // não pode derrubar a reconciliação das outras clínicas.
+    if (sub.complimentary) {
+      await stopComplimentaryBilling(sub).catch((e) =>
+        console.error('[cortesia] falha ao encerrar cobrança', sub.tenantId, e),
+      );
+    }
+
     const access = resolveAccess(sub, now);
     if (access.status === sub.status) continue;
 

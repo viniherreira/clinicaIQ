@@ -223,6 +223,15 @@ export async function getPayment(paymentId: string): Promise<AsaasPayment> {
   return request<AsaasPayment>(`/payments/${paymentId}`);
 }
 
+/**
+ * Remove uma cobrança ainda não paga. Apagar a assinatura impede as próximas,
+ * mas as já emitidas seguem vivas no Asaas — e ele continua mandando lembrete de
+ * boleto para quem não deve mais nada. Por isso cada uma sai explicitamente.
+ */
+export async function deletePayment(paymentId: string): Promise<void> {
+  await request(`/payments/${paymentId}`, { method: 'DELETE' });
+}
+
 /** The copy-and-paste PIX code, so the clinic pays without leaving the system. */
 export async function getPixCode(paymentId: string): Promise<string | null> {
   try {

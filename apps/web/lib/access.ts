@@ -24,6 +24,7 @@ export const getTenantAccess = cache(async (tenantId: string): Promise<Access> =
       currentPeriodEnd: true,
       graceEndsAt: true,
       cancelledAt: true,
+      complimentary: true,
     },
   });
   return subscription ? resolveAccess(subscription, new Date()) : NO_SUBSCRIPTION;

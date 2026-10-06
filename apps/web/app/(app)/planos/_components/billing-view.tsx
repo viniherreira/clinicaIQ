@@ -169,6 +169,56 @@ function ResumoAssinatura({ data }: { data: BillingData }) {
   );
 }
 
+function Cortesia({ data, embutido }: { data: BillingData; embutido: boolean }) {
+  const plano = data.plans.find((p) => p.current);
+  return (
+    <div className={embutido ? 'space-y-8' : 'mx-auto max-w-6xl space-y-8 p-6 lg:p-8'}>
+      {!embutido && (
+        <header className="max-w-2xl">
+          <h1 className="text-3xl font-semibold tracking-tight">Plano</h1>
+        </header>
+      )}
+      <section
+        aria-labelledby="cortesia"
+        className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
+      >
+        <div className="flex gap-4 p-6">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 id="cortesia" className="font-semibold">
+              Cortesia ativa
+            </h2>
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Sua clínica tem acesso completo ao ClinicaIQ, sem mensalidade. Nenhuma cobrança é
+              gerada enquanto a cortesia estiver ativa.
+            </p>
+          </div>
+        </div>
+        <dl className="grid gap-x-8 gap-y-3 border-t border-border bg-surface-alt/40 px-6 py-5 sm:grid-cols-2">
+          {[
+            { rotulo: 'Plano', valor: `${plano?.name ?? 'Clínica'} · todos os recursos` },
+            { rotulo: 'Mensalidade', valor: 'Isenta' },
+            { rotulo: 'Profissionais ativos', valor: String(data.professionalsInUse) },
+            { rotulo: 'Validade', valor: 'Sem prazo' },
+          ].map((i) => (
+            <div
+              key={i.rotulo}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"
+            >
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {i.rotulo}
+              </dt>
+              <dd className="text-sm font-medium">{i.valor}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </div>
+  );
+}
+
 function features(plan: PlanOption): string[] {
   return [
     plan.maxProfessionals === null
@@ -263,6 +313,12 @@ export function BillingView({
     } catch {
       // Clipboard blocked — the code is on screen and selectable.
     }
+  }
+
+  // Cortesia não tem o que escolher, pagar nem cancelar. Mostrar a grade de
+  // planos aqui seria convidar a clínica a contratar o que já tem de graça.
+  if (data.access.complimentary) {
+    return <Cortesia data={data} embutido={embutido} />;
   }
 
   return (

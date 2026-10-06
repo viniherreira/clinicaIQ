@@ -791,6 +791,16 @@ model Subscription {
   graceEndsAt        DateTime?
   cancelledAt        DateTime?
 
+  /// Cortesia: acesso completo e nenhuma cobrança, concedida por nós.
+  ///
+  /// Bandeira à parte, e não mais um valor de `status`, de propósito: o status
+  /// é reescrito pela reconciliação e pelo webhook do Asaas a partir das datas,
+  /// e uma cortesia não pode depender de nenhum dos dois lembrar que ela existe.
+  /// `resolveAccess` olha para cá antes de qualquer data.
+  complimentary     Boolean @default(false)
+  /// Por que foi concedida — para quem ler a tabela daqui a um ano.
+  complimentaryNote String?
+
   /// Identificadores no Asaas. Nulos enquanto a cobrança for manual.
   asaasCustomerId     String?
   asaasSubscriptionId String?
