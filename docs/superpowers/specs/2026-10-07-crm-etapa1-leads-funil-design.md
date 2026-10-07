@@ -30,7 +30,8 @@ Decisões já tomadas para o CRM como um todo:
 - Nenhuma tabela existente muda de formato nesta etapa.
 - A agenda e os orçamentos nunca esperam o CRM nem dependem dele para dar certo.
 - Clínica sem o módulo CRM executa exatamente o código de hoje.
-- Os E2E atuais da agenda, dos pacientes e dos orçamentos precisam passar antes da entrega.
+- Uma suíte E2E de regressão da agenda, dos pacientes e dos orçamentos é criada
+  antes do CRM e precisa passar antes da entrega (ver "Testes").
 - Esta etapa não toca em nada de WhatsApp.
 
 ## Fora do escopo
@@ -137,8 +138,9 @@ Todas as tabelas são novas e têm `tenantId`. O acesso é sempre por
 
 Regras:
 
-- Cada `role` aparece no máximo uma vez por clínica (índice único parcial em
-  `[tenantId, role]` onde `role` não é nulo).
+- Cada `role` aparece no máximo uma vez por clínica: `@@unique([tenantId, role])`.
+  No Postgres, nulos não colidem num índice único, então as etapas sem `role`
+  não são afetadas, e o projeto, que usa `db push`, não precisa de índice parcial.
 - Etapas com `role` `WON` e `LOST` não podem ser apagadas. As demais etapas com
   `role` podem ser renomeadas e reordenadas, mas não apagadas, porque a
   automação depende delas.
@@ -149,7 +151,9 @@ Regras:
 ### `LeadTag` e `LeadTagOnLead`
 
 - `LeadTag`: `id`, `tenantId`, `name` e `color`, com `@@unique([tenantId, name])`.
-- `LeadTagOnLead`: `leadId` e `tagId`, com a chave composta pelos dois.
+- `LeadTagOnLead`: `tenantId`, `leadId` e `tagId`, com a chave composta por
+  `leadId` e `tagId`. O `tenantId` existe porque `getTenantClient` filtra todo
+  modelo por ele, inclusive as tabelas de ligação.
 
 ### `LostReason`
 
@@ -346,7 +350,16 @@ leitura e não aparece para quem não tem `crm`.
 
 **Regressão**
 
-- A suíte E2E atual da agenda, dos pacientes e dos orçamentos passa sem alteração.
+Hoje não existe E2E com login (só `e2e/a11y.spec.ts`, que testa a landing).
+Por isso, a primeira tarefa da implementação é criar, **antes de qualquer
+código do CRM**, uma suíte de regressão autenticada que passe na `main`:
+
+- criar paciente;
+- criar agendamento, mudar o status para "faltou" e cancelar;
+- criar orçamento, marcar como enviado e como aceito;
+- aceitar orçamento pelo link público.
+
+Essa suíte precisa continuar passando, sem alteração, a cada tarefa do CRM.
 - A agenda aberta sem os parâmetros `novo`/`paciente` se comporta exatamente como antes.
 
 ## Critério de pronto
