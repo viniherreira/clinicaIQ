@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { reportError } from '@/lib/observability';
+import { TOOTH_PATH } from '@/components/logo';
 
 /**
  * Root error boundary — catches failures in the root layout itself, where the
@@ -36,22 +37,16 @@ export default function GlobalError({
         }}
       >
         <div style={{ maxWidth: 380 }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              margin: '0 auto 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, hsl(152 82% 30%), hsl(158 75% 24%))',
-              color: '#fff',
-              fontWeight: 700,
-            }}
+          <svg
+            viewBox="0 0 64 64"
+            width={48}
+            height={48}
+            aria-hidden="true"
+            style={{ display: 'block', margin: '0 auto 16px' }}
           >
-            CIQ
-          </div>
+            <circle cx="32" cy="32" r="32" fill="#1669C7" />
+            <path d={TOOTH_PATH} fill="#fff" fillRule="evenodd" />
+          </svg>
           <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>Algo deu errado</h1>
           <p style={{ fontSize: 14, color: '#6b6b68', margin: '0 0 20px', lineHeight: 1.5 }}>
             Tivemos um problema inesperado. Já registramos o ocorrido — tente recarregar.
@@ -60,7 +55,7 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: 'hsl(152 82% 26%)',
+              background: '#1669C7',
               color: '#fff',
               border: 'none',
               borderRadius: 8,

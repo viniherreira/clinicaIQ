@@ -3,31 +3,42 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Azul da saúde, tirado da logo (#1669C7 = 212 80% 43%).
+   *
+   * O azul da logo é o dos botões e links: com texto branco por cima dá 5,4:1,
+   * acima do mínimo do WCAG AA. Um azul mais claro nos botões ficaria ilegível,
+   * então o "azul clarinho" mora no ambiente — fundo e cinzas levemente
+   * azulados, realces com `primary/10` e o degradê da marca.
+   */
   :root {
     color-scheme: light;
-    --background: 40 6% 98%;
-    --foreground: 40 8% 10%;
+    /* A cor da logo, igual em qualquer tema: a marca não muda no escuro. */
+    --brand: 212 80% 43%;
+
+    --background: 210 40% 98%;
+    --foreground: 222 35% 12%;
 
     --surface: 0 0% 100%;
-    --surface-alt: 40 6% 96%;
+    --surface-alt: 210 40% 96%;
 
-    --border: 40 4% 90%;
-    --border-strong: 40 3% 82%;
-    --input: 40 4% 90%;
-    --ring: 152 82% 26%;
+    --border: 214 32% 91%;
+    --border-strong: 214 25% 82%;
+    --input: 214 32% 91%;
+    --ring: 212 80% 43%;
 
-    --primary: 152 82% 26%;
+    --primary: 212 80% 43%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 152 82% 22%;
+    --primary-hover: 212 80% 37%;
 
     --accent: 32 95% 44%;
     --accent-foreground: 0 0% 100%;
 
-    --secondary: 40 6% 96%;
-    --secondary-foreground: 40 8% 10%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 35% 12%;
 
-    --muted: 40 6% 96%;
-    --muted-foreground: 40 3% 42%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 40%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -36,42 +47,44 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 40 8% 10%;
+    --warning-foreground: 222 35% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 40 8% 10%;
+    --popover-foreground: 222 35% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 40 8% 10%;
+    --card-foreground: 222 35% 12%;
 
     --radius: 0.5rem;
   }
 
   .dark {
     color-scheme: dark;
-    --background: 40 4% 7%;
-    --foreground: 40 6% 93%;
+    --background: 222 30% 7%;
+    --foreground: 210 30% 94%;
 
-    --surface: 40 3% 11%;
-    --surface-alt: 40 3% 14%;
+    --surface: 222 25% 11%;
+    --surface-alt: 222 22% 14%;
 
-    --border: 40 3% 20%;
-    --border-strong: 40 3% 28%;
-    --input: 40 3% 20%;
-    --ring: 152 75% 38%;
+    --border: 220 18% 20%;
+    --border-strong: 220 15% 28%;
+    --input: 220 18% 20%;
+    /* Um pouco mais claro que o da logo para os links aparecerem no escuro,
+       sem passar do ponto em que o texto branco do botão perde contraste. */
+    --ring: 212 80% 47%;
 
-    --primary: 152 75% 38%;
+    --primary: 212 80% 47%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 152 75% 34%;
+    --primary-hover: 212 80% 42%;
 
     --accent: 32 90% 50%;
     --accent-foreground: 0 0% 100%;
 
-    --secondary: 40 3% 14%;
-    --secondary-foreground: 40 6% 93%;
+    --secondary: 222 22% 14%;
+    --secondary-foreground: 210 30% 94%;
 
-    --muted: 40 3% 14%;
-    --muted-foreground: 40 3% 56%;
+    --muted: 222 22% 14%;
+    --muted-foreground: 215 15% 62%;
 
     --destructive: 0 72% 57%;
     --destructive-foreground: 0 0% 100%;
@@ -80,13 +93,13 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 85% 55%;
-    --warning-foreground: 40 4% 7%;
+    --warning-foreground: 222 30% 7%;
 
-    --popover: 40 3% 11%;
-    --popover-foreground: 40 6% 93%;
+    --popover: 222 25% 11%;
+    --popover-foreground: 210 30% 94%;
 
-    --card: 40 3% 11%;
-    --card-foreground: 40 6% 93%;
+    --card: 222 25% 11%;
+    --card-foreground: 210 30% 94%;
   }
 
   .high-contrast {
@@ -99,11 +112,11 @@
     --border: 0 0% 0%;
     --border-strong: 0 0% 0%;
     --input: 0 0% 0%;
-    --ring: 152 100% 20%;
+    --ring: 212 100% 30%;
 
-    --primary: 152 100% 20%;
+    --primary: 212 100% 30%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 152 100% 15%;
+    --primary-hover: 212 100% 24%;
 
     --accent: 32 100% 38%;
     --accent-foreground: 0 0% 100%;
@@ -128,11 +141,11 @@
     --border: 0 0% 100%;
     --border-strong: 0 0% 100%;
     --input: 0 0% 100%;
-    --ring: 152 100% 50%;
+    --ring: 205 100% 65%;
 
-    --primary: 152 100% 50%;
+    --primary: 205 100% 65%;
     --primary-foreground: 0 0% 0%;
-    --primary-hover: 152 100% 45%;
+    --primary-hover: 205 100% 58%;
 
     --accent: 32 100% 55%;
     --accent-foreground: 0 0% 0%;
@@ -245,9 +258,15 @@
     box-shadow: 0 2px 4px hsl(var(--foreground) / 0.06), 0 8px 24px hsl(var(--foreground) / 0.08);
   }
 
-  /* Brand gradient used on the logo mark and accents. */
+  /* A cor exata da logo, para o símbolo. Não acompanha o tema. */
+  .bg-brand {
+    background-color: hsl(var(--brand));
+  }
+
+  /* Degradê da marca: do azul-claro da saúde ao azul fundo. O lado claro foi
+     escurecido até o texto branco por cima continuar legível (4,7:1). */
   .bg-brand-gradient {
-    background-image: linear-gradient(135deg, hsl(152 82% 30%), hsl(158 75% 24%));
+    background-image: linear-gradient(135deg, hsl(206 80% 42%), hsl(214 82% 34%));
   }
 
   /* Landing page: gentle vertical float for the hero mockup cards. */

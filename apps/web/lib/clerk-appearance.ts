@@ -1,8 +1,8 @@
-/** Shared Clerk appearance so sign-in / sign-up match the brand (teal primary,
- *  rounded, Geist). Clerk's card keeps its own light surface for readability. */
+/** Shared Clerk appearance so sign-in / sign-up match the brand (azul-saúde da
+ *  logo, rounded, Geist). Clerk's card keeps its own light surface for readability. */
 export const clerkAppearance = {
   variables: {
-    colorPrimary: '#0d9488',
+    colorPrimary: '#1669C7',
     borderRadius: '0.625rem',
     fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
   },

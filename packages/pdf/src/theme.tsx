@@ -5,7 +5,7 @@ import { Font, Image, StyleSheet, Text, View } from '@react-pdf/renderer';
  * Peças comuns aos documentos da clínica: orçamento, contrato e recibo.
  *
  * O documento é da clínica, não do ClinicaIQ — por isso a paleta é sóbria (um
- * verde escuro de destaque sobre cinza quente) e não há marca nossa em lugar
+ * azul-saúde de destaque sobre cinzas frios) e não há marca nossa em lugar
  * nenhum. O que identifica o papel é o logotipo e os dados de quem o emite.
  */
 
@@ -14,15 +14,16 @@ import { Font, Image, StyleSheet, Text, View } from '@react-pdf/renderer';
 Font.registerHyphenationCallback((word) => [word]);
 
 export const color = {
-  ink: '#1C1F1D',
-  body: '#2E3330',
-  muted: '#6A706C',
-  faint: '#9AA09C',
-  line: '#E3E6E4',
-  soft: '#F4F6F5',
-  zebra: '#FAFBFA',
-  accent: '#0B6B43',
-  accentSoft: '#E8F3EE',
+  ink: '#1A1F2B',
+  body: '#2D3445',
+  muted: '#646D7E',
+  faint: '#98A0AE',
+  line: '#E1E6EE',
+  soft: '#F3F6FA',
+  zebra: '#F9FBFD',
+  // Um tom abaixo do azul da logo (#1669C7): no papel, o azul claro desbota.
+  accent: '#1458A6',
+  accentSoft: '#E9F1FB',
 };
 
 export const s = StyleSheet.create({
