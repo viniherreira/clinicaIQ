@@ -248,7 +248,7 @@ Pontos de chamada (uma linha cada):
 |---|---|
 | `agenda/actions.ts` → `createAppointment` | `appointment.created` |
 | `agenda/actions.ts` → `updateAppointmentStatus` com MISSED | `appointment.missed` |
-| `(app)/orcamentos/actions.ts` → as duas ações que gravam `status: 'SENT'` | `quote.sent` |
+| `(app)/orcamentos/actions.ts` → `createQuote` | `quote.created` |
 | `(app)/orcamentos/actions.ts` → a ação que grava `status: 'ACCEPTED'` | `quote.accepted` |
 | `orcamento/[token]/actions.ts` → aceite pelo link público | `quote.accepted` |
 
@@ -257,7 +257,10 @@ Regras aplicadas pelo CRM:
 1. Procura o lead aberto (sem `wonAt`, sem `lostAt` e sem `deletedAt`) com aquele
    `patientId`. Se não houver, não faz nada.
 2. `appointment.created` → move para `SCHEDULED`.
-3. `quote.sent` → move para `QUOTED`.
+3. `quote.created` → move para `QUOTED`. É "criado", e não "enviado", porque a
+   tela da clínica não marca mais orçamento como enviado: o "copiar link" saiu
+   no commit `4d2e66d`, e `sendQuote`/`markQuoteSent` não têm quem as chame.
+   O orçamento vai de rascunho direto para aprovado.
 4. `quote.accepted` → move para `WON`, preenche `wonAt` e grava o total do
    orçamento em `estimatedValueCents`.
 5. `appointment.missed` → não move, só registra uma `AUTOMATION` no histórico.
@@ -356,8 +359,9 @@ código do CRM**, uma suíte de regressão autenticada que passe na `main`:
 
 - criar paciente;
 - criar agendamento, mudar o status para "faltou" e cancelar;
-- criar orçamento, marcar como enviado e como aceito;
-- aceitar orçamento pelo link público.
+- criar orçamento e aprovar pela clínica;
+- aceitar orçamento pelo link público (o orçamento "enviado" é criado direto
+  no banco, porque a tela não tem mais como enviar).
 
 Essa suíte precisa continuar passando, sem alteração, a cada tarefa do CRM.
 - A agenda aberta sem os parâmetros `novo`/`paciente` se comporta exatamente como antes.

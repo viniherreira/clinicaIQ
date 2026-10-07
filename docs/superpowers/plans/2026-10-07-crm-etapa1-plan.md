@@ -27,15 +27,17 @@ Hoje não há E2E com login. Esta tarefa cria a rede antes de qualquer código d
   uma conta de teste da instância de desenvolvimento.
 - Criar `packages/db/prisma/seed-e2e.ts`: uma clínica de teste idempotente
   (tenant, usuário OWNER ligado ao usuário de teste do Clerk, um profissional
-  com horário, um procedimento e assinatura em cortesia). As credenciais vêm de
-  `.env.test` (`E2E_CLERK_USER_EMAIL`, `E2E_CLERK_USER_PASSWORD`), com exemplo
-  em `.env.test.example`. Nenhum valor vai para o repositório.
+  com horário, um procedimento e assinatura em cortesia). Só o e-mail da conta
+  vem de `.env.test` (`E2E_CLERK_USER_EMAIL`), com exemplo em
+  `.env.test.example`; o login usa o token do `@clerk/testing`, sem senha.
+  Nenhum valor vai para o repositório.
 - `playwright.config.ts`: projeto `setup` que faz login e salva
   `storageState`, e o projeto `chromium` dependendo dele.
 - `e2e/regressao/agenda.spec.ts`: criar paciente, criar agendamento, mudar
   status para "faltou" e cancelar.
-- `e2e/regressao/orcamentos.spec.ts`: criar orçamento, marcar como enviado,
-  marcar como aceito, e aceitar outro pelo link público `/orcamento/[token]`.
+- `e2e/regressao/orcamentos.spec.ts`: criar orçamento e aprovar pela clínica,
+  e aceitar pelo link público `/orcamento/[token]` um orçamento "enviado" criado
+  na semeadura (a tela não marca mais como enviado).
 - **Pronto quando:** a suíte passa na `main` sem nenhuma mudança de produto.
 
 > Esta tarefa precisa de uma conta de teste no Clerk de desenvolvimento, que o
@@ -188,8 +190,8 @@ Uma linha de `after(() => notifyCrm(...))` em cada ponto, depois de salvar:
   Já usa `after`, então entra junto.
 - `(app)/agenda/actions.ts` → `updateAppointmentStatus` quando o status novo é
   `MISSED` (`appointment.missed`).
-- `(app)/orcamentos/actions.ts` → as duas ações que gravam `status: 'SENT'`
-  (`quote.sent`) e a que grava `status: 'ACCEPTED'` (`quote.accepted`).
+- `(app)/orcamentos/actions.ts` → `createQuote` (`quote.created`) e
+  `acceptQuote` (`quote.accepted`).
 - `orcamento/[token]/actions.ts` → aceite pelo link público (`quote.accepted`).
 - **Pronto quando:** a regressão passa e o diff nesses arquivos é só o import
   e as chamadas.
