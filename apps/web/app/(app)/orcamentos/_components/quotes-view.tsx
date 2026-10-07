@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { Plus, Search, FileText, FileBarChart, Wallet } from 'lucide-react';
+import { Plus, Search, FileText, Wallet } from 'lucide-react';
 import { QUOTE_STATUS, formatBRL, quoteCode } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -61,11 +61,8 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status, 
           <p className="mt-1 text-sm text-muted-foreground">{total} orçamento{total !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/financeiro" className="btn-ghost btn-md">
+          <Link href="/financeiro?type=orcamentos#detalhe" className="btn-outline btn-md">
             <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
-          </Link>
-          <Link href="/relatorios?type=orcamentos" className="btn-outline btn-md">
-            <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatório
           </Link>
           <Link href="/orcamentos/novo" className="btn-primary btn-md">
             <Plus className="h-4 w-4" aria-hidden="true" /> Novo orçamento

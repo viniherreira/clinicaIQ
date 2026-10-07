@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  FileBarChart, MessageCircle, Megaphone, Settings, PhoneCall,
+  MessageCircle, Megaphone, Settings, PhoneCall,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { can, type Capability } from '@/lib/permissions';
@@ -31,8 +31,8 @@ export const NAV: {
   { href: '/retorno', label: 'Retorno', icon: PhoneCall, capability: 'pacientes' },
   { href: '/procedimentos', label: 'Procedimentos', icon: Stethoscope, capability: 'configuracoes' },
   { href: '/orcamentos', label: 'Orçamentos', icon: FileText, capability: 'financeiro' },
+  // Financeiro e relatórios são uma tela só: resumo em cima, detalhamento embaixo.
   { href: '/financeiro', label: 'Financeiro', icon: Wallet, capability: 'financeiro' },
-  { href: '/relatorios', label: 'Relatórios', icon: FileBarChart, capability: 'financeiro' },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, capability: 'configuracoes' },
   { href: '/campanhas', label: 'Campanhas', icon: Megaphone, capability: 'campanhas' },
   { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },

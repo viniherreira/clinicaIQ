@@ -32,6 +32,8 @@ export interface ReportRow {
   cells: string[];
   /** Where clicking the row goes (patient / quote), when there is a record. */
   href?: string;
+  /** Recibo em PDF do pagamento. Só nos recebimentos; fica fora do CSV. */
+  receiptHref?: string;
 }
 
 export interface ReportResult {
@@ -244,6 +246,7 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
         fmtNum(Number(p.amount)),
       ],
       href: p.quote?.id ? `/orcamentos/${p.quote.id}` : `/pacientes/${p.patient.id}`,
+      receiptHref: `/financeiro/recibo/${p.id}`,
     })),
     totals: { 4: fmtNum(totalRecebido) },
     summary,

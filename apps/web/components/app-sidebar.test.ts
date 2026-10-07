@@ -30,7 +30,6 @@ describe('navFor', () => {
         '/procedimentos',
         '/orcamentos',
         '/financeiro',
-        '/relatorios',
         '/whatsapp',
         '/campanhas',
         '/configuracoes',
@@ -54,6 +53,11 @@ describe('navFor', () => {
 
   it('não existe rota de plano solta no menu', () => {
     expect(NAV.map((i) => i.href)).not.toContain('/planos');
+  });
+
+  it('relatórios não voltam a ser um item separado do financeiro', () => {
+    // Eram duas telas com o mesmo período, os mesmos filtros e a mesma tabela.
+    expect(NAV.map((i) => i.href)).not.toContain('/relatorios');
   });
 
   it('o dashboard fica para todo mundo que tem login', () => {

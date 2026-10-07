@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, CalendarDays, FileBarChart, Wallet } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, CalendarDays, Wallet } from 'lucide-react';
 import { getDashboardData, getSetupStatus } from './actions';
 import { SetupChecklist, type SetupStep } from './_components/setup-checklist';
 import { currentAccess } from '@/lib/guard';
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   // Financeiro, e os atalhos levavam a telas que iam recusá-lo.
   const veDinheiro = can(acesso?.role, 'financeiro');
   const veConfig = can(acesso?.role, 'configuracoes');
-  const relatorios = (qs: string) => (veDinheiro ? `/relatorios?${qs}` : undefined);
+  const detalhe = (qs: string) => (veDinheiro ? `/financeiro?${qs}#detalhe` : undefined);
   const maxBar = Math.max(1, ...series.map((d) => d.total));
   const monthPeriod = `from=${finance.monthFrom}&to=${finance.monthTo}`;
   const weekFrom = new Date(new Date(`${todayIso}T12:00:00.000Z`).getTime() - 6 * 86400000)
@@ -56,14 +56,9 @@ export default async function DashboardPage() {
             <CalendarDays className="h-4 w-4" aria-hidden="true" /> Agenda
           </Link>
           {veDinheiro && (
-            <>
-              <Link href={`/financeiro?${monthPeriod}`} className="btn-ghost btn-md">
-                <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
-              </Link>
-              <Link href={`/relatorios?type=agendamentos&from=${finance.monthFrom}&to=${finance.monthTo}`} className="btn-outline btn-md">
-                <FileBarChart className="h-4 w-4" aria-hidden="true" /> Relatórios
-              </Link>
-            </>
+            <Link href={`/financeiro?${monthPeriod}`} className="btn-outline btn-md">
+              <Wallet className="h-4 w-4" aria-hidden="true" /> Financeiro
+            </Link>
           )}
         </div>
       </header>
@@ -78,21 +73,21 @@ export default async function DashboardPage() {
           value={counts.confirmed}
           hint={`${counts.confirmedPct}% do dia`}
           tone="success"
-          href={relatorios(`type=agendamentos&status=CONFIRMED&from=${todayIso}&to=${todayIso}`)}
+          href={detalhe(`type=agendamentos&status=CONFIRMED&from=${todayIso}&to=${todayIso}`)}
         />
         <Kpi
           label="A confirmar"
           value={counts.toConfirm}
           hint="aguardando"
           tone="warning"
-          href={relatorios(`type=agendamentos&status=SCHEDULED&from=${todayIso}&to=${todayIso}`)}
+          href={detalhe(`type=agendamentos&status=SCHEDULED&from=${todayIso}&to=${todayIso}`)}
         />
         <Kpi
           label="Faltas"
           value={counts.missed}
           hint="hoje"
           tone={counts.missed > 0 ? 'danger' : 'muted'}
-          href={relatorios(`type=agendamentos&status=MISSED&from=${todayIso}&to=${todayIso}`)}
+          href={detalhe(`type=agendamentos&status=MISSED&from=${todayIso}&to=${todayIso}`)}
         />
       </section>
 
@@ -131,7 +126,7 @@ export default async function DashboardPage() {
               <h2 className="text-sm font-semibold">Atendimentos · últimos 7 dias</h2>
               {veDinheiro ? (
                 <Link
-                  href={`/relatorios?type=agendamentos&from=${weekFrom}&to=${todayIso}`}
+                  href={`/financeiro?type=agendamentos&from=${weekFrom}&to=${todayIso}#detalhe`}
                   className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {series.reduce((s, d) => s + d.total, 0)} no período
@@ -209,7 +204,7 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">Orçamentos · 30 dias</h2>
               <Link
-                href={`/relatorios?type=orcamentos&from=${finance.monthFrom}&to=${finance.monthTo}`}
+                href={`/financeiro?type=orcamentos&from=${finance.monthFrom}&to=${finance.monthTo}#detalhe`}
                 className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Relatório
@@ -257,7 +252,7 @@ const CARD_CLS =
 /**
  * Sem `href` o cartão vira número parado.
  *
- * É o que acontece para quem não alcança Relatórios: continua vendo quantos
+ * É o que acontece para quem não alcança o Financeiro: continua vendo quantos
  * atendimentos tem hoje, mas o clique não leva a uma tela que vai recusá-la.
  */
 function Kpi({

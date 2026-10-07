@@ -227,7 +227,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
             </div>
 
             <Link
-              href={`/relatorios?type=agendamentos&from=${currentDate}&to=${currentDate}`}
+              href={`/financeiro?type=agendamentos&from=${currentDate}&to=${currentDate}#detalhe`}
               className="btn-ghost btn-sm !h-9 sm:px-3"
               aria-label="Ver relatório deste dia"
               title="Ver este dia no relatório"

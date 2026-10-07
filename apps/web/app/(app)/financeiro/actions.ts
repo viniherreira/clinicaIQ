@@ -109,15 +109,9 @@ export async function getFinanceData(params: FinanceParams) {
         paidAt: { gte: start, lte: end },
         ...(procFilter ? { quote: { items: { some: { procedureId: procFilter } } } } : {}),
       },
-      select: {
-        id: true,
-        amount: true,
-        method: true,
-        paidAt: true,
-        patient: { select: { id: true, name: true } },
-        quote: { select: { id: true, number: true } },
-      },
-      orderBy: { paidAt: 'desc' },
+      // A lista linha a linha vem do detalhamento (`report-actions`); aqui só
+      // entra o que soma: valor, forma e dia.
+      select: { amount: true, method: true, paidAt: true },
     }),
     db.quote.findMany({
       where: { status: 'ACCEPTED' },
@@ -209,16 +203,6 @@ export async function getFinanceData(params: FinanceParams) {
       paymentsCount: payments.length,
       attendedCount: attended.length,
     },
-    payments: payments.map((p) => ({
-      id: p.id,
-      amount: Number(p.amount),
-      method: p.method,
-      paidAt: p.paidAt,
-      patient: p.patient.name,
-      patientId: p.patient.id,
-      quoteId: p.quote?.id ?? null,
-      quoteNumber: p.quote?.number ?? null,
-    })),
     byMethod,
     byProfessional,
     byProcedure,
