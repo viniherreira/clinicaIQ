@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@clinicaiq/db';
-import { toChargeStatus } from '@/lib/asaas';
+import { chargeStatusFromEvent } from '@/lib/asaas-events';
 import { bearerMatches, secretMatches } from '@/lib/bearer';
 
 /**
@@ -23,6 +23,8 @@ interface AsaasEvent {
     bankSlipUrl?: string;
     subscription?: string;
     externalReference?: string;
+    /** Verdadeiro nos avisos de cobrança removida. */
+    deleted?: boolean;
   };
 }
 
@@ -60,7 +62,7 @@ export async function POST(req: Request) {
     select: { id: true, tenantId: true, subscriptionId: true },
   });
 
-  const status = toChargeStatus(payment.status ?? '');
+  const status = chargeStatusFromEvent(body.event, payment);
   const paidAt = payment.paymentDate ? new Date(payment.paymentDate) : status === 'PAID' ? new Date() : null;
 
   if (charge) {
@@ -106,7 +108,9 @@ export async function POST(req: Request) {
       ? await prisma.subscription.findFirst({ where: { asaasSubscriptionId: payment.subscription } })
       : null;
 
-  if (subscription) {
+  // Cortesia não tem status a mover: não vence, não atrasa, e um aviso tardio
+  // de uma cobrança antiga não pode marcar como inadimplente quem não deve nada.
+  if (subscription && !subscription.complimentary) {
     if (status === 'PAID') {
       // A month from the due date, not from today: paying three days late must
       // not push every future invoice three days later too.

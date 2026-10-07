@@ -244,22 +244,5 @@ export async function getPixCode(paymentId: string): Promise<string | null> {
   }
 }
 
-/** Maps Asaas payment status onto our ChargeStatus. */
-export function toChargeStatus(status: string): 'PENDING' | 'PAID' | 'OVERDUE' | 'REFUNDED' | 'CANCELLED' {
-  switch (status) {
-    case 'RECEIVED':
-    case 'CONFIRMED':
-    case 'RECEIVED_IN_CASH':
-      return 'PAID';
-    case 'OVERDUE':
-      return 'OVERDUE';
-    case 'REFUNDED':
-    case 'REFUND_REQUESTED':
-      return 'REFUNDED';
-    case 'DELETED':
-    case 'CANCELLED':
-      return 'CANCELLED';
-    default:
-      return 'PENDING';
-  }
-}
+// Puro e testável, em arquivo próprio; reexportado para quem já importa daqui.
+export { toChargeStatus } from './asaas-events';
