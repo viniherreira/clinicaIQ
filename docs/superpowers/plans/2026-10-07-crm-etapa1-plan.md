@@ -1,4 +1,4 @@
-# Plano de implementação — CRM etapa 1 (leads, funil e tags)
+# Plano de implementação — CRM etapa 1 (leads, funil, tags e tarefas)
 
 Spec: [`docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md`](../specs/2026-10-07-crm-etapa1-leads-funil-design.md)
 Branch: `feat/crm-etapa1`
@@ -6,42 +6,25 @@ Branch: `feat/crm-etapa1`
 ## Regras para todas as tarefas
 
 - Uma tarefa = um commit. `pnpm lint`, `pnpm typecheck` e `pnpm test` passando ao fim de cada uma.
-- A partir da tarefa 2, a suíte `e2e/regressao/` (criada na tarefa 1) passa ao
-  fim de toda tarefa que mexa em código existente (tarefas 3, 4, 10, 11 e 12).
+- A suíte `e2e/regressao/` passa ao fim de toda tarefa que mexe em código
+  existente (2, 3, 4, 11, 12, 13).
 - Dado da clínica sempre via `getTenantClient(tenantId)`. Telefone sempre com
   `encrypt`/`decrypt`. Nada de telefone ou nome em log.
-- Código do CRM mora em `apps/web/crm/` (regras) e `apps/web/app/(crm)/crm/`
-  (telas). A agenda e os orçamentos só importam `apps/web/crm/notify.ts`.
-- Comentários e textos de tela em português, no mesmo tom do código atual.
+- Regras em `apps/web/crm/`, telas em `apps/web/app/(crm)/crm/`. Agenda e
+  orçamentos só importam `apps/web/crm/notify.ts`.
+- Comentários e textos de tela em português, no tom do código atual.
+- Banco de desenvolvimento: Postgres local (`clinicaiq_dev`). Nada roda contra produção.
 
 ---
 
 ## Fase 0 — Rede de proteção
 
-### 1. E2E autenticado e suíte de regressão
+### 1. E2E autenticado e suíte de regressão ✅
 
-Hoje não há E2E com login. Esta tarefa cria a rede antes de qualquer código do CRM.
-
-- Instalar `@clerk/testing` em `apps/web` e configurar `clerkSetup()` num
-  `e2e/global.setup.ts`, usando o modo de teste do Clerk (testing token) com
-  uma conta de teste da instância de desenvolvimento.
-- Criar `packages/db/prisma/seed-e2e.ts`: uma clínica de teste idempotente
-  (tenant, usuário OWNER ligado ao usuário de teste do Clerk, um profissional
-  com horário, um procedimento e assinatura em cortesia). Só o e-mail da conta
-  vem de `.env.test` (`E2E_CLERK_USER_EMAIL`), com exemplo em
-  `.env.test.example`; o login usa o token do `@clerk/testing`, sem senha.
-  Nenhum valor vai para o repositório.
-- `playwright.config.ts`: projeto `setup` que faz login e salva
-  `storageState`, e o projeto `chromium` dependendo dele.
-- `e2e/regressao/agenda.spec.ts`: criar paciente, criar agendamento, mudar
-  status para "faltou" e cancelar.
-- `e2e/regressao/orcamentos.spec.ts`: criar orçamento e aprovar pela clínica,
-  e aceitar pelo link público `/orcamento/[token]` um orçamento "enviado" criado
-  na semeadura (a tela não marca mais como enviado).
-- **Pronto quando:** a suíte passa na `main` sem nenhuma mudança de produto.
-
-> Esta tarefa precisa de uma conta de teste no Clerk de desenvolvimento, que o
-> dono do projeto cria. O plano não cria contas.
+Feito em `8ec5548` e `27fa423`: clínica de teste semeada, login pela conta
+`+clerk_test` via `@clerk/testing`, regressão de agenda (agendar, falta,
+cancelar) e orçamentos (criar, aprovar, aceite pelo link público). Verde duas
+vezes seguidas.
 
 ---
 
@@ -51,200 +34,172 @@ Hoje não há E2E com login. Esta tarefa cria a rede antes de qualquer código d
 
 `packages/db/prisma/schema.prisma`:
 
-- Enums `StageRole`, `LeadSource` e `LeadActivityType`.
-- Modelos `Lead`, `PipelineStage`, `LeadTag`, `LeadTagOnLead`, `LostReason` e
-  `LeadActivity`, com campos e índices da spec.
+- Enums `StageRole` (`NEW`, `SCHEDULED`, `NEGOTIATION`, `WON`, `LOST`),
+  `LeadSource`, `LeadActivityType`, `TaskOrigin`.
+- Modelos `Lead`, `PipelineStage`, `LeadTask`, `LeadTag`, `LeadTagOnLead`,
+  `LostReason`, `LeadActivity` — todos com `tenantId` (a extensão de
+  `packages/db/src/client.ts` filtra todo modelo por ele; nenhum entra em
+  `MODELS_WITHOUT_TENANT`).
+- `Lead.patientId` **sem** `@unique` (vários negócios por pessoa).
 - `Subscription.crmEnabled Boolean @default(false)`.
-- Relações reversas em `Tenant`, `User`, `Patient` e `Procedure`. São só de
-  Prisma e não mudam colunas.
-- A extensão de `packages/db/src/client.ts` filtra **todo** modelo por
-  `tenantId`, menos os de `MODELS_WITHOUT_TENANT`. Por isso, todos os seis
-  modelos novos têm `tenantId`, inclusive a tabela de ligação `LeadTagOnLead`,
-  e nenhum entra na lista de exceções.
-- Teste em `packages/db/src/client.test.ts` (ou no existente): `getTenantClient`
-  de uma clínica não lê nem altera `Lead`/`LeadTagOnLead` de outra.
-- `pnpm db:generate` e `pnpm db:push` no banco local.
-- **Pronto quando:** typecheck passa e `db push` só cria tabelas e colunas, sem
-  alterar nenhuma existente (conferir a saída do push).
+- Relações reversas em `Tenant`, `User`, `Patient`, `Procedure` (só Prisma).
+- `pnpm db:generate` e `pnpm db:push` no banco local; conferir que o push só cria.
+- Teste de isolamento em `packages/db/src/tenant-isolation.test.ts`, que roda
+  só com `DATABASE_URL` definido: uma clínica não lê nem altera `Lead`,
+  `LeadTask` e `LeadTagOnLead` de outra.
 
 ### 3. Permissões e módulo
 
-- `apps/web/lib/permissions.ts`: capacidades `crm` (OWNER, ADMIN,
-  RECEPTIONIST) e `crm_config` (OWNER, ADMIN), com os rótulos em `LABEL`.
-  PROFESSIONAL não recebe nenhuma das duas.
-- `apps/web/lib/access.ts`: `getTenantAccess` passa a ler `crmEnabled` e expõe
-  `modules: { clinic: true, crm: boolean }`. Nesta etapa a clínica sempre tem
-  `clinic: true`; o plano "só CRM" é da etapa 5.
-- `apps/web/crm/guard.ts`: `requireCrm(capability: 'crm' | 'crm_config')`,
-  que combina `requireCapability` com a checagem do módulo e devolve
-  `{ tenantId, userId, db }`.
-- Testes: `permissions.test.ts` cobre os novos papéis; `crm/guard.test.ts`
-  cobre clínica sem módulo, papel sem capacidade e caminho feliz.
+- `lib/permissions.ts`: `crm` (OWNER, ADMIN, RECEPTIONIST) e `crm_config`
+  (OWNER, ADMIN), com rótulos.
+- `lib/access.ts`: `getTenantAccess` lê `crmEnabled` e expõe `modules: { clinic: true, crm }`.
+- `crm/guard.ts`: `requireCrm(capability)` → `{ tenantId, userId, db }`.
+- Testes de permissões e do guard.
 
-### 4. Seletor Clínica | CRM e layout do CRM
+### 4. Seletor Clínica | CRM e layout
 
-- `components/app-sidebar.tsx`: `NAV` vira `CLINIC_NAV`, e entra `CRM_NAV`
-  (Funil, Leads, Configurações do CRM). O componente recebe `space: 'clinic' | 'crm'`
-  e `modules`. O texto "Gestão clínica" vira `ModuleSwitcher` quando os dois
-  módulos estão ligados.
-- `components/module-switcher.tsx`: dois links (`/dashboard` e `/crm`) com
-  `aria-current` e nome acessível "Trocar de módulo". Grava o cookie
-  `ciq_space` só como preferência.
-- Extrair o miolo de `app/(app)/layout.tsx` para `components/app-shell.tsx`
-  (busca de tenant, usuário, acesso, cabeçalho, banner). `(app)/layout.tsx`
-  passa a ser `<AppShell space="clinic">`. **Sem mudar o que aparece na tela.**
-- `app/(crm)/layout.tsx`: `<AppShell space="crm">`, que barra com a tela de
-  "módulo não contratado" quando `modules.crm` é falso.
-- Conferir o menu mobile, se houver um separado do `AppSidebar`, e aplicar o mesmo.
-- **Pronto quando:** sem `crmEnabled` o menu fica idêntico ao de hoje, com
-  `crmEnabled` o seletor aparece, e a regressão passa.
+- `components/app-sidebar.tsx`: `CLINIC_NAV` e `CRM_NAV` (Funil, Leads,
+  Tarefas, Configurações do CRM); recebe `space` e `modules`.
+- `components/module-switcher.tsx`: dois links com `aria-current`, cookie `ciq_space`.
+- `components/app-shell.tsx`: miolo extraído de `(app)/layout.tsx`, sem mudar a tela.
+- `app/(crm)/layout.tsx`: `<AppShell space="crm">`, barra sem `modules.crm`.
+- Menu mobile, se separado, recebe o mesmo.
+- Pronto quando: sem `crmEnabled` o menu é idêntico ao de hoje; regressão verde.
 
 ---
 
 ## Fase 2 — Regras do CRM (sem tela)
 
-Tudo em `apps/web/crm/`, com funções puras sempre que der, para teste unitário sem banco.
+Funções puras sempre que der, para teste sem banco.
 
 ### 5. Funil padrão e etapas
 
-- `crm/defaults.ts`: etapas e motivos de perda padrão.
-- `crm/pipeline.ts`:
-  - `ensureDefaultPipeline(db, tenantId)`: idempotente, cria só o que falta.
-  - `canDeleteStage(stage, leadCount, target?)`: devolve um erro em português ou ok.
-  - `orderStages(stages)`: as etapas da clínica na ordem, com `WON` e `LOST` por último.
-- Testes: idempotência (rodar duas vezes não duplica), bloqueio de `role` de
-  sistema e destino obrigatório quando a etapa tem leads.
+- `crm/defaults.ts`: etapas (Novo, Em conversa, Avaliação agendada, Em
+  negociação, Fechou, Perdeu) e motivos de perda.
+- `crm/pipeline.ts`: `ensureDefaultPipeline` (idempotente), `canDeleteStage`,
+  `boardStages` (sem `WON`/`LOST`), `fallbackStageAfterCancel` ("Em conversa"
+  ou `NEW`).
+- Testes.
 
-### 6. Leads
+### 6. Leads e tarefas
 
-- `crm/phone.ts`: normaliza (reusa `lib/phone.ts`) e gera o `phoneHash` (HMAC
-  com a chave da clínica de `packages/db/src/encryption.ts`; exportar de lá um
-  `hashForTenant` se ainda não houver).
-- `crm/leads.ts`: `createLead`, `updateLead`, `moveLead` (reposiciona a coluna
-  de destino, preenche ou limpa `wonAt`/`lostAt`, exige motivo para `LOST`,
-  registra `LeadActivity`), `setTags`, `addNote`, `softDelete`.
-- `crm/duplicates.ts`: `findLeadByPhone` (pelo hash) e `findPatientByPhone`
-  (decifra os telefones dos pacientes da clínica, como a busca de pacientes já faz).
-- Testes: perda sem motivo falha, reabrir limpa as datas, posição na coluna e
-  duplicados.
+- `crm/phone.ts`: normaliza (reusa `lib/phone.ts`) e `phoneHash` (exportar
+  `hashForTenant` de `packages/db/src/encryption.ts`, com teste lá).
+- `crm/leads.ts`: `createLead`, `updateLead`, `moveLead` (posição,
+  `stageEnteredAt`, ganho/perda/reabertura, histórico), `setTags`, `addNote`, `softDelete`.
+- `crm/tasks.ts`: `createTask`, `completeTask`, `taskStatus(lead, tasks, now)`
+  → `none | overdue | upcoming(dueAt)`.
+- `crm/duplicates.ts`: `findOpenLeadByPhone` (hash) e `findPatientByPhone`.
+- Testes: perda sem motivo falha, reabrir limpa datas, posição, duplicado só
+  entre abertos, situação de tarefa.
 
 ### 7. Automação
 
-- `crm/automation.ts`: `applyEvent(stages, lead, event)` é pura e devolve
-  `{ moveTo?, activity, wonValueCents? }`. Ela implementa "só para frente",
-  ignora lead fechado ou perdido e trata `MISSED` como só registro.
-- `crm/notify.ts`: `notifyCrm(tenantId, event)`.
-  - Lê `crmEnabled`; se for falso, sai.
-  - Acha o lead aberto pelo `patientId`, aplica `applyEvent` e grava numa transação.
-  - Envolve tudo em try/catch e loga só o tipo do evento e os ids. Nunca lança erro.
-- Testes: tabela de casos de `applyEvent`; `notifyCrm` com o banco mockado
-  falhando não lança erro; sem módulo, não consulta lead.
+- `crm/automation.ts`: `planForEvent(ctx, event)` pura. Recebe etapas, o lead
+  aberto mais recente, se há agendamento futuro e se há orçamento em aberto;
+  devolve `{ moveTo?, reopen?, wonValueCents?, tasks[], activity }`. Implementa
+  a tabela de regras da spec (avançar só para frente, voltar só de
+  `SCHEDULED` em cancelamento/falta, nunca perder, reabrir só pelo orçamento
+  que ganhou).
+- `crm/notify.ts`: `notifyCrm(tenantId, event)` — checa `crmEnabled`, monta o
+  contexto, aplica o plano numa transação, nunca lança.
+- `crm/live.ts`: `liveInfoForLeads(db, leads)` — próxima avaliação e orçamento
+  em aberto por `patientId`, numa consulta por tipo (sem N+1).
+- Testes: tabela de casos de `planForEvent`; `notifyCrm` com banco falhando;
+  sem módulo não consulta.
 
 ---
 
 ## Fase 3 — Telas
 
-Todas as telas usam `requireCrm`, server actions em `app/(crm)/crm/**/actions.ts`
-com `zod` e `refOutsideTenant`, e os componentes de `packages/ui`/shadcn já usados no app.
+`requireCrm` em tudo, server actions com `zod` e `refOutsideTenant`,
+componentes de `packages/ui`/shadcn já usados no app.
 
-### 8. Funil (kanban) e novo lead
+### 8. Funil (quadro)
 
-- `app/(crm)/crm/page.tsx`: chama `ensureDefaultPipeline` e carrega etapas e
-  leads com os filtros (responsável, tag, origem, busca). `WON`/`LOST` mostram
-  só os últimos 30 dias.
-- `_components/board.tsx`: colunas como regiões rotuladas ("Etapa Novo, 12 leads"),
-  com contagem e soma de valor. Arrastar com `@dnd-kit/core`, usando
-  `KeyboardSensor` e `announcements` em português.
-- `_components/lead-card.tsx`: o card focável, com o menu "Mover para…".
-  Mover para Perdeu abre o modal de motivo.
-- `_components/new-lead-modal.tsx`: aviso de duplicado (abrir o lead existente,
-  ou criar já vinculado ao paciente).
-- Região `aria-live` para anunciar os movimentos.
+- `app/(crm)/crm/page.tsx`: etapas, leads abertos, situação de tarefa e
+  informação ao vivo; filtros rápidos e busca.
+- `_components/board.tsx`, `column.tsx` (cabeçalho com cor, contagem, soma,
+  adicionar rápido), `lead-card.tsx` (menu "Mover para…"), `drop-bar.tsx`
+  (Ganho | Perdido | Excluir ao arrastar), `lost-reason-modal.tsx`,
+  `new-lead-modal.tsx` (com aviso de duplicado).
+- `@dnd-kit/core` com `KeyboardSensor`, anúncios em português e `aria-live`.
 
-### 9. Lista e detalhe
+### 9. Ficha do lead
 
-- `app/(crm)/crm/leads/page.tsx`: tabela com os mesmos filtros e colunas ordenáveis.
-- `app/(crm)/crm/leads/[id]/page.tsx`: dados editáveis, tags (com criar na
-  hora), responsável, valor, anotação, histórico e as ações Marcar como
-  perdido / Reabrir.
+- `app/(crm)/crm/leads/[id]/page.tsx`: duas metades. Esquerda: dados, tags,
+  barra de etapas, ações. Direita: histórico + caixa Tarefa | Nota; bloco
+  "Outros negócios".
 
-### 10. Converter e agendar
+### 10. Lista e Tarefas
 
-- No detalhe: "Converter em paciente" checa primeiro `findPatientByPhone`. Se
-  achar, oferece "Vincular a este paciente". Se não, abre o
-  `patient-form.tsx` existente com nome, telefone e e-mail já preenchidos.
-  - Se o formulário não aceitar valores iniciais, adicionar uma prop opcional
-    `initialValues`, sem mudar o comportamento atual.
-  - Ao salvar, grava `Lead.patientId` e registra `CONVERTED`.
-- "Agendar avaliação": converte se preciso e navega para `/agenda?novo=1&paciente=<id>`.
-- `agenda/_components/agenda-shell.tsx`: com `novo=1&paciente=<id>`, abre o
-  modal de novo agendamento com o paciente escolhido. Sem os parâmetros, nada muda.
-- Ficha do paciente (`pacientes/[id]/page.tsx`): link "Ver no funil" quando
-  existe um lead com aquele `patientId` e a pessoa tem `crm`.
+- `app/(crm)/crm/leads/page.tsx`: tabela com filtros (inclui ganhos/perdidos).
+- `app/(crm)/crm/tarefas/page.tsx`: Atrasadas / Hoje / Próximas, filtro por
+  responsável, concluir na lista.
 
-### 11. Ligar a automação na agenda e nos orçamentos
+### 11. Converter e agendar
 
-Uma linha de `after(() => notifyCrm(...))` em cada ponto, depois de salvar:
+- "Converter em paciente" com "Vincular a este paciente" ou `patient-form.tsx`
+  preenchido (prop opcional `initialValues`, sem mudar o uso atual).
+- "Agendar avaliação" → `/agenda?novo=1&paciente=<id>`;
+  `agenda/_components/agenda-shell.tsx` abre o modal com o paciente. Sem os
+  parâmetros, nada muda.
+- Ficha do paciente: bloco "Negócios no CRM" (só com `crm`).
 
-- `(app)/agenda/actions.ts` → `createAppointment` (`appointment.created`).
-  Já usa `after`, então entra junto.
-- `(app)/agenda/actions.ts` → `updateAppointmentStatus` quando o status novo é
-  `MISSED` (`appointment.missed`).
-- `(app)/orcamentos/actions.ts` → `createQuote` (`quote.created`) e
-  `acceptQuote` (`quote.accepted`).
-- `orcamento/[token]/actions.ts` → aceite pelo link público (`quote.accepted`).
-- **Pronto quando:** a regressão passa e o diff nesses arquivos é só o import
-  e as chamadas.
+### 12. Ligar a automação
 
-### 12. Configurações do CRM
+Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 
-- `app/(crm)/crm/configuracoes/page.tsx`, com `requireCrm('crm_config')` e abas:
-  - **Etapas:** criar, renomear, cor da paleta, reordenar (arrastar e botões
-    subir/descer) e apagar escolhendo o destino.
-  - **Tags:** criar, renomear, cor e apagar.
-  - **Motivos de perda:** criar, renomear, desativar e reordenar.
-- Ligação manual do módulo: um script `packages/db/prisma/crm-enable.ts <tenantId>`
-  liga `crmEnabled`, no mesmo estilo de como a cortesia é concedida hoje.
+- `(app)/agenda/actions.ts`: `createAppointment`, `updateAppointment`,
+  `moveAppointment`, `updateAppointmentStatus` (CANCELLED / MISSED / ATTENDED),
+  `cancelAppointment`, `deleteAppointment` (ler o `patientId` antes de apagar).
+- `(app)/orcamentos/actions.ts`: `createQuote`, `acceptQuote`, `reopenQuote`,
+  `deleteQuote` (ler o `patientId` antes de apagar).
+- `orcamento/[token]/actions.ts`: aceite e recusa pelo link.
+- Pronto quando: regressão verde e o diff nesses arquivos é só import + chamadas.
+
+### 13. Configurações do CRM
+
+- `app/(crm)/crm/configuracoes/page.tsx` (`crm_config`): Etapas, Tags, Motivos de perda.
+- Script `packages/db/prisma/crm-enable.ts <tenantId>` para ligar o módulo.
 
 ---
 
 ## Fase 4 — Fechamento
 
-### 13. E2E do CRM e acessibilidade
+### 14. E2E do CRM e acessibilidade
 
-- `e2e/crm/fluxo.spec.ts`: criar lead → mover com "Mover para…" pelo teclado →
-  converter → agendar avaliação → o card está em "Avaliação agendada" →
-  marcar o orçamento como aceito → o card está em "Fechou".
-- `e2e/crm/acesso.spec.ts`: sem `crmEnabled` o seletor não aparece e `/crm`
-  mostra "módulo não contratado"; recepção não abre `/crm/configuracoes`.
-- `e2e/a11y.spec.ts`: axe-core em `/crm`, `/crm/leads`, `/crm/leads/[id]` e
-  `/crm/configuracoes`, e também em `/agenda` e `/dashboard` com o seletor visível.
-- Regressão completa passando.
+- `e2e/crm/fluxo.spec.ts`: o caminho completo da spec (lead → tarefa →
+  converter → agendar → cancelar volta → reagendar → orçamento → aprovar → Fechou).
+- `e2e/crm/teclado.spec.ts`: "Mover para…", inclusive Perdido com motivo.
+- `e2e/crm/acesso.spec.ts`: sem módulo e papel sem permissão.
+- axe-core em `/crm`, `/crm/leads`, `/crm/leads/[id]`, `/crm/tarefas`,
+  `/crm/configuracoes` e na agenda com o seletor.
+- A semeadura liga `crmEnabled` na clínica de teste.
 
-### 14. Documentação
+### 15. Documentação
 
-- `CLAUDE.md`: corrigir "Filas: BullMQ + Redis" (o projeto usa outbox no
-  Postgres e o gateway no Fly) e acrescentar a seção do CRM (pastas, `notifyCrm`,
-  regra de que a agenda não importa nada do CRM além dele).
-- `ROADMAP.md`: atualizar com o que já existe e com as etapas 1–5 do CRM.
+- `CLAUDE.md`: corrigir "BullMQ + Redis" (é outbox no Postgres + gateway no
+  Fly), seção do CRM e do ambiente local (Postgres local, `e2e/README.md`).
+- `ROADMAP.md`: estado real e etapas 1–5 do CRM.
 
 ---
 
-## Ordem e paralelismo
+## Ordem
 
 ```
-1 → 2 → 3 → 4 ─┐
-       └→ 5 → 6 → 7 ─┼→ 8 → 9 → 10 → 11 → 12 → 13 → 14
+1 ✅ → 2 → 3 → 4 ─┐
+       └→ 5 → 6 → 7 ─┼→ 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
 ```
 
-As tarefas 5–7 (só regras e testes) podem andar em paralelo com a 4.
-
-## Riscos e como cada um é coberto
+## Riscos
 
 | Risco | Cobertura |
 |---|---|
-| Quebrar a agenda ao extrair o layout (tarefa 4) | regressão E2E + layout visualmente idêntico sem `crmEnabled` |
-| Automação atrasar ou derrubar a agenda | `after()` + `notifyCrm` que nunca lança erro + teste unitário com o banco falhando |
-| Modelos novos sem filtro de clínica | todos com `tenantId` (a extensão filtra por padrão) + teste de que uma clínica não lê lead de outra |
-| Kanban inacessível | "Mover para…" como caminho principal + axe-core + E2E pelo teclado |
-| `db push` mexer em tabela existente | conferir a saída na tarefa 2; só tabelas e uma coluna nova com valor padrão |
+| Extrair o layout quebrar a agenda (4) | regressão E2E + tela idêntica sem `crmEnabled` |
+| Automação atrasar ou derrubar a agenda | `after()` + `notifyCrm` que nunca lança + teste com banco falhando |
+| Card mostrar data ou valor errado | informação lida ao vivo da agenda e dos orçamentos |
+| Card puxado para trás indevidamente | voltar só de `SCHEDULED` e só sem outro agendamento futuro; testes de tabela |
+| Modelos novos sem filtro de clínica | todos com `tenantId` + teste de isolamento |
+| Quadro inacessível | "Mover para…" como caminho principal + axe-core + E2E por teclado |
+| `db push` mexer em tabela existente | conferir a saída; só tabelas novas e uma coluna com padrão |

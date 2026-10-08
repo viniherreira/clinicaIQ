@@ -1,20 +1,22 @@
-# CRM — Etapa 1: leads, funil e tags
+# CRM — Etapa 1: leads, funil, tags e tarefas
 
-Data: 2026-10-07
-Status: aprovado no brainstorming, aguardando revisão da spec
+Data: 2026-10-07 (revisada em 2026-10-08)
+Status: aprovado no brainstorming
 
 ## Contexto
 
-O ClinicaIQ ganha um CRM de captação para clínicas, no estilo do Kommo, mas
-pensado para o caminho de clínica: o lead chega, conversa, agenda avaliação,
-recebe orçamento e vira paciente.
+O ClinicaIQ ganha um CRM de captação para clínicas. As **funcionalidades e a
+organização de tela seguem o Kommo**; a identidade visual (cores, logo,
+tipografia) continua a do ClinicaIQ. Nada de marca, ilustração ou texto do
+Kommo é copiado.
 
 O CRM inteiro foi dividido em cinco entregas, cada uma com spec e plano próprios:
 
-1. **Leads, funil e tags** ← esta spec
-2. Conexão pela API oficial do WhatsApp (Embedded Signup) e caixa de entrada
+1. **Leads, funil, tags e tarefas** ← esta spec
+2. Conexão pela API oficial do WhatsApp (Embedded Signup), caixa de entrada e
+   coluna "Entrada" (leads que chegam sozinhos)
 3. Transmissões com templates aprovados pela Meta (substitui Campanhas para quem tem CRM)
-4. Chatbot por botões (menu, perguntas de qualificação, fora do horário, passar para humano)
+4. Chatbot por botões e automações por etapa (ao entrar na etapa: mensagem, tarefa)
 5. Plano "só CRM", plano combinado e cobrança
 
 Decisões já tomadas para o CRM como um todo:
@@ -22,109 +24,105 @@ Decisões já tomadas para o CRM como um todo:
 - Só para clínicas. O lead vira paciente dentro do ClinicaIQ.
 - A API oficial é exclusiva do CRM. O plano básico continua no QR code (gateway Baileys).
 - Na entrada, só WhatsApp e cadastro manual.
-- Um funil por clínica, editável, que anda sozinho com os eventos da agenda e dos orçamentos.
+- Um funil por clínica, editável, que anda sozinho com a agenda e os orçamentos.
 - O CRM pode ser vendido junto com a gestão clínica ou sozinho.
 
 ### Requisito principal: não atrapalhar o agendamento
 
-- Nenhuma tabela existente muda de formato nesta etapa.
+- Nenhuma tabela existente muda de formato nesta etapa (só ganha relações e um
+  campo novo com valor padrão em `Subscription`).
 - A agenda e os orçamentos nunca esperam o CRM nem dependem dele para dar certo.
 - Clínica sem o módulo CRM executa exatamente o código de hoje.
-- Uma suíte E2E de regressão da agenda, dos pacientes e dos orçamentos é criada
-  antes do CRM e precisa passar antes da entrega (ver "Testes").
+- A suíte E2E de regressão (`apps/web/e2e/regressao/`) passa a cada tarefa que
+  mexe em código existente.
 - Esta etapa não toca em nada de WhatsApp.
 
 ## Fora do escopo
 
-Campos personalizados, vários funis, tarefas do atendente, importação de
-planilha, qualquer coisa de WhatsApp, cobrança do módulo e acesso de
-profissionais ao CRM.
+Campos personalizados, vários funis, coluna "Entrada", automações configuráveis
+por etapa, importação de planilha, qualquer coisa de WhatsApp, cobrança do
+módulo e acesso de profissionais ao CRM.
+
+## Modelo: pessoa e negócio
+
+Como no Kommo, o **lead é um negócio** (uma oportunidade), não a pessoa. A
+mesma pessoa pode ter vários leads ao longo do tempo: "Implante" em 2026 e
+"Harmonização" em 2027. Enquanto não é paciente, os dados de contato ficam no
+próprio lead; depois de convertido, o lead aponta para o `Patient`, e os
+próximos leads dessa pessoa nascem já ligados a ele.
 
 ## Separação: dois espaços no mesmo app
-
-O app passa a ter dois espaços, cada um com o próprio menu lateral:
 
 | Espaço | Menu |
 |---|---|
 | Clínica | o menu de hoje (Dashboard, Agenda, Pacientes, Retorno, Procedimentos, Orçamentos, Financeiro, WhatsApp, Campanhas, Configurações) |
-| CRM | Funil, Leads, Configurações do CRM (Conversas, Transmissões e Chatbot entram nas etapas 2–4) |
+| CRM | Funil, Leads, Tarefas, Configurações do CRM (Conversas, Transmissões e Chatbot entram nas etapas 2–4) |
 
 - O texto "Gestão clínica" embaixo do logo vira um seletor `Clínica | CRM`.
-- O seletor só aparece quando a clínica tem os dois módulos. Com um só, o menu
-  mostra apenas aquele espaço, sem seletor.
-- O último espaço usado fica lembrado em um cookie, que é só preferência: o
-  acesso é sempre validado no servidor.
-- O seletor é um grupo de dois links com `aria-current`. Ele é navegável por
-  teclado e tem nome acessível ("Trocar de módulo").
-- Os pontos de encontro entre os espaços são só links: "Agendar avaliação" no
-  lead leva para a Agenda, e "Ver no funil" no paciente que veio de um lead leva
-  para o card dele.
+- O seletor só aparece quando a clínica tem os dois módulos.
+- O último espaço usado fica num cookie, só como preferência: o acesso é sempre
+  validado no servidor.
+- O seletor é um grupo de dois links com `aria-current` e nome acessível
+  "Trocar de módulo".
+- Os pontos de encontro são links: "Agendar avaliação" no lead leva à Agenda;
+  "Ver no funil" no paciente leva aos leads dele.
 
 ### No código
 
-- Rotas: `apps/web/app/(crm)/crm/...`, um grupo de rotas com layout e menu
-  próprios. O que é comum (cabeçalho, menu do usuário, provedores) sai do layout
-  de `(app)` para um componente compartilhado, sem mudar o comportamento.
-- Domínio: `apps/web/crm/` guarda as regras (funil, conversão, automação,
-  funil padrão). Telas e server actions do CRM importam daqui.
-- A agenda e os orçamentos nunca importam de `apps/web/crm/`, com uma única
-  exceção: a função `notifyCrm` (ver "Automação").
-- `NAV` em `components/app-sidebar.tsx` vira duas listas, `CLINIC_NAV` e `CRM_NAV`.
+- Rotas: `apps/web/app/(crm)/crm/...`, grupo próprio com layout e menu. O que é
+  comum (cabeçalho, menu do usuário) sai de `(app)/layout.tsx` para um
+  `AppShell` compartilhado, sem mudar o que aparece.
+- Domínio: `apps/web/crm/` guarda as regras. A agenda e os orçamentos só
+  importam `apps/web/crm/notify.ts`.
+- `NAV` em `components/app-sidebar.tsx` vira `CLINIC_NAV` e `CRM_NAV`.
 
 ## Acesso
 
-Duas camadas, como no resto do sistema:
-
-1. **Módulo contratado.** A flag `crmEnabled` em `Subscription` diz se a clínica
-   tem o CRM. Nesta etapa ela é ligada manualmente, como a cortesia. Sem a flag,
-   as rotas `/crm` respondem com a tela de "módulo não contratado" e a automação
+1. **Módulo contratado:** `Subscription.crmEnabled` (padrão `false`). Ligado à
+   mão nesta etapa. Sem ele, `/crm` mostra "módulo não contratado" e a automação
    não faz nada.
-2. **Papel da pessoa.** Duas capacidades novas em `lib/permissions.ts`:
-   - `crm`: criar, editar, mover, converter e marcar perda em leads. Vale para OWNER, ADMIN e RECEPTIONIST.
-   - `crm_config`: editar etapas, tags e motivos de perda. Vale para OWNER e ADMIN.
-   - PROFESSIONAL não recebe nenhuma das duas nesta etapa.
+2. **Papel:**
+   - `crm` — criar, editar, mover, converter, perder leads, criar e concluir
+     tarefas: OWNER, ADMIN, RECEPTIONIST.
+   - `crm_config` — etapas, tags, motivos de perda, excluir lead: OWNER, ADMIN.
+   - PROFESSIONAL não tem acesso nesta etapa.
 
-Toda server action do CRM chama `requireCapability`, checa a flag do módulo e
-valida que os ids recebidos pertencem à clínica, seguindo o padrão `refOutsideTenant`.
+Toda server action do CRM chama `requireCrm(...)` (capacidade + módulo) e
+valida que os ids recebidos são da clínica (`refOutsideTenant`).
 
 ## Dados
 
-Todas as tabelas são novas e têm `tenantId`. O acesso é sempre por
-`getTenantClient(tenantId)`.
+Todas as tabelas novas têm `tenantId` — a extensão de `getTenantClient` filtra
+**todo** modelo por ele, inclusive tabelas de ligação.
 
 ### `Lead`
 
 | Campo | Tipo | Observação |
 |---|---|---|
-| id | cuid | |
-| tenantId | String | |
-| name | String | |
-| phoneEncrypted | String | AES-256-GCM via `encrypt`, como no paciente |
-| phoneHash | String | HMAC do telefone normalizado, para busca e para achar duplicados sem decifrar |
+| id, tenantId | | |
+| title | String? | nome do negócio ("Implante"); vazio = mostra o interesse ou o nome |
+| name | String | nome da pessoa (copiado do paciente quando ligado) |
+| phoneEncrypted | String | AES-256-GCM via `encrypt` |
+| phoneHash | String | HMAC do telefone normalizado com a chave da clínica, para duplicados |
 | email | String? | |
-| stageId | String | FK para `PipelineStage` |
-| position | Int | ordem dentro da coluna |
-| assignedToId | String? | FK para `User` |
+| stageId | String | FK `PipelineStage` |
+| position | Int | ordem na coluna |
+| assignedToId | String? | FK `User` |
 | source | LeadSource | `WHATSAPP`, `INDICACAO`, `INSTAGRAM`, `SITE`, `MANUAL`, `OUTRO` |
-| interestProcedureId | String? | FK para `Procedure` |
+| interestProcedureId | String? | FK `Procedure` |
 | estimatedValueCents | Int? | |
 | notes | String? | |
-| patientId | String? @unique | preenchido quando vira paciente |
-| lostReasonId | String? | FK para `LostReason` |
-| wonAt / lostAt | DateTime? | |
-| deletedAt | DateTime? | exclusão lógica |
-| createdById / updatedById | String? | |
-| createdAt / updatedAt | DateTime | |
+| patientId | String? | FK `Patient`, **não único** (vários negócios por pessoa) |
+| lostReasonId | String? | FK `LostReason` |
+| stageEnteredAt | DateTime | quando entrou na etapa atual ("há 3 dias") |
+| wonAt, lostAt, deletedAt | DateTime? | |
+| createdById, updatedById | String? | |
+| createdAt, updatedAt | DateTime | |
 
 Índices: `[tenantId, stageId, position]`, `[tenantId, phoneHash]`,
-`[tenantId, deletedAt]` e `[tenantId, assignedToId]`.
+`[tenantId, patientId]`, `[tenantId, assignedToId]`, `[tenantId, deletedAt]`.
 
-> Hoje os pacientes não têm hash de telefone. O `phoneHash` do lead é um HMAC
-> com a chave derivada da clínica (`packages/db/src/encryption.ts`) e serve só
-> para achar lead duplicado. Para achar paciente com o mesmo telefone, o sistema
-> decifra os telefones dos pacientes da clínica, como a busca de pacientes já
-> faz. Criar um hash para pacientes mexeria em tabela existente e fica fora
-> desta etapa.
+Lead **aberto** = sem `wonAt`, sem `lostAt` e sem `deletedAt`.
 
 ### `PipelineStage`
 
@@ -132,172 +130,180 @@ Todas as tabelas são novas e têm `tenantId`. O acesso é sempre por
 |---|---|---|
 | id, tenantId | | |
 | name | String | editável |
-| color | String | um token da paleta, não um hex livre |
+| color | String | token da paleta, não hex livre |
 | order | Int | |
-| role | StageRole? | `NEW`, `SCHEDULED`, `QUOTED`, `WON`, `LOST`; null = etapa criada pela clínica |
+| role | StageRole? | `NEW`, `SCHEDULED`, `NEGOTIATION`, `WON`, `LOST`; null = etapa da clínica |
 
-Regras:
+- `@@unique([tenantId, role])` — no Postgres, nulos não colidem, então etapas
+  sem `role` não são afetadas.
+- Etapas com `role` podem ser renomeadas e reordenadas, mas não apagadas.
+- Etapas sem `role` podem ser apagadas; se tiverem leads, escolhe-se o destino.
+- `WON` e `LOST` não aparecem como colunas: viram a barra "solte aqui" (ver Telas).
 
-- Cada `role` aparece no máximo uma vez por clínica: `@@unique([tenantId, role])`.
-  No Postgres, nulos não colidem num índice único, então as etapas sem `role`
-  não são afetadas, e o projeto, que usa `db push`, não precisa de índice parcial.
-- Etapas com `role` `WON` e `LOST` não podem ser apagadas. As demais etapas com
-  `role` podem ser renomeadas e reordenadas, mas não apagadas, porque a
-  automação depende delas.
-- Etapas sem `role` podem ser apagadas. Se tiverem leads, a pessoa escolhe a
-  etapa de destino antes.
-- `WON` e `LOST` sempre aparecem por último no quadro, nessa ordem.
+### `LeadTask` (tarefas)
 
-### `LeadTag` e `LeadTagOnLead`
+| Campo | Tipo | Observação |
+|---|---|---|
+| id, tenantId, leadId | | |
+| text | String | "Ligar para confirmar avaliação" |
+| dueAt | DateTime | data e hora |
+| assignedToId | String | FK `User` (padrão: responsável do lead) |
+| completedAt | DateTime? | |
+| completedById | String? | |
+| origin | TaskOrigin | `MANUAL` ou `AUTOMATION` |
+| createdById | String? | |
+| createdAt, updatedAt | DateTime | |
 
-- `LeadTag`: `id`, `tenantId`, `name` e `color`, com `@@unique([tenantId, name])`.
-- `LeadTagOnLead`: `tenantId`, `leadId` e `tagId`, com a chave composta por
-  `leadId` e `tagId`. O `tenantId` existe porque `getTenantClient` filtra todo
-  modelo por ele, inclusive as tabelas de ligação.
+Índices: `[tenantId, leadId, completedAt]`, `[tenantId, assignedToId, completedAt, dueAt]`.
 
-### `LostReason`
+Situação do lead, calculada na leitura (não gravada):
 
-`id`, `tenantId`, `name`, `order` e `active`. A clínica começa com: Achou caro,
-Sem resposta, Fechou com outra clínica, Só pesquisando, Outro.
+- **Sem tarefa** — lead aberto sem nenhuma tarefa pendente.
+- **Atrasada** — tem tarefa pendente com `dueAt` no passado.
+- **Em dia** — a próxima tarefa pendente ainda não venceu (o card mostra quando).
 
-### `LeadActivity`
+### `LeadTag`, `LeadTagOnLead`, `LostReason`
 
-Histórico do card, mais novo primeiro.
+- `LeadTag`: `tenantId`, `name`, `color`; `@@unique([tenantId, name])`.
+- `LeadTagOnLead`: `tenantId`, `leadId`, `tagId`; chave `[leadId, tagId]`.
+- `LostReason`: `tenantId`, `name`, `order`, `active`. Padrão: Achou caro, Sem
+  resposta, Fechou com outra clínica, Só pesquisando, Outro.
 
-| Campo | Tipo |
-|---|---|
-| id, tenantId, leadId | |
-| type | `CREATED`, `STAGE_CHANGED`, `NOTE`, `TAG_ADDED`, `TAG_REMOVED`, `ASSIGNED`, `CONVERTED`, `LOST`, `REOPENED`, `AUTOMATION` |
-| data | Json (ex.: `{ from, to }`, `{ tagId }`, `{ appointmentId }`) |
-| actorId | String? (nulo quando foi a automação) |
-| createdAt | DateTime |
+### `LeadActivity` (histórico)
 
-Índice: `[tenantId, leadId, createdAt desc]`.
+`tenantId`, `leadId`, `type`, `data` (Json), `actorId?` (nulo = automação), `createdAt`.
 
-Telefone e qualquer outro dado pessoal nunca vão para `data`.
+Tipos: `CREATED`, `STAGE_CHANGED`, `NOTE`, `TAG_ADDED`, `TAG_REMOVED`,
+`ASSIGNED`, `TASK_CREATED`, `TASK_COMPLETED`, `CONVERTED`, `LOST`, `REOPENED`,
+`CLINIC_EVENT` (eventos da agenda e dos orçamentos).
+
+Índice: `[tenantId, leadId, createdAt desc]`. Telefone e dados pessoais nunca vão em `data`.
 
 ### `Subscription`
 
-Ganha `crmEnabled Boolean @default(false)`. É o único campo novo numa tabela
-existente. Ele é aditivo e tem valor padrão, então nenhuma consulta atual muda.
+Ganha `crmEnabled Boolean @default(false)`.
 
 ## Funil padrão
 
-Criado na primeira vez que a clínica abre o CRM com o módulo ligado, por uma
-função idempotente (`ensureDefaultPipeline`):
+Criado por `ensureDefaultPipeline` (idempotente) na primeira abertura do CRM:
 
-| Ordem | Nome | role |
-|---|---|---|
-| 1 | Novo | NEW |
-| 2 | Em conversa | — |
-| 3 | Avaliação agendada | SCHEDULED |
-| 4 | Orçamento enviado | QUOTED |
-| 5 | Fechou | WON |
-| 6 | Perdeu | LOST |
-
-A mesma função cria os motivos de perda padrão.
+| Ordem | Nome | role | Como o card chega |
+|---|---|---|---|
+| 1 | Novo | NEW | lead criado |
+| 2 | Em conversa | — | manual |
+| 3 | Avaliação agendada | SCHEDULED | automático: agendamento criado |
+| 4 | Em negociação | NEGOTIATION | automático: orçamento criado (em aberto) |
+| — | Fechou | WON | automático: orçamento aprovado; ou manual |
+| — | Perdeu | LOST | sempre manual, com motivo |
 
 ## Regras do lead
 
-- **Criar:** nome e telefone são obrigatórios. O lead entra na etapa `NEW`, a
-  menos que a pessoa escolha outra. Se o telefone já pertencer a um lead aberto,
-  o sistema avisa e oferece abrir o existente. Se pertencer a um paciente,
-  oferece criar o lead já vinculado.
-- **Mover para `WON`:** preenche `wonAt`.
-- **Mover para `LOST`:** exige motivo de perda e preenche `lostAt`.
-- **Reabrir:** tirar o lead de `WON` ou `LOST` limpa as datas e registra
-  `REOPENED`.
-- **Ordem na coluna:** campo `position`. Mover o card reposiciona só a coluna
-  de destino.
-- **Excluir:** exclusão lógica, só para quem tem `crm_config`.
+- **Criar:** nome e telefone obrigatórios; título, interesse, valor, origem,
+  responsável (padrão: quem criou) opcionais. Entra em `NEW`.
+- **Duplicado:** se já houver lead **aberto** com o mesmo telefone, avisa e
+  oferece abrir o existente. Se o telefone for de um paciente, cria o lead já
+  ligado a ele (sem perguntar de novo os dados).
+- **Ganho:** preenche `wonAt`. **Perda:** exige motivo e preenche `lostAt`.
+- **Reabrir:** limpa `wonAt`/`lostAt`, volta para a etapa escolhida, registra `REOPENED`.
+- **Mover:** atualiza `stageId`, `position`, `stageEnteredAt` e registra `STAGE_CHANGED`.
+- **Excluir:** exclusão lógica, só `crm_config`.
 
 ## Conversão em paciente
 
-- **"Converter em paciente":** abre o formulário de paciente que já existe
-  (`pacientes/_components/patient-form.tsx`), preenchido com nome, telefone e
-  e-mail. O aceite da LGPD continua obrigatório. Ao salvar, `Lead.patientId`
-  recebe o paciente e registra `CONVERTED`.
-- **Telefone igual ao de um paciente existente:** antes de abrir o formulário, o
-  sistema mostra o paciente e oferece "Vincular a este paciente". Vincular não
-  cria nem altera o paciente.
-- **"Agendar avaliação":** converte primeiro, se ainda não for paciente, e
-  depois navega para `/agenda?novo=1&paciente=<id>`. A agenda abre o modal de
-  novo agendamento com o paciente escolhido. Essa é a única mudança visível na
-  agenda: ler dois parâmetros da URL e pré-selecionar. Sem esses parâmetros, a
-  agenda se comporta como hoje.
-- Converter não move o card. Quem move é o agendamento ou o orçamento, pela automação.
+- "Converter em paciente": se o telefone já for de um paciente, oferece
+  "Vincular a este paciente". Senão, abre o `patient-form.tsx` existente
+  preenchido (nome, telefone, e-mail). Aceite LGPD continua obrigatório. Ao
+  salvar, grava `Lead.patientId` e registra `CONVERTED`.
+- "Agendar avaliação": converte se preciso e abre `/agenda?novo=1&paciente=<id>`,
+  que abre o modal de novo agendamento com o paciente escolhido. Sem esses
+  parâmetros a agenda não muda.
+- Converter não move o card; quem move é a agenda, pela automação.
 
-## Automação: o card anda sozinho
+## Integração automática com a agenda e os orçamentos
 
-Depois que a ação da agenda ou do orçamento já salvou, ela chama:
+### Como o aviso chega
 
-```ts
-after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId, appointmentId }));
-```
+Depois que a ação da clínica **já salvou**, ela chama
+`after(() => notifyCrm(tenantId, evento))`. `notifyCrm`:
 
-- `after()` (de `next/server`) roda depois da resposta. A ação não espera e o
-  usuário não vê atraso.
-- `notifyCrm` mora em `apps/web/crm/notify.ts` e:
-  - não faz nada se a clínica não tiver `crmEnabled`;
-  - trata qualquer erro dentro de si mesma (try/catch com log sem dados
-    pessoais) e nunca lança erro.
+- não faz nada sem `crmEnabled`;
+- acha o **lead aberto mais recente** do paciente (`patientId`); sem lead, nada;
+- trata qualquer erro por dentro (log só com tipo e ids) e **nunca lança**.
 
-Pontos de chamada (uma linha cada):
+### Regras
 
-| Ação existente | Evento |
-|---|---|
-| `agenda/actions.ts` → `createAppointment` | `appointment.created` |
-| `agenda/actions.ts` → `updateAppointmentStatus` com MISSED | `appointment.missed` |
-| `(app)/orcamentos/actions.ts` → `createQuote` | `quote.created` |
-| `(app)/orcamentos/actions.ts` → a ação que grava `status: 'ACCEPTED'` | `quote.accepted` |
-| `orcamento/[token]/actions.ts` → aceite pelo link público | `quote.accepted` |
+| Evento | Onde nasce | O que o CRM faz |
+|---|---|---|
+| `appointment.created` | `createAppointment` | move para `SCHEDULED` |
+| `appointment.rescheduled` | `updateAppointment`, `moveAppointment` | só histórico (a data no card é lida ao vivo) |
+| `appointment.cancelled` | `updateAppointmentStatus`/`cancelAppointment` com CANCELLED, `deleteAppointment` | se o lead está em `SCHEDULED` e o paciente não tem outro agendamento futuro: volta para "Em conversa" (ou `NEW`, se a clínica apagou "Em conversa") e cria a tarefa "Reagendar avaliação" (amanhã 10h, para o responsável) |
+| `appointment.missed` | `updateAppointmentStatus` com MISSED | igual ao cancelamento, com o texto "Faltou na avaliação — reagendar" |
+| `appointment.attended` | `updateAppointmentStatus` com ATTENDED | histórico; se o paciente não tem orçamento em aberto, cria a tarefa "Enviar orçamento" (amanhã 10h) |
+| `quote.created` | `createQuote` | move para `NEGOTIATION` |
+| `quote.accepted` | `acceptQuote`, aceite pelo link público | move para `WON`, `wonAt` e valor = total do orçamento |
+| `quote.reopened` | `reopenQuote` | se o lead foi ganho por esse orçamento: reabre e volta para `NEGOTIATION` |
+| `quote.rejected` | recusa pelo link público | histórico com o motivo + tarefa "Retomar negociação"; **não** perde o lead |
+| `quote.deleted` | `deleteQuote` | histórico + tarefa "Retomar negociação" se não sobrou orçamento em aberto |
 
-Regras aplicadas pelo CRM:
+Princípios:
 
-1. Procura o lead aberto (sem `wonAt`, sem `lostAt` e sem `deletedAt`) com aquele
-   `patientId`. Se não houver, não faz nada.
-2. `appointment.created` → move para `SCHEDULED`.
-3. `quote.created` → move para `QUOTED`. É "criado", e não "enviado", porque a
-   tela da clínica não marca mais orçamento como enviado: o "copiar link" saiu
-   no commit `4d2e66d`, e `sendQuote`/`markQuoteSent` não têm quem as chame.
-   O orçamento vai de rascunho direto para aprovado.
-4. `quote.accepted` → move para `WON`, preenche `wonAt` e grava o total do
-   orçamento em `estimatedValueCents`.
-5. `appointment.missed` → não move, só registra uma `AUTOMATION` no histórico.
-6. **Só para frente:** a automação só move se a etapa de destino vier depois da
-   atual na ordem do funil. Se a recepção já colocou o card mais adiante, nada acontece.
-7. Todo movimento automático registra `STAGE_CHANGED` com `actorId` nulo e a
-   origem no `data`.
+1. **Avançar** (`SCHEDULED`, `NEGOTIATION`, `WON`) só acontece se a etapa de
+   destino vier depois da atual. Se a recepção já pôs o card mais à frente, a
+   automação não o puxa para trás.
+2. **Voltar** só acontece no cancelamento ou falta, e só a partir de `SCHEDULED`.
+3. **Perder nunca é automático.**
+4. Lead ganho ou perdido não é mexido, exceto por `quote.reopened` do próprio
+   orçamento que o ganhou.
+5. Todo movimento ou tarefa automática registra histórico com `actorId` nulo e
+   a origem do evento.
 
-Limite conhecido: se `notifyCrm` falhar, o card fica para trás. Isso é aceito
-nesta etapa, porque o agendamento já foi salvo e a pessoa pode mover o card à
-mão. Uma fila com reprocessamento só entra se isso acontecer na prática.
+### O que o card mostra ao vivo
 
-## Telas
+A próxima avaliação ("Avaliação 12/10 9h") e o orçamento em aberto ("Orçamento
+nº 12 · R$ 6.500") são **lidos da agenda e dos orçamentos** na hora de montar
+o quadro, pelo `patientId` do lead — não copiados para o CRM. Se um aviso se
+perder, o card fica numa etapa atrasada (a pessoa arrasta), mas nunca mostra
+data ou valor errados.
 
-### `/crm` — Funil (kanban)
+## Telas (organização no estilo Kommo)
 
-- Uma coluna por etapa, com nome, quantidade e soma de `estimatedValueCents`.
-- O card mostra nome, tags, responsável, origem, valor e há quanto tempo está na etapa.
-- Filtros: responsável, tag e origem. Busca por nome ou telefone.
-- As colunas `WON` e `LOST` mostram só os últimos 30 dias, com o link "ver todos".
-- Arrastar usa `@dnd-kit/core`, que a agenda já usa, com `KeyboardSensor` e
-  `announcements` em português.
-- Todo card tem um menu "Mover para…", que é o caminho principal para teclado e
-  leitor de tela.
-- "Novo lead" abre um modal.
+### `/crm` — Funil
+
+- Barra superior: Quadro | Lista, busca por nome ou telefone, filtros rápidos
+  ("Meus leads", "Sem tarefa", "Atrasadas", por tag, por origem) e "Novo lead".
+- Uma coluna por etapa (exceto `WON`/`LOST`): linha colorida no topo, nome,
+  quantidade e soma do valor; "Adicionar rápido" no topo da coluna (nome +
+  telefone, Enter salva).
+- Card: título ou nome, interesse e origem, tags, responsável, valor, avaliação
+  ou orçamento ao vivo, e a situação da tarefa ("Sem tarefa" em aviso,
+  "Atrasada" em perigo, ou a hora da próxima).
+- Ao arrastar um card aparece no rodapé a barra "Ganho | Perdido | Excluir".
+  Soltar em Perdido abre o motivo; Excluir só aparece para `crm_config`.
+- Arrastar usa `@dnd-kit/core` (já usado na agenda) com `KeyboardSensor` e
+  anúncios em português. Todo card tem o menu "Mover para…" (inclui Ganho e
+  Perdido), que é o caminho principal por teclado.
 
 ### `/crm/leads` — Lista
 
-A mesma informação do funil em tabela, com colunas ordenáveis e os mesmos
-filtros. É a alternativa completa ao kanban.
+Tabela com as mesmas informações e filtros, colunas ordenáveis, inclusive
+ganhos e perdidos (filtro por situação).
 
-### `/crm/leads/[id]` — Detalhe
+### `/crm/leads/[id]` — Ficha do lead
 
-- Dados editáveis, etapa, responsável, tags (adicionar e criar na hora) e valor.
-- Ações: Converter em paciente, Agendar avaliação, Marcar como perdido, Reabrir.
-- Anotação rápida e histórico.
-- Se tiver `patientId`, mostra o link "Abrir ficha do paciente".
+- **Esquerda (dados):** título, tags (adicionar e criar na hora), barra de
+  progresso pelas etapas com seletor, responsável, valor, interesse, telefone
+  (mascarado até clicar em "mostrar"), e-mail, origem, paciente ligado, e os
+  botões Agendar avaliação, Converter em paciente, Marcar como perdido / Reabrir.
+- **Direita (histórico):** linha do tempo mais nova embaixo, com eventos,
+  notas, tarefas (com botão "Concluir") e eventos da clínica. Embaixo, a caixa
+  com abas **Tarefa** (texto, data e hora, responsável) e **Nota**. A aba
+  Conversa fica reservada para a etapa 2.
+- Outros leads da mesma pessoa aparecem num bloco "Outros negócios".
+
+### `/crm/tarefas` — Tarefas
+
+Lista das tarefas pendentes em três grupos — Atrasadas, Hoje, Próximas —
+filtráveis por responsável (padrão: as minhas). Concluir direto da lista.
 
 ### `/crm/configuracoes`
 
@@ -306,69 +312,53 @@ Motivos de perda. Exige `crm_config`.
 
 ### Na ficha do paciente
 
-Se existir um lead com aquele `patientId`, aparece o link "Ver no funil". É só
-leitura e não aparece para quem não tem `crm`.
+Bloco "Negócios no CRM" com os leads da pessoa e link para cada um. Só aparece
+com `crm`.
 
 ## Acessibilidade (WCAG 2.1 AA)
 
-- O kanban é uma lista de regiões rotuladas ("Etapa Novo, 12 leads"), e os
-  cards são itens focáveis.
-- Mover pelo teclado: o menu "Mover para…" e o sensor de teclado do dnd-kit.
-  Os dois anunciam o resultado numa região `aria-live`.
-- A cor da etapa e da tag nunca é a única informação, porque o nome aparece sempre.
-- Os modais seguem o padrão já usado na agenda (foco preso, Esc fecha, foco
-  volta para quem abriu).
-- O axe-core roda nas quatro telas no E2E.
+- O quadro é uma lista de regiões rotuladas ("Etapa Novo, 12 leads"); cards
+  são itens focáveis.
+- "Mover para…" e o sensor de teclado anunciam o resultado em `aria-live`.
+- A barra "solte aqui" tem equivalente no menu "Mover para…".
+- Cor de etapa, tag e situação de tarefa nunca é a única informação (sempre há texto).
+- Modais seguem o padrão da agenda (foco preso, Esc fecha, foco volta).
+- axe-core em todas as telas do CRM.
 
 ## LGPD
 
-- O telefone do lead é criptografado como o do paciente e nunca aparece em log
-  nem no `data` do histórico.
-- O lead não tem aceite de LGPD próprio nesta etapa: o dado é de contato
-  comercial que a própria pessoa iniciou. O aceite do tratamento continua sendo
-  coletado na conversão em paciente.
-- Excluir o lead é exclusão lógica. Anonimizar a pedido do titular fica fora
-  desta etapa e entra junto com a caixa de entrada (etapa 2), quando o lead
-  passa a ter conversas guardadas.
+- Telefone do lead criptografado e mascarado na tela; nunca em log nem no histórico.
+- O aceite de tratamento é coletado na conversão em paciente.
+- Exclusão é lógica. Anonimização a pedido entra na etapa 2, junto com as conversas.
 
 ## Testes
 
 **Unitários (Vitest)**
 
-- Regras de movimento automático: só para frente, ignora lead fechado ou
-  perdido, sem lead não faz nada, `MISSED` não move.
-- `notifyCrm` nunca lança erro, mesmo com o banco falhando, e não faz nada sem `crmEnabled`.
-- `ensureDefaultPipeline` é idempotente.
-- Apagar etapa: bloqueia `role` de sistema e exige destino quando há leads.
-- Achar duplicado por telefone (lead e paciente).
-- Perda exige motivo, e reabrir limpa as datas.
+- Regras de automação (tabela de casos): avança só para frente; volta só em
+  cancelamento/falta a partir de `SCHEDULED`; não volta se há outro
+  agendamento futuro; nunca perde; reabertura só pelo orçamento que ganhou;
+  tarefas automáticas criadas nos casos certos; sem lead não faz nada.
+- `notifyCrm` nunca lança, mesmo com o banco falhando; sem módulo não consulta nada.
+- Situação de tarefa (sem tarefa / atrasada / em dia).
+- `ensureDefaultPipeline` idempotente; apagar etapa (bloqueio de `role`, destino).
+- Duplicado por telefone só entre leads abertos; perda exige motivo; reabrir limpa datas.
 
 **E2E (Playwright + axe-core)**
 
-- Criar lead → mover pelo teclado com "Mover para…" → converter em paciente →
-  agendar avaliação → o card aparece em "Avaliação agendada".
-- Clínica sem `crmEnabled`: o seletor não aparece e `/crm` é barrado.
-- Recepção não abre `/crm/configuracoes`.
-- axe-core sem violações em `/crm`, `/crm/leads`, `/crm/leads/[id]` e `/crm/configuracoes`.
+- Caminho completo: criar lead → "Sem tarefa" aparece → criar tarefa →
+  converter → agendar (card em "Avaliação agendada") → cancelar (card volta e
+  aparece "Reagendar avaliação") → reagendar → criar orçamento ("Em
+  negociação") → aprovar ("Fechou").
+- Mover pelo teclado com "Mover para…", inclusive para Perdido com motivo.
+- Sem `crmEnabled`: sem seletor e `/crm` barrado. Recepção não abre configurações.
+- axe-core sem violações em todas as telas do CRM e na agenda com o seletor.
 
-**Regressão**
-
-Hoje não existe E2E com login (só `e2e/a11y.spec.ts`, que testa a landing).
-Por isso, a primeira tarefa da implementação é criar, **antes de qualquer
-código do CRM**, uma suíte de regressão autenticada que passe na `main`:
-
-- criar paciente;
-- criar agendamento, mudar o status para "faltou" e cancelar;
-- criar orçamento e aprovar pela clínica;
-- aceitar orçamento pelo link público (o orçamento "enviado" é criado direto
-  no banco, porque a tela não tem mais como enviar).
-
-Essa suíte precisa continuar passando, sem alteração, a cada tarefa do CRM.
-- A agenda aberta sem os parâmetros `novo`/`paciente` se comporta exatamente como antes.
+**Regressão:** `e2e/regressao/` verde a cada tarefa que mexe em código existente.
 
 ## Critério de pronto
 
-- Uma clínica com `crmEnabled` consegue captar, mover, etiquetar, perder,
-  reabrir e converter leads, e o card anda sozinho com agendamento e orçamento.
-- Uma clínica sem `crmEnabled` não vê nenhuma diferença.
+- Com `crmEnabled`, a clínica capta, organiza, etiqueta, agenda tarefas, perde,
+  reabre e converte leads, e o card anda sozinho com a agenda e os orçamentos.
+- Sem `crmEnabled`, nenhuma diferença.
 - Lint, typecheck, unitários e E2E passando.
