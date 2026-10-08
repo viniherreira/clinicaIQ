@@ -233,7 +233,8 @@
     @apply rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-150 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   .segmented-item[aria-pressed='true'],
-  .segmented-item[aria-selected='true'] {
+  .segmented-item[aria-selected='true'],
+  .segmented-item[aria-current='page'] {
     @apply bg-surface text-foreground shadow-sm;
   }
 }

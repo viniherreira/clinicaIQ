@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
+import { ModuleSwitcher, type Space } from './module-switcher';
 import { can, type Capability } from '@/lib/permissions';
 
 /**
@@ -18,13 +19,15 @@ import { can, type Capability } from '@/lib/permissions';
  * Isto é arrumação, não segurança. Quem digitar o endereço direto continua
  * sendo barrado no servidor, por `requireCapability`.
  */
-export const NAV: {
+type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
   capability?: Capability;
-}[] = [
+};
+
+export const CLINIC_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays, capability: 'agenda' },
   { href: '/pacientes', label: 'Pacientes', icon: Users, capability: 'pacientes' },
@@ -38,13 +41,47 @@ export const NAV: {
   { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },
 ];
 
-export function navFor(role: string | null | undefined) {
-  return NAV.filter((item) => !item.capability || can(role, item.capability));
+/**
+ * O menu do espaço CRM. Conversas, Transmissões e Chatbot entram nas próximas
+ * etapas. O próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
+ */
+export const CRM_NAV: NavItem[] = [
+  { href: '/crm', label: 'Funil', icon: KanbanSquare, capability: 'crm' },
+  { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
+  { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
+  { href: '/crm/configuracoes', label: 'Configurações do CRM', icon: Settings, capability: 'crm_config' },
+];
+
+export function navFor(role: string | null | undefined, space: Space = 'clinic') {
+  const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV;
+  return nav.filter((item) => !item.capability || can(role, item.capability));
 }
 
-export function AppSidebar({ clinicName, role }: { clinicName: string; role: string }) {
+/**
+ * Item ativo: o de endereço mais longo que casa com a página. Sem isso, em
+ * /crm/leads o "Funil" (/crm) também acenderia, porque /crm/leads começa com /crm.
+ */
+export function activeHref(items: NavItem[], pathname: string): string | undefined {
+  return items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
+
+export function AppSidebar({
+  clinicName,
+  role,
+  space = 'clinic',
+  showSwitcher = false,
+}: {
+  clinicName: string;
+  role: string;
+  space?: Space;
+  /** A clínica tem os dois módulos e a pessoa alcança o CRM. */
+  showSwitcher?: boolean;
+}) {
   const pathname = usePathname();
-  const itens = navFor(role);
+  const itens = navFor(role, space);
+  const ativo = activeHref(itens, pathname);
 
   return (
     <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex print:!hidden">
@@ -53,13 +90,23 @@ export function AppSidebar({ clinicName, role }: { clinicName: string; role: str
         <LogoMark size="md" />
         <div className="flex flex-col leading-none">
           <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
-          <span className="mt-1 text-[11px] text-muted-foreground">Gestão clínica</span>
+          {!showSwitcher && (
+            <span className="mt-1 text-[11px] text-muted-foreground">
+              {space === 'crm' ? 'CRM' : 'Gestão clínica'}
+            </span>
+          )}
         </div>
       </div>
 
+      {showSwitcher && (
+        <div className="px-3 pb-2">
+          <ModuleSwitcher space={space} />
+        </div>
+      )}
+
       <ul className="flex-1 space-y-1 overflow-y-auto px-3 pb-3 pt-1">
         {itens.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = item.href === ativo;
           const Icon = item.icon;
           return (
             <li key={item.href}>
