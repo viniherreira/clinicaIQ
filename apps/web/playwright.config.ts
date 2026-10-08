@@ -12,6 +12,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  // Em `next dev`, a primeira chamada de cada tela ou server action compila na
+  // hora e pode levar vários segundos. Com os 5s/30s padrão, a primeira
+  // execução numa máquina fria falhava sem nada estar quebrado.
+  timeout: 90_000,
+  expect: { timeout: 20_000 },
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',

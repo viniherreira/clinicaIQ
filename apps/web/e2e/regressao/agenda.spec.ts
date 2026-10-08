@@ -37,12 +37,18 @@ test('cadastra paciente, agenda, marca falta e cancela', async ({ page }) => {
   const block = page.getByRole('button', { name: new RegExp(`${patientName}.*Agendado`) });
   await expect(block).toBeVisible();
 
+  // O detalhe fecha sozinho depois de mudar a situação; o resultado aparece no
+  // rótulo do bloco na agenda.
+  const blockWith = (status: string) =>
+    page.getByRole('button', { name: new RegExp(`${patientName}.*${status}`) });
+
   // Falta
   await block.click();
   await page.getByRole('button', { name: 'Faltou', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Faltou', exact: true })).toBeDisabled();
+  await expect(blockWith('Faltou')).toBeVisible();
 
   // Cancelamento
+  await blockWith('Faltou').click();
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Cancelar', exact: true })).toBeDisabled();
+  await expect(blockWith('Cancelado')).toBeVisible();
 });
