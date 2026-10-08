@@ -14,6 +14,8 @@ const MODULOS: Record<string, Capability> = {
   equipe: 'equipe',
   planos: 'planos',
   privacidade: 'privacidade',
+  crm: 'crm',
+  crm_config: 'crm_config',
 };
 
 /**

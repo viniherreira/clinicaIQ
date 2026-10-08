@@ -13,7 +13,7 @@ vi.mock('@clinicaiq/db', () => ({
   prisma: { subscription: { findUnique: (...a: unknown[]) => findUnique(...(a as [])) } },
 }));
 
-const { writeBlocked, canWriteTenant } = await import('./access');
+const { writeBlocked, canWriteTenant, getTenantModules } = await import('./access');
 
 const DIA = 24 * 60 * 60 * 1000;
 const daqui = (dias: number) => new Date(Date.now() + dias * DIA);
@@ -132,5 +132,21 @@ describe('writeBlocked', () => {
       cancelledAt: null,
     };
     expect(await writeBlocked('t1')).toBeTruthy();
+  });
+});
+
+describe('getTenantModules', () => {
+  it('liga o CRM só quando a assinatura diz que foi contratado', async () => {
+    assinatura = { crmEnabled: true };
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: true });
+    assinatura = { crmEnabled: false };
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false });
+  });
+
+  it('sem assinatura, ou com o banco falhando, o CRM some e a clínica fica', async () => {
+    assinatura = null;
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false });
+    findUnique.mockRejectedValueOnce(new Error('banco fora'));
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false });
   });
 });
