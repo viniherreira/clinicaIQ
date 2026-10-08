@@ -135,6 +135,15 @@ model Tenant {
   subscription        Subscription?
   invitations         Invitation[]
 
+  // CRM (etapa 1)
+  leads               Lead[]
+  pipelineStages      PipelineStage[]
+  leadTasks           LeadTask[]
+  leadTags            LeadTag[]
+  leadTagOnLeads      LeadTagOnLead[]
+  lostReasons         LostReason[]
+  leadActivities      LeadActivity[]
+
   @@map("tenants")
 }
 
@@ -173,6 +182,8 @@ model User {
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   patientNotes PatientNote[]
   auditLogs    AuditLog[]
+  assignedLeads Lead[]     @relation("LeadAssignee")
+  assignedTasks LeadTask[] @relation("LeadTaskAssignee")
 
   @@index([tenantId])
   @@index([tenantId, deactivatedAt])
@@ -232,6 +243,7 @@ model Patient {
   evolutions   Evolution[]
   files        PatientFile[]
   campaignRecipients CampaignRecipient[]
+  leads              Lead[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -352,6 +364,7 @@ model Procedure {
   professionals Professional[]     @relation("ProcedureProfessionals")
   appointments  Appointment[]
   quoteItems    QuoteItem[]
+  interestedLeads Lead[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -833,6 +846,10 @@ model Subscription {
   asaasCustomerId     String?
   asaasSubscriptionId String?
 
+  /// Módulo CRM contratado. Desligado por padrão: clínica sem CRM não vê
+  /// nada novo e a automação do funil não faz nada para ela.
+  crmEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -895,4 +912,230 @@ model Invitation {
   @@unique([tenantId, email])
   @@index([email, status])
   @@map("invitations")
+}
+
+// ─── CRM ────────────────────────────────────────────────────────────────────
+//
+// Captação de pacientes no estilo Kommo. O lead é um negócio, não a pessoa: a
+// mesma pessoa pode ter vários ao longo do tempo ("Implante" hoje,
+// "Harmonização" ano que vem). Enquanto não é paciente, o contato mora no
+// próprio lead; depois de convertido, `patientId` aponta para a ficha.
+//
+// Toda tabela daqui tem `tenantId`, inclusive as de ligação: `getTenantClient`
+// filtra todo modelo por ele, e uma tabela sem a coluna quebraria as consultas.
+// Ver docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md.
+
+/// Papel de uma etapa para a automação. A automação procura a etapa pelo
+/// papel, nunca pelo nome — assim a clínica renomeia à vontade.
+enum StageRole {
+  NEW
+  SCHEDULED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadSource {
+  WHATSAPP
+  INDICACAO
+  INSTAGRAM
+  SITE
+  MANUAL
+  OUTRO
+}
+
+enum LeadActivityType {
+  CREATED
+  STAGE_CHANGED
+  NOTE
+  TAG_ADDED
+  TAG_REMOVED
+  ASSIGNED
+  TASK_CREATED
+  TASK_COMPLETED
+  CONVERTED
+  LOST
+  REOPENED
+  /// Algo que aconteceu na agenda ou nos orçamentos do paciente ligado.
+  CLINIC_EVENT
+}
+
+enum TaskOrigin {
+  MANUAL
+  /// Criada pela integração com a agenda e os orçamentos (ex.: "Reagendar avaliação").
+  AUTOMATION
+}
+
+model Lead {
+  id       String @id @default(cuid())
+  tenantId String
+
+  /// Nome do negócio ("Implante"). Vazio: a tela mostra o interesse ou o nome.
+  title          String?
+  /// Nome da pessoa. Copiado do paciente quando o lead é ligado a um.
+  name           String
+  phoneEncrypted String  @map("phone")
+  /// HMAC do telefone normalizado com a chave da clínica. Serve só para achar
+  /// lead duplicado sem decifrar todos os telefones.
+  phoneHash      String
+  email          String?
+
+  stageId        String
+  /// Ordem dentro da coluna do quadro.
+  position       Int      @default(0)
+  /// Quando entrou na etapa atual — o card mostra "há 3 dias".
+  stageEnteredAt DateTime @default(now())
+
+  assignedToId        String?
+  source              LeadSource @default(MANUAL)
+  interestProcedureId String?
+  estimatedValueCents Int?
+  notes               String?
+
+  /// Paciente ligado. Não é único de propósito: vários negócios por pessoa.
+  patientId    String?
+  lostReasonId String?
+
+  /// Lead "aberto" = os três nulos.
+  wonAt     DateTime?
+  lostAt    DateTime?
+  deletedAt DateTime?
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  stage             PipelineStage   @relation(fields: [stageId], references: [id])
+  assignedTo        User?           @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  interestProcedure Procedure?      @relation(fields: [interestProcedureId], references: [id])
+  patient           Patient?        @relation(fields: [patientId], references: [id])
+  lostReason        LostReason?     @relation(fields: [lostReasonId], references: [id])
+  tasks             LeadTask[]
+  tags              LeadTagOnLead[]
+  activities        LeadActivity[]
+
+  @@index([tenantId, stageId, position])
+  @@index([tenantId, phoneHash])
+  @@index([tenantId, patientId])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, deletedAt])
+  @@map("leads")
+}
+
+model PipelineStage {
+  id       String     @id @default(cuid())
+  tenantId String
+  name     String
+  /// Nome de um token da paleta do app, não um hex livre.
+  color    String
+  order    Int
+  /// Null = etapa criada pela clínica, que a automação não conhece.
+  role     StageRole?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  leads  Lead[]
+
+  /// Cada papel no máximo uma vez por clínica. No Postgres nulos não colidem
+  /// num índice único, então as etapas sem papel ficam livres.
+  @@unique([tenantId, role])
+  @@index([tenantId, order])
+  @@map("pipeline_stages")
+}
+
+model LeadTask {
+  id       String @id @default(cuid())
+  tenantId String
+  leadId   String
+
+  text          String
+  dueAt         DateTime
+  assignedToId  String
+  completedAt   DateTime?
+  completedById String?
+  origin        TaskOrigin @default(MANUAL)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  lead       Lead   @relation(fields: [leadId], references: [id])
+  assignedTo User   @relation("LeadTaskAssignee", fields: [assignedToId], references: [id])
+
+  @@index([tenantId, leadId, completedAt])
+  /// "Minhas tarefas": pendentes de uma pessoa, por vencimento.
+  @@index([tenantId, assignedToId, completedAt, dueAt])
+  @@map("lead_tasks")
+}
+
+model LeadTag {
+  id       String @id @default(cuid())
+  tenantId String
+  name     String
+  color    String
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  leads  LeadTagOnLead[]
+
+  @@unique([tenantId, name])
+  @@map("lead_tags")
+}
+
+model LeadTagOnLead {
+  tenantId String
+  leadId   String
+  tagId    String
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  lead   Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag    LeadTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@index([tenantId, tagId])
+  @@map("lead_tags_on_leads")
+}
+
+model LostReason {
+  id       String  @id @default(cuid())
+  tenantId String
+  name     String
+  order    Int
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  leads  Lead[]
+
+  @@unique([tenantId, name])
+  @@map("lost_reasons")
+}
+
+model LeadActivity {
+  id       String           @id @default(cuid())
+  tenantId String
+  leadId   String
+  type     LeadActivityType
+  /// Detalhe do evento (ex.: { from, to }, { tagId }, { appointmentId }).
+  /// Nunca telefone nem outro dado pessoal.
+  data     Json?
+  /// Null = foi a automação.
+  actorId  String?
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  @@index([tenantId, leadId, createdAt(sort: Desc)])
+  @@map("lead_activities")
 }
