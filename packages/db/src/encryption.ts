@@ -34,3 +34,17 @@ export function decrypt(ciphertext: string, masterKey: string, tenantId: string)
 
   return decipher.update(encrypted) + decipher.final('utf8');
 }
+
+/**
+ * Índice cego: um código fixo para um valor, que permite achar registros
+ * iguais sem decifrar a tabela inteira — e sem guardar o valor em claro.
+ *
+ * Mesma chave mestra, outro domínio (`hash:` em vez do usado para cifrar):
+ * nada do que sai daqui serve para decifrar coisa alguma. É por clínica, então
+ * o mesmo telefone em duas clínicas dá dois códigos diferentes.
+ *
+ * Normalize antes de chamar (ex.: só dígitos): o código é do texto exato.
+ */
+export function hashForTenant(value: string, masterKey: string, tenantId: string): string {
+  return createHmac('sha256', masterKey).update(`hash:${tenantId}:${value}`).digest('base64url');
+}
