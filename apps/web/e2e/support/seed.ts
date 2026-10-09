@@ -13,6 +13,8 @@ import { required } from './env';
 export const E2E_TENANT_SLUG = 'e2e-clinica-de-teste';
 export const E2E_PROFESSIONAL = 'Dra. Teste E2E';
 export const E2E_PROCEDURE = 'Avaliação E2E';
+export const E2E_RECEPTIONIST = 'Recepção E2E';
+export const E2E_RECEPTIONIST_EMAIL = 'recepcao-e2e@teste.local';
 /** Orçamento "enviado" para testar a página pública: a tela da clínica não
  *  tem mais o "copiar link" (commit 4d2e66d), então ele nasce direto no banco. */
 export const E2E_PUBLIC_QUOTE_TOKEN = 'e2e-orcamento-publico';
@@ -80,6 +82,17 @@ export async function seedE2EClinic() {
   } else if (!existing.crmSeat) {
     // O CRM é cobrado por pessoa: o dono de teste tem acesso.
     await prisma.user.update({ where: { id: existing.id }, data: { crmSeat: true } });
+  }
+
+  // Uma recepcionista sem conta no Clerk: serve para testar a chave de acesso
+  // ao CRM na Equipe. Começa sem acesso a cada execução.
+  const recepcao = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: E2E_RECEPTIONIST_EMAIL } });
+  if (recepcao) {
+    await prisma.user.update({ where: { id: recepcao.id }, data: { crmSeat: false, active: true } });
+  } else {
+    await prisma.user.create({
+      data: { tenantId: tenant.id, name: E2E_RECEPTIONIST, email: E2E_RECEPTIONIST_EMAIL, role: 'RECEPTIONIST' },
+    });
   }
 
   // Cortesia: acesso completo sem depender de datas nem do Asaas. Com o CRM

@@ -21,6 +21,13 @@ Atualizado em 2026-10-09. Leia isto antes de continuar o CRM.
 - Banco de desenvolvimento **separado da produção** (Postgres local). Nunca testar contra o banco das clínicas.
 - Publicar em produção só com autorização explícita, passo a passo (cópia de segurança → mostrar o SQL → aplicar → clínica piloto).
 
+## CRM adicional pago — pronto
+
+Feito no plano `docs/superpowers/plans/2026-10-09-crm-adicional-pago-plan.md`: colunas novas,
+regras de cobrança, ligar/desligar com teste de 14 dias, acesso por pessoa (Equipe),
+cartão no Plano, tela de venda em `/crm-indisponivel`, aviso de fim de teste, troca de
+plano e rotina diária cobrando plano + CRM. 19 testes E2E verdes.
+
 ## Etapa 2 — WhatsApp e caixa de entrada (desenho em discussão, ainda sem spec)
 
 Decidido:
@@ -42,10 +49,10 @@ Fatos do código relevantes para a etapa 2:
 
 ## Pendências com o dono do produto
 
-1. Aprovar o desenho da etapa 2 (opção A) → escrever a spec.
-2. **Link de acompanhamento na Vercel**: preview da branch com banco de teste na nuvem (Neon, gratuito) e Clerk de desenvolvimento, usando variáveis de Preview **restritas à branch** `feat/crm-etapa1`. O dono cria o Neon e cola os segredos na Vercel; depois roda-se `db push` + dados de exemplo no Neon.
+1. Publicar etapa 1 + adicional em produção (banco **antes** do merge — ver abaixo).
+2. Aprovar o desenho da etapa 2 (opção A) → escrever a spec.
+3. **Link de acompanhamento na Vercel**: preview da branch com banco de teste na nuvem (Neon, gratuito) e Clerk de desenvolvimento, usando variáveis de Preview **restritas à branch** `feat/crm-etapa1`. O dono cria o Neon e cola os segredos na Vercel; depois roda-se `db push` + dados de exemplo no Neon.
    - Hoje o Preview da Vercel usa **as mesmas variáveis da produção** (banco, Clerk, Asaas): não usar previews para testes até separar.
-3. Publicar a etapa 1 em produção, quando autorizado.
 4. Tarefas paralelas sugeridas: contraste da landing (`text-sky-600`) e do minicalendário da agenda (`#bbc1c8`) — problemas anteriores ao CRM.
 
 ## Preparar outro computador
@@ -57,3 +64,16 @@ Fatos do código relevantes para a etapa 2:
 5. `pnpm db:push`, `pnpm --filter @clinicaiq/db exec tsx prisma/seed-plans.ts`, `pnpm --filter @clinicaiq/web exec playwright install chromium`
 6. `pnpm --filter @clinicaiq/web test:e2e` cria a clínica de teste (com CRM ligado) e roda tudo. Detalhes em `apps/web/e2e/README.md`.
 7. `pnpm dev` → http://localhost:3000, entrar com a conta `+clerk_test` (código de verificação do Clerk de teste: 424242).
+
+## Publicar em produção (ordem obrigatória)
+
+**Não dar merge na `main` antes de aplicar o banco.** Várias consultas à assinatura e
+aos usuários leem todas as colunas; com o código novo e o banco antigo, quebram o
+onboarding, a tela de Planos, o webhook do Asaas e a rotina diária.
+
+1. Cópia de segurança do banco de produção (`pg_dump`).
+2. `prisma migrate diff` produção → schema da branch; conferir que só há `CREATE` e `ADD COLUMN` com padrão.
+3. Aplicar no banco de produção (com autorização do dono).
+4. `seed-plans.ts` em produção (grava `crmSeatPriceCents`).
+5. Merge na `main` → deploy da Vercel.
+6. Conferir o site; a clínica piloto experimenta o CRM.

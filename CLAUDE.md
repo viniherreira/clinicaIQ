@@ -56,7 +56,8 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 
 ## CRM
 
-- Módulo contratado por clínica (`Subscription.crmEnabled`) + papel (`crm` para dono, admin e recepção; `crm_config` para dono e admin). Páginas usam `requireCrm`, actions usam `guardCrmAction` (`apps/web/crm/guard.ts`).
+- **O CRM é um adicional pago** do sistema de agenda: R$ 39 por usuário/mês (`Plan.crmSeatPriceCents`), 14 dias grátis uma vez, cortesia inclui. Uma cobrança só no Asaas (plano + CRM) — `crm/billing.ts` (regras puras) e `crm/addon.ts` (ligar, desligar, acesso, `syncBillingValue`). Qualquer mudança que afete o valor chama `syncBillingValue`; a rotina diária também.
+- Entrar no CRM exige três coisas: CRM ligado na clínica (`Subscription.crmEnabled`), perfil com `crm` (dono, admin, recepção; `crm_config` para dono e admin) e a chave da pessoa (`User.crmSeat`). Páginas usam `requireCrm`, actions usam `guardCrmAction` (`apps/web/crm/guard.ts`).
 - O lead é um negócio, não a pessoa: a mesma pessoa pode ter vários. `Lead.patientId` liga ao paciente depois da conversão.
 - **A agenda e os orçamentos nunca dependem do CRM.** A única ligação é `after(() => notifyCrm(tenantId, evento))` depois de salvar (`apps/web/crm/notify.ts`), que não faz nada sem o módulo e nunca lança. Não importe nada mais de `crm/` em código da clínica.
 - As regras de automação ficam em `crm/automation.ts` (puras, testadas por tabela): avançar só para frente, voltar só no cancelamento ou falta, nunca perder sozinho.

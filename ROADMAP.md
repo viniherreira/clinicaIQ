@@ -24,7 +24,7 @@ Funcionalidades e organização de tela inspiradas no Kommo; identidade do Clini
   - Tarefas com aviso "sem tarefa"; vários negócios por paciente
   - Conversão em paciente e "Agendar avaliação" direto na agenda
   - O card anda sozinho com a agenda e os orçamentos
-- [ ] **CRM como adicional pago** — R$ 39 por usuário/mês, 14 dias grátis, uma cobrança só (antes de publicar)
+- [x] **CRM como adicional pago** — R$ 39 por usuário/mês, 14 dias grátis, uma cobrança só (antes de publicar)
   - [ ] Publicar etapa 1 + adicional em produção (cópia de segurança, SQL revisado, banco antes do merge, clínica piloto)
 - [ ] **Etapa 2 — API oficial do WhatsApp e caixa de entrada**
   - Cadastro incorporado da Meta (exige o ClinicaIQ como Tech Provider verificado — iniciar o processo cedo)
