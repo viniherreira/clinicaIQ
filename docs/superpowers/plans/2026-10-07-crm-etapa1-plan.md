@@ -30,7 +30,7 @@ vezes seguidas.
 
 ## Fase 1 — Dados e acesso
 
-### 2. Schema
+### 2. Schema ✅
 
 `packages/db/prisma/schema.prisma`:
 
@@ -48,7 +48,7 @@ vezes seguidas.
   só com `DATABASE_URL` definido: uma clínica não lê nem altera `Lead`,
   `LeadTask` e `LeadTagOnLead` de outra.
 
-### 3. Permissões e módulo
+### 3. Permissões e módulo ✅
 
 - `lib/permissions.ts`: `crm` (OWNER, ADMIN, RECEPTIONIST) e `crm_config`
   (OWNER, ADMIN), com rótulos.
@@ -56,7 +56,7 @@ vezes seguidas.
 - `crm/guard.ts`: `requireCrm(capability)` → `{ tenantId, userId, db }`.
 - Testes de permissões e do guard.
 
-### 4. Seletor Clínica | CRM e layout
+### 4. Seletor Clínica | CRM e layout ✅
 
 - `components/app-sidebar.tsx`: `CLINIC_NAV` e `CRM_NAV` (Funil, Leads,
   Tarefas, Configurações do CRM); recebe `space` e `modules`.
@@ -72,7 +72,7 @@ vezes seguidas.
 
 Funções puras sempre que der, para teste sem banco.
 
-### 5. Funil padrão e etapas
+### 5. Funil padrão e etapas ✅
 
 - `crm/defaults.ts`: etapas (Novo, Em conversa, Avaliação agendada, Em
   negociação, Fechou, Perdeu) e motivos de perda.
@@ -81,7 +81,7 @@ Funções puras sempre que der, para teste sem banco.
   ou `NEW`).
 - Testes.
 
-### 6. Leads e tarefas
+### 6. Leads e tarefas ✅
 
 - `crm/phone.ts`: normaliza (reusa `lib/phone.ts`) e `phoneHash` (exportar
   `hashForTenant` de `packages/db/src/encryption.ts`, com teste lá).
@@ -93,7 +93,7 @@ Funções puras sempre que der, para teste sem banco.
 - Testes: perda sem motivo falha, reabrir limpa datas, posição, duplicado só
   entre abertos, situação de tarefa.
 
-### 7. Automação
+### 7. Automação ✅
 
 - `crm/automation.ts`: `planForEvent(ctx, event)` pura. Recebe etapas, o lead
   aberto mais recente, se há agendamento futuro e se há orçamento em aberto;
@@ -115,7 +115,7 @@ Funções puras sempre que der, para teste sem banco.
 `requireCrm` em tudo, server actions com `zod` e `refOutsideTenant`,
 componentes de `packages/ui`/shadcn já usados no app.
 
-### 8. Funil (quadro)
+### 8. Funil (quadro) ✅
 
 - `app/(crm)/crm/page.tsx`: etapas, leads abertos, situação de tarefa e
   informação ao vivo; filtros rápidos e busca.
@@ -125,19 +125,19 @@ componentes de `packages/ui`/shadcn já usados no app.
   `new-lead-modal.tsx` (com aviso de duplicado).
 - `@dnd-kit/core` com `KeyboardSensor`, anúncios em português e `aria-live`.
 
-### 9. Ficha do lead
+### 9. Ficha do lead ✅
 
 - `app/(crm)/crm/leads/[id]/page.tsx`: duas metades. Esquerda: dados, tags,
   barra de etapas, ações. Direita: histórico + caixa Tarefa | Nota; bloco
   "Outros negócios".
 
-### 10. Lista e Tarefas
+### 10. Lista e Tarefas ✅
 
 - `app/(crm)/crm/leads/page.tsx`: tabela com filtros (inclui ganhos/perdidos).
 - `app/(crm)/crm/tarefas/page.tsx`: Atrasadas / Hoje / Próximas, filtro por
   responsável, concluir na lista.
 
-### 11. Converter e agendar
+### 11. Converter e agendar ✅
 
 - "Converter em paciente" com "Vincular a este paciente" ou `patient-form.tsx`
   preenchido (prop opcional `initialValues`, sem mudar o uso atual).
@@ -146,7 +146,7 @@ componentes de `packages/ui`/shadcn já usados no app.
   parâmetros, nada muda.
 - Ficha do paciente: bloco "Negócios no CRM" (só com `crm`).
 
-### 12. Ligar a automação
+### 12. Ligar a automação ✅
 
 Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 
@@ -158,7 +158,7 @@ Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 - `orcamento/[token]/actions.ts`: aceite e recusa pelo link.
 - Pronto quando: regressão verde e o diff nesses arquivos é só import + chamadas.
 
-### 13. Configurações do CRM
+### 13. Configurações do CRM ✅
 
 - `app/(crm)/crm/configuracoes/page.tsx` (`crm_config`): Etapas, Tags, Motivos de perda.
 - Script `packages/db/prisma/crm-enable.ts <tenantId>` para ligar o módulo.
@@ -167,7 +167,7 @@ Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 
 ## Fase 4 — Fechamento
 
-### 14. E2E do CRM e acessibilidade
+### 14. E2E do CRM e acessibilidade ✅
 
 - `e2e/crm/fluxo.spec.ts`: o caminho completo da spec (lead → tarefa →
   converter → agendar → cancelar volta → reagendar → orçamento → aprovar → Fechou).
@@ -177,7 +177,7 @@ Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
   `/crm/configuracoes` e na agenda com o seletor.
 - A semeadura liga `crmEnabled` na clínica de teste.
 
-### 15. Documentação
+### 15. Documentação ✅
 
 - `CLAUDE.md`: corrigir "BullMQ + Redis" (é outbox no Postgres + gateway no
   Fly), seção do CRM e do ambiente local (Postgres local, `e2e/README.md`).
@@ -188,8 +188,8 @@ Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 ## Ordem
 
 ```
-1 ✅ → 2 → 3 → 4 ─┐
-       └→ 5 → 6 → 7 ─┼→ 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
+1 ✅ → 2 ✅ → 3 ✅ → 4 ✅ ─┐
+       └→ 5 ✅ → 6 ✅ → 7 ✅ ─┼→ 8 ✅ → 9 ✅ → 10 ✅ → 11 ✅ → 12 ✅ → 13 ✅ → 14 ✅ → 15 ✅
 ```
 
 ## Riscos
