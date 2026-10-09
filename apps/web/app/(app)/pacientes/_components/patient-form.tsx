@@ -129,7 +129,18 @@ export type PatientFormData = {
   marketingConsentAt?: Date | null;
 };
 
-export function PatientForm({ patient }: { patient?: PatientFormData }) {
+export function PatientForm({
+  patient,
+  afterCreate,
+}: {
+  patient?: PatientFormData;
+  /**
+   * Opcional: roda no servidor depois de criar e devolve para onde ir. É como
+   * o CRM liga o lead ao paciente recém-criado e segue para a agenda. Sem ele,
+   * o formulário abre a ficha, como sempre.
+   */
+  afterCreate?: (patientId: string) => Promise<string>;
+}) {
   const router = useRouter();
   const isEdit = Boolean(patient?.id);
   const [isPending, startTransition] = useTransition();
@@ -177,7 +188,8 @@ export function PatientForm({ patient }: { patient?: PatientFormData }) {
         }
 
         if (result.success) {
-          window.location.href = `/pacientes/${result.patientId}`;
+          window.location.href =
+            !isEdit && afterCreate ? await afterCreate(result.patientId) : `/pacientes/${result.patientId}`;
         } else {
           setErrors(result.errors);
           if (result.message) setServerError(result.message);

@@ -13,6 +13,7 @@ import { AnamnesisSection } from './_components/anamnesis-section';
 import { EvolutionsSection } from './_components/evolutions-section';
 import { ImagesSection } from './_components/images-section';
 import { wallClockTime } from '@/lib/tz';
+import { CrmPatientDeals } from '@/components/crm-patient-deals';
 
 export const metadata = { title: 'Ficha do paciente' };
 
@@ -255,6 +256,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           </div>
         </header>
       </div>
+
+      <CrmPatientDeals patientId={patient.id} />
 
       {/* Stats */}
       <section aria-label="Resumo do paciente" className="grid grid-cols-2 gap-3 lg:grid-cols-4">

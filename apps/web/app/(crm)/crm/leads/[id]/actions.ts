@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@clinicaiq/db';
 import { guardCrmAction } from '@/crm/guard';
-import { addNote, setTags, updateLead } from '@/crm/leads';
+import { addNote, linkPatient, setTags, updateLead } from '@/crm/leads';
+import { findPatientByPhone } from '@/crm/duplicates';
 import { completeTask, createTask } from '@/crm/tasks';
 import { clinicLocalToInstant } from '@/crm/clock';
 import { CRM_COLORS } from '@/crm/defaults';
@@ -126,4 +127,52 @@ export async function revealPhoneAction(leadId: string): Promise<Result<{ phone:
     data: { tenantId: g.tenantId, userId: g.userId, action: 'LEAD_PHONE_VIEWED', entity: 'Lead', entityId: lead.id },
   });
   return { ok: true, phone: decryptPhone(lead.phoneEncrypted, g.tenantId) };
+}
+
+// ─── Conversão em paciente ───────────────────────────────────────────────────
+
+export type ConvertIntent = 'ficha' | 'agendar';
+
+const destinoDepois = (leadId: string, patientId: string, intent: ConvertIntent) =>
+  intent === 'agendar' ? `/agenda?novo=1&paciente=${patientId}` : `/crm/leads/${leadId}`;
+
+/** Antes de cadastrar: já existe paciente com o telefone deste lead? */
+export async function findPatientMatchAction(
+  leadId: string,
+): Promise<Result<{ match: { id: string; name: string; controlNumber: number } | null }>> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  const lead = await g.db.lead.findFirst({ where: { id: leadId, deletedAt: null }, select: { phoneEncrypted: true } });
+  if (!lead) return { ok: false, message: 'Lead não encontrado.' };
+  const match = await findPatientByPhone(g.db, g.tenantId, decryptPhone(lead.phoneEncrypted, g.tenantId));
+  return { ok: true, match };
+}
+
+/** Liga o lead a um paciente que já existe. Devolve para onde seguir. */
+export async function linkExistingPatientAction(
+  leadId: string,
+  patientId: string,
+  intent: ConvertIntent,
+): Promise<Result<{ href: string }>> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  const r = await linkPatient(g.db, g, leadId, patientId, 'linked');
+  if (!r.ok) return r;
+  refresh(leadId);
+  return { ok: true, href: destinoDepois(leadId, patientId, intent) };
+}
+
+/**
+ * Passada ao formulário de paciente (`afterCreate`): roda logo depois do
+ * cadastro, liga o lead à ficha nova e diz para onde ir. Se a ligação falhar,
+ * o paciente já existe — segue para a ficha dele, e o lead pode ser vinculado
+ * depois pela própria ficha do lead.
+ */
+export async function linkAfterCreateAction(leadId: string, intent: ConvertIntent, patientId: string): Promise<string> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return `/pacientes/${patientId}`;
+  const r = await linkPatient(g.db, g, leadId, patientId, 'converted');
+  if (!r.ok) return `/pacientes/${patientId}`;
+  refresh(leadId);
+  return destinoDepois(leadId, patientId, intent);
 }

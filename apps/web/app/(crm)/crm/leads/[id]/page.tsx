@@ -6,6 +6,7 @@ import { loadLeadDetail } from '@/crm/lead-detail';
 import { loadCrmBasics } from '@/crm/page-data';
 import { LeadFeed } from './_components/lead-feed';
 import { LeadPanel } from './_components/lead-panel';
+import { ConvertActions } from './_components/convert-actions';
 
 export async function generateMetadata() {
   return { title: 'Lead · ClinicaIQ' };
@@ -35,6 +36,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             team={basics.team}
             procedures={basics.procedures}
             lostReasons={basics.lostReasons}
+            actions={<ConvertActions key="converter" leadId={lead.id} patient={lead.patient} />}
           />
         </div>
         <LeadFeed lead={lead} team={basics.team} meId={ctx.userId} />

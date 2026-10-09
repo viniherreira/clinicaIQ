@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lo
 import { MiniCalendar } from './mini-calendar';
 import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
-import { AppointmentModal, type EditingAppointment } from './appointment-modal';
+import { AppointmentModal, type EditingAppointment, type Patient } from './appointment-modal';
 import { AppointmentDetailModal } from './appointment-detail-modal';
 import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
@@ -22,6 +22,7 @@ interface ModalState {
   defaultDate: string;
   defaultTime?: string;
   defaultProfessionalId?: string;
+  defaultPatient?: Patient | null;
 }
 
 interface BlockModalState {
@@ -35,9 +36,11 @@ interface AgendaShellProps {
   initialDate: string;
   initialView: 'day' | 'week';
   initialData: AgendaData;
+  /** Abre o "Novo agendamento" já com este paciente (link "Agendar avaliação" do CRM). */
+  prefillPatient?: Patient | null;
 }
 
-export function AgendaShell({ initialDate, initialView, initialData }: AgendaShellProps) {
+export function AgendaShell({ initialDate, initialView, initialData, prefillPatient = null }: AgendaShellProps) {
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = useState(initialDate);
@@ -50,6 +53,15 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
   const [modal, setModal] = useState<ModalState>({ open: false, defaultDate: initialDate });
   const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, defaultDate: initialDate });
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
+
+  // Veio com paciente na URL: abre o agendamento e limpa a URL, para um
+  // recarregar não abrir o modal de novo.
+  useEffect(() => {
+    if (!prefillPatient) return;
+    setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient });
+    router.replace(`/agenda?date=${initialDate}&view=${initialView}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [visibleProfessionals, setVisibleProfessionals] = useState<Set<string>>(
     () => new Set(initialData.professionals.map((p) => p.id)),
@@ -331,6 +343,7 @@ export function AgendaShell({ initialDate, initialView, initialData }: AgendaShe
         defaultDate={modal.defaultDate}
         defaultTime={modal.defaultTime}
         defaultProfessionalId={modal.defaultProfessionalId}
+        defaultPatient={modal.defaultPatient ?? null}
         editing={editing}
         onSuccess={() => {
           refreshData();

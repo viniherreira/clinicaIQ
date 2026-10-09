@@ -22,7 +22,7 @@ interface Procedure {
   basePrice: number;
 }
 
-interface Patient {
+export interface Patient {
   id: string;
   name: string;
   controlNumber: number;
@@ -54,6 +54,8 @@ interface AppointmentModalProps {
   /** When set, the modal edits this appointment instead of creating one.
    *  Callers should also key the modal by the appointment id so state resets. */
   editing?: EditingAppointment | null;
+  /** Paciente já escolhido ao abrir um agendamento novo (ex.: vindo do CRM). */
+  defaultPatient?: Patient | null;
   onSuccess: () => void;
 }
 
@@ -75,6 +77,7 @@ export function AppointmentModal({
   open, onClose, professionals, procedures,
   defaultDate, defaultTime = '08:00', defaultProfessionalId,
   editing = null,
+  defaultPatient = null,
   onSuccess,
 }: AppointmentModalProps) {
   const [state, formAction, pending] = useActionState<AppointmentFormState | null, FormData>(
@@ -129,13 +132,13 @@ export function AppointmentModal({
       setProcId('');
       setType('PARTICULAR');
       setStatus('SCHEDULED');
-      setQuery('');
+      setQuery(defaultPatient?.name ?? '');
       setNotes('');
-      setSelectedPatient(null);
+      setSelectedPatient(defaultPatient);
       setPatients([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing, defaultDate, defaultTime, defaultProfessionalId]);
+  }, [open, editing, defaultDate, defaultTime, defaultProfessionalId, defaultPatient]);
 
   // Close on success
   useEffect(() => {

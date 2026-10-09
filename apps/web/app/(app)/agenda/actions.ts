@@ -200,6 +200,19 @@ export async function searchPatients(query: string) {
   }));
 }
 
+/**
+ * O paciente que vem na URL (`/agenda?novo=1&paciente=…`, o "Agendar
+ * avaliação" do CRM). Só da própria clínica; qualquer outro id vira null e a
+ * agenda abre normalmente.
+ */
+export async function getPrefillPatient(id: string) {
+  const { tenantId } = await requireTenant();
+  return getTenantClient(tenantId).patient.findFirst({
+    where: { id, deletedAt: null, active: true },
+    select: { id: true, name: true, controlNumber: true },
+  });
+}
+
 // ─── Appointment validation schema ───────────────────────────────────────────
 
 const appointmentSchema = z.object({
