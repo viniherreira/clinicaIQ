@@ -1,15 +1,38 @@
 import { requireCrm } from '@/crm/guard';
+import { loadBoardLeads, parseFilters } from '@/crm/board-data';
+import { loadCrmBasics } from '@/crm/page-data';
+import { can } from '@/lib/permissions';
+import { Board } from './_components/board';
+import { CrmToolbar } from './_components/toolbar';
 
 export const metadata = { title: 'Funil · ClinicaIQ' };
 
-/** Provisória: o quadro do funil entra na tarefa 8 do plano. */
-export default async function FunilPage() {
-  await requireCrm('crm');
+export default async function FunilPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const ctx = await requireCrm('crm');
+  const filters = parseFilters(await searchParams);
+  const [basics, leads] = await Promise.all([loadCrmBasics(ctx), loadBoardLeads(ctx, filters)]);
 
   return (
-    <div className="px-6 py-8">
-      <h1 className="text-xl font-semibold tracking-tight">Funil</h1>
-      <p className="mt-2 text-sm text-muted-foreground">O quadro do funil está sendo construído.</p>
+    <div className="flex h-full flex-col gap-4">
+      <CrmToolbar
+        view="quadro"
+        filters={filters}
+        tags={basics.tags}
+        team={basics.team}
+        procedures={basics.procedures}
+        meId={ctx.userId}
+      />
+      <Board
+        stages={basics.columns}
+        leads={leads}
+        closedStages={basics.closedStages}
+        lostReasons={basics.lostReasons}
+        canDelete={can(ctx.role, 'crm_config')}
+      />
     </div>
   );
 }
