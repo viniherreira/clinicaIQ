@@ -76,7 +76,7 @@ export async function completeTask(
       data: { completedAt: new Date(), completedById: actor.userId },
     });
     await tx.leadActivity.create({
-      data: { tenantId, leadId: task.leadId, type: 'TASK_COMPLETED', actorId: actor.userId, data: { taskId: task.id } },
+      data: { tenantId, leadId: task.leadId, type: 'TASK_COMPLETED', actorId: actor.userId, data: { taskId: task.id, text: task.text } },
     });
     return { ok: true as const };
   });

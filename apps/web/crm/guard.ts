@@ -54,7 +54,10 @@ export type CrmActionGuard =
  * Inclui a trava de escrita da cobrança — action não passa pelo layout, então
  * o aviso de clínica suspensa sozinho não impede gravar.
  */
-export async function guardCrmAction(capability: CrmCapability): Promise<CrmActionGuard> {
+export async function guardCrmAction(
+  capability: CrmCapability,
+  { write = true }: { write?: boolean } = {},
+): Promise<CrmActionGuard> {
   const acesso = await currentAccess();
   if (!acesso) return { ok: false, message: 'Sua sessão expirou. Entre de novo.' };
 
@@ -62,8 +65,11 @@ export async function guardCrmAction(capability: CrmCapability): Promise<CrmActi
   if (!modules.crm) return { ok: false, message: CRM_NOT_CONTRACTED_MESSAGE };
   if (!can(acesso.role, capability)) return { ok: false, message: capabilityDeniedMessage(capability) };
 
-  const bloqueio = await writeBlocked(acesso.tenantId);
-  if (bloqueio) return { ok: false, message: bloqueio };
+  // Ler continua aberto para clínica suspensa — os dados são dos pacientes.
+  if (write) {
+    const bloqueio = await writeBlocked(acesso.tenantId);
+    if (bloqueio) return { ok: false, message: bloqueio };
+  }
 
   return { ok: true, ...acesso, db: getTenantClient(acesso.tenantId) };
 }

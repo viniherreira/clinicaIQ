@@ -8,7 +8,7 @@ import {
   type AutomationContext,
   type ClinicEvent,
 } from './automation';
-import { clinicDateAt, clinicNowWall } from './clock';
+import { clinicDateAt, clinicLocalToInstant, clinicNowWall, instantToClinicLocal } from './clock';
 import { DEFAULT_STAGES } from './defaults';
 import type { StageLike } from './pipeline';
 
@@ -140,5 +140,11 @@ describe('relógio da clínica', () => {
 
   it('agora em hora de parede, no formato da agenda', () => {
     expect(clinicNowWall(new Date('2026-10-08T23:30:00Z')).toISOString()).toBe('2026-10-08T20:30:00.000Z');
+  });
+
+  it('campo de data e hora da tela, no horário da clínica', () => {
+    expect(clinicLocalToInstant('2026-10-10T10:00')?.toISOString()).toBe('2026-10-10T13:00:00.000Z');
+    expect(instantToClinicLocal(new Date('2026-10-10T13:00:00Z'))).toBe('2026-10-10T10:00');
+    expect(clinicLocalToInstant('ontem')).toBeNull();
   });
 });

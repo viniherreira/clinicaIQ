@@ -67,6 +67,11 @@ describe('guardCrmAction (server actions)', () => {
     expect(await guardCrmAction('crm')).toEqual({ ok: false, message: 'Plano suspenso.' });
   });
 
+  it('leitura passa mesmo com a clínica suspensa', async () => {
+    bloqueio = 'Plano suspenso.';
+    expect(await guardCrmAction('crm', { write: false })).toMatchObject({ ok: true });
+  });
+
   it('sem sessão pede para entrar de novo', async () => {
     acesso = null;
     const r = await guardCrmAction('crm');
