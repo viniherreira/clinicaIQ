@@ -75,8 +75,11 @@ export async function seedE2EClinic() {
   }
   if (!existing) {
     await prisma.user.create({
-      data: { tenantId: tenant.id, clerkUserId, name: 'Dono E2E', email, role: 'OWNER' },
+      data: { tenantId: tenant.id, clerkUserId, name: 'Dono E2E', email, role: 'OWNER', crmSeat: true },
     });
+  } else if (!existing.crmSeat) {
+    // O CRM é cobrado por pessoa: o dono de teste tem acesso.
+    await prisma.user.update({ where: { id: existing.id }, data: { crmSeat: true } });
   }
 
   // Cortesia: acesso completo sem depender de datas nem do Asaas. Com o CRM

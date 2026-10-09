@@ -30,6 +30,14 @@ export async function createLeadViaModal(page: Page, opts: { name?: string; titl
   return { name, title, phone };
 }
 
+/**
+ * Espera o quadro anunciar que o servidor confirmou o movimento. Antes disso,
+ * navegar para outra página cancelaria o envio.
+ */
+export async function waitAnnounced(page: Page, text: string | RegExp) {
+  await expect(page.getByRole('status').filter({ hasText: text })).toBeAttached({ timeout: 30_000 });
+}
+
 const COLUNAS = ['Novo', 'Em conversa', 'Avaliação agendada', 'Em negociação'];
 
 /** Em que coluna do quadro o lead está (ou "fora do quadro", se ganho/perdido). */

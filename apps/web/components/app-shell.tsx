@@ -34,7 +34,7 @@ export async function AppShell({
   children,
 }: {
   space: Space;
-  guard?: (ctx: { role: string; crm: boolean }) => void;
+  guard?: (ctx: { role: string; crm: boolean; seat: boolean }) => void;
   children: React.ReactNode;
 }) {
   const { userId } = await auth();
@@ -50,7 +50,7 @@ export async function AppShell({
   // Clerk: assim o nome no topo e o que a pessoa consegue fazer nunca divergem.
   const me = await prisma.user.findFirst({
     where: { clerkUserId: userId, tenantId: tenant.id, active: true },
-    select: { name: true, email: true, role: true },
+    select: { name: true, email: true, role: true, crmSeat: true },
   });
 
   const [access, modules] = await Promise.all([
@@ -59,9 +59,11 @@ export async function AppShell({
   ]);
 
   const role = me?.role ?? '';
-  guard?.({ role, crm: modules.crm });
+  const seat = Boolean(me?.crmSeat);
+  guard?.({ role, crm: modules.crm, seat });
 
-  const showSwitcher = modules.crm && can(role, 'crm');
+  // O seletor só aparece para quem consegue entrar no CRM.
+  const showSwitcher = modules.crm && seat && can(role, 'crm');
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createLeadViaModal, expectColumn, uniquePhone } from './helpers';
+import { createLeadViaModal, expectColumn, uniquePhone, waitAnnounced } from './helpers';
 
 test('mover pelo teclado: alça do card, seta para a direita, Espaço', async ({ page }) => {
   const lead = await createLeadViaModal(page);
@@ -13,6 +13,7 @@ test('mover pelo teclado: alça do card, seta para a direita, Espaço', async ({
   await tecla('ArrowRight');
   await tecla('Space');
   await expect(page.getByRole('region', { name: 'Em conversa' }).getByRole('link', { name: lead.title, exact: true })).toBeVisible();
+  await waitAnnounced(page, `${lead.name} movido para Em conversa.`);
   await expectColumn(page, lead.title, 'Em conversa');
 });
 
@@ -20,6 +21,7 @@ test('menu "Mover para…" e perda com motivo obrigatório', async ({ page }) =>
   const lead = await createLeadViaModal(page);
   await page.getByRole('button', { name: `Mover ${lead.name} para…` }).click();
   await page.getByRole('menuitem', { name: 'Avaliação agendada' }).click();
+  await waitAnnounced(page, `${lead.name} movido para Avaliação agendada.`);
   await expectColumn(page, lead.title, 'Avaliação agendada');
 
   await page.getByRole('button', { name: `Mover ${lead.name} para…` }).click();
@@ -29,6 +31,7 @@ test('menu "Mover para…" e perda com motivo obrigatório', async ({ page }) =>
   await expect(dialog.getByRole('alert')).toHaveText('Escolha um motivo.');
   await dialog.getByRole('radio', { name: 'Achou caro' }).check();
   await dialog.getByRole('button', { name: 'Marcar como perdido' }).click();
+  await waitAnnounced(page, `${lead.name} marcado como perdido.`);
   await expectColumn(page, lead.title, 'fora do quadro');
 
   await page.goto('/crm/leads?situacao=perdidos');

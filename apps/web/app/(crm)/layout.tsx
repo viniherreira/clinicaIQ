@@ -14,9 +14,10 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   return (
     <AppShell
       space="crm"
-      guard={({ role, crm }) => {
+      guard={({ role, crm, seat }) => {
         if (!crm) redirect(CRM_NOT_CONTRACTED_PATH);
         if (!can(role, 'crm')) redirect('/sem-acesso?modulo=crm');
+        if (!seat) redirect(CRM_NOT_CONTRACTED_PATH);
       }}
     >
       {children}

@@ -44,6 +44,15 @@ export function Board({
 
   useEffect(() => setLeads(initial), [initial]);
 
+  // O card já mudou de lugar na tela antes de o servidor confirmar. Sair da
+  // página nesse meio-tempo cancelaria o envio — o navegador avisa antes.
+  useEffect(() => {
+    if (!pending) return;
+    const segurar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', segurar);
+    return () => window.removeEventListener('beforeunload', segurar);
+  }, [pending]);
+
   const porEtapa = useMemo(() => {
     const m = new Map<string, BoardLead[]>(stages.map((s) => [s.id, []]));
     for (const l of leads) m.get(l.stageId)?.push(l);

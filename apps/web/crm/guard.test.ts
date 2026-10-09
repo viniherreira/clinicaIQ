@@ -12,13 +12,17 @@ vi.mock('next/navigation', () => ({
 let acesso: { tenantId: string; userId: string; role: string } | null = null;
 let crmEnabled = true;
 let bloqueio: string | null = null;
+let assento = true;
 
 vi.mock('@/lib/guard', () => ({ currentAccess: async () => acesso }));
 vi.mock('@/lib/access', () => ({
   getTenantModules: async () => ({ clinic: true, crm: crmEnabled }),
   writeBlocked: async () => bloqueio,
 }));
-vi.mock('@clinicaiq/db', () => ({ getTenantClient: (tenantId: string) => ({ tenantId }) }));
+vi.mock('@clinicaiq/db', () => ({
+  getTenantClient: (tenantId: string) => ({ tenantId }),
+  prisma: { user: { findUnique: async () => ({ crmSeat: assento }) } },
+}));
 
 const { requireCrm, guardCrmAction, CRM_NOT_CONTRACTED_PATH, CRM_NOT_CONTRACTED_MESSAGE } = await import('./guard');
 
@@ -26,6 +30,7 @@ beforeEach(() => {
   acesso = { tenantId: 't1', userId: 'u1', role: 'RECEPTIONIST' };
   crmEnabled = true;
   bloqueio = null;
+  assento = true;
 });
 
 describe('requireCrm (páginas)', () => {
@@ -44,6 +49,12 @@ describe('requireCrm (páginas)', () => {
     await expect(requireCrm('crm_config')).rejects.toThrow('redirect:/sem-acesso?modulo=crm_config');
     acesso = { tenantId: 't1', userId: 'u1', role: 'PROFESSIONAL' };
     await expect(requireCrm('crm')).rejects.toThrow('redirect:/sem-acesso?modulo=crm');
+  });
+
+  it('sem acesso pessoal ao CRM (chave desligada na Equipe), não entra', async () => {
+    assento = false;
+    await expect(requireCrm('crm')).rejects.toThrow(`redirect:${CRM_NOT_CONTRACTED_PATH}`);
+    expect(await guardCrmAction('crm')).toMatchObject({ ok: false });
   });
 
   it('com módulo e papel, devolve o banco já filtrado pela clínica', async () => {
