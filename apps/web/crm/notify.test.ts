@@ -8,7 +8,7 @@ const getTenantClient = vi.fn();
 vi.mock('@/lib/access', () => ({ getTenantModules: () => modulos() }));
 vi.mock('@clinicaiq/db', () => ({ getTenantClient: (id: string) => getTenantClient(id) }));
 
-const { notifyCrm } = await import('./notify');
+const { notifyCrm, appointmentStatusEvent } = await import('./notify');
 const evento = { type: 'appointment.created', patientId: 'p1', appointmentId: 'a1' } as const;
 
 beforeEach(() => {
@@ -40,5 +40,16 @@ describe('notifyCrm — nunca atrapalha a agenda', () => {
     const log = vi.mocked(console.error).mock.calls.at(-1)!;
     expect(log[0]).toBe('[crm] aviso da clínica falhou');
     expect(Object.keys(log[1] as object).sort()).toEqual(['event', 'message', 'patientId', 'tenantId']);
+  });
+});
+
+describe('appointmentStatusEvent', () => {
+  it('cada situação da agenda vira o aviso certo', () => {
+    expect(appointmentStatusEvent('CANCELLED')).toBe('appointment.cancelled');
+    expect(appointmentStatusEvent('MISSED')).toBe('appointment.missed');
+    expect(appointmentStatusEvent('ATTENDED')).toBe('appointment.attended');
+    for (const s of ['SCHEDULED', 'CONFIRMED', 'RESCHEDULED'] as const) {
+      expect(appointmentStatusEvent(s)).toBe('appointment.rescheduled');
+    }
   });
 });

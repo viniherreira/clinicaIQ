@@ -96,6 +96,16 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     expect(tarefas[0].dueAt.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('agendar de novo conclui sozinho o "Reagendar avaliação"', async () => {
+    const nova = await prisma.appointment.create({
+      data: { tenantId: tenant.id, patientId: paciente.id, professionalId: profissional.id, startTime: emDias(5), endTime: emDias(5.02) },
+    });
+    await notifyCrm(tenant.id, { type: 'appointment.created', patientId: paciente.id, appointmentId: nova.id });
+    expect((await etapa()).nome).toBe('Avaliação agendada');
+    expect(await db.leadTask.count({ where: { leadId, completedAt: null } })).toBe(0);
+    expect(await db.leadTask.count({ where: { leadId, text: TASK_REAGENDAR, completedById: null, NOT: { completedAt: null } } })).toBe(1);
+  });
+
   let orcamento: { id: string };
 
   it('orçamento criado → Em negociação; aprovado → Fechou com o valor', async () => {
@@ -114,7 +124,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     expect((await etapa()).nome).toBe('Em negociação');
 
     await prisma.quote.update({ where: { id: orcamento.id }, data: { status: 'ACCEPTED' } });
-    await notifyCrm(tenant.id, { type: 'quote.accepted', patientId: paciente.id, quoteId: orcamento.id, totalCents: 650_000 });
+    await notifyCrm(tenant.id, { type: 'quote.accepted', patientId: paciente.id, quoteId: orcamento.id });
     expect(await etapa()).toEqual({ nome: 'Fechou', valor: 650_000, ganho: true });
   });
 

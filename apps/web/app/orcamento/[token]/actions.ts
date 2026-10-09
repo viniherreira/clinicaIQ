@@ -2,6 +2,8 @@
 
 import { prisma } from '@clinicaiq/db';
 import { headers } from 'next/headers';
+import { after } from 'next/server';
+import { notifyCrm } from '@/crm/notify';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
 import { describePayment } from '@/lib/payment-terms';
 
@@ -84,7 +86,7 @@ async function respond(
 
   const quote = await prisma.quote.findUnique({
     where: { publicToken: token },
-    select: { id: true, status: true, validUntil: true, tenantId: true },
+    select: { id: true, status: true, validUntil: true, tenantId: true, patientId: true },
   });
   if (!quote) return { ok: false, message: 'Orçamento não encontrado.' };
   if (quote.status !== 'SENT' && quote.status !== 'VIEWED') {
@@ -112,6 +114,15 @@ async function respond(
       ipAddress: ip,
     },
   });
+
+  after(() =>
+    notifyCrm(
+      quote.tenantId,
+      decision === 'ACCEPTED'
+        ? { type: 'quote.accepted', patientId: quote.patientId, quoteId: quote.id }
+        : { type: 'quote.rejected', patientId: quote.patientId, quoteId: quote.id, reason },
+    ),
+  );
 
   return { ok: true };
 }

@@ -5,7 +5,7 @@ import { getTenantModules } from '@/lib/access';
 import { planForEvent, type ClinicEvent } from './automation';
 import { clinicDateAt, clinicNowWall } from './clock';
 import { moveLead, OPEN_LEAD } from './leads';
-import { createTask } from './tasks';
+import { completeTask, createTask } from './tasks';
 
 export type { ClinicEvent } from './automation';
 
@@ -72,7 +72,7 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
   }
   if (!lead) return;
 
-  const [stages, futuros, orcamentosAbertos] = await Promise.all([
+  const [stages, futuros, orcamentosAbertos, orcamento] = await Promise.all([
     db.pipelineStage.findMany(),
     db.appointment.count({
       where: {
@@ -89,6 +89,9 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
         ...('quoteId' in event ? { id: { not: event.quoteId } } : {}),
       },
     }),
+    event.type === 'quote.accepted'
+      ? db.quote.findFirst({ where: { id: event.quoteId }, select: { total: true } })
+      : Promise.resolve(null),
   ]);
 
   const plan = planForEvent(
@@ -98,6 +101,7 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
       hasFutureAppointment: futuros > 0,
       hasOpenQuote: orcamentosAbertos > 0,
       wonByThisQuote,
+      quoteTotalCents: orcamento ? Math.round(Number(orcamento.total) * 100) : undefined,
     },
     event,
   );
@@ -128,6 +132,14 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
     await db.lead.update({ where: { id: lead.id, tenantId }, data: { estimatedValueCents: plan.wonValueCents } });
   }
 
+  if (plan.completes?.length) {
+    const resolvidas = await db.leadTask.findMany({
+      where: { leadId: lead.id, origin: 'AUTOMATION', completedAt: null, text: { in: plan.completes } },
+      select: { id: true },
+    });
+    for (const t of resolvidas) await completeTask(db, automacao, t.id);
+  }
+
   if (plan.tasks.length > 0) {
     const responsavel = lead.assignedToId ?? (await fallbackAssignee(db));
     if (!responsavel) return;
@@ -145,6 +157,21 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
       });
     }
   }
+}
+
+type AppointmentStatus = 'SCHEDULED' | 'CONFIRMED' | 'RESCHEDULED' | 'CANCELLED' | 'ATTENDED' | 'MISSED';
+
+/**
+ * Qual aviso mandar quando a situação de um agendamento muda. Agendado,
+ * confirmado e remarcado contam como "remarcado" (só histórico).
+ */
+export function appointmentStatusEvent(
+  status: AppointmentStatus,
+): 'appointment.cancelled' | 'appointment.missed' | 'appointment.attended' | 'appointment.rescheduled' {
+  if (status === 'CANCELLED') return 'appointment.cancelled';
+  if (status === 'MISSED') return 'appointment.missed';
+  if (status === 'ATTENDED') return 'appointment.attended';
+  return 'appointment.rescheduled';
 }
 
 /** Lead sem responsável: a tarefa vai para o dono (ou um admin) da clínica. */

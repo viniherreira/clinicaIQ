@@ -15,6 +15,7 @@ import { writeBlocked } from '@/lib/access';
 import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@/lib/whatsapp';
 import type { Preparation } from '@/lib/whatsapp';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
+import { appointmentStatusEvent, notifyCrm } from '@/crm/notify';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -345,6 +346,9 @@ export async function createAppointment(
     },
   });
 
+  // Avisa o CRM depois da resposta; ele nunca falha nem atrasa o agendamento.
+  after(() => notifyCrm(tenantId, { type: 'appointment.created', patientId, appointmentId: appointment.id }));
+
   if (sendWhatsApp) {
     // Record the message *before* returning, while we still control the request.
     // `after()` is an optimisation, not a guarantee — if the platform never runs
@@ -438,6 +442,8 @@ export async function updateAppointment(
     },
   });
 
+  after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId, appointmentId: id }));
+
   revalidatePath('/agenda');
   return { success: true, appointmentId: id };
 }
@@ -473,10 +479,11 @@ export async function moveAppointment(
     return { success: false, message: `Horário bloqueado${blocked.reason ? ` (${blocked.reason})` : ''}` };
   }
 
-  await prisma.appointment.update({
+  const movido = await prisma.appointment.update({
     where: { id, tenantId },
     data: { startTime: start, endTime: end, professionalId, updatedById: userId },
   });
+  after(() => notifyCrm(tenantId, { type: 'appointment.rescheduled', patientId: movido.patientId, appointmentId: id }));
 
   revalidatePath('/agenda');
   return { success: true };
@@ -578,7 +585,7 @@ export async function updateAppointmentStatus(
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
 
-  await prisma.appointment.update({
+  const atualizado = await prisma.appointment.update({
     where: { id, tenantId },
     data: {
       status,
@@ -586,6 +593,7 @@ export async function updateAppointmentStatus(
       updatedById: userId,
     },
   });
+  after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: atualizado.patientId, appointmentId: id }));
 
   revalidatePath('/agenda');
 }
@@ -626,6 +634,7 @@ export async function deleteAppointment(id: string) {
   await prisma.auditLog.create({
     data: { tenantId, action: 'APPOINTMENT_DELETED', entity: 'Appointment', entityId: id },
   });
+  after(() => notifyCrm(tenantId, { type: 'appointment.cancelled', patientId: appt.patientId, appointmentId: id }));
 
   revalidatePath('/agenda');
   revalidatePath('/dashboard');

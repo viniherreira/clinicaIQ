@@ -32,7 +32,7 @@ const ev = {
   faltou: { type: 'appointment.missed', patientId: 'p', appointmentId: 'a' },
   compareceu: { type: 'appointment.attended', patientId: 'p', appointmentId: 'a' },
   orcou: { type: 'quote.created', patientId: 'p', quoteId: 'q' },
-  aprovou: { type: 'quote.accepted', patientId: 'p', quoteId: 'q', totalCents: 650_000 },
+  aprovou: { type: 'quote.accepted', patientId: 'p', quoteId: 'q' },
   reabriu: { type: 'quote.reopened', patientId: 'p', quoteId: 'q' },
   recusou: { type: 'quote.rejected', patientId: 'p', quoteId: 'q', reason: 'caro' },
   excluiu: { type: 'quote.deleted', patientId: 'p', quoteId: 'q' },
@@ -54,7 +54,13 @@ describe('avançar', () => {
   });
 
   it('aprovar fecha com o valor do orçamento', () => {
-    expect(planForEvent(ctx('Em negociação'), ev.aprovou)).toEqual({ moveTo: 'Fechou', wonValueCents: 650_000, tasks: [] });
+    expect(planForEvent(ctx('Em negociação', { quoteTotalCents: 650_000 }), ev.aprovou)).toMatchObject({ moveTo: 'Fechou', wonValueCents: 650_000, tasks: [] });
+  });
+
+  it('fazer o que a tarefa automática pedia conclui a tarefa', () => {
+    expect(planForEvent(ctx('Em conversa'), ev.agendou).completes).toEqual([TASK_REAGENDAR, TASK_FALTOU]);
+    expect(planForEvent(ctx('Avaliação agendada'), ev.orcou).completes).toEqual([TASK_ENVIAR_ORCAMENTO, TASK_RETOMAR]);
+    expect(planForEvent(ctx('Em negociação'), ev.aprovou).completes).toContain(TASK_RETOMAR);
   });
 
   it('remarcar não mexe no card', () => {

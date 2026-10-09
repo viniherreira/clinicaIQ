@@ -22,7 +22,7 @@ export type ClinicEvent =
   | { type: 'appointment.missed'; patientId: string; appointmentId: string }
   | { type: 'appointment.attended'; patientId: string; appointmentId: string }
   | { type: 'quote.created'; patientId: string; quoteId: string }
-  | { type: 'quote.accepted'; patientId: string; quoteId: string; totalCents: number }
+  | { type: 'quote.accepted'; patientId: string; quoteId: string }
   | { type: 'quote.reopened'; patientId: string; quoteId: string }
   | { type: 'quote.rejected'; patientId: string; quoteId: string; reason?: string | null }
   | { type: 'quote.deleted'; patientId: string; quoteId: string };
@@ -43,6 +43,8 @@ export interface AutomationContext {
   hasOpenQuote: boolean;
   /** Este lead foi ganho por este orçamento (só importa em `quote.reopened`). */
   wonByThisQuote: boolean;
+  /** Total do orçamento do evento, em centavos (só importa em `quote.accepted`). */
+  quoteTotalCents?: number;
 }
 
 export interface AutomationTask {
@@ -56,6 +58,12 @@ export interface AutomationPlan {
   /** Valor do negócio, gravado quando o orçamento é aprovado. */
   wonValueCents?: number;
   tasks: AutomationTask[];
+  /**
+   * Tarefas automáticas que este evento resolve (pelo texto). Agendou de novo?
+   * "Reagendar avaliação" está feita. Só as criadas pela automação — a tarefa
+   * que alguém da equipe escreveu, só a própria equipe conclui.
+   */
+  completes?: string[];
 }
 
 export const TASK_REAGENDAR = 'Reagendar avaliação';
@@ -87,7 +95,7 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
 
   switch (event.type) {
     case 'appointment.created':
-      return { moveTo: avancar(ctx, 'SCHEDULED'), tasks: [] };
+      return { moveTo: avancar(ctx, 'SCHEDULED'), tasks: [], completes: [TASK_REAGENDAR, TASK_FALTOU] };
 
     case 'appointment.rescheduled':
       // A data nova aparece sozinha no card (lida ao vivo da agenda).
@@ -107,10 +115,15 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
       return ctx.hasOpenQuote ? NADA : { tasks: [{ text: TASK_ENVIAR_ORCAMENTO, inDays: 1 }] };
 
     case 'quote.created':
-      return { moveTo: avancar(ctx, 'NEGOTIATION'), tasks: [] };
+      return { moveTo: avancar(ctx, 'NEGOTIATION'), tasks: [], completes: [TASK_ENVIAR_ORCAMENTO, TASK_RETOMAR] };
 
     case 'quote.accepted':
-      return { moveTo: stageByRole(ctx.stages, 'WON')?.id, wonValueCents: event.totalCents, tasks: [] };
+      return {
+        moveTo: stageByRole(ctx.stages, 'WON')?.id,
+        wonValueCents: ctx.quoteTotalCents,
+        tasks: [],
+        completes: [TASK_REAGENDAR, TASK_FALTOU, TASK_ENVIAR_ORCAMENTO, TASK_RETOMAR],
+      };
 
     case 'quote.rejected':
     case 'quote.deleted':
