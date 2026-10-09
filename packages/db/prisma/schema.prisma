@@ -167,6 +167,8 @@ model User {
   name   String
   email  String
   role   Role    @default(RECEPTIONIST)
+  /// Tem acesso ao CRM e conta na cobrança do adicional (R$ por usuário).
+  crmSeat Boolean @default(false)
   /// Bandeira operacional: é ela que todas as consultas filtram.
   /// `deactivatedAt` é o registro do fato; as duas são escritas juntas.
   active Boolean @default(true)
@@ -809,6 +811,9 @@ model Plan {
   campaignsEnabled  Boolean  @default(false)
   assistantEnabled  Boolean  @default(false)
   advancedReports   Boolean  @default(false)
+  /// Preço do CRM por usuário com acesso, por mês. O CRM é um adicional pago
+  /// por cima de qualquer plano (docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md).
+  crmSeatPriceCents Int      @default(3900)
   /// Ordem de exibição na tela de planos.
   sortOrder         Int      @default(0)
   active            Boolean  @default(true)
@@ -849,6 +854,12 @@ model Subscription {
   /// Módulo CRM contratado. Desligado por padrão: clínica sem CRM não vê
   /// nada novo e a automação do funil não faz nada para ela.
   crmEnabled Boolean @default(false)
+  /// Fim dos 14 dias grátis do CRM. Preenchido também marca que o teste já foi
+  /// usado: ligar e desligar não dá um teste novo.
+  crmTrialEndsAt   DateTime?
+  /// Último valor mensal enviado ao Asaas (plano + CRM). Só se manda de novo
+  /// quando o cálculo der diferente — a rotina diária pode rodar à vontade.
+  billedValueCents Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
