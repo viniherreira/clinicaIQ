@@ -21,6 +21,7 @@ import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription'
 import { documentError, formatDocument, isValidDocument } from '@/lib/document';
 import { capabilityBlocked } from '@/lib/access';
 import { stopComplimentaryBilling } from '@/lib/complimentary';
+import { billingFor } from '@/crm/addon';
 
 const EM_CORTESIA = 'Sua clínica está em cortesia: acesso completo, sem cobrança. Não há plano a contratar ou cancelar.';
 
@@ -302,13 +303,16 @@ export async function choosePlan(
         phone: tenant.phone,
       }));
 
+    // Plano + CRM (por usuário), numa cobrança só.
+    const cobranca = await billingFor(tenantId, plan);
+
     // Switching plans updates the existing subscription instead of opening a
     // second one — two live subscriptions would bill the clinic twice.
     if (existing?.asaasSubscriptionId) {
-      await updateSubscriptionValue(existing.asaasSubscriptionId, plan.monthlyPriceCents, plan.name);
+      await updateSubscriptionValue(existing.asaasSubscriptionId, cobranca.valueCents, plan.name, cobranca.description);
       await prisma.subscription.update({
         where: { tenantId },
-        data: { tier: plan.tier, asaasCustomerId: customerId },
+        data: { tier: plan.tier, asaasCustomerId: customerId, billedValueCents: cobranca.valueCents },
       });
     } else {
       // A clinic still inside its trial keeps every day of it: the first charge
@@ -319,7 +323,7 @@ export async function choosePlan(
       const sub = await createSubscription({
         customerId,
         tenantId,
-        priceCents: plan.monthlyPriceCents,
+        priceCents: cobranca.valueCents,
         planName: plan.name,
         billingType: method,
         firstDueDate,
@@ -341,6 +345,7 @@ export async function choosePlan(
           asaasSubscriptionId: sub.id,
           currentPeriodEnd: new Date(sub.nextDueDate),
           cancelledAt: null,
+          billedValueCents: cobranca.valueCents,
         },
       });
     }

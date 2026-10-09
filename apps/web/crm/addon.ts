@@ -81,6 +81,35 @@ export async function syncBillingValue(
   return { sent: true, valueCents };
 }
 
+/**
+ * Valor e descrição da mensalidade (plano + CRM) para um plano — o atual, ou
+ * outro que a clínica está escolhendo. Usado pela troca de plano.
+ */
+export async function billingFor(
+  tenantId: string,
+  plan: { name: string; monthlyPriceCents: number; crmSeatPriceCents: number },
+  now: Date = new Date(),
+): Promise<{ valueCents: number; description: string }> {
+  const [sub, users] = await Promise.all([
+    prisma.subscription.findUnique({
+      where: { tenantId },
+      select: { crmEnabled: true, crmTrialEndsAt: true, complimentary: true },
+    }),
+    prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } }),
+  ]);
+  const status = crmStatus(sub, now);
+  const seats = seatsCharged(users);
+  return {
+    valueCents: subscriptionValueCents({
+      planPriceCents: plan.monthlyPriceCents,
+      seatPriceCents: plan.crmSeatPriceCents,
+      seats,
+      status,
+    }),
+    description: subscriptionDescription(plan.name, status, seats),
+  };
+}
+
 const isEligible = (role: string) => (CRM_ELIGIBLE_ROLES as readonly string[]).includes(role);
 
 /**
