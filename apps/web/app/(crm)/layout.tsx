@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/app-shell';
+import { CrmTrialBanner } from '@/components/crm-trial-banner';
 import { CRM_NOT_CONTRACTED_PATH } from '@/crm/guard';
 import { can } from '@/lib/permissions';
 
@@ -20,6 +21,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
         if (!seat) redirect(CRM_NOT_CONTRACTED_PATH);
       }}
     >
+      <CrmTrialBanner />
       {children}
     </AppShell>
   );

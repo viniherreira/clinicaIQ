@@ -43,6 +43,8 @@ const COLUNAS = ['Novo', 'Em conversa', 'Avaliação agendada', 'Em negociação
 /** Em que coluna do quadro o lead está (ou "fora do quadro", se ganho/perdido). */
 export async function columnOf(page: Page, title: string): Promise<string> {
   await page.goto('/crm');
+  // Espera a página ganhar vida: o próximo passo do teste costuma ser um clique.
+  await page.waitForLoadState('networkidle');
   for (const nome of COLUNAS) {
     if (await page.getByRole('region', { name: nome }).getByRole('link', { name: title, exact: true }).count()) return nome;
   }

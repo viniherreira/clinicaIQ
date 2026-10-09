@@ -1,5 +1,6 @@
 import { getBillingData } from '../../planos/actions';
 import { BillingView } from '../../planos/_components/billing-view';
+import { CrmAddonCard } from '@/components/crm-addon-card';
 
 /**
  * O plano inteiro dentro da aba de Configurações.
@@ -14,5 +15,10 @@ import { BillingView } from '../../planos/_components/billing-view';
  */
 export async function BillingPanel() {
   const data = await getBillingData();
-  return <BillingView data={data} embutido />;
+  return (
+    <>
+      <BillingView data={data} embutido />
+      <CrmAddonCard />
+    </>
+  );
 }

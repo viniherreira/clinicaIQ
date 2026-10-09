@@ -14,6 +14,7 @@ import {
 import { Suspense } from 'react';
 import { SettingsView } from './_components/settings-view';
 import { BillingPanel } from './_components/billing-panel';
+import { CrmSeatsSection } from '@/components/crm-seats-section';
 
 import { requireCapability } from '@/lib/guard';
 import { can } from '@/lib/permissions';
@@ -75,6 +76,7 @@ export default async function ConfiguracoesPage() {
           </Suspense>
         ) : null
       }
+      crmSeats={podeEquipe ? <CrmSeatsSection /> : null}
       whatsapp={{
         status: session?.status ?? 'DISCONNECTED',
         phoneNumber: session?.phoneNumber ?? null,
