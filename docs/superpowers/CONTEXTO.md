@@ -14,7 +14,8 @@ Atualizado em 2026-10-09. Leia isto antes de continuar o CRM.
 ## Decisões tomadas com o dono do produto
 
 - CRM **só para clínicas**, funcionalidades e organização de tela **inspiradas no Kommo**, identidade visual do ClinicaIQ (nada de marca do Kommo).
-- Dois espaços no mesmo app com seletor `Clínica | CRM`; o CRM pode ser vendido junto ou sozinho (cobrança na etapa 5).
+- Dois espaços no mesmo app com seletor `Clínica | CRM`.
+- **Mudança de estratégia (2026-10-09): o produto é o sistema de agenda; o CRM é um adicional pago** por cima de qualquer plano — R$ 39 por usuário/mês, a clínica escolhe quem tem acesso, 14 dias grátis, uma cobrança só no Asaas, cortesia inclui o CRM. Não existe plano "só CRM". Spec: `docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md`; plano: `docs/superpowers/plans/2026-10-09-crm-adicional-pago-plan.md`. Vem **antes** da etapa 2.
 - Lead = negócio (várias por pessoa). Tarefas com aviso "sem tarefa". Um funil editável por clínica.
 - **A agenda nunca depende do CRM**: só `after(() => notifyCrm(...))` depois de salvar.
 - Banco de desenvolvimento **separado da produção** (Postgres local). Nunca testar contra o banco das clínicas.

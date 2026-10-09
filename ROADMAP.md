@@ -24,14 +24,15 @@ Funcionalidades e organização de tela inspiradas no Kommo; identidade do Clini
   - Tarefas com aviso "sem tarefa"; vários negócios por paciente
   - Conversão em paciente e "Agendar avaliação" direto na agenda
   - O card anda sozinho com a agenda e os orçamentos
-  - [ ] Publicar em produção (cópia de segurança, SQL revisado, clínica piloto)
+- [ ] **CRM como adicional pago** — R$ 39 por usuário/mês, 14 dias grátis, uma cobrança só (antes de publicar)
+  - [ ] Publicar etapa 1 + adicional em produção (cópia de segurança, SQL revisado, banco antes do merge, clínica piloto)
 - [ ] **Etapa 2 — API oficial do WhatsApp e caixa de entrada**
   - Cadastro incorporado da Meta (exige o ClinicaIQ como Tech Provider verificado — iniciar o processo cedo)
   - Conversas na ficha do lead; coluna "Entrada" para leads que chegam sozinhos
   - Anonimização do lead a pedido do titular
 - [ ] **Etapa 3 — Transmissões** com templates aprovados pela Meta (substitui Campanhas para quem tem CRM)
 - [ ] **Etapa 4 — Chatbot por botões** e automações por etapa
-- [ ] **Etapa 5 — Planos**: só CRM, clínica + CRM, cobrança
+- ~~Etapa 5 — plano "só CRM"~~ (descartado: o CRM é adicional do sistema de agenda)
 
 ## Ideias para depois
 
