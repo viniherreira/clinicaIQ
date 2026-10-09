@@ -98,3 +98,51 @@ export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, now: Date
 }
 
 export { leadInclude };
+
+export type ListStatus = 'abertos' | 'ganhos' | 'perdidos' | 'todos';
+export type ListOrder = 'recentes' | 'nome' | 'valor' | 'etapa';
+
+/** A lista: os mesmos filtros do quadro, mais a situação (ganhos, perdidos) e a ordem. */
+export async function loadLeadList(
+  ctx: CrmContext,
+  f: BoardFilters,
+  status: ListStatus,
+  order: ListOrder,
+  now: Date = new Date(),
+) {
+  const situacao: Prisma.LeadWhereInput =
+    status === 'abertos'
+      ? OPEN_LEAD
+      : status === 'ganhos'
+        ? { wonAt: { not: null } }
+        : status === 'perdidos'
+          ? { lostAt: { not: null } }
+          : {};
+  const orderBy: Prisma.LeadOrderByWithRelationInput[] =
+    order === 'nome'
+      ? [{ name: 'asc' }]
+      : order === 'valor'
+        ? [{ estimatedValueCents: { sort: 'desc', nulls: 'last' } }]
+        : order === 'etapa'
+          ? [{ stage: { order: 'asc' } }, { position: 'asc' }]
+          : [{ createdAt: 'desc' }];
+
+  const rows = await ctx.db.lead.findMany({
+    where: { ...leadWhere(ctx, f), ...situacao },
+    include: { ...leadInclude, stage: { select: { name: true } } },
+    orderBy,
+    take: 500,
+  });
+  const leads = await toBoardLeads(ctx, rows, now);
+  const stageName = new Map(rows.map((r) => [r.id, r.stage.name]));
+  const createdAt = new Map(rows.map((r) => [r.id, r.createdAt.toISOString()]));
+  const list = leads.map((l) => ({ ...l, stageName: stageName.get(l.id) ?? '', createdAt: createdAt.get(l.id) ?? '' }));
+  return f.tarefa ? list.filter((l) => l.task.kind === f.tarefa) : list;
+}
+
+export function parseListParams(sp: Record<string, string | string[] | undefined>) {
+  const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
+  const status = (['abertos', 'ganhos', 'perdidos', 'todos'] as const).find((s) => s === one('situacao')) ?? 'abertos';
+  const order = (['recentes', 'nome', 'valor', 'etapa'] as const).find((s) => s === one('ordem')) ?? 'recentes';
+  return { status, order };
+}
