@@ -79,12 +79,15 @@ export async function seedE2EClinic() {
     });
   }
 
-  // Cortesia: acesso completo sem depender de datas nem do Asaas.
+  // Cortesia: acesso completo sem depender de datas nem do Asaas. Com o CRM
+  // ligado — a regressão da agenda roda assim de propósito, para provar que o
+  // CRM não atrapalha quem agenda.
   const farFuture = new Date('2099-12-31T00:00:00Z');
   await prisma.subscription.upsert({
     where: { tenantId: tenant.id },
-    update: { complimentary: true, status: 'ACTIVE', currentPeriodEnd: farFuture },
+    update: { complimentary: true, status: 'ACTIVE', currentPeriodEnd: farFuture, crmEnabled: true },
     create: {
+      crmEnabled: true,
       tenantId: tenant.id,
       tier: 'CLINICA',
       status: 'ACTIVE',

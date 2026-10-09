@@ -55,11 +55,13 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
 
   // Veio com paciente na URL: abre o agendamento e limpa a URL, para um
-  // recarregar não abrir o modal de novo.
+  // recarregar não abrir o modal de novo. `history.replaceState`, e não
+  // `router.replace`: este último é uma navegação que vai ao servidor, e o
+  // "Agendar" clicado enquanto ela corre fica na fila atrás dela.
   useEffect(() => {
     if (!prefillPatient) return;
     setModal({ open: true, defaultDate: initialDate, defaultPatient: prefillPatient });
-    router.replace(`/agenda?date=${initialDate}&view=${initialView}`, { scroll: false });
+    window.history.replaceState(null, '', `/agenda?date=${initialDate}&view=${initialView}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

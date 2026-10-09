@@ -10,7 +10,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // O servidor de desenvolvimento compila cada tela na primeira visita; com
+  // muitos testes em paralelo ele engasga e ações passam do tempo sem nada
+  // estar quebrado.
+  workers: process.env.CI ? 1 : 2,
   reporter: 'html',
   // Em `next dev`, a primeira chamada de cada tela ou server action compila na
   // hora e pode levar vários segundos. Com os 5s/30s padrão, a primeira
@@ -36,7 +39,7 @@ export default defineConfig({
     },
     {
       name: 'logado',
-      testMatch: /regressao\/.*\.spec\.ts/,
+      testMatch: /(regressao|crm)\/.*\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: OWNER_STATE },
     },
