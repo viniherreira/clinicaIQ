@@ -6,8 +6,8 @@ import { createCipheriv, createDecipheriv, randomBytes, createHmac } from 'node:
  * client rather than importing the app's TypeScript-source `@clinicaiq/db`
  * package (which only resolves inside a bundler).
  *
- * It reads and writes only `whatsapp_sessions` and `whatsapp_auth_keys`, always
- * scoped by tenantId — it never touches patient data.
+ * Everything it reads or writes is scoped by tenantId. Patient phones and the
+ * CRM conversations are stored encrypted, with the same key derivation as the app.
  */
 export const prisma = new PrismaClient({ log: ['error'] });
 
@@ -46,6 +46,14 @@ export function decrypt(ciphertext: string, masterKey: string, tenantId: string)
   decipher.setAuthTag(authTag);
 
   return decipher.update(encrypted) + decipher.final('utf8');
+}
+
+/**
+ * Blind index for looking a value up without decrypting the table. Mirrors
+ * `hashForTenant` in packages/db/src/encryption.ts — change them together.
+ */
+export function hashForTenant(value: string, masterKey: string, tenantId: string): string {
+  return createHmac('sha256', masterKey).update(`hash:${tenantId}:${value}`).digest('base64url');
 }
 
 export type WhatsAppConnectionStatus =
