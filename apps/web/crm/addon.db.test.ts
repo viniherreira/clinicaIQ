@@ -43,6 +43,11 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
     await prisma.$disconnect();
   });
 
+  it('clínica que nunca ligou o CRM: o Asaas não é tocado', async () => {
+    expect(await syncBillingValue(tenant.id, asaas)).toEqual({ sent: false, reason: 'never-crm' });
+    expect(asaas.updateValue).not.toHaveBeenCalled();
+  });
+
   it('primeira vez: 14 dias grátis, e quem ligou ganha acesso', async () => {
     const agora = new Date();
     expect(await turnOnCrm(tenant.id, dono.id, agora)).toEqual({ ok: true, mode: 'trial' });

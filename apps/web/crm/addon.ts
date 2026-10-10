@@ -33,7 +33,7 @@ async function defaultGateway(): Promise<BillingGateway> {
 
 export type SyncResult =
   | { sent: true; valueCents: number }
-  | { sent: false; reason: 'no-subscription' | 'no-asaas' | 'complimentary' | 'unchanged' | 'not-configured' };
+  | { sent: false; reason: 'no-subscription' | 'no-asaas' | 'complimentary' | 'never-crm' | 'unchanged' | 'not-configured' };
 
 /**
  * Calcula o valor da mensalidade (plano + CRM) e, se mudou desde o último
@@ -61,6 +61,11 @@ export async function syncBillingValue(
   // Cortesia não é cobrada; a rotina de cortesia já encerra a cobrança no Asaas.
   if (sub.complimentary) return { sent: false, reason: 'complimentary' };
   if (!sub.asaasSubscriptionId) return { sent: false, reason: 'no-asaas' };
+  // Clínica que nunca ligou o CRM: a cobrança dela é a de sempre e não se
+  // mexe — inclusive valores combinados à parte direto no Asaas.
+  if (!sub.crmEnabled && sub.crmTrialEndsAt === null && sub.billedValueCents === null) {
+    return { sent: false, reason: 'never-crm' };
+  }
 
   const users = await prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } });
   const status = crmStatus(sub, now);
