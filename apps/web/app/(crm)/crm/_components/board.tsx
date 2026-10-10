@@ -8,8 +8,10 @@ import {
 } from '@dnd-kit/core';
 import { Check, Trash2, X } from 'lucide-react';
 import type { BoardLead, BoardStage, LostReasonOption } from '@/crm/types';
+import type { ConversationSummary } from '@/crm/conversations';
 import { deleteLeadAction, moveLeadAction } from '../actions';
 import { Column } from './column';
+import { InboxColumn } from './inbox-column';
 import { LeadCard, type MoveTarget } from './lead-card';
 import { LostReasonModal } from './lost-reason-modal';
 import { boardKeyboardCoordinates } from './keyboard-coordinates';
@@ -28,12 +30,15 @@ export function Board({
   closedStages,
   lostReasons,
   canDelete,
+  inbox = [],
 }: {
   stages: BoardStage[];
   leads: BoardLead[];
   closedStages: { won: string; lost: string };
   lostReasons: LostReasonOption[];
   canDelete: boolean;
+  /** Números novos no WhatsApp: a coluna Entrada, só quando há alguém. */
+  inbox?: ConversationSummary[];
 }) {
   const router = useRouter();
   const [leads, setLeads] = useState(initial);
@@ -180,6 +185,11 @@ export function Board({
         onDragEnd={onDragEnd}
       >
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 pb-4 sm:px-6" role="list" aria-label="Etapas do funil">
+          {inbox.length > 0 && (
+            <div role="listitem" className="flex">
+              <InboxColumn entries={inbox} onAnnounce={anunciar} />
+            </div>
+          )}
           {stages.map((s) => (
             <div role="listitem" key={s.id} className="flex">
               <Column

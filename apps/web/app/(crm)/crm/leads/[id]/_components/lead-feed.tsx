@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, CalendarClock, Check, CheckCircle2, CircleDot, FileText, MessageSquare, StickyNote, Trophy, XCircle } from 'lucide-react';
+import { Bot, CalendarClock, Check, CheckCircle2, CircleDot, FileText, StickyNote, Trophy, XCircle } from 'lucide-react';
 import { formatDue } from '@/crm/format';
 import { instantToClinicLocal } from '@/crm/clock';
 import type { LeadDetail } from '@/crm/lead-detail';
@@ -165,9 +165,6 @@ function Composer({
             <a.icon className="h-4 w-4" aria-hidden="true" /> {a.label}
           </button>
         ))}
-        <span className="inline-flex items-center gap-1.5 pb-1 text-muted-foreground" title="Chega com a integração do WhatsApp">
-          <MessageSquare className="h-4 w-4" aria-hidden="true" /> Conversa <span className="text-xs">(em breve)</span>
-        </span>
       </div>
 
       <form
