@@ -49,3 +49,29 @@ export function timeAgo(d: Date, now: Date = new Date()): string {
   const dias = Math.floor(h / 24);
   return dias === 1 ? 'há 1 dia' : `há ${dias} dias`;
 }
+
+// ─── Conversas ───────────────────────────────────────────────────────────────
+
+const diaDe = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TZ }).format(d);
+
+/** Hora de uma mensagem: "14:32". */
+export function chatTime(d: Date): string {
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TZ, hour: '2-digit', minute: '2-digit' }).format(d);
+}
+
+/** Na lista de conversas: "14:32" hoje, "ontem", ou "12/10". */
+export function chatListTime(d: Date, now: Date = new Date()): string {
+  if (diaDe(d) === diaDe(now)) return chatTime(d);
+  if (diaDe(d) === diaDe(new Date(now.getTime() - 86_400_000))) return 'ontem';
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TZ, day: '2-digit', month: '2-digit' }).format(d);
+}
+
+/** Separador de dia dentro da conversa: "Hoje", "Ontem", "12 de outubro". */
+export function chatDayLabel(d: Date, now: Date = new Date()): string {
+  if (diaDe(d) === diaDe(now)) return 'Hoje';
+  if (diaDe(d) === diaDe(new Date(now.getTime() - 86_400_000))) return 'Ontem';
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TZ, day: 'numeric', month: 'long' }).format(d);
+}
+
+/** Mesmo dia no fuso da clínica? Decide onde entra o separador. */
+export const sameClinicDay = (a: Date, b: Date) => diaDe(a) === diaDe(b);

@@ -434,7 +434,10 @@ export async function simulateSent(db: TenantPrismaClient, chatMessageId: string
 
 // ─── Entrada ──────────────────────────────────────────────────────────────────
 
-/** Aceitar: vira lead em Novo, com origem WhatsApp e o nome que a pessoa usa lá. */
+/**
+ * Aceitar (Entrada) ou "Criar negócio" (conversa de paciente sem negócio aberto):
+ * vira lead em Novo, com origem WhatsApp e o nome que a pessoa usa lá.
+ */
 export async function acceptConversation(
   db: TenantPrismaClient,
   actor: Actor & { userId: string },
@@ -442,10 +445,21 @@ export async function acceptConversation(
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const conv = await db.conversation.findFirst({
     where: { id: conversationId },
-    select: { id: true, status: true, contactName: true, phoneEncrypted: true, patientId: true, patient: { select: { name: true } } },
+    select: {
+      id: true,
+      status: true,
+      contactName: true,
+      phoneEncrypted: true,
+      patientId: true,
+      patient: { select: { name: true } },
+      lead: { select: { wonAt: true, lostAt: true, deletedAt: true } },
+    },
   });
   if (!conv) return { ok: false, message: 'Conversa não encontrada.' };
-  if (conv.status !== 'INBOX') return { ok: false, message: 'Esta conversa já saiu da Entrada.' };
+  if (conv.status === 'DECLINED') return { ok: false, message: 'Esta conversa foi recusada.' };
+  if (conv.lead && !conv.lead.wonAt && !conv.lead.lostAt && !conv.lead.deletedAt) {
+    return { ok: false, message: 'Esta conversa já tem um negócio aberto.' };
+  }
 
   const phone = decryptPhone(conv.phoneEncrypted, actor.tenantId);
   const r = await createLead(db, actor, {
@@ -500,10 +514,4 @@ export async function linkConversation(
     data: { patientId: patient.id, status: 'ACTIVE', classifiedAt: new Date() },
   });
   return { ok: true };
-}
-
-/** Respostas rápidas: troca {nome} pelo primeiro nome do contato. */
-export function fillQuickReply(body: string, name: string | null): string {
-  const first = (name ?? '').trim().split(/\s+/)[0] ?? '';
-  return body.replace(/\{nome\}/gi, first).replace(/[ \t]+([,.!?])/g, '$1').replace(/[ \t]{2,}/g, ' ').trim();
 }

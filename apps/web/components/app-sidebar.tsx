@@ -42,11 +42,12 @@ export const CLINIC_NAV: NavItem[] = [
 ];
 
 /**
- * O menu do espaço CRM. Conversas, Transmissões e Chatbot entram nas próximas
- * etapas. O próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
+ * O menu do espaço CRM. Transmissões e Chatbot entram nas próximas etapas. O
+ * próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
  */
 export const CRM_NAV: NavItem[] = [
   { href: '/crm', label: 'Funil', icon: KanbanSquare, capability: 'crm' },
+  { href: '/crm/conversas', label: 'Conversas', icon: MessageCircle, capability: 'crm' },
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
   { href: '/crm/configuracoes', label: 'Configurações do CRM', icon: Settings, capability: 'crm_config' },
@@ -72,12 +73,15 @@ export function AppSidebar({
   role,
   space = 'clinic',
   showSwitcher = false,
+  counts = {},
 }: {
   clinicName: string;
   role: string;
   space?: Space;
   /** A clínica tem os dois módulos e a pessoa alcança o CRM. */
   showSwitcher?: boolean;
+  /** Números ao lado de um item (conversas não lidas), por endereço. */
+  counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
   const itens = navFor(role, space);
@@ -125,6 +129,12 @@ export function AppSidebar({
                 )}
                 <Icon className="h-[18px] w-[18px] shrink-0 transition-transform group-hover:scale-110" aria-hidden="true" />
                 {item.label}
+                {(counts[item.href] ?? 0) > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                    {counts[item.href]}
+                    <span className="sr-only"> não lida(s)</span>
+                  </span>
+                )}
                 {item.badge && (
                   <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
                     {item.badge}

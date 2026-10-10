@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fillQuickReply, newMessageId } from './conversations';
+import { newMessageId } from './conversations';
+import { fillQuickReply } from './quick-replies';
 
 describe('fillQuickReply', () => {
   it.each([

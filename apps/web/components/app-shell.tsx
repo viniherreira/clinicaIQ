@@ -65,9 +65,23 @@ export async function AppShell({
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
 
+  // Conversas não lidas, no menu do CRM.
+  const unread =
+    space === 'crm' && showSwitcher
+      ? await prisma.conversation
+          .count({ where: { tenantId: tenant.id, status: { not: 'DECLINED' }, unreadCount: { gt: 0 } } })
+          .catch(() => 0)
+      : 0;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <AppSidebar clinicName={tenant.name} role={role} space={space} showSwitcher={showSwitcher} />
+      <AppSidebar
+        clinicName={tenant.name}
+        role={role}
+        space={space}
+        showSwitcher={showSwitcher}
+        counts={{ '/crm/conversas': unread }}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
           clinicName={tenant.name}
