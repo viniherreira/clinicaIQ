@@ -1,9 +1,11 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import { CRM_COLORS } from './defaults';
 import { canDeleteStage, isClosedStage } from './pipeline';
+import { MAX_QUICK_REPLY, normalizeShortcut } from './quick-replies';
 
 /**
- * O que dono e admin mudam no funil: etapas, tags e motivos de perda.
+ * O que dono e admin mudam no CRM: etapas, tags, motivos de perda e
+ * respostas rápidas.
  * Quem chama já passou por `guardCrmAction('crm_config')`.
  */
 
@@ -169,4 +171,32 @@ export async function upsertLostReason(
 export async function toggleLostReason(db: TenantPrismaClient, reasonId: string, active: boolean): Promise<Result> {
   const r = await db.lostReason.updateMany({ where: { id: reasonId }, data: { active } });
   return r.count ? ok : { ok: false, message: 'Motivo não encontrado.' };
+}
+
+// ─── Respostas rápidas ───────────────────────────────────────────────────────
+
+export async function upsertQuickReply(
+  db: TenantPrismaClient,
+  tenantId: string,
+  input: { id?: string; title: string; body: string },
+): Promise<Result> {
+  const title = normalizeShortcut(input.title);
+  const body = input.body.trim();
+  if (!title) return { ok: false, message: 'Escreva o atalho (ex.: horarios).' };
+  if (!body) return { ok: false, message: 'Escreva o texto da resposta.' };
+  if (body.length > MAX_QUICK_REPLY) return { ok: false, message: `O texto passa de ${MAX_QUICK_REPLY} caracteres.` };
+  const igual = await db.quickReply.findFirst({ where: { title, ...(input.id ? { id: { not: input.id } } : {}) } });
+  if (igual) return { ok: false, message: `Já existe a resposta /${title}.` };
+  if (input.id) {
+    const r = await db.quickReply.updateMany({ where: { id: input.id }, data: { title, body } });
+    return r.count ? ok : { ok: false, message: 'Resposta não encontrada.' };
+  }
+  const ultima = await db.quickReply.findFirst({ orderBy: { order: 'desc' }, select: { order: true } });
+  await db.quickReply.create({ data: { tenantId, title, body, order: (ultima?.order ?? 0) + 10 } });
+  return ok;
+}
+
+export async function deleteQuickReply(db: TenantPrismaClient, id: string): Promise<Result> {
+  const r = await db.quickReply.deleteMany({ where: { id } });
+  return r.count ? ok : { ok: false, message: 'Resposta não encontrada.' };
 }

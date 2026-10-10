@@ -60,7 +60,8 @@ export function ConversationPane({
 
       <ChatComposer
         quickReplies={quickReplies}
-        contactName={c.contactName ?? c.name}
+        // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
+        contactName={c.name === c.phoneMasked ? null : c.name}
         disabled={c.status === 'DECLINED'}
         disabledReason="Conversa recusada"
         onSend={async (text) => {

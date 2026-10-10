@@ -26,6 +26,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     await prisma.leadTag.deleteMany({ where: t });
     await prisma.lead.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
+    await prisma.quickReply.deleteMany({ where: t });
     await prisma.pipelineStage.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();
@@ -75,5 +76,17 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     await s.toggleLostReason(db, motivo.id, false);
     expect((await db.lostReason.findFirst({ where: { id: motivo.id } }))?.active).toBe(false);
     expect((await s.upsertLostReason(db, tenant.id, { name: 'Mudou de cidade' })).ok).toBe(true);
+  });
+
+  it('resposta rápida: atalho limpo, sem repetir, edita e apaga', async () => {
+    expect(await s.upsertQuickReply(db, tenant.id, { title: '/Horários de Sábado', body: 'Oi {nome}! Sábado até 12h.' })).toEqual({ ok: true });
+    const r = (await db.quickReply.findFirst())!;
+    expect(r.title).toBe('horarios-de-sabado');
+    expect((await s.upsertQuickReply(db, tenant.id, { title: 'horarios de sabado', body: 'x' })).ok).toBe(false);
+    expect((await s.upsertQuickReply(db, tenant.id, { title: 'vazio', body: '   ' })).ok).toBe(false);
+    expect(await s.upsertQuickReply(db, tenant.id, { id: r.id, title: 'sabado', body: 'Sábado até 13h.' })).toEqual({ ok: true });
+    expect((await db.quickReply.findFirst({ where: { id: r.id } }))?.title).toBe('sabado');
+    expect(await s.deleteQuickReply(db, r.id)).toEqual({ ok: true });
+    expect(await db.quickReply.count()).toBe(0);
   });
 });

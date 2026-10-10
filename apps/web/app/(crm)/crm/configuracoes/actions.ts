@@ -27,3 +27,7 @@ export const deleteTagAction = async (id: string) => run((g) => s.deleteTag(g.db
 
 export const upsertLostReasonAction = async (input: { id?: string; name: string }) => run((g) => s.upsertLostReason(g.db, g.tenantId, input));
 export const toggleLostReasonAction = async (id: string, active: boolean) => run((g) => s.toggleLostReason(g.db, id, active));
+
+export const upsertQuickReplyAction = async (input: { id?: string; title: string; body: string }) =>
+  run((g) => s.upsertQuickReply(g.db, g.tenantId, input));
+export const deleteQuickReplyAction = async (id: string) => run((g) => s.deleteQuickReply(g.db, id));

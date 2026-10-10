@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newMessageId } from './conversations';
-import { fillQuickReply } from './quick-replies';
+import { fillQuickReply, normalizeShortcut } from './quick-replies';
 
 describe('fillQuickReply', () => {
   it.each([
@@ -20,5 +20,16 @@ describe('newMessageId', () => {
     const ids = new Set(Array.from({ length: 500 }, newMessageId));
     expect(ids.size).toBe(500);
     for (const id of ids) expect(id).toMatch(/^3EB0[0-9A-F]{18}$/);
+  });
+});
+
+describe('normalizeShortcut', () => {
+  it.each([
+    ['Horários', 'horarios'],
+    ['/endereço da clínica', 'endereco-da-clinica'],
+    ['  PIX!! ', 'pix'],
+    ['', ''],
+  ])('%s → %s', (entrada, atalho) => {
+    expect(normalizeShortcut(entrada)).toBe(atalho);
   });
 });
