@@ -40,13 +40,13 @@ const GIVE_UP_AFTER_MS = 6 * 60 * 60 * 1000;
 const BATCH = 50;
 
 /** Failures no retry would change. Everything else is worth another go. */
-const PERMANENT = new Set(['numero-sem-whatsapp', 'invalid-number', 'empty-body']);
+export const PERMANENT = new Set(['numero-sem-whatsapp', 'invalid-number', 'empty-body']);
 
 /**
  * Reasons the clinic will read on the message. Mirrors friendlyError in
  * apps/web/lib/whatsapp.ts — same codes, same wording. Change them together.
  */
-const REASON: Record<string, string> = {
+export const REASON: Record<string, string> = {
   'numero-sem-whatsapp':
     'WhatsApp não encontrado neste número — confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
   'invalid-number': 'Número de telefone inválido',

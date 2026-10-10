@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { runCampaign } from './campaigns.js';
+import { retryPendingChats, sendChat, sweepStuckChats } from './chat-send.js';
 import { prisma } from './db.js';
 import { env, envProblems, logEnvSummary } from './env.js';
 import { retryPendingMessages, sweepStuckMessages } from './outbox.js';
@@ -195,6 +196,22 @@ app.post(
   }),
 );
 
+/**
+ * Manda uma resposta escrita no CRM. O app já gravou a mensagem; aqui ela sai
+ * pela linha da clínica. Se não sair agora, a rotina de reenvio tenta depois.
+ */
+app.post(
+  '/sessions/:tenantId/chat',
+  asyncRoute(async (req, res) => {
+    const { chatMessageId } = req.body ?? {};
+    if (typeof chatMessageId !== 'string' || !chatMessageId.trim()) {
+      res.status(400).json({ ok: false, error: 'chatMessageId-required' });
+      return;
+    }
+    res.json(await sendChat(tenantIdOf(req), chatMessageId));
+  }),
+);
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[gateway] unhandled error', error);
@@ -267,12 +284,21 @@ app.listen(env.PORT, '0.0.0.0', () => {
   retry();
   setInterval(retry, 30_000).unref();
 
+  // As respostas do CRM têm a própria fila, com a mesma ideia.
+  const retryChats = () =>
+    void retryPendingChats().catch((e) => console.error('[gateway] fila do CRM falhou:', e?.message ?? e));
+  setInterval(retryChats, 30_000).unref();
+
   // Close out messages whose ack was lost to a restart, so the screen stops
   // showing "Saindo…" for something that reached nobody.
   const sweep = () =>
     void sweepStuckMessages().catch((e) => console.error('[gateway] sweep falhou:', e?.message ?? e));
   sweep();
   setInterval(sweep, 5 * 60_000).unref();
+  setInterval(
+    () => void sweepStuckChats().catch((e) => console.error('[gateway] sweep do CRM falhou:', e?.message ?? e)),
+    5 * 60_000,
+  ).unref();
 
   restoreSessions()
     .then((n) => console.log(`[gateway] restored ${n} session(s)`))
