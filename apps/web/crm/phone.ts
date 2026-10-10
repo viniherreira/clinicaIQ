@@ -1,5 +1,5 @@
 import { decrypt, encrypt, hashForTenant } from '@clinicaiq/db';
-import { normalizeBrazilPhone } from '@/lib/phone';
+import { chatKey, normalizeBrazilPhone } from '@/lib/phone';
 
 /**
  * Telefone do lead. Guardado cifrado como o do paciente (LGPD), com um índice
@@ -24,6 +24,25 @@ export function isValidPhone(raw: string): boolean {
 
 export function phoneHash(raw: string, tenantId: string): string {
   return hashForTenant(canonicalPhone(raw), masterKey(), tenantId);
+}
+
+/**
+ * Índice cego da conversa de WhatsApp desse telefone. Usa a chave de conversa
+ * (celular sempre com o 9), a mesma que o gateway grava.
+ */
+export function conversationHash(raw: string, tenantId: string): string {
+  return hashForTenant(chatKey(raw), masterKey(), tenantId);
+}
+
+/**
+ * Os índices de lead que podem ser o mesmo número da conversa: com e sem o 9,
+ * porque o lead guarda o telefone como foi digitado.
+ */
+export function leadHashesForChat(raw: string, tenantId: string): string[] {
+  const key = chatKey(raw);
+  const m = /^55(\d{2})9([6-9]\d{7})$/.exec(key);
+  const forms = m ? [key, `55${m[1]}${m[2]}`] : [key];
+  return forms.map((f) => phoneHash(f, tenantId));
 }
 
 export function encryptPhone(raw: string, tenantId: string): string {

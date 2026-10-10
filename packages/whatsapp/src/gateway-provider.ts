@@ -128,6 +128,23 @@ export class GatewayWhatsAppProvider implements WhatsAppProvider {
     await this.request(`/sessions/${encodeURIComponent(this.tenantId)}`, { method: 'DELETE' });
   }
 
+  // ─── CRM conversations ──────────────────────────────────────────────────────
+
+  /**
+   * Asks the gateway to send a reply written in the CRM. The app already stored
+   * the message; if this call fails, the gateway's own retry loop picks it up.
+   */
+  async sendChat(chatMessageId: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      return await this.request<{ ok: boolean; error?: string }>(
+        `/sessions/${encodeURIComponent(this.tenantId)}/chat`,
+        { method: 'POST', body: JSON.stringify({ chatMessageId }) },
+      );
+    } catch (error) {
+      return { ok: false, error: classifyTransportError(error) };
+    }
+  }
+
   // ─── Campaigns ──────────────────────────────────────────────────────────────
 
   /**

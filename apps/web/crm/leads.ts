@@ -1,6 +1,6 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isClosedStage, stageByRole, type StageLike } from './pipeline';
-import { encryptPhone, phoneHash } from './phone';
+import { conversationHash, encryptPhone, phoneHash } from './phone';
 
 /**
  * Operações do lead. Cada uma grava a mudança e o registro no histórico na
@@ -235,6 +235,18 @@ export async function createLead(
         data: { source: lead.source, stageId: stage.id },
       },
     });
+
+    // Já existe conversa de WhatsApp com esse número: passa a ser deste negócio
+    // e sai da Entrada.
+    await tx.conversation.updateMany({
+      where: { tenantId, phoneHash: conversationHash(input.phone, tenantId) },
+      data: {
+        leadId: lead.id,
+        status: 'ACTIVE',
+        classifiedAt: new Date(),
+        ...(lead.patientId ? { patientId: lead.patientId } : {}),
+      },
+    });
     return { ok: true as const, leadId: lead.id };
   });
 }
@@ -303,6 +315,8 @@ export async function linkPatient(
     await tx.leadActivity.create({
       data: { tenantId, leadId, type: 'CONVERTED', actorId: actor.userId, data: { patientId: patient.id, how } },
     });
+    // A conversa do negócio passa a mostrar o paciente.
+    await tx.conversation.updateMany({ where: { tenantId, leadId: lead.id }, data: { patientId: patient.id } });
     return { ok: true as const };
   });
 }
