@@ -144,6 +144,11 @@ model Tenant {
   lostReasons         LostReason[]
   leadActivities      LeadActivity[]
 
+  // CRM (etapa 2)
+  conversations       Conversation[]
+  chatMessages        ChatMessage[]
+  quickReplies        QuickReply[]
+
   @@map("tenants")
 }
 
@@ -186,6 +191,7 @@ model User {
   auditLogs    AuditLog[]
   assignedLeads Lead[]     @relation("LeadAssignee")
   assignedTasks LeadTask[] @relation("LeadTaskAssignee")
+  chatMessagesSent ChatMessage[]
 
   @@index([tenantId])
   @@index([tenantId, deactivatedAt])
@@ -246,6 +252,7 @@ model Patient {
   files        PatientFile[]
   campaignRecipients CampaignRecipient[]
   leads              Lead[]
+  conversations      Conversation[]
 
   @@unique([tenantId, controlNumber])
   @@index([tenantId])
@@ -1026,6 +1033,7 @@ model Lead {
   tasks             LeadTask[]
   tags              LeadTagOnLead[]
   activities        LeadActivity[]
+  conversations     Conversation[]
 
   @@index([tenantId, stageId, position])
   @@index([tenantId, phoneHash])
@@ -1149,4 +1157,139 @@ model LeadActivity {
 
   @@index([tenantId, leadId, createdAt(sort: Desc)])
   @@map("lead_activities")
+}
+
+// ─── CRM etapa 2: conversas do WhatsApp ──────────────────────────────────────
+
+enum ConversationStatus {
+  /// Número que ninguém conhece ainda: espera alguém aceitar ou recusar.
+  INBOX
+  ACTIVE
+  /// Recusada na Entrada. Volta para a Entrada se a pessoa escrever de novo.
+  DECLINED
+}
+
+enum ChatOrigin {
+  /// Escrita pelo contato.
+  CONTACT
+  /// Escrita no CRM por alguém da equipe.
+  CRM
+  /// Escrita no celular (ou WhatsApp Web) da clínica.
+  PHONE
+  /// Lembrete, confirmação ou campanha do sistema.
+  AUTOMATION
+}
+
+enum ChatKind {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  CONTACT
+  OTHER
+}
+
+/// Um número de WhatsApp = uma conversa, como no celular. Gravada pelo gateway
+/// só para clínicas com o CRM ligado.
+model Conversation {
+  id       String @id @default(cuid())
+  tenantId String
+
+  phoneEncrypted String  @map("phone")
+  /// Índice cego da chave de conversa (telefone normalizado, celular sempre com
+  /// o 9). Gateway e app calculam igual — ver `chatKey`.
+  phoneHash      String
+  /// O nome que a pessoa usa no WhatsApp.
+  contactName    String?
+
+  status       ConversationStatus @default(INBOX)
+  leadId       String?
+  patientId    String?
+  /// Quando o app já tentou ligar a lead ou paciente. Nulo = falta tentar.
+  classifiedAt DateTime?
+
+  unreadCount          Int      @default(0)
+  /// A última palavra é do contato: ninguém da clínica respondeu ainda.
+  awaitingReply        Boolean  @default(false)
+  lastMessageAt        DateTime @default(now())
+  /// Começo da última mensagem, cifrado (é conversa de clínica).
+  lastPreviewEncrypted String?  @map("lastPreview")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id])
+  lead     Lead?         @relation(fields: [leadId], references: [id])
+  patient  Patient?      @relation(fields: [patientId], references: [id])
+  messages ChatMessage[]
+
+  @@unique([tenantId, phoneHash])
+  @@index([tenantId, lastMessageAt(sort: Desc)])
+  @@index([tenantId, status, lastMessageAt(sort: Desc)])
+  @@index([tenantId, leadId])
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id             String @id @default(cuid())
+  tenantId       String
+  conversationId String
+
+  direction     MessageDirection
+  origin        ChatOrigin
+  kind          ChatKind      @default(TEXT)
+  /// Texto ou legenda, cifrado. Nulo em mídia sem legenda.
+  textEncrypted String?       @map("text")
+  /// Id da mensagem no WhatsApp. Único por clínica: é o que impede gravar duas
+  /// vezes a mesma mensagem (o gateway vê a própria saída de volta).
+  externalId    String
+  status        MessageStatus @default(SENT)
+  /// Quem escreveu, quando foi pelo CRM.
+  sentById      String?
+  /// Hora da mensagem no WhatsApp.
+  at            DateTime      @default(now())
+
+  /// Fila do envio pelo CRM. `acceptedAt` = o WhatsApp aceitou; daí em diante
+  /// quem manda no status são os acks.
+  acceptedAt    DateTime?
+  attempts      Int           @default(0)
+  nextAttemptAt DateTime?
+  /// Reserva de quem está enviando agora, para o envio direto e a rotina de
+  /// reenvio não mandarem a mesma linha ao mesmo tempo.
+  claimedUntil  DateTime?
+  errorMessage  String?
+
+  createdAt DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sentBy       User?        @relation(fields: [sentById], references: [id])
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, conversationId, at])
+  /// A rotina de reenvio do gateway.
+  @@index([status, nextAttemptAt])
+  @@map("chat_messages")
+}
+
+/// Respostas prontas da clínica, chamadas com "/" na caixa de texto.
+model QuickReply {
+  id       String @id @default(cuid())
+  tenantId String
+  /// O atalho ("horarios"). Único na clínica.
+  title    String
+  /// O texto. Aceita {nome}.
+  body     String
+  order    Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, title])
+  @@map("quick_replies")
 }
