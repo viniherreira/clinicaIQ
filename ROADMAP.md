@@ -31,13 +31,13 @@ Funcionalidades e organização de tela inspiradas no Kommo; identidade do Clini
   - Coluna Entrada no funil (aceitar, recusar, ligar a lead ou paciente)
   - Respostas rápidas com `/`; mensagens cifradas; envio com fila e reenvio no gateway
   - [ ] Publicar junto com a etapa 1 (banco → app → gateway no Fly.io)
-- [ ] **Etapa 2b — API oficial do WhatsApp**
-  - Cadastro incorporado da Meta (exige o ClinicaIQ como Tech Provider verificado — iniciar o processo cedo)
-  - Mesmas tabelas de conversa; coexistência com o celular da clínica
-  - Mídia (ver e enviar foto, áudio, documento)
-  - Anonimização do lead a pedido do titular
-- [ ] **Etapa 3 — Transmissões** com templates aprovados pela Meta (substitui Campanhas para quem tem CRM)
-- [ ] **Etapa 4 — Chatbot por botões** e automações por etapa
+- [x] **Etapa 2b — API oficial do WhatsApp (pronta para ligar)**
+  - Cadastro incorporado da Meta com coexistência, conexão de teste, modelos (sincronizar e criar), janela de 24h, mídia recebida aberta no CRM
+  - [ ] Ligar de verdade: aprovação do ClinicaIQ como Tech Provider na Meta e as variáveis `META_*`
+  - [ ] Enviar mídia; anonimização do lead a pedido do titular
+- [x] **Etapa 3 — Transmissões** (QR espaçado; modelo aprovado na API oficial; agendar, cancelar, números)
+- [x] **Etapa 4 — Robô por botões e automações por etapa**
+- [x] **Cortesia inclui o CRM**, ligado e aberto a toda a equipe com perfil de CRM
 - ~~Etapa 5 — plano "só CRM"~~ (descartado: o CRM é adicional do sistema de agenda)
 
 ## Ideias para depois

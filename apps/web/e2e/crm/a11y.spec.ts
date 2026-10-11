@@ -10,7 +10,17 @@ import { createLeadViaModal } from './helpers';
 const axe = (page: import('@playwright/test').Page) =>
   new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
 
-for (const path of ['/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/configuracoes', '/dashboard']) {
+for (const path of [
+  '/crm',
+  '/crm/conversas',
+  '/crm/leads',
+  '/crm/tarefas',
+  '/crm/transmissoes',
+  '/crm/transmissoes/nova',
+  '/crm/whatsapp',
+  '/crm/configuracoes',
+  '/dashboard',
+]) {
   test(`${path} sem violações de acessibilidade`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
@@ -64,5 +74,16 @@ test('conversa aberta e aba Conversa da ficha sem violações', async ({ page })
   await page.waitForLoadState('networkidle');
   await page.getByRole('tab', { name: /Conversa/ }).click();
   await expect(page.getByText('Oi, tudo bem?')).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
+});
+
+test('abas Automações e Robô (com o editor aberto) sem violações', async ({ page }) => {
+  await page.goto('/crm/configuracoes');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('tab', { name: 'Automações' }).click();
+  await page.getByRole('button', { name: /^Adicionar automação em/ }).first().click();
+  expect((await axe(page)).violations).toEqual([]);
+  await page.getByRole('tab', { name: 'Robô' }).click();
+  await page.getByRole('button', { name: 'Novo robô' }).click();
   expect((await axe(page)).violations).toEqual([]);
 });

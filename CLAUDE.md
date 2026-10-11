@@ -39,7 +39,7 @@ captação (funil de leads no estilo Kommo).
 
 - `apps/web` — Next.js frontend app
   - `app/(app)` — gestão da clínica
-  - `app/(crm)` — telas do CRM (`/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/configuracoes`)
+  - `app/(crm)` — telas do CRM (`/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/transmissoes`, `/crm/whatsapp`, `/crm/configuracoes`)
   - `crm/` — regras do CRM (funil, leads, tarefas, automação), sem telas
   - `e2e/regressao` — regressão da agenda e dos orçamentos; `e2e/crm` — CRM
 - `apps/whatsapp-gateway` — gateway de WhatsApp por QR code
@@ -73,6 +73,18 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - Resposta do CRM: a action grava `ChatMessage` PENDING com o id do WhatsApp já escolhido e `after(dispatchChat)` pede ao gateway (`POST /sessions/:tenantId/chat`); o gateway reserva a linha e reenvia sozinho. Sem gateway configurado, o app dá como enviada (só fora de produção).
 - Origem: `CONTACT`, `CRM`, `PHONE` (celular da clínica) e `AUTOMATION` (o `send()` do gateway anota o id antes de mandar).
 - Spec e plano: `docs/superpowers/specs/2026-10-10-crm-etapa2-conversas-design.md` e `docs/superpowers/plans/2026-10-10-crm-etapa2-plan.md`.
+
+### API oficial, transmissões, robô e automações
+
+- **Canal por clínica** (`crm/cloud.ts`): com `WhatsAppCloudAccount` ativa e conectada, as conversas entram pelo webhook `/api/webhooks/meta` (assinatura conferida com `META_APP_SECRET`) e saem pela Cloud API (`crm/cloud-send.ts`); o gateway não grava nem envia para essa clínica. Sem ela, é o gateway de QR. Os lembretes da agenda não mudam.
+- `crm/chat-ingest.ts` espelha a gravação do gateway (`chat-log.ts`) — mudar os dois juntos.
+- Janela de 24 h: na API oficial, fora dela só modelo aprovado (`MessageTemplate`). Token da Meta cifrado; nunca vai para a tela.
+- **Relógio do CRM** (`crm/tick.ts`, `/api/cron/crm-tick`): o gateway chama a cada minuto (a Vercel Hobby só tem crons diários). Roda automações com atraso, transmissões agendadas, a fila da API oficial e expira robôs. Em desenvolvimento, `instrumentation.ts` faz esse papel e dá como enviadas as mensagens da fila (`crm/dev-clock.ts`, nunca em produção).
+- **Transmissões** (`crm/broadcasts.ts`): uma mensagem por lead na fila da conversa, com hora marcada (espaçada no QR). Respeitam `Lead.whatsappOptOut` ("SAIR", tratado em `crm/inbound.ts`).
+- **Automações por etapa** (`crm/stage-automations.ts`): `createLead`/`moveLead` agendam (`crm/stage-queue.ts`, na mesma transação); se o lead sair da etapa antes da hora, não roda.
+- **Robô** (`crm/bot-engine.ts` puro, `crm/bot.ts` executa): roda depois de cada mensagem do contato (`afterInbound`); para quando a equipe responde.
+- **Cortesia inclui o CRM**: `getTenantModules` liga o módulo e `crmWholeTeam` dispensa a chave por pessoa.
+- Spec e plano: `docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md` e `docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
 
 ## Accessibility
 

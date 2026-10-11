@@ -1,6 +1,6 @@
 # Contexto do trabalho no CRM (para continuar em outro computador)
 
-Atualizado em 2026-10-10. Leia isto antes de continuar o CRM.
+Atualizado em 2026-10-11. Leia isto antes de continuar o CRM.
 
 ## Onde estamos
 
@@ -39,10 +39,21 @@ Aprovada (opção A) e feita no plano `docs/superpowers/plans/2026-10-10-crm-eta
 - Localmente não há gateway: a resposta é dada como enviada. Para ver conversas na tela, rode os E2E (`e2e/crm/chat.ts` grava mensagens chegando na clínica `e2e-clinica-de-teste`).
 - Fica para depois: API oficial (Cloud API + coexistência), mídia (ver e enviar), anonimização.
 
+## API oficial, transmissões, robô e automações — prontas
+
+O dono pediu para fazer as etapas seguidas, sem aprovar cada uma (2026-10-11). Spec e plano:
+`docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md`,
+`docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
+
+- **API oficial pronta para ligar**: CRM → WhatsApp (cadastro incorporado com coexistência, conexão de teste com o número de teste da Meta, modelos), webhook `/api/webhooks/meta`, janela de 24 h, mídia aberta no CRM. Só funciona de verdade quando a Meta aprovar o ClinicaIQ como Tech Provider e as variáveis `META_*` estiverem na Vercel (lista em `apps/web/.env.example`). No `.env.local` há valores só de desenvolvimento para os testes do webhook.
+- **Transmissões** (`/crm/transmissoes`), **Automações por etapa** e **Robô** (abas em Configurações do CRM).
+- **Cortesia inclui o CRM**: ligado sem ativar e aberto a toda a equipe com perfil de CRM.
+- **Relógio do CRM**: o gateway chama `/api/cron/crm-tick` a cada minuto — publicar o gateway novo é o que faz automações com atraso e transmissões andarem em produção.
+
 ## Pendências com o dono do produto
 
 1. Publicar etapa 1 + adicional + etapa 2 em produção (banco **antes** do merge, **gateway por último** — ver abaixo). Em 2026-10-10 o dono preferiu seguir desenvolvendo antes de publicar.
-2. Iniciar a aprovação do ClinicaIQ como Tech Provider na Meta (para a API oficial).
+2. Iniciar a aprovação do ClinicaIQ como Tech Provider na Meta (para a API oficial). Depois, criar na Meta a configuração do cadastro incorporado e passar as variáveis `META_*` para a Vercel.
 3. **Link de acompanhamento na Vercel**: preview da branch com banco de teste na nuvem (Neon, gratuito) e Clerk de desenvolvimento, usando variáveis de Preview **restritas à branch** `feat/crm-etapa1`. O dono cria o Neon e cola os segredos na Vercel; depois roda-se `db push` + dados de exemplo no Neon.
    - Hoje o Preview da Vercel usa **as mesmas variáveis da produção** (banco, Clerk, Asaas): não usar previews para testes até separar.
 4. Tarefas paralelas sugeridas: contraste da landing (`text-sky-600`) e do minicalendário da agenda (`#bbc1c8`) — problemas anteriores ao CRM.

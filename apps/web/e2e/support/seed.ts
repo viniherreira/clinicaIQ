@@ -188,4 +188,10 @@ async function seedPublicQuote(tenantId: string, masterKey: string) {
       items: { create: [{ name: E2E_PROCEDURE, unitPrice: 150, quantity: 1, total: 150 }] },
     },
   });
+
+  // Automações, robôs e conta oficial mudam o que acontece nas conversas e no
+  // funil: os testes começam sem nenhum (cada teste que precisa cria o seu).
+  await prisma.stageAutomation.deleteMany({ where: { tenantId } });
+  await prisma.chatbotFlow.deleteMany({ where: { tenantId } });
+  await prisma.whatsAppCloudAccount.deleteMany({ where: { tenantId } });
 }
