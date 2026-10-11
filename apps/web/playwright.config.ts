@@ -28,7 +28,8 @@ export default defineConfig({
     // Páginas públicas: não precisam de banco semeado nem de conta no Clerk.
     {
       name: 'publico',
-      testMatch: /a11y\.spec\.ts/,
+      // Só o e2e/a11y.spec.ts da raiz: o e2e/crm/a11y.spec.ts precisa de login.
+      testMatch: /e2e[\\/]a11y\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     // Semeia a clínica de teste e faz login uma vez; os projetos logados

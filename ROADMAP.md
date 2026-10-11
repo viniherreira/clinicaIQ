@@ -26,9 +26,15 @@ Funcionalidades e organização de tela inspiradas no Kommo; identidade do Clini
   - O card anda sozinho com a agenda e os orçamentos
 - [x] **CRM como adicional pago** — R$ 39 por usuário/mês, 14 dias grátis, uma cobrança só (antes de publicar)
   - [ ] Publicar etapa 1 + adicional em produção (cópia de segurança, SQL revisado, banco antes do merge, clínica piloto)
-- [ ] **Etapa 2 — API oficial do WhatsApp e caixa de entrada**
+- [x] **Etapa 2 — Conversas do WhatsApp** (pelo gateway de QR; mesma branch)
+  - Tela Conversas (Todas/Minhas/Sem resposta/Entrada), aba Conversa na ficha do lead
+  - Coluna Entrada no funil (aceitar, recusar, ligar a lead ou paciente)
+  - Respostas rápidas com `/`; mensagens cifradas; envio com fila e reenvio no gateway
+  - [ ] Publicar junto com a etapa 1 (banco → app → gateway no Fly.io)
+- [ ] **Etapa 2b — API oficial do WhatsApp**
   - Cadastro incorporado da Meta (exige o ClinicaIQ como Tech Provider verificado — iniciar o processo cedo)
-  - Conversas na ficha do lead; coluna "Entrada" para leads que chegam sozinhos
+  - Mesmas tabelas de conversa; coexistência com o celular da clínica
+  - Mídia (ver e enviar foto, áudio, documento)
   - Anonimização do lead a pedido do titular
 - [ ] **Etapa 3 — Transmissões** com templates aprovados pela Meta (substitui Campanhas para quem tem CRM)
 - [ ] **Etapa 4 — Chatbot por botões** e automações por etapa

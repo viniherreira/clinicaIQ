@@ -39,7 +39,7 @@ captação (funil de leads no estilo Kommo).
 
 - `apps/web` — Next.js frontend app
   - `app/(app)` — gestão da clínica
-  - `app/(crm)` — telas do CRM (`/crm`, `/crm/leads`, `/crm/tarefas`, `/crm/configuracoes`)
+  - `app/(crm)` — telas do CRM (`/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/configuracoes`)
   - `crm/` — regras do CRM (funil, leads, tarefas, automação), sem telas
   - `e2e/regressao` — regressão da agenda e dos orçamentos; `e2e/crm` — CRM
 - `apps/whatsapp-gateway` — gateway de WhatsApp por QR code
@@ -64,6 +64,15 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - O que o card mostra da clínica (próxima avaliação, orçamento em aberto) é lido ao vivo (`crm/live.ts`), nunca copiado para o CRM.
 - Horários: agendamentos são "hora de parede em UTC" (`lib/tz.ts`); tarefas do CRM são instantes reais. Conversões em `crm/clock.ts`.
 - Spec e plano: `docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md` e `docs/superpowers/plans/2026-10-07-crm-etapa1-plan.md`.
+
+### Conversas do WhatsApp (etapa 2)
+
+- O gateway grava toda mensagem 1:1 da linha da clínica (`apps/whatsapp-gateway/src/chat-log.ts`) só para clínica com CRM: `Conversation` (um número = uma conversa) e `ChatMessage` (texto **cifrado**), sem duplicar por `tenantId + externalId`. A confirmação de consulta roda antes e não depende disso.
+- A chave da conversa é `chatKey` (celular sempre com o 9), duplicada em `apps/web/lib/phone.ts` e `apps/whatsapp-gateway/src/phone.ts` — mudar as duas juntas (`chat-key.test.ts` nos dois lados).
+- O app liga a conversa a lead aberto, paciente ou Entrada (`crm/conversations.ts`, `classifyConversation`), avisado pelo gateway em `/api/whatsapp/conversation` ou ao abrir o funil/Conversas.
+- Resposta do CRM: a action grava `ChatMessage` PENDING com o id do WhatsApp já escolhido e `after(dispatchChat)` pede ao gateway (`POST /sessions/:tenantId/chat`); o gateway reserva a linha e reenvia sozinho. Sem gateway configurado, o app dá como enviada (só fora de produção).
+- Origem: `CONTACT`, `CRM`, `PHONE` (celular da clínica) e `AUTOMATION` (o `send()` do gateway anota o id antes de mandar).
+- Spec e plano: `docs/superpowers/specs/2026-10-10-crm-etapa2-conversas-design.md` e `docs/superpowers/plans/2026-10-10-crm-etapa2-plan.md`.
 
 ## Accessibility
 

@@ -1,6 +1,6 @@
 # Contexto do trabalho no CRM (para continuar em outro computador)
 
-Atualizado em 2026-10-09. Leia isto antes de continuar o CRM.
+Atualizado em 2026-10-10. Leia isto antes de continuar o CRM.
 
 ## Onde estamos
 
@@ -28,29 +28,21 @@ regras de cobrança, ligar/desligar com teste de 14 dias, acesso por pessoa (Equ
 cartão no Plano, tela de venda em `/crm-indisponivel`, aviso de fim de teste, troca de
 plano e rotina diária cobrando plano + CRM. 19 testes E2E verdes.
 
-## Etapa 2 — WhatsApp e caixa de entrada (desenho em discussão, ainda sem spec)
+## Etapa 2 — Conversas do WhatsApp — pronta
 
-Decidido:
-- **QR code agora, API oficial depois**: a caixa de entrada não depende do provedor. Começa com o gateway de QR (`apps/whatsapp-gateway`), que já está conectado nas clínicas. Em paralelo, o dono inicia a aprovação do ClinicaIQ como Tech Provider na Meta; depois, cada clínica migra para a Cloud API com **coexistência** (o celular continua funcionando).
-- Escopo: tela **Conversas** (lista com não lidas e filtros Todas/Minhas/Sem resposta/Entrada) + **chat na ficha do lead** (aba Conversa), **coluna Entrada** (número novo; aceitar, ligar a lead/paciente existente, recusar), **respostas rápidas** (`/`). Mídia fica para depois ("mídia recebida, abra no celular").
-- **Todas as conversas** aparecem (pacientes, leads e números novos). Confirmações de consulta continuam automáticas e também aparecem na conversa.
+Aprovada (opção A) e feita no plano `docs/superpowers/plans/2026-10-10-crm-etapa2-plan.md`
+(spec `docs/superpowers/specs/2026-10-10-crm-etapa2-conversas-design.md`):
 
-Proposto e **aguardando aprovação** (opção A recomendada):
-- O gateway passa a gravar toda mensagem 1:1 direto no banco (inclusive as enviadas pelo celular da clínica e a mídia como aviso), sem duplicar os lembretes (pelo id da mensagem), e só para clínicas com `crmEnabled`. Depois avisa o app, que liga a conversa ao lead/paciente ou manda para Entrada.
-- Tabelas novas: `Conversation` (telefone cifrado + índice cego, lead/paciente, responsável, não lidas, situação Entrada/aceita/recusada), `ChatMessage` (**texto cifrado** — dado de saúde), `QuickReply`.
-- Envio das respostas do CRM pela mesma fila com reenvio dos lembretes.
-- Telas atualizam por consulta periódica enquanto abertas.
-- Publicar esta etapa exige **atualizar o gateway no Fly.io** (com o mesmo cuidado de produção).
-
-Fatos do código relevantes para a etapa 2:
-- `packages/whatsapp/src/meta-provider.ts` atende um número só (credenciais em variável de ambiente) — precisa virar por clínica.
-- `apps/whatsapp-gateway/src/session-manager.ts` (`messages.upsert`) ignora `fromMe` e mídia, e só repassa texto/botão para `/api/whatsapp/inbound`, que só trata confirmação de consulta.
-- `WhatsAppMessage` exige `patientId` — não serve para conversa com lead.
+- **Gateway** grava toda mensagem 1:1 (entrando, pelo celular, do sistema) para clínica com CRM, texto cifrado, sem duplicar; envia as respostas do CRM com reserva e reenvio (`chat-log.ts`, `chat-send.ts`).
+- **App**: tela Conversas (Todas/Minhas/Sem resposta/Entrada), aba Conversa na ficha do lead, coluna Entrada no funil, respostas rápidas com `/`, não lidas no menu.
+- Testes: unitários e contra o banco nos dois lados; E2E `e2e/crm/conversas.spec.ts` (a mensagem que chega é gravada direto no banco, como o gateway faria); axe sem violações.
+- Localmente não há gateway: a resposta é dada como enviada. Para ver conversas na tela, rode os E2E (`e2e/crm/chat.ts` grava mensagens chegando na clínica `e2e-clinica-de-teste`).
+- Fica para depois: API oficial (Cloud API + coexistência), mídia (ver e enviar), anonimização.
 
 ## Pendências com o dono do produto
 
-1. Publicar etapa 1 + adicional em produção (banco **antes** do merge — ver abaixo).
-2. Aprovar o desenho da etapa 2 (opção A) → escrever a spec.
+1. Publicar etapa 1 + adicional + etapa 2 em produção (banco **antes** do merge, **gateway por último** — ver abaixo). Em 2026-10-10 o dono preferiu seguir desenvolvendo antes de publicar.
+2. Iniciar a aprovação do ClinicaIQ como Tech Provider na Meta (para a API oficial).
 3. **Link de acompanhamento na Vercel**: preview da branch com banco de teste na nuvem (Neon, gratuito) e Clerk de desenvolvimento, usando variáveis de Preview **restritas à branch** `feat/crm-etapa1`. O dono cria o Neon e cola os segredos na Vercel; depois roda-se `db push` + dados de exemplo no Neon.
    - Hoje o Preview da Vercel usa **as mesmas variáveis da produção** (banco, Clerk, Asaas): não usar previews para testes até separar.
 4. Tarefas paralelas sugeridas: contraste da landing (`text-sky-600`) e do minicalendário da agenda (`#bbc1c8`) — problemas anteriores ao CRM.
@@ -72,8 +64,9 @@ aos usuários leem todas as colunas; com o código novo e o banco antigo, quebra
 onboarding, a tela de Planos, o webhook do Asaas e a rotina diária.
 
 1. Cópia de segurança do banco de produção (`pg_dump`).
-2. `prisma migrate diff` produção → schema da branch; conferir que só há `CREATE` e `ADD COLUMN` com padrão.
+2. `prisma migrate diff` produção → schema da branch; conferir que só há `CREATE` e `ADD COLUMN` com padrão (etapa 2: só `CREATE TYPE/TABLE/INDEX` e chaves estrangeiras).
 3. Aplicar no banco de produção (com autorização do dono).
 4. `seed-plans.ts` em produção (grava `crmSeatPriceCents`).
 5. Merge na `main` → deploy da Vercel.
-6. Conferir o site; a clínica piloto experimenta o CRM.
+6. Deploy do gateway no Fly.io (`apps/whatsapp-gateway`), só depois do banco e do app. Gateway novo com banco antigo: a gravação das conversas falha em silêncio e a confirmação de consulta continua.
+7. Conferir o site; a clínica piloto experimenta o CRM.

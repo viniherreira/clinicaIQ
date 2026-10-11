@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { MessageCircle, Search, WifiOff } from 'lucide-react';
 import type { ConversationSummary, InboxTab } from '@/crm/conversations';
 import { chatListTime, initials } from '@/crm/format';
 import { ConversationPane } from '@/components/crm-chat/conversation-pane';
+import { announceUnread } from '@/components/crm-chat/unread';
 import type { QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { refreshInboxAction, type InboxSnapshot } from '../actions';
 
@@ -38,7 +38,6 @@ export function Inbox({
   canConfigWhatsapp: boolean;
 }) {
   const id = useId();
-  const router = useRouter();
   const [snap, setSnap] = useState(initial);
   const [tab, setTab] = useState(initialTab);
   const [busca, setBusca] = useState(initialQ);
@@ -62,13 +61,14 @@ export function Inbox({
       if (!r.ok || pedido.tab !== agora.tab || pedido.q !== agora.q || pedido.selectedId !== agora.selectedId) return;
       const novas = novasRecebidas(snapRef.current, r.snapshot);
       if (novas) setAviso(novas);
-      // O número do menu vem do servidor: muda junto quando as não lidas mudam.
-      if (r.snapshot.counts.unread !== snapRef.current.counts.unread) router.refresh();
+      // O número do menu acompanha sem recarregar a página: um router.refresh()
+      // aqui cancelava a navegação em andamento numa clínica movimentada.
+      if (r.snapshot.counts.unread !== snapRef.current.counts.unread) announceUnread(r.snapshot.counts.unread);
       setSnap(r.snapshot);
     } finally {
       emVoo.current = false;
     }
-  }, [router]);
+  }, []);
 
   // Filtros e conversa aberta moram na URL (sem recarregar a página).
   useEffect(() => {
@@ -250,7 +250,7 @@ function ConversationList({
             >
               <span
                 aria-hidden="true"
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${entrada ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' : 'bg-primary/10 text-primary'}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${entrada ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' : 'bg-primary/10 text-primary-hover dark:text-sky-300'}`}
               >
                 {initials(c.name)}
               </span>
@@ -276,7 +276,7 @@ function ConversationList({
                   )}
                   {c.lead && <span className="truncate rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">{c.lead.stage}</span>}
                   {!c.lead && c.patient && <span className="rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">Paciente</span>}
-                  {c.awaitingReply && !entrada && <span className="rounded-full px-1 py-0.5 text-amber-700 dark:text-amber-300">Sem resposta</span>}
+                  {c.awaitingReply && !entrada && <span className="rounded-full px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
                 </span>
               </span>
             </button>

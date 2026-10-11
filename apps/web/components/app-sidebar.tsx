@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
   MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks,
@@ -85,6 +86,8 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const itens = navFor(role, space);
+  const unread = useLiveUnread(counts['/crm/conversas'] ?? 0);
+  const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
   const ativo = activeHref(itens, pathname);
 
   return (
@@ -129,9 +132,9 @@ export function AppSidebar({
                 )}
                 <Icon className="h-[18px] w-[18px] shrink-0 transition-transform group-hover:scale-110" aria-hidden="true" />
                 {item.label}
-                {(counts[item.href] ?? 0) > 0 && (
+                {(contagem[item.href] ?? 0) > 0 && (
                   <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                    {counts[item.href]}
+                    {contagem[item.href]}
                     <span className="sr-only"> não lida(s)</span>
                   </span>
                 )}
