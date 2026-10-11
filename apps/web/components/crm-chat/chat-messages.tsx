@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef } from 'react';
 import {
-  AlertCircle, Bot, Check, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw, Smartphone, Sticker, User, Video,
+  AlertCircle, Bot, Check, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw, Smartphone, Sticker, User, Video,
 } from 'lucide-react';
 import type { ChatLine } from '@/crm/conversations';
 import { chatDayLabel, chatTime, sameClinicDay } from '@/crm/format';
@@ -31,6 +31,8 @@ function statusOf(m: ChatLine): { label: string; icon: typeof Check; tone: strin
 function whoOf(m: ChatLine, contact: string): { label: string; icon?: typeof Bot } {
   if (m.direction === 'INBOUND') return { label: contact };
   if (m.origin === 'AUTOMATION') return { label: 'Automático', icon: Bot };
+  if (m.origin === 'BOT') return { label: 'Robô', icon: Bot };
+  if (m.origin === 'BROADCAST') return { label: 'Transmissão', icon: Megaphone };
   if (m.origin === 'PHONE') return { label: 'Pelo celular', icon: Smartphone };
   return { label: m.sentBy ?? 'Equipe' };
 }
@@ -93,7 +95,7 @@ export function ChatMessages({
             const quem = whoOf(m, contactName);
             const status = statusOf(m);
             const media = m.kind !== 'TEXT' ? MEDIA[m.kind] ?? MEDIA.OTHER : null;
-            const auto = m.origin === 'AUTOMATION';
+            const auto = m.origin === 'AUTOMATION' || m.origin === 'BOT' || m.origin === 'BROADCAST';
             return (
               <Fragment key={m.id}>
                 {novoDia && (

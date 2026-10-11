@@ -240,7 +240,7 @@ export async function inboxCounts(db: TenantPrismaClient): Promise<{ unread: num
 export interface ChatLine {
   id: string;
   direction: 'INBOUND' | 'OUTBOUND';
-  origin: 'CONTACT' | 'CRM' | 'PHONE' | 'AUTOMATION';
+  origin: 'CONTACT' | 'CRM' | 'PHONE' | 'AUTOMATION' | 'BROADCAST' | 'BOT';
   kind: string;
   text: string;
   at: string;

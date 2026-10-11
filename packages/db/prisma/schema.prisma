@@ -149,6 +149,15 @@ model Tenant {
   chatMessages        ChatMessage[]
   quickReplies        QuickReply[]
 
+  // CRM (API oficial, transmissões, robô e automações)
+  whatsappCloudAccount WhatsAppCloudAccount?
+  messageTemplates     MessageTemplate[]
+  broadcasts           Broadcast[]
+  broadcastRecipients  BroadcastRecipient[]
+  stageAutomations     StageAutomation[]
+  automationRuns       AutomationRun[]
+  chatbotFlows         ChatbotFlow[]
+
   @@map("tenants")
 }
 
@@ -1010,6 +1019,10 @@ model Lead {
   estimatedValueCents Int?
   notes               String?
 
+  /// Pediu para não receber mais mensagens (respondeu SAIR). Transmissões e
+  /// automações pulam; a conversa continua.
+  whatsappOptOut Boolean @default(false)
+
   /// Paciente ligado. Não é único de propósito: vários negócios por pessoa.
   patientId    String?
   lostReasonId String?
@@ -1034,6 +1047,8 @@ model Lead {
   tags              LeadTagOnLead[]
   activities        LeadActivity[]
   conversations     Conversation[]
+  broadcastRecipients BroadcastRecipient[]
+  automationRuns    AutomationRun[]
 
   @@index([tenantId, stageId, position])
   @@index([tenantId, phoneHash])
@@ -1056,8 +1071,9 @@ model PipelineStage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  leads  Lead[]
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  leads       Lead[]
+  automations StageAutomation[]
 
   /// Cada papel no máximo uma vez por clínica. No Postgres nulos não colidem
   /// num índice único, então as etapas sem papel ficam livres.
@@ -1178,6 +1194,10 @@ enum ChatOrigin {
   PHONE
   /// Lembrete, confirmação ou campanha do sistema.
   AUTOMATION
+  /// Transmissão do CRM.
+  BROADCAST
+  /// Robô ou automação por etapa do CRM.
+  BOT
 }
 
 enum ChatKind {
@@ -1217,6 +1237,15 @@ model Conversation {
   lastMessageAt        DateTime @default(now())
   /// Começo da última mensagem, cifrado (é conversa de clínica).
   lastPreviewEncrypted String?  @map("lastPreview")
+  /// Última mensagem do contato. Na API oficial, define a janela de 24 horas.
+  lastInboundAt        DateTime?
+
+  /// Robô ativo nesta conversa (nulo = nenhum).
+  botFlowId    String?
+  botStepId    String?
+  botStartedAt DateTime?
+  /// Respostas que o robô não entendeu seguidas; na segunda, passa para a equipe.
+  botMisses    Int      @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1224,7 +1253,9 @@ model Conversation {
   tenant   Tenant        @relation(fields: [tenantId], references: [id])
   lead     Lead?         @relation(fields: [leadId], references: [id])
   patient  Patient?      @relation(fields: [patientId], references: [id])
+  botFlow  ChatbotFlow?  @relation(fields: [botFlowId], references: [id], onDelete: SetNull)
   messages ChatMessage[]
+  broadcastRecipients BroadcastRecipient[]
 
   @@unique([tenantId, phoneHash])
   @@index([tenantId, lastMessageAt(sort: Desc)])
@@ -1252,6 +1283,15 @@ model ChatMessage {
   /// Hora da mensagem no WhatsApp.
   at            DateTime      @default(now())
 
+  /// Modelo aprovado usado (API oficial).
+  templateName  String?
+  /// Mídia na API oficial: id na Meta, buscado sob demanda (nada é guardado).
+  mediaRef      String?
+  mimeType      String?
+  /// Opções do robô: [{ id, title }]. Botões na API oficial; no QR o texto já
+  /// traz as opções numeradas.
+  buttons       Json?
+
   /// Fila do envio pelo CRM. `acceptedAt` = o WhatsApp aceitou; daí em diante
   /// quem manda no status são os acks.
   acceptedAt    DateTime?
@@ -1267,6 +1307,7 @@ model ChatMessage {
   tenant       Tenant       @relation(fields: [tenantId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id])
   sentBy       User?        @relation(fields: [sentById], references: [id])
+  broadcastRecipient BroadcastRecipient?
 
   @@unique([tenantId, externalId])
   @@index([tenantId, conversationId, at])
@@ -1292,4 +1333,248 @@ model QuickReply {
 
   @@unique([tenantId, title])
   @@map("quick_replies")
+}
+
+// ─── CRM: API oficial, transmissões, robô e automações ──────────────────────
+
+enum CloudAccountStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+/// A conta da clínica na API oficial do WhatsApp (Cloud API da Meta). Ativa e
+/// conectada, ela é o canal das conversas do CRM no lugar do gateway de QR.
+model WhatsAppCloudAccount {
+  id       String @id @default(cuid())
+  tenantId String @unique
+
+  wabaId        String
+  /// Único no sistema: é por ele que o webhook da Meta descobre a clínica.
+  phoneNumberId String  @unique
+  displayPhone  String?
+  verifiedName  String?
+  /// Token de acesso, cifrado com a chave da clínica. Nunca vai para a tela.
+  accessTokenEncrypted String @map("accessToken")
+  /// O número continua no app WhatsApp Business do celular (coexistência).
+  coexistence Boolean @default(false)
+  /// Conectada pelo formulário de teste (número de teste da Meta).
+  manual      Boolean @default(false)
+  active      Boolean @default(true)
+  status      CloudAccountStatus @default(CONNECTED)
+  lastError   String?
+  connectedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("whatsapp_cloud_accounts")
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum TemplateStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+/// Modelo de mensagem aprovado pela Meta. Fora da janela de 24 horas, é o único
+/// jeito de escrever pela API oficial.
+model MessageTemplate {
+  id       String @id @default(cuid())
+  tenantId String
+
+  name           String
+  language       String           @default("pt_BR")
+  category       TemplateCategory
+  status         TemplateStatus   @default(PENDING)
+  /// Texto do corpo, com {{1}}, {{2}}…
+  body           String
+  variables      Int              @default(0)
+  components     Json?
+  externalId     String?
+  rejectedReason String?
+  lastSyncedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  broadcasts Broadcast[]
+
+  @@unique([tenantId, name, language])
+  @@map("message_templates")
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  DONE
+  CANCELLED
+}
+
+enum BroadcastRecipientStatus {
+  /// Mensagem criada na fila (o andamento está na própria mensagem).
+  QUEUED
+  /// Não recebe: pediu para sair, sem telefone válido…
+  SKIPPED
+  CANCELLED
+}
+
+/// Transmissão do CRM para um grupo de leads.
+model Broadcast {
+  id       String          @id @default(cuid())
+  tenantId String
+  name     String
+  status   BroadcastStatus @default(DRAFT)
+
+  /// Mensagem livre (gateway de QR). Aceita {nome}.
+  text           String?
+  /// Modelo aprovado (API oficial).
+  templateId     String?
+  /// Valor de cada variável do modelo, em ordem: texto fixo ou "{nome}".
+  templateParams Json?
+  /// Quem recebe: { stageIds, tagIds, sources, assignedToIds }.
+  audience       Json
+
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  cancelledAt DateTime?
+  total       Int       @default(0)
+  skipped     Int       @default(0)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  template   MessageTemplate?     @relation(fields: [templateId], references: [id])
+  recipients BroadcastRecipient[]
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([status, scheduledAt])
+  @@map("broadcasts")
+}
+
+model BroadcastRecipient {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  broadcastId    String
+  leadId         String
+  conversationId String?
+  chatMessageId  String?                  @unique
+  status         BroadcastRecipientStatus @default(QUEUED)
+  skipReason     String?
+
+  createdAt DateTime @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  broadcast    Broadcast     @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  lead         Lead          @relation(fields: [leadId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+  chatMessage  ChatMessage?  @relation(fields: [chatMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([broadcastId, leadId])
+  @@index([tenantId, broadcastId])
+  @@map("broadcast_recipients")
+}
+
+enum AutomationAction {
+  SEND_MESSAGE
+  CREATE_TASK
+  ADD_TAG
+  ASSIGN_USER
+}
+
+enum AutomationRunStatus {
+  PENDING
+  DONE
+  SKIPPED
+  FAILED
+}
+
+/// O que acontece quando um lead entra numa etapa (o "funil digital" do Kommo).
+model StageAutomation {
+  id       String           @id @default(cuid())
+  tenantId String
+  stageId  String
+  action   AutomationAction
+  /// SEND_MESSAGE { text } ou { templateId, params } · CREATE_TASK { text, dueHours,
+  /// assignTo: "responsible" | userId } · ADD_TAG { tagId } · ASSIGN_USER { userId }
+  config       Json
+  delayMinutes Int     @default(0)
+  active       Boolean @default(true)
+  order        Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  stage  PipelineStage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  runs   AutomationRun[]
+
+  @@index([tenantId, stageId])
+  @@map("stage_automations")
+}
+
+model AutomationRun {
+  id           String              @id @default(cuid())
+  tenantId     String
+  automationId String
+  leadId       String
+  dueAt        DateTime
+  /// A entrada na etapa que disparou. Se o lead saiu e voltou, é outra execução.
+  stageEnteredAt DateTime
+  status       AutomationRunStatus @default(PENDING)
+  error        String?
+  doneAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  automation StageAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  lead       Lead            @relation(fields: [leadId], references: [id])
+
+  @@index([status, dueAt])
+  @@index([tenantId, leadId])
+  @@map("automation_runs")
+}
+
+enum ChatbotTrigger {
+  /// Primeira mensagem de um número que ninguém conhece.
+  NEW_CONTACT
+  /// A mensagem é uma das palavras-chave.
+  KEYWORD
+}
+
+/// Robô por botões: um menu, com submenus, respostas e ações.
+model ChatbotFlow {
+  id       String         @id @default(cuid())
+  tenantId String
+  name     String
+  active   Boolean        @default(false)
+  trigger  ChatbotTrigger
+  keywords String[]       @default([])
+  /// { start, steps: { [id]: { text, options: [{ id, label, reply?, next?, actions? }] } } }
+  steps    Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+
+  @@index([tenantId, active])
+  @@map("chatbot_flows")
 }
