@@ -6,6 +6,7 @@ import { planForEvent, type ClinicEvent } from './automation';
 import { clinicDateAt, clinicNowWall } from './clock';
 import { moveLead, OPEN_LEAD } from './leads';
 import { completeTask, createTask } from './tasks';
+import { runDueAutomations } from './stage-automations';
 
 export type { ClinicEvent } from './automation';
 
@@ -126,6 +127,8 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
 
   if (plan.moveTo && plan.moveTo !== lead.stageId) {
     await moveLead(db, automacao, lead.id, { stageId: plan.moveTo, origin: { event: event.type, ...ref } });
+    // As automações "na hora" da etapa nova (mensagem, tarefa…) saem já.
+    await runDueAutomations(new Date(), { tenantId });
   }
 
   if (plan.wonValueCents !== undefined) {

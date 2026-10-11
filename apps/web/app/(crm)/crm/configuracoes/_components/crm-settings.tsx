@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Lock, Plus, Save, Trash2 } from 'lucide-react';
 import { COLOR_LABEL, colorClasses } from '@/crm/colors';
 import { CRM_COLORS } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
+import { AutomationsTab, type AutomationRow } from './automations-tab';
 import {
   createStageAction, deleteQuickReplyAction, deleteStageAction, deleteTagAction, moveStageAction, toggleLostReasonAction,
   updateStageAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
@@ -36,13 +37,19 @@ export function CrmSettings({
   tags,
   reasons,
   quickReplies,
+  automations,
+  team,
+  templates,
 }: {
   stages: Stage[];
   tags: Tag[];
   reasons: Reason[];
   quickReplies: QuickReply[];
+  automations: AutomationRow[];
+  team: { id: string; name: string }[];
+  templates: { id: string; name: string; variables: number }[];
 }) {
-  const [aba, setAba] = useState<'etapas' | 'tags' | 'motivos' | 'respostas'>('etapas');
+  const [aba, setAba] = useState<'etapas' | 'automacoes' | 'tags' | 'motivos' | 'respostas'>('etapas');
   const [aviso, setAviso] = useState('');
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -57,6 +64,7 @@ export function CrmSettings({
 
   const abas = [
     { key: 'etapas' as const, label: 'Etapas do funil' },
+    { key: 'automacoes' as const, label: 'Automações' },
     { key: 'tags' as const, label: 'Tags' },
     { key: 'motivos' as const, label: 'Motivos de perda' },
     { key: 'respostas' as const, label: 'Respostas rápidas' },
@@ -86,6 +94,15 @@ export function CrmSettings({
         {aba === 'tags' && <Tags tags={tags} pending={pending} agir={agir} />}
         {aba === 'motivos' && <Motivos reasons={reasons} pending={pending} agir={agir} />}
         {aba === 'respostas' && <Respostas items={quickReplies} pending={pending} agir={agir} />}
+        {aba === 'automacoes' && (
+          <AutomationsTab
+            stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+            automations={automations}
+            tags={tags.map((t) => ({ id: t.id, name: t.name }))}
+            team={team}
+            templates={templates}
+          />
+        )}
       </div>
 
       {aviso && (

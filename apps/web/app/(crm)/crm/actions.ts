@@ -1,11 +1,13 @@
 'use server';
 
+import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { guardCrmAction } from '@/crm/guard';
 import { createLead, moveLead, softDeleteLead } from '@/crm/leads';
 import { findOpenLeadByPhone, findPatientByPhone } from '@/crm/duplicates';
 import { isValidPhone } from '@/crm/phone';
+import { runDueAutomations } from '@/crm/stage-automations';
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
@@ -76,6 +78,7 @@ export async function createLeadAction(input: NewLeadForm): Promise<CreateLeadRe
   if (!r.ok) return r;
 
   revalidatePath('/crm');
+  after(() => runDueAutomations(new Date(), { tenantId: g.tenantId }));
   return { ok: true, leadId: r.leadId, linkedPatient: paciente?.name ?? null };
 }
 
@@ -93,7 +96,11 @@ export async function moveLeadAction(input: z.input<typeof moveSchema>): Promise
   if (!parsed.success) return { ok: false, message: 'Movimento inválido.' };
 
   const r = await moveLead(g.db, g, parsed.data.leadId, parsed.data);
-  if (r.ok) revalidatePath('/crm');
+  if (r.ok) {
+    revalidatePath('/crm');
+    // Automações "na hora" da etapa nova saem já, sem esperar o relógio.
+    after(() => runDueAutomations(new Date(), { tenantId: g.tenantId }));
+  }
   return r;
 }
 

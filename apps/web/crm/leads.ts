@@ -1,6 +1,7 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isClosedStage, stageByRole, type StageLike } from './pipeline';
 import { conversationHash, encryptPhone, phoneHash } from './phone';
+import { queueStageAutomations } from './stage-queue';
 
 /**
  * Operações do lead. Cada uma grava a mudança e o registro no histórico na
@@ -125,14 +126,17 @@ export async function moveLead(
     if (!plan.ok) return plan;
 
     const mudouEtapa = plan.data.stageId !== lead.stageId;
+    const entrou = new Date();
     await tx.lead.update({
       where: { id: lead.id, tenantId },
       data: {
         ...plan.data,
-        ...(mudouEtapa ? { stageEnteredAt: new Date() } : {}),
+        ...(mudouEtapa ? { stageEnteredAt: entrou } : {}),
         updatedById: actor.userId,
       },
     });
+    // As automações da etapa nova (e as da anterior deixam de valer).
+    if (mudouEtapa) await queueStageAutomations(tx, tenantId, lead.id, plan.data.stageId, entrou);
 
     // Fechou e Perdeu não são colunas: não há ordem a manter lá.
     const target = stages.find((s) => s.id === plan.data.stageId)!;
@@ -225,6 +229,7 @@ export async function createLead(
         updatedById: actor.userId,
       },
     });
+    await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
 
     await tx.leadActivity.create({
       data: {

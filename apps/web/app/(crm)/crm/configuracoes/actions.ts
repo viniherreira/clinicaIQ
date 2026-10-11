@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
 import * as s from '@/crm/settings';
+import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
+import type { AutomationAction } from '@clinicaiq/db';
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -31,3 +33,13 @@ export const toggleLostReasonAction = async (id: string, active: boolean) => run
 export const upsertQuickReplyAction = async (input: { id?: string; title: string; body: string }) =>
   run((g) => s.upsertQuickReply(g.db, g.tenantId, input));
 export const deleteQuickReplyAction = async (id: string) => run((g) => s.deleteQuickReply(g.db, id));
+
+export const saveAutomationAction = async (input: {
+  id?: string;
+  stageId: string;
+  action: AutomationAction;
+  config: Record<string, unknown>;
+  delayMinutes: number;
+}) => run((g) => saveAutomation(g.db, g.tenantId, input));
+export const toggleAutomationAction = async (id: string, active: boolean) => run((g) => toggleAutomation(g.db, id, active));
+export const deleteAutomationAction = async (id: string) => run((g) => deleteAutomation(g.db, id));
