@@ -1,12 +1,16 @@
 import { requireCrm } from '@/crm/guard';
 import { INBOX_TABS, classifyPending, inboxCounts, listConversations, loadThread, markRead, type InboxTab } from '@/crm/conversations';
 import { activeCloudAccount } from '@/crm/cloud';
+import { loadCrmBasics } from '@/crm/page-data';
 import { can } from '@/lib/permissions';
 import { Inbox } from './_components/inbox';
 
 export const metadata = { title: 'Conversas · ClinicaIQ' };
 
-/** A caixa de conversas do WhatsApp, como os chats do Kommo: lista à esquerda, conversa à direita. */
+/**
+ * A caixa de conversas do WhatsApp, como os chats do Kommo: lista à esquerda,
+ * a conversa no meio e, em tela larga, o lead à direita.
+ */
 export default async function ConversasPage({
   searchParams,
 }: {
@@ -22,13 +26,14 @@ export default async function ConversasPage({
   // As que o aviso do gateway não alcançou.
   await classifyPending(ctx.db, ctx.tenantId);
 
-  const [list, counts, thread, quickReplies, line, cloud] = await Promise.all([
+  const [list, counts, thread, quickReplies, line, cloud, basics] = await Promise.all([
     listConversations(ctx.db, ctx, tab, q),
     inboxCounts(ctx.db),
     selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
     ctx.db.whatsAppSession.findFirst({ select: { status: true } }),
     activeCloudAccount(ctx.tenantId),
+    loadCrmBasics(ctx),
   ]);
   if (thread && thread.conversation.unread > 0) {
     await markRead(ctx.db, thread.conversation.id);
@@ -48,6 +53,14 @@ export default async function ConversasPage({
       lineDown={!cloud && line?.status !== 'CONNECTED'}
       canConfigWhatsapp={can(ctx.role, 'configuracoes')}
       canManage={can(ctx.role, 'crm_config')}
+      basics={{
+        stages: basics.columns,
+        closedStages: basics.closedStages,
+        tags: basics.tags,
+        team: basics.team,
+        procedures: basics.procedures,
+        lostReasons: basics.lostReasons,
+      }}
     />
   );
 }

@@ -9,6 +9,7 @@ import { ConversationPane } from '@/components/crm-chat/conversation-pane';
 import { announceUnread } from '@/components/crm-chat/unread';
 import type { QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { refreshInboxAction, type InboxSnapshot } from '../actions';
+import { LeadSide, type LeadSideBasics } from './lead-side';
 
 const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
@@ -29,6 +30,7 @@ export function Inbox({
   lineDown,
   canConfigWhatsapp,
   canManage,
+  basics,
 }: {
   initial: InboxSnapshot;
   initialTab: InboxTab;
@@ -38,6 +40,7 @@ export function Inbox({
   lineDown: boolean;
   canConfigWhatsapp: boolean;
   canManage: boolean;
+  basics: LeadSideBasics;
 }) {
   const id = useId();
   const [snap, setSnap] = useState(initial);
@@ -126,11 +129,13 @@ export function Inbox({
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(300px,360px)_1fr]">
+      <div
+        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(300px,340px)_1fr] ${thread?.conversation.lead ? 'xl:grid-cols-[320px_1fr_340px]' : ''}`}
+      >
         <aside aria-labelledby={`${id}-titulo`} className={`${selectedId ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col border-r border-border bg-surface`}>
           <div className="space-y-3 border-b border-border p-4">
             <div className="flex items-baseline justify-between">
-              <h1 id={`${id}-titulo`} className="text-lg font-semibold">
+              <h1 id={`${id}-titulo`} className="text-base font-semibold uppercase tracking-wide">
                 Conversas
               </h1>
               {snap.counts.unread > 0 && <span className="text-xs text-muted-foreground">{snap.counts.unread} não lida(s)</span>}
@@ -146,7 +151,7 @@ export function Inbox({
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Nome ou telefone"
-                className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                className="h-9 w-full rounded-md border border-border bg-surface-alt pl-8 pr-2 text-sm focus:bg-surface focus-visible:outline-2 focus-visible:outline-ring"
               />
             </div>
             <div role="group" aria-label="Filtrar conversas" className="segmented flex w-full">
@@ -183,12 +188,16 @@ export function Inbox({
               canManage={canManage}
             />
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-board p-8 text-center text-muted-foreground">
               <MessageCircle className="h-10 w-10" aria-hidden="true" />
               <p className="text-sm">{selectedId ? 'Carregando conversa…' : 'Escolha uma conversa na lista.'}</p>
             </div>
           )}
         </div>
+
+        {thread?.conversation.lead && (
+          <LeadSide key={thread.conversation.lead.id} leadId={thread.conversation.lead.id} basics={basics} onChanged={() => void refresh()} />
+        )}
       </div>
       <p role="status" aria-live="polite" className="sr-only">
         {aviso}
@@ -249,7 +258,7 @@ function ConversationList({
               type="button"
               onClick={() => onSelect(c.id)}
               aria-current={ativa ? 'true' : undefined}
-              className={`flex w-full gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${ativa ? 'bg-primary/10' : 'hover:bg-surface-alt'}`}
+              className={`relative flex w-full gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${ativa ? 'bg-primary/10 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-primary' : 'hover:bg-surface-alt'}`}
             >
               <span
                 aria-hidden="true"

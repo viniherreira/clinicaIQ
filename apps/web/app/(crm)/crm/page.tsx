@@ -23,7 +23,7 @@ export default async function FunilPage({
   ]);
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col">
       <CrmToolbar
         view="quadro"
         filters={filters}
@@ -31,6 +31,7 @@ export default async function FunilPage({
         team={basics.team}
         procedures={basics.procedures}
         meId={ctx.userId}
+        summary={{ count: leads.length, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
       />
       <Board
         stages={basics.columns}

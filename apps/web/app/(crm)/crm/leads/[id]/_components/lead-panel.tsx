@@ -26,6 +26,7 @@ export function LeadPanel({
   procedures,
   lostReasons,
   actions,
+  onSaved,
 }: {
   lead: LeadDetail;
   stages: BoardStage[];
@@ -36,6 +37,8 @@ export function LeadPanel({
   lostReasons: LostReasonOption[];
   /** Botões de conversão/agendamento, montados pela página. */
   actions?: React.ReactNode;
+  /** Algo foi salvo: quem mostra o painel fora da ficha (Conversas) busca de novo. */
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -48,7 +51,10 @@ export function LeadPanel({
     start(async () => {
       const r = await updateLeadAction(lead.id, patch);
       setAviso(r.ok ? msg : r.message);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        router.refresh();
+        onSaved?.();
+      }
     });
   }
 
@@ -56,7 +62,10 @@ export function LeadPanel({
     start(async () => {
       const r = await moveLeadAction({ leadId: lead.id, stageId, lostReasonId });
       setAviso(r.ok ? msg ?? `Movido para ${stages.find((s) => s.id === stageId)?.name ?? 'a etapa escolhida'}.` : r.message);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        router.refresh();
+        onSaved?.();
+      }
     });
   }
 
@@ -71,7 +80,15 @@ export function LeadPanel({
           onSave={(v) => salvar({ title: v || null }, 'Nome do negócio salvo.')}
         />
         {lead.title && <p className="mt-0.5 text-sm text-muted-foreground">{lead.name}</p>}
-        <TagEditor leadId={lead.id} tags={lead.tags} allTags={allTags} onDone={(m) => setAviso(m)} />
+        <TagEditor
+          leadId={lead.id}
+          tags={lead.tags}
+          allTags={allTags}
+          onDone={(m) => {
+            setAviso(m);
+            onSaved?.();
+          }}
+        />
       </div>
 
       {/* Situação e etapa */}
@@ -118,7 +135,7 @@ export function LeadPanel({
 
       {actions}
 
-      <dl className="space-y-3 text-sm">
+      <dl className="divide-y divide-border/70 text-sm">
         <Field label="Responsável">
           <InlineSelect
             label="Responsável"
@@ -218,11 +235,12 @@ export function LeadPanel({
   );
 }
 
+/** Um dado da ficha, como no Kommo: o nome à esquerda, o valor à direita. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
+    <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-3 py-2">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
     </div>
   );
 }

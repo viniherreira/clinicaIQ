@@ -10,8 +10,9 @@ import { createLeadAction } from '../actions';
 import { LeadCard, type MoveTarget } from './lead-card';
 
 /**
- * Uma coluna do funil: faixa com a cor da etapa, quantos leads e quanto valem,
- * o "Adicionar rápido" (nome e telefone, Enter salva) e os cards.
+ * Uma coluna do funil, como no Kommo: o nome da etapa em maiúsculas, a linha
+ * da cor dela, quantos leads e quanto valem; depois o "Adição rápida" (nome e
+ * telefone, Enter salva) e os cards, direto sobre o fundo do quadro.
  */
 export function Column({
   stage,
@@ -38,22 +39,23 @@ export function Column({
     <section
       aria-labelledby={headingId}
       className={[
-        'flex w-72 shrink-0 flex-col rounded-xl bg-surface-alt/70 transition-colors',
-        isOver ? 'bg-primary/5 ring-2 ring-primary/30' : '',
+        'flex w-[272px] shrink-0 flex-col rounded-md transition-colors',
+        isOver ? 'bg-primary/[0.06] ring-2 ring-primary/30' : '',
       ].join(' ')}
     >
-      <header className={`rounded-t-xl border-t-[3px] px-3 pb-2 pt-2.5 ${colorClasses(stage.color).stripe}`}>
-        <h2 id={headingId} className="flex items-baseline justify-between gap-2 text-sm font-semibold">
-          <span className="truncate">{stage.name}</span>
-          <span className="text-xs font-normal text-muted-foreground">
-            <span className="sr-only">, </span>
-            {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
-          </span>
+      <header className="px-1 pb-2.5 pt-1 text-center">
+        <h2 id={headingId} className="truncate text-[13px] font-semibold uppercase tracking-wide text-foreground/85">
+          {stage.name}
+          <span className="sr-only">, {leads.length} {leads.length === 1 ? 'lead' : 'leads'}</span>
         </h2>
-        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{formatCents(total)}</p>
+        <div className={`mt-2 h-[3px] rounded-full ${colorClasses(stage.color).dot}`} aria-hidden="true" />
+        <p className="mt-1.5 text-xs tabular-nums text-muted-foreground" aria-hidden="true">
+          {leads.length} {leads.length === 1 ? 'lead' : 'leads'}: {formatCents(total)}
+        </p>
+        <p className="sr-only">Valor: {formatCents(total)}</p>
       </header>
 
-      <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3">
+      <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto px-0.5 pb-3">
         <QuickAdd stage={stage} onAnnounce={onAnnounce} />
         <ul className="flex flex-col gap-2" aria-label={`Leads em ${stage.name}`}>
           {leads.map((lead) => (
@@ -63,7 +65,7 @@ export function Column({
           ))}
         </ul>
         {leads.length === 0 && (
-          <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             Nenhum lead nesta etapa
           </p>
         )}
@@ -89,10 +91,10 @@ function QuickAdd({ stage, onAnnounce }: { stage: BoardStage; onAnnounce: (msg: 
           setAberto(true);
           setTimeout(() => nomeRef.current?.focus(), 0);
         }}
-        className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        className="flex items-center justify-center gap-1 rounded-[5px] border border-dashed border-border-strong/70 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:bg-surface hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
       >
         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-        Adicionar rápido<span className="sr-only"> em {stage.name}</span>
+        Adição rápida<span className="sr-only"> em {stage.name}</span>
       </button>
     );
   }
@@ -108,7 +110,7 @@ function QuickAdd({ stage, onAnnounce }: { stage: BoardStage; onAnnounce: (msg: 
 
   return (
     <form
-      className="space-y-1.5 rounded-lg border border-border bg-surface p-2"
+      className="space-y-1.5 rounded-[5px] border border-primary/30 bg-surface p-2 shadow-sm"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {

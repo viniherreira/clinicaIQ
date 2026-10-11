@@ -62,6 +62,7 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **A agenda e os orçamentos nunca dependem do CRM.** A única ligação é `after(() => notifyCrm(tenantId, evento))` depois de salvar (`apps/web/crm/notify.ts`), que não faz nada sem o módulo e nunca lança. Não importe nada mais de `crm/` em código da clínica.
 - As regras de automação ficam em `crm/automation.ts` (puras, testadas por tabela): avançar só para frente, voltar só no cancelamento ou falta, nunca perder sozinho.
 - O que o card mostra da clínica (próxima avaliação, orçamento em aberto) é lido ao vivo (`crm/live.ts`), nunca copiado para o CRM.
+- **Visual no jeito do Kommo** (só no espaço do CRM): menu escuro estreito (`components/crm-rail.tsx`), quadro sobre fundo cinza-azulado e cards compactos, e nas Conversas o lead à direita (`conversas/_components/lead-side.tsx`, o mesmo `LeadPanel` da ficha). Cores em `--rail`, `--board` e `--bubble-out` (`app/globals.css`), com modo escuro e alto contraste.
 - Horários: agendamentos são "hora de parede em UTC" (`lib/tz.ts`); tarefas do CRM são instantes reais. Conversões em `crm/clock.ts`.
 - Spec e plano: `docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md` e `docs/superpowers/plans/2026-10-07-crm-etapa1-plan.md`.
 

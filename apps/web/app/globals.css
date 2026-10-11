@@ -55,6 +55,16 @@
     --card: 0 0% 100%;
     --card-foreground: 222 35% 12%;
 
+    /*
+     * CRM no jeito do Kommo: menu escuro estreito à esquerda e o quadro sobre
+     * um cinza-azulado, com os cards brancos por cima.
+     */
+    --rail: 214 45% 17%;
+    --rail-foreground: 214 30% 80%;
+    --rail-active: 214 40% 26%;
+    --board: 214 30% 94%;
+    --bubble-out: 207 90% 93%;
+
     --radius: 0.5rem;
   }
 
@@ -100,6 +110,12 @@
 
     --card: 222 25% 11%;
     --card-foreground: 210 30% 94%;
+
+    --rail: 222 32% 6%;
+    --rail-foreground: 215 20% 72%;
+    --rail-active: 222 25% 14%;
+    --board: 222 28% 9%;
+    --bubble-out: 212 45% 22%;
   }
 
   .high-contrast {
@@ -129,6 +145,12 @@
 
     --success: 142 100% 25%;
     --success-foreground: 0 0% 100%;
+
+    --rail: 0 0% 0%;
+    --rail-foreground: 0 0% 100%;
+    --rail-active: 212 100% 30%;
+    --board: 0 0% 100%;
+    --bubble-out: 0 0% 92%;
   }
 
   .dark.high-contrast {
@@ -158,6 +180,12 @@
 
     --success: 142 100% 45%;
     --success-foreground: 0 0% 0%;
+
+    --rail: 0 0% 0%;
+    --rail-foreground: 0 0% 100%;
+    --rail-active: 0 0% 20%;
+    --board: 0 0% 0%;
+    --bubble-out: 0 0% 15%;
   }
 
   * {

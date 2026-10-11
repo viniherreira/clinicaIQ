@@ -71,7 +71,7 @@ export function ChatMessages({
         const b = e.currentTarget;
         grudado.current = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
       }}
-      className="min-h-0 flex-1 overflow-y-auto bg-surface-alt/40 px-4 py-4 sm:px-6"
+      className="min-h-0 flex-1 overflow-y-auto bg-board px-4 py-4 sm:px-6"
       // Área que rola precisa receber foco, senão quem usa só o teclado não lê o
       // começo da conversa (axe: scrollable-region-focusable).
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
@@ -108,12 +108,12 @@ export function ChatMessages({
                 <li className={`flex ${saida ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={[
-                      'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[70%]',
+                      'max-w-[85%] rounded-lg px-3.5 py-2 text-sm shadow-[0_1px_2px_rgba(15,30,60,0.10)] sm:max-w-[70%]',
                       saida
                         ? auto
-                          ? 'rounded-br-md border border-dashed border-border bg-surface text-foreground'
-                          : 'rounded-br-md bg-primary/10 text-foreground'
-                        : 'rounded-bl-md border border-border bg-surface text-foreground',
+                          ? 'rounded-br-sm border border-dashed border-border-strong bg-surface text-foreground'
+                          : 'rounded-br-sm bg-bubble-out text-foreground'
+                        : 'rounded-bl-sm bg-surface text-foreground',
                       m.status === 'FAILED' ? 'ring-1 ring-destructive/50' : '',
                     ].join(' ')}
                   >

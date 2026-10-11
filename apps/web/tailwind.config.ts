@@ -63,6 +63,13 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        rail: {
+          DEFAULT: 'hsl(var(--rail))',
+          foreground: 'hsl(var(--rail-foreground))',
+          active: 'hsl(var(--rail-active))',
+        },
+        board: 'hsl(var(--board))',
+        'bubble-out': 'hsl(var(--bubble-out))',
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { KanbanSquare, List, Plus, Search, X } from 'lucide-react';
 import type { BoardFilters, BoardPerson, BoardTag } from '@/crm/types';
-import { SOURCE_LABEL } from '@/crm/format';
+import { formatCents, SOURCE_LABEL } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
 
 /**
- * Barra do topo do funil e da lista: alternar Quadro | Lista, buscar,
- * filtros rápidos e "Novo lead". Os filtros moram na URL, então o voltar do
- * navegador e um link copiado mostram a mesma coisa.
+ * Barra do topo do funil e da lista, como a do Kommo: o nome da tela, Quadro |
+ * Lista, a busca larga, quantos leads e quanto valem, e "Novo lead"; embaixo,
+ * os filtros rápidos. Os filtros moram na URL, então o voltar do navegador e
+ * um link copiado mostram a mesma coisa.
  */
 export function CrmToolbar({
   view,
@@ -20,8 +21,11 @@ export function CrmToolbar({
   team,
   procedures,
   meId,
+  summary,
 }: {
   view: 'quadro' | 'lista';
+  /** Quantos leads abertos a tela mostra e quanto somam. */
+  summary?: { count: number; valueCents: number };
   filters: BoardFilters;
   tags: BoardTag[];
   team: BoardPerson[];
@@ -65,9 +69,9 @@ export function CrmToolbar({
   const temFiltro = filters.q || filters.resp !== 'all' || filters.tarefa || filters.tag || filters.origem;
 
   return (
-    <div className="space-y-3 px-4 pt-5 sm:px-6">
+    <div className="space-y-2.5 border-b border-border bg-surface px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">{view === 'quadro' ? 'Funil' : 'Leads'}</h1>
+        <h1 className="text-base font-semibold uppercase tracking-wide">{view === 'quadro' ? 'Funil' : 'Leads'}</h1>
 
         <nav aria-label="Modo de visualização" className="segmented">
           <Link href={`/crm${qs}`} aria-current={view === 'quadro' ? 'page' : undefined} className="segmented-item inline-flex items-center gap-1.5">
@@ -78,9 +82,7 @@ export function CrmToolbar({
           </Link>
         </nav>
 
-        <div className="flex-1" />
-
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full sm:max-w-md sm:flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <label htmlFor="crm-busca" className="sr-only">Buscar por nome ou telefone</label>
           <input
@@ -89,11 +91,20 @@ export function CrmToolbar({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar nome ou telefone"
-            className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="h-9 w-full rounded-md border border-border bg-surface-alt pl-8 pr-3 text-sm focus:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </div>
 
-        <button type="button" onClick={() => setNovo(true)} className="btn-primary btn-md inline-flex items-center gap-1.5">
+        <div className="flex-1" />
+
+        {summary && (
+          <p className="text-sm tabular-nums text-muted-foreground">
+            <span className="font-semibold text-foreground">{summary.count}</span> {summary.count === 1 ? 'lead' : 'leads'}:{' '}
+            <span className="font-semibold text-foreground">{formatCents(summary.valueCents)}</span>
+          </p>
+        )}
+
+        <button type="button" onClick={() => setNovo(true)} className="btn-primary btn-md inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
           <Plus className="h-4 w-4" aria-hidden="true" /> Novo lead
         </button>
       </div>

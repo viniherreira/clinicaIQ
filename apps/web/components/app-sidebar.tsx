@@ -8,6 +8,7 @@ import {
   MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
+import { CrmRail } from './crm-rail';
 import { ModuleSwitcher, type Space } from './module-switcher';
 import { can, type Capability } from '@/lib/permissions';
 
@@ -26,6 +27,8 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   badge?: string;
   capability?: Capability;
+  /** O nome que cabe no menu estreito do CRM. */
+  short?: string;
 };
 
 export const CLINIC_NAV: NavItem[] = [
@@ -53,7 +56,7 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
   { href: '/crm/transmissoes', label: 'Transmissões', icon: Megaphone, capability: 'crm' },
   { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
-  { href: '/crm/configuracoes', label: 'Configurações do CRM', icon: Settings, capability: 'crm_config' },
+  { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm_config' },
 ];
 
 export function navFor(role: string | null | undefined, space: Space = 'clinic') {
@@ -92,6 +95,10 @@ export function AppSidebar({
   const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
   const ativo = activeHref(itens, pathname);
 
+  if (space === 'crm') {
+    return <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} />;
+  }
+
   return (
     <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex print:!hidden">
       {/* Brand */}
@@ -101,7 +108,7 @@ export function AppSidebar({
           <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
           {!showSwitcher && (
             <span className="mt-1 text-[11px] text-muted-foreground">
-              {space === 'crm' ? 'CRM' : 'Gestão clínica'}
+              Gestão clínica
             </span>
           )}
         </div>

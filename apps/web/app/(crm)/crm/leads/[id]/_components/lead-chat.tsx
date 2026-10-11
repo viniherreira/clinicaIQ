@@ -41,7 +41,7 @@ export function LeadRightPane({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div role="tablist" aria-label="Ficha do lead" className="flex gap-5 border-b border-border px-5 text-sm">
+      <div role="tablist" aria-label="Ficha do lead" className="flex gap-5 border-b border-border bg-surface px-5 text-sm">
         {abas.map((a) => (
           <button
             key={a.key}

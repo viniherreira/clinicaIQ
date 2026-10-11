@@ -32,7 +32,7 @@ export function LeadFeed({ lead, team, meId }: { lead: LeadDetail; team: BoardPe
     <section aria-label="Tarefas e histórico" className="flex min-h-0 flex-1 flex-col">
       <PendingTasks lead={lead} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-board px-5 py-4">
         <h2 className="sr-only">Histórico</h2>
         <ol className="space-y-3">
           {lead.timeline.map((e) => {
@@ -45,7 +45,7 @@ export function LeadFeed({ lead, team, meId }: { lead: LeadDetail; team: BoardPe
                     'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
                     e.kind === 'won' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : '',
                     e.kind === 'lost' ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : '',
-                    e.kind !== 'won' && e.kind !== 'lost' ? 'bg-surface-alt text-muted-foreground' : '',
+                    e.kind !== 'won' && e.kind !== 'lost' ? 'bg-surface text-muted-foreground shadow-sm' : '',
                   ].join(' ')}
                   aria-hidden="true"
                 >

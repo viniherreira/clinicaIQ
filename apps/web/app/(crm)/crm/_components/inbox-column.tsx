@@ -16,18 +16,18 @@ import { acceptConversationAction, declineConversationAction } from '../conversa
 export function InboxColumn({ entries, onAnnounce }: { entries: ConversationSummary[]; onAnnounce: (msg: string) => void }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="flex w-72 shrink-0 flex-col rounded-xl bg-amber-50/70 dark:bg-amber-950/30">
-      <header className="rounded-t-xl border-t-[3px] border-amber-400 px-3 pb-2 pt-2.5">
-        <h2 id={headingId} className="flex items-baseline justify-between gap-2 text-sm font-semibold">
-          <span>Entrada</span>
-          <span className="text-xs font-normal text-muted-foreground">
-            <span className="sr-only">, </span>
-            {entries.length} {entries.length === 1 ? 'contato novo' : 'contatos novos'}
-          </span>
+    <section aria-labelledby={headingId} className="flex w-[272px] shrink-0 flex-col">
+      <header className="px-1 pb-2.5 pt-1 text-center">
+        <h2 id={headingId} className="truncate text-[13px] font-semibold uppercase tracking-wide text-foreground/85">
+          Entrada
+          <span className="sr-only">, {entries.length} {entries.length === 1 ? 'contato novo' : 'contatos novos'}</span>
         </h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">Escreveram no WhatsApp</p>
+        <div className="mt-2 h-[3px] rounded-full bg-amber-400" aria-hidden="true" />
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          <span aria-hidden="true">{entries.length} {entries.length === 1 ? 'contato novo' : 'contatos novos'} · </span>WhatsApp
+        </p>
       </header>
-      <ul className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3" aria-label="Contatos na Entrada">
+      <ul className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto px-0.5 pb-3" aria-label="Contatos na Entrada">
         {entries.map((c) => (
           <li key={c.id}>
             <InboxCard entry={c} onAnnounce={onAnnounce} />
@@ -53,7 +53,7 @@ function InboxCard({ entry, onAnnounce }: { entry: ConversationSummary; onAnnoun
     });
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-3 shadow-sm">
+    <article className="rounded-[5px] border-l-[3px] border-amber-400 bg-surface p-3 shadow-[0_1px_2px_rgba(15,30,60,0.10)]">
       <div className="flex items-baseline justify-between gap-2">
         <Link
           href={`/crm/conversas?c=${entry.id}`}

@@ -21,6 +21,7 @@ import {
   type InboxTab,
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
+import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
 import { activeCloudAccount } from '@/crm/cloud';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 
@@ -53,6 +54,13 @@ export async function refreshInboxAction(input: { tab: string; q: string; select
     if (item) item.unread = 0;
   }
   return { ok: true, snapshot: { list, counts, thread } };
+}
+
+/** Os dados do lead da conversa aberta, para o painel à direita (como no Kommo). */
+export async function leadDetailAction(leadId: string): Promise<Result<{ lead: LeadDetail | null }>> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  return { ok: true, lead: await loadLeadDetail(g, leadId) };
 }
 
 /** Só a conversa (a aba Conversa da ficha do lead). */

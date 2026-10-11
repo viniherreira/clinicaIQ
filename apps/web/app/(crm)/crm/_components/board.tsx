@@ -184,7 +184,7 @@ export function Board({
         onDragCancel={() => setActiveId(null)}
         onDragEnd={onDragEnd}
       >
-        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 pb-4 sm:px-6" role="list" aria-label="Etapas do funil">
+        <div className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto bg-board px-4 pb-4 pt-4 sm:px-5" role="list" aria-label="Etapas do funil">
           {inbox.length > 0 && (
             <div role="listitem" className="flex">
               <InboxColumn entries={inbox} onAnnounce={anunciar} />
@@ -209,7 +209,7 @@ export function Board({
 
         <DragOverlay dropAnimation={null}>
           {ativo ? (
-            <div className="w-72">
+            <div className="w-[272px]">
               <LeadCard lead={ativo} stages={stages} canDelete={false} onMove={() => {}} overlay />
             </div>
           ) : null}
