@@ -51,6 +51,7 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/conversas', label: 'Conversas', icon: MessageCircle, capability: 'crm' },
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
+  { href: '/crm/transmissoes', label: 'Transmissões', icon: Megaphone, capability: 'crm' },
   { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
   { href: '/crm/configuracoes', label: 'Configurações do CRM', icon: Settings, capability: 'crm_config' },
 ];

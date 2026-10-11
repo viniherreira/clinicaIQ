@@ -1,4 +1,6 @@
+import { finishBroadcasts, startDueBroadcasts } from './broadcasts';
 import { processCloudQueue } from './cloud-send';
+import { simulateDueLocal } from './dev-clock';
 
 /**
  * O relógio do CRM: o que precisa acontecer sem ninguém na tela. O gateway, que
@@ -8,6 +10,9 @@ import { processCloudQueue } from './cloud-send';
  * Cada parte tem limite por rodada, para caber no tempo de uma função.
  */
 export async function runTick(now: Date = new Date()) {
+  const broadcastsStarted = await startDueBroadcasts(now);
   const cloudSent = await processCloudQueue(now);
-  return { cloudSent };
+  const simulated = await simulateDueLocal(now);
+  const broadcastsDone = await finishBroadcasts(now);
+  return { broadcastsStarted, cloudSent, simulated, broadcastsDone };
 }

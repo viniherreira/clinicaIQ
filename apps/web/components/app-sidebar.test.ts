@@ -82,7 +82,7 @@ describe('navFor — espaço do CRM', () => {
   });
 
   it('a recepção trabalha o funil; só dono e admin configuram', () => {
-    expect(crm('RECEPTIONIST')).toEqual(['/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas']);
+    expect(crm('RECEPTIONIST')).toEqual(['/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/transmissoes']);
     expect(crm('OWNER')).toEqual(CRM_NAV.map((i) => i.href));
     expect(crm('ADMIN')).toContain('/crm/configuracoes');
   });
