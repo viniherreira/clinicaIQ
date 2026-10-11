@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { currentAccess } from '@/lib/guard';
 import { getTenantModules, writeBlocked } from '@/lib/access';
 import { can, capabilityDeniedMessage, type Role } from '@/lib/permissions';
+import { nudgeTick } from './tick-nudge';
 
 /**
  * A porta do CRM. São três trancas, e todas precisam abrir:
@@ -50,6 +51,7 @@ export async function requireCrm(capability: CrmCapability): Promise<CrmContext>
   if (!can(acesso.role, capability)) redirect(`/sem-acesso?modulo=${capability}`);
   if (!modules.crmWholeTeam && !(await hasCrmSeat(acesso.userId))) redirect(CRM_NOT_CONTRACTED_PATH);
 
+  nudgeTick();
   return { ...acesso, db: getTenantClient(acesso.tenantId) };
 }
 

@@ -2,6 +2,9 @@ import { decrypt, encrypt, getTenantClient, prisma } from '@clinicaiq/db';
 import { CloudApiError } from '@clinicaiq/whatsapp';
 import { activeCloudAccount, cloudClient, windowOpen, type CloudAccount } from './cloud';
 import { previewText } from './chat-ingest';
+import { fileNameOf, isStoredRef, readChatMedia } from './media-store';
+
+const CLOUD_KIND = { IMAGE: 'image', VIDEO: 'video', AUDIO: 'audio', DOCUMENT: 'document' } as const;
 
 /**
  * Envio das mensagens do CRM pela API oficial. Mesma ideia da fila do gateway
@@ -55,6 +58,9 @@ export async function sendViaCloud(
       templateLang: true,
       templateParams: true,
       buttons: true,
+      kind: true,
+      mediaRef: true,
+      mimeType: true,
       attempts: true,
       at: true,
       conversation: { select: { id: true, phoneEncrypted: true, lastInboundAt: true, lastMessageAt: true } },
@@ -87,8 +93,17 @@ export async function sendViaCloud(
 
   const api = cloudClient(account);
   const buttons = Array.isArray(row.buttons) ? (row.buttons as { id: string; title: string }[]) : [];
+  const cloudKind = isStoredRef(row.mediaRef) ? CLOUD_KIND[row.kind as keyof typeof CLOUD_KIND] : undefined;
   try {
-    const sent = row.templateName
+    let mediaId: string | null = null;
+    if (cloudKind && row.mediaRef) {
+      const file = await readChatMedia(row.mediaRef);
+      if (!file) return fail('O arquivo não foi encontrado. Envie de novo.');
+      mediaId = await api.uploadMedia(file.bytes, row.mimeType ?? file.contentType, fileNameOf(row.mediaRef));
+    }
+    const sent = cloudKind && mediaId
+      ? await api.sendMedia(phone, cloudKind, mediaId, text || undefined, fileNameOf(row.mediaRef!))
+      : row.templateName
       ? await api.sendTemplate(phone, row.templateName, row.templateLang ?? 'pt_BR', (row.templateParams as string[] | null) ?? [])
       : buttons.length > 0 && buttons.length <= 3
         ? await api.sendButtons(phone, text, buttons)
@@ -104,7 +119,7 @@ export async function sendViaCloud(
     if (row.conversation.lastMessageAt.getTime() <= now.getTime()) {
       await db.conversation.updateMany({
         where: { id: row.conversation.id, lastMessageAt: { lte: now } },
-        data: { lastMessageAt: now, lastPreviewEncrypted: encrypt(previewText('TEXT', text), masterKey(), tenantId) },
+        data: { lastMessageAt: now, lastPreviewEncrypted: encrypt(previewText(row.kind, text || null), masterKey(), tenantId) },
       });
     }
     return { ok: true };

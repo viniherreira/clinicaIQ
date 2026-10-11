@@ -19,3 +19,6 @@ test-results/
 
 # Sessão de login salva pelos testes E2E.
 apps/web/e2e/.auth/
+
+# Arquivos do CRM no desenvolvimento (apps/web/crm/media-store.ts)
+.crm-media/

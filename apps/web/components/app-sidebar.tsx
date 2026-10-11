@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { CrmRail } from './crm-rail';
@@ -50,6 +50,7 @@ export const CLINIC_NAV: NavItem[] = [
  * próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
  */
 export const CRM_NAV: NavItem[] = [
+  { href: '/crm/painel', label: 'Painel', icon: BarChart3, capability: 'crm' },
   { href: '/crm', label: 'Funil', icon: KanbanSquare, capability: 'crm' },
   { href: '/crm/conversas', label: 'Conversas', icon: MessageCircle, capability: 'crm' },
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },

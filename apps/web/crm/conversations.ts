@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
 import { activeCloudAccount, windowOpen } from './cloud';
+import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 
@@ -265,6 +266,8 @@ export interface ChatThread {
   channel: 'cloud' | 'gateway';
   /** API oficial: dá para escrever livre (24 h desde a última mensagem da pessoa). */
   windowOpen: boolean;
+  /** Dá para mandar arquivo por este canal. */
+  mediaOk: boolean;
 }
 
 const THREAD_LIMIT = 200;
@@ -309,6 +312,8 @@ export async function loadThread(
     truncated,
     channel: cloud ? 'cloud' : 'gateway',
     windowOpen: windowOpen(conv.lastInboundAt),
+    // Arquivo sai pela API oficial; sem canal nenhum (desenvolvimento), é simulado.
+    mediaOk: Boolean(cloud) || (!process.env.WHATSAPP_GATEWAY_URL && process.env.NODE_ENV !== 'production'),
   };
 }
 
@@ -382,6 +387,8 @@ export interface WriteOptions {
   checkWindow?: boolean;
   /** Quando sai (transmissão espaçada). Padrão: agora. */
   sendAt?: Date;
+  /** Arquivo já guardado (`crm/media-store.ts`); o `text` vira a legenda, que pode faltar. */
+  media?: { kind: 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO'; ref: string; mimeType: string };
 }
 
 export const WINDOW_CLOSED_MESSAGE = 'Passaram 24 horas desde a última mensagem da pessoa. Na API oficial, use um modelo aprovado.';
@@ -394,8 +401,9 @@ export async function writeChatMessage(
   now: Date = new Date(),
   opts: WriteOptions = {},
 ): Promise<{ ok: true; messageId: string } | { ok: false; message: string }> {
-  const text = rawText.trim();
-  if (!text) return { ok: false, message: 'Escreva a mensagem.' };
+  // Áudio vai sem legenda: o WhatsApp não mostra.
+  const text = opts.media?.kind === 'AUDIO' ? '' : rawText.trim();
+  if (!text && !opts.media) return { ok: false, message: 'Escreva a mensagem.' };
   if (text.length > MAX_CHAT_TEXT) return { ok: false, message: `A mensagem passa de ${MAX_CHAT_TEXT} caracteres.` };
 
   const { tenantId } = actor;
@@ -416,8 +424,9 @@ export async function writeChatMessage(
         conversationId,
         direction: 'OUTBOUND',
         origin,
-        kind: 'TEXT',
-        textEncrypted: seal(text, tenantId),
+        kind: opts.media?.kind ?? 'TEXT',
+        textEncrypted: text ? seal(text, tenantId) : null,
+        ...(opts.media ? { mediaRef: opts.media.ref, mimeType: opts.media.mimeType } : {}),
         externalId: newMessageId(),
         status: 'PENDING',
         sentById: origin === 'CRM' ? actor.userId : null,
@@ -436,7 +445,7 @@ export async function writeChatMessage(
         where: { id: conversationId, tenantId },
         data: {
           lastMessageAt: now,
-          lastPreviewEncrypted: seal(text.replace(/\s+/g, ' ').slice(0, 120), tenantId),
+          lastPreviewEncrypted: seal(previewText(opts.media?.kind ?? 'TEXT', text || null), tenantId),
           // Quem responde é a equipe: leu, respondeu e o robô sai da conversa.
           ...(origin === 'CRM'
             ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 }

@@ -12,6 +12,7 @@ import {
   retryChatAction,
   searchLinkTargetsAction,
   sendChatAction,
+  sendMediaAction,
   type LinkTarget,
 } from '@/app/(crm)/crm/conversas/actions';
 import { ChatComposer, type QuickReplyOption } from './chat-composer';
@@ -87,6 +88,18 @@ export function ConversationPane({
           }
           return r;
         }}
+        onSendMedia={
+          thread.mediaOk
+            ? async (form) => {
+                const r = await sendMediaAction(c.id, form);
+                if (r.ok) {
+                  setAviso('Arquivo enviado para a fila do WhatsApp.');
+                  onChanged();
+                }
+                return r;
+              }
+            : undefined
+        }
       />
       )}
       <p role="status" aria-live="polite" className="sr-only">

@@ -49,6 +49,8 @@ export async function sendChat(tenantId: string, chatMessageId: string, now: Dat
       origin: { in: [...SENDABLE] },
       status: 'PENDING',
       acceptedAt: null,
+      // Arquivo só sai pela API oficial (o app não deixa pedir pelo QR).
+      mediaRef: null,
       tenant: NOT_CLOUD,
       OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }],
     },
@@ -154,6 +156,7 @@ export async function retryPendingChats(now: Date = new Date()): Promise<number>
         origin: { in: [...SENDABLE] },
         status: 'PENDING',
         acceptedAt: null,
+        mediaRef: null,
         attempts: { lt: MAX_ATTEMPTS },
         tenant: ON_GATEWAY,
         AND: [

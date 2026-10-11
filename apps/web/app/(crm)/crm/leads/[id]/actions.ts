@@ -11,6 +11,8 @@ import { clinicLocalToInstant } from '@/crm/clock';
 import { CRM_COLORS } from '@/crm/defaults';
 import { decryptPhone, isValidPhone } from '@/crm/phone';
 import type { BoardTag } from '@/crm/types';
+import { eraseLeadPersonalData } from '@/crm/anonymize';
+import { deleteChatMedia } from '@/crm/media-store';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
@@ -175,4 +177,20 @@ export async function linkAfterCreateAction(leadId: string, intent: ConvertInten
   if (!r.ok) return `/pacientes/${patientId}`;
   refresh(leadId);
   return destinoDepois(leadId, patientId, intent);
+}
+
+/**
+ * Apaga os dados pessoais da pessoa deste lead, a pedido dela (LGPD). Só dono e
+ * administração; pede a palavra APAGAR, porque não tem volta.
+ */
+export async function eraseLeadDataAction(leadId: string, confirmacao: string): Promise<Result<{ leads: number; conversations: number }>> {
+  const g = await guardCrmAction('crm_config');
+  if (!g.ok) return g;
+  if (confirmacao.trim().toUpperCase() !== 'APAGAR') return { ok: false, message: 'Digite APAGAR para confirmar.' };
+  const r = await eraseLeadPersonalData(g.db, g, leadId);
+  if (!r.ok) return r;
+  // Os arquivos ficam fora da transação do banco: apagados depois, um a um.
+  for (const ref of r.mediaRefs) await deleteChatMedia(ref).catch(() => {});
+  refresh(leadId);
+  return { ok: true, leads: r.leads, conversations: r.conversations };
 }

@@ -50,6 +50,13 @@ O dono pediu para fazer as etapas seguidas, sem aprovar cada uma (2026-10-11). S
 - **Cortesia inclui o CRM**: ligado sem ativar e aberto a toda a equipe com perfil de CRM.
 - **Relógio do CRM**: o gateway chama `/api/cron/crm-tick` a cada minuto — publicar o gateway novo é o que faz automações com atraso e transmissões andarem em produção.
 
+## Em produção desde 2026-10-11 (tudo ainda em teste)
+
+- Banco: o dono rodou `docs/producao/2026-10-11-crm.sql` no SQL Editor do Supabase (só acréscimos, RLS nas tabelas novas). Merge da branch na `main` pelo pull request #2; a Vercel publicou.
+- O gateway do Fly está parado desde 24/08/2026 (último sinal de vida). **Decisão do dono: não usar mais o Fly; o WhatsApp será a API oficial**, depois de terminar o CRM. Mensagens velhas da fila não saem atrasadas (desistência após 6 h).
+- Depois disso: visual no jeito do Kommo, Painel, arquivos pelo CRM, LGPD e relógio pelo uso (sem gateway). Para ligar o relógio mesmo sem ninguém no CRM: `docs/producao/relogio-crm.sql` (pg_cron, com o CRON_SECRET no Vault).
+- **Arquivos em produção** exigem `SUPABASE_SERVICE_ROLE_KEY` na Vercel (o mesmo das fichas de paciente) e a API oficial ligada.
+
 ## Pendências com o dono do produto
 
 1. Publicar etapa 1 + adicional + etapa 2 em produção (banco **antes** do merge, **gateway por último** — ver abaixo). Em 2026-10-10 o dono preferiu seguir desenvolvendo antes de publicar.

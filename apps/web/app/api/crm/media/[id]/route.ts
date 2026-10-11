@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { guardCrmAction } from '@/crm/guard';
 import { activeCloudAccount, cloudClient } from '@/crm/cloud';
+import { fileNameOf, isStoredRef, readChatMedia } from '@/crm/media-store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 /**
- * Abre a foto, o áudio ou o documento de uma mensagem da API oficial. Busca na
- * Meta na hora e repassa: nada fica guardado no ClinicaIQ. Mesmas travas do CRM.
+ * Abre a foto, o áudio ou o documento de uma mensagem. O que a equipe mandou
+ * está guardado no ClinicaIQ (`crm/media-store.ts`); o que chegou pela API
+ * oficial é buscado na Meta na hora e repassado, sem guardar. Mesmas travas do CRM.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guardCrmAction('crm', { write: false });
@@ -16,6 +18,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const msg = await g.db.chatMessage.findFirst({ where: { id }, select: { mediaRef: true, mimeType: true } });
   if (!msg?.mediaRef) return NextResponse.json({ error: 'sem mídia' }, { status: 404 });
+
+  if (isStoredRef(msg.mediaRef)) {
+    const file = await readChatMedia(msg.mediaRef);
+    if (!file) return NextResponse.json({ error: 'O arquivo não está mais disponível.' }, { status: 410 });
+    return new NextResponse(file.bytes, {
+      headers: {
+        'content-type': msg.mimeType || file.contentType,
+        'content-disposition': `inline; filename="${fileNameOf(msg.mediaRef)}"`,
+        'cache-control': 'private, no-store',
+        'x-content-type-options': 'nosniff',
+      },
+    });
+  }
+
   const account = await activeCloudAccount(g.tenantId);
   if (!account) return NextResponse.json({ error: 'API oficial desconectada' }, { status: 409 });
 

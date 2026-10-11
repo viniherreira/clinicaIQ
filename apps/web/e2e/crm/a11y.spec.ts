@@ -14,6 +14,7 @@ for (const path of [
   '/crm',
   '/crm/conversas',
   '/crm/leads',
+  '/crm/painel',
   '/crm/tarefas',
   '/crm/transmissoes',
   '/crm/transmissoes/nova',

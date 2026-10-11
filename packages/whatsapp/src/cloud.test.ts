@@ -38,6 +38,27 @@ describe('CloudApi', () => {
     });
   });
 
+  it('arquivo: sobe para a Meta e manda pelo id, com legenda e nome do documento', async () => {
+    const f = vi.fn(async (url: string) => (url.endsWith('/media') ? ok({ id: 'MID' }) : ok({ messages: [{ id: 'w' }] })));
+    const api = new CloudApi({ token: 't', phoneNumberId: '1', fetchImpl: f as unknown as typeof fetch });
+    const id = await api.uploadMedia(new TextEncoder().encode('%PDF').buffer as ArrayBuffer, 'application/pdf', 'orcamento.pdf');
+    expect(id).toBe('MID');
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v23.0/1/media');
+    const form = init.body as FormData;
+    expect(form.get('messaging_product')).toBe('whatsapp');
+    expect(form.get('type')).toBe('application/pdf');
+    expect((form.get('file') as File).name).toBe('orcamento.pdf');
+
+    await api.sendMedia('55', 'document', 'MID', 'Segue o orçamento', 'orcamento.pdf');
+    await api.sendMedia('55', 'audio', 'MID2', 'legenda que não vai');
+    const doc = JSON.parse(String((f.mock.calls[1] as unknown as [string, RequestInit])[1].body));
+    const audio = JSON.parse(String((f.mock.calls[2] as unknown as [string, RequestInit])[1].body));
+    expect(doc).toMatchObject({ type: 'document', document: { id: 'MID', caption: 'Segue o orçamento', filename: 'orcamento.pdf' } });
+    expect(audio).toMatchObject({ type: 'audio', audio: { id: 'MID2' } });
+    expect(audio.audio.caption).toBeUndefined();
+  });
+
   it('janela de 24 h fechada vira erro próprio; limite pode tentar de novo', async () => {
     const api = (r: Response) => new CloudApi({ token: 't', phoneNumberId: '1', fetchImpl: (async () => r) as unknown as typeof fetch });
     const e1 = await api(fail(400, 131047)).sendText('55', 'oi').catch((e) => e);
