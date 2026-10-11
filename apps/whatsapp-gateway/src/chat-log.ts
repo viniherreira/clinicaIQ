@@ -27,12 +27,14 @@ export async function crmEnabled(tenantId: string): Promise<boolean> {
   const hit = crmCache.get(tenantId);
   if (hit && Date.now() - hit.at < CRM_TTL_MS) return hit.on;
   const [sub, cloud] = await Promise.all([
-    prisma.subscription.findUnique({ where: { tenantId }, select: { crmEnabled: true } }).catch(() => null),
+    prisma.subscription.findUnique({ where: { tenantId }, select: { crmEnabled: true, complimentary: true } }).catch(() => null),
     prisma.whatsAppCloudAccount
       .findUnique({ where: { tenantId }, select: { active: true, status: true } })
       .catch(() => null),
   ]);
-  const on = Boolean(sub?.crmEnabled) && !(cloud?.active && cloud.status === 'CONNECTED');
+  // Cortesia inclui o CRM (mesma regra de `getTenantModules` no app).
+  const crm = Boolean(sub?.crmEnabled) || Boolean(sub?.complimentary);
+  const on = crm && !(cloud?.active && cloud.status === 'CONNECTED');
   crmCache.set(tenantId, { on, at: Date.now() });
   return on;
 }

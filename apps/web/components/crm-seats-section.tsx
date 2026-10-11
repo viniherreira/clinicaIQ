@@ -28,13 +28,24 @@ export async function CrmSeatsSection() {
     );
   }
 
+  if (a.status === 'complimentary') {
+    return (
+      <section aria-labelledby="crm-acesso" className="rounded-xl border border-border bg-surface p-4 text-sm shadow-card">
+        <h2 id="crm-acesso" className="font-semibold">Acesso ao CRM</h2>
+        <p className="mt-1 text-muted-foreground">
+          Incluído na cortesia: toda a equipe com perfil de dono, administração ou recepção entra no CRM. Profissionais não usam o CRM.
+        </p>
+      </section>
+    );
+  }
+
   const pessoas = await prisma.user.findMany({
     where: { tenantId: acesso.tenantId, active: true, role: { in: [...CRM_ELIGIBLE_ROLES] } },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, role: true, crmSeat: true },
   });
   const custo =
-    a.status === 'trial' ? 'grátis no teste' : a.status === 'complimentary' ? 'incluído na cortesia' : `${formatCents(a.seatPriceCents)}/mês`;
+    a.status === 'trial' ? 'grátis no teste' : `${formatCents(a.seatPriceCents)}/mês`;
 
   return (
     <section aria-labelledby="crm-acesso" className="rounded-xl border border-border bg-surface p-4 shadow-card">

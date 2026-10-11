@@ -18,6 +18,7 @@ describe('crmStatus', () => {
     ['teste acabou', { crmEnabled: true, crmTrialEndsAt: emDias(-1), complimentary: false }, 'paid'],
     ['ativado sem teste', { crmEnabled: true, crmTrialEndsAt: null, complimentary: false }, 'paid'],
     ['cortesia, mesmo em teste', { crmEnabled: true, crmTrialEndsAt: emDias(5), complimentary: true }, 'complimentary'],
+    ['cortesia, mesmo sem ter ligado', { crmEnabled: false, crmTrialEndsAt: null, complimentary: true }, 'complimentary'],
   ] as const)('%s', (_, sub, esperado) => {
     expect(crmStatus(sub, agora)).toBe(esperado);
   });

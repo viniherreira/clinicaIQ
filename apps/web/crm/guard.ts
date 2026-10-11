@@ -12,6 +12,7 @@ import { can, capabilityDeniedMessage, type Role } from '@/lib/permissions';
  * 1. a clínica ligou o CRM (`Subscription.crmEnabled` — em teste, pago ou cortesia);
  * 2. o papel da pessoa alcança a capacidade (`crm` ou `crm_config`);
  * 3. a pessoa tem acesso ao CRM (`User.crmSeat`) — é por pessoa que o CRM é cobrado.
+ *    Na cortesia não há cobrança por pessoa: toda a equipe com o perfil entra.
  *
  * Esconder o menu não protege nada — quem digita /crm cai aqui, no servidor.
  */
@@ -47,7 +48,7 @@ export async function requireCrm(capability: CrmCapability): Promise<CrmContext>
   const modules = await getTenantModules(acesso.tenantId);
   if (!modules.crm) redirect(CRM_NOT_CONTRACTED_PATH);
   if (!can(acesso.role, capability)) redirect(`/sem-acesso?modulo=${capability}`);
-  if (!(await hasCrmSeat(acesso.userId))) redirect(CRM_NOT_CONTRACTED_PATH);
+  if (!modules.crmWholeTeam && !(await hasCrmSeat(acesso.userId))) redirect(CRM_NOT_CONTRACTED_PATH);
 
   return { ...acesso, db: getTenantClient(acesso.tenantId) };
 }
@@ -74,7 +75,7 @@ export async function guardCrmAction(
   const modules = await getTenantModules(acesso.tenantId);
   if (!modules.crm) return { ok: false, message: CRM_NOT_CONTRACTED_MESSAGE };
   if (!can(acesso.role, capability)) return { ok: false, message: capabilityDeniedMessage(capability) };
-  if (!(await hasCrmSeat(acesso.userId))) return { ok: false, message: CRM_NO_SEAT_MESSAGE };
+  if (!modules.crmWholeTeam && !(await hasCrmSeat(acesso.userId))) return { ok: false, message: CRM_NO_SEAT_MESSAGE };
 
   // Ler continua aberto para clínica suspensa — os dados são dos pacientes.
   if (write) {

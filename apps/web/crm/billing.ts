@@ -20,8 +20,9 @@ export interface CrmSubscriptionState {
 }
 
 export function crmStatus(sub: CrmSubscriptionState | null, now: Date = new Date()): CrmStatus {
+  // Cortesia inclui o CRM, ligado ou não.
+  if (sub?.complimentary) return 'complimentary';
   if (!sub?.crmEnabled) return 'off';
-  if (sub.complimentary) return 'complimentary';
   if (sub.crmTrialEndsAt && sub.crmTrialEndsAt.getTime() > now.getTime()) return 'trial';
   return 'paid';
 }

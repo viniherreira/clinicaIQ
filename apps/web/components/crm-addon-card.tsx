@@ -26,7 +26,7 @@ export async function CrmAddonCard() {
       : a.status === 'trial'
         ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${preco} por usuário (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
         : a.status === 'complimentary'
-          ? `Incluído na cortesia · ${usuarios} com acesso.`
+          ? 'Incluído na cortesia, sem custo: toda a equipe com perfil de dono, administração ou recepção tem acesso.'
           : `Ativo · ${usuarios} × ${preco} = ${formatCents(a.crmMonthlyCents)}/mês.`;
 
   return (
@@ -48,7 +48,9 @@ export async function CrmAddonCard() {
             </p>
           )}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {a.status === 'off' ? (
+            {a.status === 'complimentary' ? (
+              <Link href="/crm" className="btn-primary btn-md">Abrir o CRM</Link>
+            ) : a.status === 'off' ? (
               <CrmTurnOnButton label={a.trialAvailable ? 'Experimentar 14 dias grátis' : 'Ativar o CRM'} />
             ) : (
               <>

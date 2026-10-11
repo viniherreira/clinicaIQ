@@ -59,7 +59,7 @@ export async function AppShell({
   ]);
 
   const role = me?.role ?? '';
-  const seat = Boolean(me?.crmSeat);
+  const seat = Boolean(me?.crmSeat) || modules.crmWholeTeam;
   guard?.({ role, crm: modules.crm, seat });
 
   // O seletor só aparece para quem consegue entrar no CRM.

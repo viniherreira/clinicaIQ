@@ -32,9 +32,14 @@ export const getTenantAccess = cache(async (tenantId: string): Promise<Access> =
 
 /** Módulos que a clínica contratou. */
 export interface TenantModules {
-  /** Gestão clínica (agenda, pacientes…). Sempre ligada até o plano "só CRM" (etapa 5). */
+  /** Gestão clínica (agenda, pacientes…). Sempre ligada. */
   clinic: true;
   crm: boolean;
+  /**
+   * Cortesia: o CRM vem incluído e sem cobrança por pessoa, então toda a
+   * equipe com perfil de CRM entra, sem precisar da chave individual.
+   */
+  crmWholeTeam: boolean;
 }
 
 /**
@@ -47,10 +52,12 @@ export interface TenantModules {
  */
 export const getTenantModules = cache(async (tenantId: string): Promise<TenantModules> => {
   const subscription = await prisma.subscription
-    .findUnique({ where: { tenantId }, select: { crmEnabled: true } })
+    .findUnique({ where: { tenantId }, select: { crmEnabled: true, complimentary: true } })
     .catch(() => null);
   // Falha fechada: sem resposta do banco, o CRM some — a gestão clínica não.
-  return { clinic: true, crm: subscription?.crmEnabled ?? false };
+  // Cortesia inclui o CRM: ligado sempre, sem precisar ativar.
+  const complimentary = subscription?.complimentary ?? false;
+  return { clinic: true, crm: Boolean(subscription?.crmEnabled) || complimentary, crmWholeTeam: complimentary };
 });
 
 /** Thrown when a suspended clinic tries to change something. */

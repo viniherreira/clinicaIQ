@@ -13,10 +13,11 @@ let acesso: { tenantId: string; userId: string; role: string } | null = null;
 let crmEnabled = true;
 let bloqueio: string | null = null;
 let assento = true;
+let cortesia = false;
 
 vi.mock('@/lib/guard', () => ({ currentAccess: async () => acesso }));
 vi.mock('@/lib/access', () => ({
-  getTenantModules: async () => ({ clinic: true, crm: crmEnabled }),
+  getTenantModules: async () => ({ clinic: true, crm: crmEnabled, crmWholeTeam: cortesia }),
   writeBlocked: async () => bloqueio,
 }));
 vi.mock('@clinicaiq/db', () => ({
@@ -31,6 +32,21 @@ beforeEach(() => {
   crmEnabled = true;
   bloqueio = null;
   assento = true;
+  cortesia = false;
+});
+
+describe('cortesia', () => {
+  it('toda a equipe com perfil de CRM entra, sem a chave individual', async () => {
+    cortesia = true;
+    assento = false;
+    await expect(requireCrm('crm')).resolves.toMatchObject({ tenantId: 't1' });
+    expect(await guardCrmAction('crm')).toMatchObject({ ok: true });
+  });
+  it('o perfil continua valendo', async () => {
+    cortesia = true;
+    acesso = { tenantId: 't1', userId: 'u1', role: 'PROFESSIONAL' };
+    await expect(requireCrm('crm')).rejects.toThrow('redirect:/sem-acesso');
+  });
 });
 
 describe('requireCrm (páginas)', () => {
