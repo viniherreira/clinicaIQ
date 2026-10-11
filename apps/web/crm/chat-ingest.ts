@@ -113,8 +113,10 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
     if (name && name !== conv.contactName) data.contactName = name;
     if (conv.status === 'DECLINED') data.status = 'INBOX';
   } else if (newest) {
+    // Respondido pelo celular da clínica: alguém leu, e o robô sai da conversa.
     data.unreadCount = 0;
     data.awaitingReply = false;
+    Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 });
   }
   await db.conversation.update({ where: { id: conv.id, tenantId }, data });
 

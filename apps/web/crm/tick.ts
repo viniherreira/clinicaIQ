@@ -1,3 +1,4 @@
+import { expireBots } from './bot';
 import { finishBroadcasts, startDueBroadcasts } from './broadcasts';
 import { processCloudQueue } from './cloud-send';
 import { simulateDueLocal } from './dev-clock';
@@ -16,5 +17,6 @@ export async function runTick(now: Date = new Date()) {
   const cloudSent = await processCloudQueue(now);
   const simulated = await simulateDueLocal(now);
   const broadcastsDone = await finishBroadcasts(now);
-  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone };
+  const botsExpired = await expireBots(now);
+  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsExpired };
 }

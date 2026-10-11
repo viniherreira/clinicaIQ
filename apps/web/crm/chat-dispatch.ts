@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { getTenantClient } from '@clinicaiq/db';
 import { getGatewayProvider } from '@clinicaiq/whatsapp';
 import { activeCloudAccount } from './cloud';

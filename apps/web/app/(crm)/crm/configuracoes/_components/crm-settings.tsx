@@ -7,6 +7,7 @@ import { COLOR_LABEL, colorClasses } from '@/crm/colors';
 import { CRM_COLORS } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
 import { AutomationsTab, type AutomationRow } from './automations-tab';
+import { BotsTab, type BotRow } from './bots-tab';
 import {
   createStageAction, deleteQuickReplyAction, deleteStageAction, deleteTagAction, moveStageAction, toggleLostReasonAction,
   updateStageAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
@@ -40,6 +41,7 @@ export function CrmSettings({
   automations,
   team,
   templates,
+  bots,
 }: {
   stages: Stage[];
   tags: Tag[];
@@ -48,8 +50,9 @@ export function CrmSettings({
   automations: AutomationRow[];
   team: { id: string; name: string }[];
   templates: { id: string; name: string; variables: number }[];
+  bots: BotRow[];
 }) {
-  const [aba, setAba] = useState<'etapas' | 'automacoes' | 'tags' | 'motivos' | 'respostas'>('etapas');
+  const [aba, setAba] = useState<'etapas' | 'automacoes' | 'robo' | 'tags' | 'motivos' | 'respostas'>('etapas');
   const [aviso, setAviso] = useState('');
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -65,6 +68,7 @@ export function CrmSettings({
   const abas = [
     { key: 'etapas' as const, label: 'Etapas do funil' },
     { key: 'automacoes' as const, label: 'Automações' },
+    { key: 'robo' as const, label: 'Robô' },
     { key: 'tags' as const, label: 'Tags' },
     { key: 'motivos' as const, label: 'Motivos de perda' },
     { key: 'respostas' as const, label: 'Respostas rápidas' },
@@ -94,6 +98,14 @@ export function CrmSettings({
         {aba === 'tags' && <Tags tags={tags} pending={pending} agir={agir} />}
         {aba === 'motivos' && <Motivos reasons={reasons} pending={pending} agir={agir} />}
         {aba === 'respostas' && <Respostas items={quickReplies} pending={pending} agir={agir} />}
+        {aba === 'robo' && (
+          <BotsTab
+            bots={bots}
+            stages={stages.filter((s) => s.role !== 'WON' && s.role !== 'LOST').map((s) => ({ id: s.id, name: s.name }))}
+            tags={tags.map((t) => ({ id: t.id, name: t.name }))}
+            team={team}
+          />
+        )}
         {aba === 'automacoes' && (
           <AutomationsTab
             stages={stages.map((s) => ({ id: s.id, name: s.name }))}

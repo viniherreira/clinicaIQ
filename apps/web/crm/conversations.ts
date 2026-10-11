@@ -437,8 +437,10 @@ export async function writeChatMessage(
         data: {
           lastMessageAt: now,
           lastPreviewEncrypted: seal(text.replace(/\s+/g, ' ').slice(0, 120), tenantId),
-          // Quem responde é a equipe: leu e respondeu. O robô não conta.
-          ...(origin === 'CRM' ? { unreadCount: 0, awaitingReply: false } : {}),
+          // Quem responde é a equipe: leu, respondeu e o robô sai da conversa.
+          ...(origin === 'CRM'
+            ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 }
+            : {}),
         },
       });
     }

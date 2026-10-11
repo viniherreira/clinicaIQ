@@ -161,9 +161,10 @@ export async function recordChatMessage(
       // Recusada que escreve de novo volta para a Entrada.
       if (conv.status === 'DECLINED') data.status = 'INBOX';
     } else if (origin === 'PHONE' && newest) {
-      // Quem respondeu pelo celular leu.
+      // Quem respondeu pelo celular leu, e o robô do CRM sai da conversa.
       data.unreadCount = 0;
       data.awaitingReply = false;
+      Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 });
     }
     if (Object.keys(data).length > 0) {
       await prisma.conversation.update({ where: { id: conv.id }, data });

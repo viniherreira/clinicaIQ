@@ -1,4 +1,5 @@
 import { decrypt, getTenantClient } from '@clinicaiq/db';
+import { runBotOnInbound } from './bot';
 import { classifyConversation } from './conversations';
 
 /**
@@ -14,13 +15,6 @@ function masterKey(): string {
   const key = process.env.ENCRYPTION_MASTER_KEY;
   if (!key) throw new Error('ENCRYPTION_MASTER_KEY not set');
   return key;
-}
-
-/** Ganchos que outras partes do CRM registram (o robô). */
-type InboundHook = (tenantId: string, conversationId: string, messageId: string) => Promise<void>;
-const hooks: InboundHook[] = [];
-export function onInbound(hook: InboundHook): void {
-  if (!hooks.includes(hook)) hooks.push(hook);
 }
 
 export async function afterInbound(tenantId: string, conversationId: string, messageId: string | null): Promise<void> {
@@ -53,11 +47,9 @@ export async function afterInbound(tenantId: string, conversationId: string, mes
     return;
   }
 
-  for (const hook of hooks) {
-    try {
-      await hook(tenantId, conversationId, msg.id);
-    } catch (e) {
-      console.error('[crm] gancho de entrada falhou', e instanceof Error ? e.message : e);
-    }
+  try {
+    await runBotOnInbound(tenantId, conversationId, msg.id);
+  } catch (e) {
+    console.error('[crm] robô falhou', e instanceof Error ? e.message : e);
   }
 }

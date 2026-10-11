@@ -5,6 +5,8 @@ import { guardCrmAction } from '@/crm/guard';
 import * as s from '@/crm/settings';
 import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
 import type { AutomationAction } from '@clinicaiq/db';
+import { deleteBot, saveBot, toggleBot } from '@/crm/bot-admin';
+import { toSteps, type UiMenu } from '@/crm/bot-form';
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -43,3 +45,24 @@ export const saveAutomationAction = async (input: {
 }) => run((g) => saveAutomation(g.db, g.tenantId, input));
 export const toggleAutomationAction = async (id: string, active: boolean) => run((g) => toggleAutomation(g.db, id, active));
 export const deleteAutomationAction = async (id: string) => run((g) => deleteAutomation(g.db, id));
+
+export const saveBotAction = async (input: {
+  id?: string;
+  name: string;
+  trigger: 'NEW_CONTACT' | 'KEYWORD';
+  keywords: string;
+  menu: UiMenu;
+  active: boolean;
+}) =>
+  run((g) =>
+    saveBot(g.db, g.tenantId, {
+      id: input.id,
+      name: input.name,
+      trigger: input.trigger === 'KEYWORD' ? 'KEYWORD' : 'NEW_CONTACT',
+      keywords: input.keywords.split(','),
+      steps: toSteps(input.menu),
+      active: input.active,
+    }),
+  );
+export const toggleBotAction = async (id: string, active: boolean) => run((g) => toggleBot(g.db, id, active));
+export const deleteBotAction = async (id: string) => run((g) => deleteBot(g.db, id));
