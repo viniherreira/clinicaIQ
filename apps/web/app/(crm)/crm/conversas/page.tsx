@@ -1,5 +1,6 @@
 import { requireCrm } from '@/crm/guard';
 import { INBOX_TABS, classifyPending, inboxCounts, listConversations, loadThread, markRead, type InboxTab } from '@/crm/conversations';
+import { activeCloudAccount } from '@/crm/cloud';
 import { can } from '@/lib/permissions';
 import { Inbox } from './_components/inbox';
 
@@ -21,12 +22,13 @@ export default async function ConversasPage({
   // As que o aviso do gateway não alcançou.
   await classifyPending(ctx.db, ctx.tenantId);
 
-  const [list, counts, thread, quickReplies, line] = await Promise.all([
+  const [list, counts, thread, quickReplies, line, cloud] = await Promise.all([
     listConversations(ctx.db, ctx, tab, q),
     inboxCounts(ctx.db),
     selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
     ctx.db.whatsAppSession.findFirst({ select: { status: true } }),
+    activeCloudAccount(ctx.tenantId),
   ]);
   if (thread && thread.conversation.unread > 0) {
     await markRead(ctx.db, thread.conversation.id);
@@ -42,8 +44,10 @@ export default async function ConversasPage({
       initialQ={q}
       initialSelectedId={thread ? selectedId : null}
       quickReplies={quickReplies}
-      lineDown={line?.status !== 'CONNECTED'}
+      // Na API oficial não há linha de QR para cair.
+      lineDown={!cloud && line?.status !== 'CONNECTED'}
       canConfigWhatsapp={can(ctx.role, 'configuracoes')}
+      canManage={can(ctx.role, 'crm_config')}
     />
   );
 }

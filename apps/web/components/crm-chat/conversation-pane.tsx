@@ -16,6 +16,7 @@ import {
 } from '@/app/(crm)/crm/conversas/actions';
 import { ChatComposer, type QuickReplyOption } from './chat-composer';
 import { ChatMessages } from './chat-messages';
+import { TemplatePicker } from './template-picker';
 
 /**
  * Uma conversa aberta: quem é, as mensagens e a caixa de texto. Usada na tela
@@ -28,6 +29,7 @@ export function ConversationPane({
   onChanged,
   onBack,
   compact = false,
+  canManage = false,
 }: {
   thread: ChatThread;
   quickReplies: QuickReplyOption[];
@@ -35,6 +37,8 @@ export function ConversationPane({
   onChanged: () => void;
   onBack?: () => void;
   compact?: boolean;
+  /** Pode criar modelos (crm_config). */
+  canManage?: boolean;
 }) {
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
@@ -58,6 +62,17 @@ export function ConversationPane({
         }}
       />
 
+      {thread.channel === 'cloud' && !thread.windowOpen && c.status !== 'DECLINED' ? (
+        <TemplatePicker
+          target={{ conversationId: c.id }}
+          contactName={c.name === c.phoneMasked ? null : c.name}
+          canManage={canManage}
+          onSent={() => {
+            setAviso('Modelo enviado para a fila do WhatsApp.');
+            onChanged();
+          }}
+        />
+      ) : (
       <ChatComposer
         quickReplies={quickReplies}
         // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
@@ -73,6 +88,7 @@ export function ConversationPane({
           return r;
         }}
       />
+      )}
       <p role="status" aria-live="polite" className="sr-only">
         {aviso}
       </p>

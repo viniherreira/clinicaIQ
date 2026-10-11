@@ -118,7 +118,8 @@ export function ChatMessages({
                     ].join(' ')}
                   >
                     <span className="sr-only">{`${quem.label}, ${chatDayLabel(at)} às ${chatTime(at)}: `}</span>
-                    {media && (
+                    {media && m.hasMedia && <MediaView line={m} label={media.label} />}
+                    {media && !m.hasMedia && (
                       <p className="flex items-center gap-1.5 text-muted-foreground">
                         <media.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                         <span>
@@ -166,5 +167,29 @@ export function ChatMessages({
         </ol>
       )}
     </div>
+  );
+}
+
+/** Mídia da API oficial: o CRM busca na Meta na hora (nada fica guardado). */
+function MediaView({ line, label }: { line: ChatLine; label: string }) {
+  const src = `/api/crm/media/${line.id}`;
+  if (line.kind === 'IMAGE' || line.kind === 'STICKER') {
+    return (
+      <a href={src} target="_blank" rel="noopener noreferrer" className="block focus-visible:outline-2 focus-visible:outline-ring">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={line.text ? `${label}: ${line.text}` : `${label} recebida`} loading="lazy" className="max-h-64 rounded-lg" />
+      </a>
+    );
+  }
+  // Áudio e vídeo mandados pelo contato não vêm com legenda, e uma faixa vazia só
+  // fingiria cumprir a regra. A transcrição automática fica para depois.
+  // eslint-disable-next-line jsx-a11y/media-has-caption
+  if (line.kind === 'AUDIO') return <audio controls preload="none" src={src} aria-label={label} className="w-56 max-w-full" />;
+  // eslint-disable-next-line jsx-a11y/media-has-caption
+  if (line.kind === 'VIDEO') return <video controls preload="none" src={src} aria-label={label} className="max-h-64 rounded-lg" />;
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-2">
+      <FileText className="h-4 w-4" aria-hidden="true" /> Abrir {label.toLowerCase()}
+    </a>
   );
 }

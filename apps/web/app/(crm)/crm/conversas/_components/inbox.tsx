@@ -28,6 +28,7 @@ export function Inbox({
   quickReplies,
   lineDown,
   canConfigWhatsapp,
+  canManage,
 }: {
   initial: InboxSnapshot;
   initialTab: InboxTab;
@@ -36,6 +37,7 @@ export function Inbox({
   quickReplies: QuickReplyOption[];
   lineDown: boolean;
   canConfigWhatsapp: boolean;
+  canManage: boolean;
 }) {
   const id = useId();
   const [snap, setSnap] = useState(initial);
@@ -178,6 +180,7 @@ export function Inbox({
               quickReplies={quickReplies}
               onChanged={() => void refresh()}
               onBack={() => setSelectedId(null)}
+              canManage={canManage}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">

@@ -5,6 +5,7 @@ import { History, MessageCircle } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { ChatComposer, type QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { ConversationPane } from '@/components/crm-chat/conversation-pane';
+import { TemplatePicker } from '@/components/crm-chat/template-picker';
 import { loadThreadAction, startLeadChatAction } from '@/app/(crm)/crm/conversas/actions';
 
 const POLL_MS = 4_000;
@@ -19,12 +20,16 @@ export function LeadRightPane({
   leadName,
   initialThread,
   quickReplies,
+  channel,
+  canManage,
 }: {
   feed: React.ReactNode;
   leadId: string;
   leadName: string;
   initialThread: ChatThread | null;
   quickReplies: QuickReplyOption[];
+  channel: 'cloud' | 'gateway';
+  canManage: boolean;
 }) {
   const id = useId();
   const [aba, setAba] = useState<'historico' | 'conversa'>('historico');
@@ -72,7 +77,16 @@ export function LeadRightPane({
         {feed}
       </div>
       <div id={`${id}-painel-conversa`} role="tabpanel" aria-labelledby={`${id}-conversa`} hidden={aba !== 'conversa'} className={`${aba === 'conversa' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col`}>
-        {aba === 'conversa' && <LeadChat leadId={leadId} leadName={leadName} initialThread={initialThread} quickReplies={quickReplies} />}
+        {aba === 'conversa' && (
+          <LeadChat
+            leadId={leadId}
+            leadName={leadName}
+            initialThread={initialThread}
+            quickReplies={quickReplies}
+            channel={channel}
+            canManage={canManage}
+          />
+        )}
       </div>
     </div>
   );
@@ -83,11 +97,15 @@ function LeadChat({
   leadName,
   initialThread,
   quickReplies,
+  channel,
+  canManage,
 }: {
   leadId: string;
   leadName: string;
   initialThread: ChatThread | null;
   quickReplies: QuickReplyOption[];
+  channel: 'cloud' | 'gateway';
+  canManage: boolean;
 }) {
   const [thread, setThread] = useState(initialThread);
   const [conversationId, setConversationId] = useState(initialThread?.conversation.id ?? null);
@@ -110,15 +128,24 @@ function LeadChat({
     return () => clearInterval(t);
   }, [refresh]);
 
-  if (thread) return <ConversationPane thread={thread} quickReplies={quickReplies} onChanged={() => void refresh()} compact />;
+  if (thread) {
+    return <ConversationPane thread={thread} quickReplies={quickReplies} onChanged={() => void refresh()} compact canManage={canManage} />;
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
         <MessageCircle className="h-10 w-10" aria-hidden="true" />
         <p className="text-sm">Ainda não há conversa com {leadName} no WhatsApp da clínica.</p>
-        <p className="text-xs">Escreva abaixo para começar. A mensagem sai pelo número da clínica.</p>
+        <p className="text-xs">
+          {channel === 'cloud'
+            ? 'Na API oficial, a primeira mensagem precisa ser um modelo aprovado.'
+            : 'Escreva abaixo para começar. A mensagem sai pelo número da clínica.'}
+        </p>
       </div>
+      {channel === 'cloud' ? (
+        <TemplatePicker target={{ leadId }} contactName={leadName} canManage={canManage} onSent={(id) => setConversationId(id)} />
+      ) : (
       <ChatComposer
         quickReplies={quickReplies}
         contactName={leadName}
@@ -129,6 +156,7 @@ function LeadChat({
           return { ok: true as const };
         }}
       />
+      )}
     </div>
   );
 }

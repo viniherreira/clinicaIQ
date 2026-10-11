@@ -5,6 +5,8 @@ import { requireCrm } from '@/crm/guard';
 import { loadLeadDetail } from '@/crm/lead-detail';
 import { loadCrmBasics } from '@/crm/page-data';
 import { conversationIdForLead, loadThread } from '@/crm/conversations';
+import { activeCloudAccount } from '@/crm/cloud';
+import { can } from '@/lib/permissions';
 import { LeadFeed } from './_components/lead-feed';
 import { LeadPanel } from './_components/lead-panel';
 import { ConvertActions } from './_components/convert-actions';
@@ -25,7 +27,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
   ]);
   if (!lead) notFound();
-  const thread = conversationId ? await loadThread(ctx.db, ctx.tenantId, conversationId) : null;
+  const [thread, cloud] = await Promise.all([
+    conversationId ? loadThread(ctx.db, ctx.tenantId, conversationId) : Promise.resolve(null),
+    activeCloudAccount(ctx.tenantId),
+  ]);
 
   return (
     <div className="flex h-full flex-col">
@@ -53,6 +58,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           leadName={lead.name}
           initialThread={thread}
           quickReplies={quickReplies}
+          channel={cloud ? 'cloud' : 'gateway'}
+          canManage={can(ctx.role, 'crm_config')}
         />
       </div>
     </div>

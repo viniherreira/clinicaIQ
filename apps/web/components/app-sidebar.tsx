@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
 import { ModuleSwitcher, type Space } from './module-switcher';
@@ -51,6 +51,7 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/conversas', label: 'Conversas', icon: MessageCircle, capability: 'crm' },
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
+  { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
   { href: '/crm/configuracoes', label: 'Configurações do CRM', icon: Settings, capability: 'crm_config' },
 ];
 
