@@ -10,6 +10,17 @@ import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { podeRemover } from '@/lib/team';
+import { syncBillingValue } from '@/crm/addon';
+
+/** Mudanças na equipe mexem na cobrança do CRM (por usuário). Falha no Asaas
+ *  não desfaz a mudança: a rotina diária acerta o valor depois. */
+async function sincronizarCobranca(tenantId: string) {
+  try {
+    await syncBillingValue(tenantId);
+  } catch (error) {
+    console.error('[equipe] valor da assinatura não sincronizado', tenantId, error instanceof Error ? error.message : error);
+  }
+}
 import { composeAddress } from '@/lib/address';
 import { documentError, formatDocument, onlyDigits } from '@/lib/document';
 import { contractTitle, DEFAULT_QUOTE_TERMS } from '@/lib/document-content';
@@ -588,6 +599,8 @@ export async function updateTeamRole(
   }
 
   await prisma.user.update({ where: { id: targetUserId }, data: { role } });
+  // Virar Profissional tira a pessoa da cobrança do CRM.
+  await sincronizarCobranca(tenantId);
   await prisma.auditLog.create({
     data: {
       tenantId,
@@ -719,6 +732,8 @@ export async function removeTeamMember(input: {
         // depois: `clerkUserId` é único no banco inteiro.
         clerkUserId: null,
         previousClerkUserId: alvo.clerkUserId,
+        // Quem sai da equipe sai também da cobrança do CRM.
+        crmSeat: false,
       },
     }),
     prisma.invitation.updateMany({
@@ -736,6 +751,7 @@ export async function removeTeamMember(input: {
       },
     }),
   ]);
+  await sincronizarCobranca(tenantId);
 
   revalidatePath('/configuracoes');
   return { ok: true };

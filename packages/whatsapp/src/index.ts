@@ -34,3 +34,15 @@ export type {
   QuoteMessageData,
   BirthdayMessageData,
 } from './templates';
+export {
+  CloudApi,
+  CloudApiError,
+  DEFAULT_GRAPH_VERSION,
+  countTemplateVariables,
+  describeGraphError,
+  exchangeSignupCode,
+  renderTemplateBody,
+} from './cloud-api';
+export type { CloudButton, CloudConfig, GraphTemplate } from './cloud-api';
+export { cloudContent, parseCloudWebhook, verifyMetaSignature } from './cloud-webhook';
+export type { CloudContent, CloudEvent, CloudKind } from './cloud-webhook';

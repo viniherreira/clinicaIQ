@@ -1,30 +1,50 @@
 # ClinicaIQ — Roadmap
 
-## MVP (em andamento)
+## Gestão da clínica (em produção)
 
-- [x] Monorepo + configuração
-- [x] Schema Prisma completo
-- [ ] Auth + onboarding da clínica
-- [ ] CRUD de pacientes + timeline
-- [ ] Agenda (dia/semana, drag-and-drop + teclado)
-- [ ] Cadastro de procedimentos
-- [ ] Orçamentos (CRUD, PDF, link público)
-- [ ] WhatsApp (mock ponta-a-ponta, BullMQ 24h)
-- [ ] Dashboard do dia
-- [ ] Documentação (ARCHITECTURE, ACCESSIBILITY, WHATSAPP_SETUP)
-- [ ] CI com lint, typecheck, testes, axe
+- [x] Monorepo, schema, auth e onboarding da clínica
+- [x] Pacientes: cadastro, ficha, prontuário (anamnese, evolução, odontograma, arquivos)
+- [x] Agenda (dia/semana, arrastar e teclado, bloqueios)
+- [x] Procedimentos
+- [x] Orçamentos (PDF, contrato, recibo, link público)
+- [x] WhatsApp por QR code (gateway próprio, outbox com reenvio)
+- [x] Lembretes, aniversários e campanhas com consentimento separado
+- [x] Retorno (recall de quem chamar de volta)
+- [x] Financeiro e relatórios numa tela só
+- [x] Equipe, perfis de acesso e auditoria
+- [x] Planos e cobrança (Asaas), cortesia
+- [x] Regressão E2E com login (agenda e orçamentos)
 
-## Pós-MVP (ideias para futuro — NÃO implementar agora)
+## CRM de captação
 
-- Prontuário clínico digital
-- Odontograma interativo
-- Módulo financeiro (contas a receber, fluxo de caixa)
+Funcionalidades e organização de tela inspiradas no Kommo; identidade do ClinicaIQ.
+
+- [x] **Etapa 1 — leads, funil, tags e tarefas** (branch `feat/crm-etapa1`)
+  - Seletor Clínica | CRM; funil editável no estilo Kommo; ficha do lead em duas metades
+  - Tarefas com aviso "sem tarefa"; vários negócios por paciente
+  - Conversão em paciente e "Agendar avaliação" direto na agenda
+  - O card anda sozinho com a agenda e os orçamentos
+- [x] **CRM como adicional pago** — R$ 39 por usuário/mês, 14 dias grátis, uma cobrança só (antes de publicar)
+  - [ ] Publicar etapa 1 + adicional em produção (cópia de segurança, SQL revisado, banco antes do merge, clínica piloto)
+- [x] **Etapa 2 — Conversas do WhatsApp** (pelo gateway de QR; mesma branch)
+  - Tela Conversas (Todas/Minhas/Sem resposta/Entrada), aba Conversa na ficha do lead
+  - Coluna Entrada no funil (aceitar, recusar, ligar a lead ou paciente)
+  - Respostas rápidas com `/`; mensagens cifradas; envio com fila e reenvio no gateway
+  - [ ] Publicar junto com a etapa 1 (banco → app → gateway no Fly.io)
+- [x] **Etapa 2b — API oficial do WhatsApp (pronta para ligar)**
+  - Cadastro incorporado da Meta com coexistência, conexão de teste, modelos (sincronizar e criar), janela de 24h, mídia recebida aberta no CRM
+  - [ ] Ligar de verdade: aprovação do ClinicaIQ como Tech Provider na Meta e as variáveis `META_*`
+  - [ ] Enviar mídia; anonimização do lead a pedido do titular
+- [x] **Etapa 3 — Transmissões** (QR espaçado; modelo aprovado na API oficial; agendar, cancelar, números)
+- [x] **Etapa 4 — Robô por botões e automações por etapa**
+- [x] **Cortesia inclui o CRM**, ligado e aberto a toda a equipe com perfil de CRM
+- ~~Etapa 5 — plano "só CRM"~~ (descartado: o CRM é adicional do sistema de agenda)
+
+## Ideias para depois
+
+- Campos personalizados e vários funis no CRM
 - NPS / pesquisa de satisfação
-- Aniversário automático (mensagem WhatsApp)
-- Atribuição de origem / marketing (como o paciente chegou)
-- App mobile (React Native ou PWA)
+- App mobile (PWA)
 - Multi-unidades (uma conta, várias clínicas)
-- Relatórios avançados e exportação
-- Integração com sistemas de convênio
+- Integração com convênios
 - Fila de espera inteligente
-- Recall automático (paciente inativo há X meses)

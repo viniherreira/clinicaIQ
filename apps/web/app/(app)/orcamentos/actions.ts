@@ -5,11 +5,13 @@ import { prisma, getTenantClient } from '@clinicaiq/db';
 import type { ContractDocumentProps, QuoteDocumentProps } from '@clinicaiq/pdf';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
+import { notifyCrm } from '@/crm/notify';
 import { describePayment, isPaymentMethod, MAX_INSTALLMENTS } from '@/lib/payment-terms';
 import { loadClinicInfo, loadPatientDocData } from '@/lib/documents';
 import {
@@ -383,6 +385,7 @@ export async function createQuote(
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'CREATE', entity: 'Quote', entityId: quote.id },
   });
+  after(() => notifyCrm(tenantId, { type: 'quote.created', patientId: data.patientId, quoteId: quote.id }));
 
   revalidatePath('/orcamentos');
   return { success: true, quoteId: quote.id };
@@ -617,6 +620,7 @@ export async function acceptQuote(id: string): Promise<{ ok: boolean; message?: 
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'ACCEPT', entity: 'Quote', entityId: id },
   });
+  after(() => notifyCrm(tenantId, { type: 'quote.accepted', patientId: quote.patientId, quoteId: id }));
 
   revalidatePath('/orcamentos');
   revalidatePath(`/orcamentos/${id}`);
@@ -649,6 +653,7 @@ export async function reopenQuote(id: string): Promise<{ ok: boolean }> {
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'REOPEN', entity: 'Quote', entityId: id },
   });
+  after(() => notifyCrm(tenantId, { type: 'quote.reopened', patientId: quote.patientId, quoteId: id }));
 
   revalidatePath('/orcamentos');
   revalidatePath(`/orcamentos/${id}`);
@@ -681,6 +686,7 @@ export async function deleteQuote(id: string) {
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Quote', entityId: id },
   });
+  after(() => notifyCrm(tenantId, { type: 'quote.deleted', patientId: quote.patientId, quoteId: id }));
 
   revalidatePath('/orcamentos');
   revalidatePath('/financeiro');

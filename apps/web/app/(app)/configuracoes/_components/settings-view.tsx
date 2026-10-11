@@ -65,6 +65,8 @@ interface Props {
   /** Renderizado no servidor e passado pronto: o cartão de cobrança busca dados
    *  do Asaas e não pode virar componente de cliente só para caber numa aba. */
   billing: React.ReactNode;
+  /** "Acesso ao CRM" na aba Equipe, renderizado no servidor (lê a cobrança do CRM). */
+  crmSeats?: React.ReactNode;
   whatsapp: { status: string; phoneNumber: string | null };
   /** As três abas de administração. Quem não alcança não recebe nem os dados. */
   podeEquipe: boolean;
@@ -84,6 +86,7 @@ export function SettingsView({
   privacy,
   audit,
   billing,
+  crmSeats,
   whatsapp,
   podeEquipe,
   podePlano,
@@ -111,6 +114,7 @@ export function SettingsView({
             panel: (
               <div className="space-y-6">
                 <TeamPanel team={team} invites={invites} />
+                {crmSeats}
                 <ProfessionalsSection
                   professionals={professionals}
                   suggestedColor={suggestedColor}

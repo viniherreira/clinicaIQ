@@ -187,12 +187,14 @@ export async function updateSubscriptionValue(
   subscriptionId: string,
   priceCents: number,
   planName: string,
+  /** Texto da fatura. Padrão: só o plano; com o CRM, "plano X + CRM (n usuários)". */
+  description: string = `ClinicaIQ — plano ${planName}`,
 ): Promise<void> {
   await request(`/subscriptions/${subscriptionId}`, {
     method: 'PUT',
     body: JSON.stringify({
       value: priceCents / 100,
-      description: `ClinicaIQ — plano ${planName}`,
+      description,
       // Keeps the already-issued invoice in step with the new plan instead of
       // leaving the clinic with a charge for what it no longer has.
       updatePendingPayments: true,

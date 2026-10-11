@@ -30,6 +30,36 @@ export const getTenantAccess = cache(async (tenantId: string): Promise<Access> =
   return subscription ? resolveAccess(subscription, new Date()) : NO_SUBSCRIPTION;
 });
 
+/** Módulos que a clínica contratou. */
+export interface TenantModules {
+  /** Gestão clínica (agenda, pacientes…). Sempre ligada. */
+  clinic: true;
+  crm: boolean;
+  /**
+   * Cortesia: o CRM vem incluído e sem cobrança por pessoa, então toda a
+   * equipe com perfil de CRM entra, sem precisar da chave individual.
+   */
+  crmWholeTeam: boolean;
+}
+
+/**
+ * Quais módulos a clínica tem. Em cache por requisição: o menu, a página e a
+ * action perguntam a mesma coisa e pagam uma consulta.
+ *
+ * Separado de `getTenantAccess` de propósito: aquele responde "pode gravar?"
+ * a partir das datas da cobrança; este responde "o que foi contratado?". Uma
+ * clínica pode estar em dia sem ter o CRM, ou ter o CRM e estar suspensa.
+ */
+export const getTenantModules = cache(async (tenantId: string): Promise<TenantModules> => {
+  const subscription = await prisma.subscription
+    .findUnique({ where: { tenantId }, select: { crmEnabled: true, complimentary: true } })
+    .catch(() => null);
+  // Falha fechada: sem resposta do banco, o CRM some — a gestão clínica não.
+  // Cortesia inclui o CRM: ligado sempre, sem precisar ativar.
+  const complimentary = subscription?.complimentary ?? false;
+  return { clinic: true, crm: Boolean(subscription?.crmEnabled) || complimentary, crmWholeTeam: complimentary };
+});
+
 /** Thrown when a suspended clinic tries to change something. */
 export class SubscriptionBlockedError extends Error {
   constructor(readonly access: Access) {

@@ -13,3 +13,9 @@ test-results/
 
 .vercel
 .env*
+
+# Exemplos de variáveis vão para o repositório; os valores de verdade, não.
+!.env*.example
+
+# Sessão de login salva pelos testes E2E.
+apps/web/e2e/.auth/

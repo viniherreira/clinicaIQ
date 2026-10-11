@@ -32,7 +32,11 @@ export type Capability =
   /** Assinatura e cobrança do SaaS. */
   | 'planos'
   /** LGPD: consentimentos, exclusão de dados e o registro de quem fez o quê. */
-  | 'privacidade';
+  | 'privacidade'
+  /** CRM: leads, funil, tarefas e conversão em paciente. */
+  | 'crm'
+  /** CRM: etapas do funil, tags, motivos de perda e excluir lead. */
+  | 'crm_config';
 
 /**
  * O que cada papel alcança.
@@ -57,10 +61,21 @@ const DIA_A_DIA: readonly Capability[] = [
   'campanhas',
 ];
 
+/**
+ * O CRM é trabalho de quem capta: a recepção move os leads, o dono e o admin
+ * também arrumam o funil. O profissional fica de fora nesta primeira versão —
+ * quem atende na cadeira não toca a captação.
+ *
+ * O papel é só metade da porta: a clínica também precisa ter o módulo
+ * contratado (`Subscription.crmEnabled`), conferido em `crm/guard.ts`.
+ */
+const CRM: readonly Capability[] = ['crm'];
+const CRM_ADMIN: readonly Capability[] = ['crm', 'crm_config'];
+
 const GRANTS: Record<Role, readonly Capability[]> = {
-  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY],
-  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY],
-  RECEPTIONIST: DIA_A_DIA,
+  OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
+  ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
+  RECEPTIONIST: [...DIA_A_DIA, ...CRM],
   PROFESSIONAL: DIA_A_DIA,
 };
 
@@ -90,6 +105,8 @@ const LABEL: Record<Capability, string> = {
   equipe: 'a gestão de quem tem acesso',
   planos: 'o plano e a cobrança',
   privacidade: 'os dados de privacidade e o histórico de alterações',
+  crm: 'o CRM',
+  crm_config: 'a configuração do funil do CRM',
 };
 
 export function capabilityDeniedMessage(capability: Capability): string {

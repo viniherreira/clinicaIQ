@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt } from './encryption';
+import { encrypt, decrypt, hashForTenant } from './encryption';
 
 const KEY = 'unit-test-master-key-not-a-real-secret';
 
@@ -32,5 +32,19 @@ describe('encryption (AES-256-GCM, per-tenant)', () => {
     const value = 'Ação · São Paulo · (11) 99999-0000 · 😀';
     const cipher = encrypt(value, KEY, 'tenant_a');
     expect(decrypt(cipher, KEY, 'tenant_a')).toBe(value);
+  });
+});
+
+describe('hashForTenant (índice cego)', () => {
+  it('é estável: o mesmo valor dá o mesmo código', () => {
+    expect(hashForTenant('5511987654321', KEY, 'tenant_a')).toBe(hashForTenant('5511987654321', KEY, 'tenant_a'));
+  });
+
+  it('muda de clínica para clínica', () => {
+    expect(hashForTenant('5511987654321', KEY, 'tenant_a')).not.toBe(hashForTenant('5511987654321', KEY, 'tenant_b'));
+  });
+
+  it('não revela o valor', () => {
+    expect(hashForTenant('5511987654321', KEY, 'tenant_a')).not.toContain('98765');
   });
 });

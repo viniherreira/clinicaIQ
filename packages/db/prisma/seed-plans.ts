@@ -21,6 +21,7 @@ const PLANS = [
     campaignsEnabled: false,
     assistantEnabled: false,
     advancedReports: false,
+    crmSeatPriceCents: 3_900,
     sortOrder: 1,
   },
   {
@@ -33,6 +34,7 @@ const PLANS = [
     campaignsEnabled: true,
     assistantEnabled: false,
     advancedReports: false,
+    crmSeatPriceCents: 3_900,
     sortOrder: 2,
   },
   {
@@ -45,6 +47,7 @@ const PLANS = [
     campaignsEnabled: true,
     assistantEnabled: false,
     advancedReports: true,
+    crmSeatPriceCents: 3_900,
     sortOrder: 3,
   },
 ];

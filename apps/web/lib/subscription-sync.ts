@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@clinicaiq/db';
 import { GRACE_DAYS, resolveAccess } from './subscription';
 import { stopComplimentaryBilling } from './complimentary';
+import { syncBillingValue } from '@/crm/addon';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -45,6 +46,12 @@ export async function reconcileSubscriptions(now: Date = new Date()): Promise<Re
         console.error('[cortesia] falha ao encerrar cobrança', sub.tenantId, e),
       );
     }
+
+    // Valor da mensalidade (plano + CRM): pega o fim do teste grátis do CRM e
+    // qualquer divergência com o Asaas. Só manda quando o valor mudou.
+    await syncBillingValue(sub.tenantId, undefined, now).catch((e) =>
+      console.error('[crm] valor da assinatura não sincronizado', sub.tenantId, e instanceof Error ? e.message : e),
+    );
 
     const access = resolveAccess(sub, now);
     if (access.status === sub.status) continue;

@@ -13,7 +13,7 @@ vi.mock('@clinicaiq/db', () => ({
   prisma: { subscription: { findUnique: (...a: unknown[]) => findUnique(...(a as [])) } },
 }));
 
-const { writeBlocked, canWriteTenant } = await import('./access');
+const { writeBlocked, canWriteTenant, getTenantModules } = await import('./access');
 
 const DIA = 24 * 60 * 60 * 1000;
 const daqui = (dias: number) => new Date(Date.now() + dias * DIA);
@@ -132,5 +132,26 @@ describe('writeBlocked', () => {
       cancelledAt: null,
     };
     expect(await writeBlocked('t1')).toBeTruthy();
+  });
+});
+
+describe('getTenantModules', () => {
+  it('liga o CRM só quando a assinatura diz que foi contratado', async () => {
+    assinatura = { crmEnabled: true, complimentary: false };
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: true, crmWholeTeam: false });
+    assinatura = { crmEnabled: false, complimentary: false };
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false, crmWholeTeam: false });
+  });
+
+  it('cortesia inclui o CRM, aberto a toda a equipe, mesmo sem ter ligado', async () => {
+    assinatura = { crmEnabled: false, complimentary: true };
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: true, crmWholeTeam: true });
+  });
+
+  it('sem assinatura, ou com o banco falhando, o CRM some e a clínica fica', async () => {
+    assinatura = null;
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false, crmWholeTeam: false });
+    findUnique.mockRejectedValueOnce(new Error('banco fora'));
+    expect(await getTenantModules('t1')).toEqual({ clinic: true, crm: false, crmWholeTeam: false });
   });
 });

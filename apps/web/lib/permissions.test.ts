@@ -11,6 +11,8 @@ const TODAS: Capability[] = [
   'equipe',
   'planos',
   'privacidade',
+  'crm',
+  'crm_config',
 ];
 
 /** O que só o dono e o administrador alcançam. */
@@ -67,6 +69,23 @@ describe('can', () => {
     for (const r of PAPEIS) {
       expect(can(r, 'agenda')).toBe(true);
     }
+  });
+});
+
+describe('can — CRM', () => {
+  it('a recepção capta; dono e admin também arrumam o funil', () => {
+    expect(PAPEIS.filter((r) => can(r, 'crm'))).toEqual(['OWNER', 'ADMIN', 'RECEPTIONIST']);
+    expect(PAPEIS.filter((r) => can(r, 'crm_config'))).toEqual(['OWNER', 'ADMIN']);
+  });
+
+  it('o profissional não entra no CRM nesta versão', () => {
+    expect(can('PROFESSIONAL', 'crm')).toBe(false);
+    expect(can('PROFESSIONAL', 'crm_config')).toBe(false);
+  });
+
+  it('papel desconhecido não entra no CRM', () => {
+    expect(can(null, 'crm')).toBe(false);
+    expect(can('SUPERUSUARIO', 'crm_config')).toBe(false);
   });
 });
 

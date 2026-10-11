@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
-import { navFor } from './app-sidebar';
+import { activeHref, navFor } from './app-sidebar';
+import { ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
 import { LogoMark, LogoWordmark } from './logo';
 import { UserMenu } from './user-menu';
@@ -17,6 +18,8 @@ export function AppHeader({
   roleLabel,
   canConfig,
   canPlanos,
+  space = 'clinic',
+  showSwitcher = false,
 }: {
   clinicName: string;
   /** Quem está logado agora — não a clínica, não o dono. */
@@ -26,11 +29,14 @@ export function AppHeader({
   roleLabel: string;
   canConfig: boolean;
   canPlanos: boolean;
+  space?: Space;
+  showSwitcher?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   // O menu do celular precisa esconder exatamente o mesmo que a lateral.
-  const itens = navFor(role);
+  const itens = navFor(role, space);
+  const ativo = activeHref(itens, pathname);
 
   return (
     <>
@@ -77,9 +83,14 @@ export function AppHeader({
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
+            {showSwitcher && (
+              <div className="px-3">
+                <ModuleSwitcher space={space} onNavigate={() => setOpen(false)} />
+              </div>
+            )}
             <ul className="flex-1 space-y-1 overflow-y-auto p-3">
               {itens.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = item.href === ativo;
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>

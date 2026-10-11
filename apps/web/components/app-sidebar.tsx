@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
-  MessageCircle, Megaphone, Settings, PhoneCall,
+  MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from './logo';
+import { CrmRail } from './crm-rail';
+import { ModuleSwitcher, type Space } from './module-switcher';
 import { can, type Capability } from '@/lib/permissions';
 
 /**
@@ -18,13 +21,17 @@ import { can, type Capability } from '@/lib/permissions';
  * Isto é arrumação, não segurança. Quem digitar o endereço direto continua
  * sendo barrado no servidor, por `requireCapability`.
  */
-export const NAV: {
+type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
   capability?: Capability;
-}[] = [
+  /** O nome que cabe no menu estreito do CRM. */
+  short?: string;
+};
+
+export const CLINIC_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays, capability: 'agenda' },
   { href: '/pacientes', label: 'Pacientes', icon: Users, capability: 'pacientes' },
@@ -38,13 +45,59 @@ export const NAV: {
   { href: '/configuracoes', label: 'Configurações', icon: Settings, capability: 'configuracoes' },
 ];
 
-export function navFor(role: string | null | undefined) {
-  return NAV.filter((item) => !item.capability || can(role, item.capability));
+/**
+ * O menu do espaço CRM. Transmissões e Chatbot entram nas próximas etapas. O
+ * próprio espaço só abre para quem tem `crm` (ver `crm/guard.ts`).
+ */
+export const CRM_NAV: NavItem[] = [
+  { href: '/crm', label: 'Funil', icon: KanbanSquare, capability: 'crm' },
+  { href: '/crm/conversas', label: 'Conversas', icon: MessageCircle, capability: 'crm' },
+  { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
+  { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
+  { href: '/crm/transmissoes', label: 'Transmissões', icon: Megaphone, capability: 'crm' },
+  { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
+  { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm_config' },
+];
+
+export function navFor(role: string | null | undefined, space: Space = 'clinic') {
+  const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV;
+  return nav.filter((item) => !item.capability || can(role, item.capability));
 }
 
-export function AppSidebar({ clinicName, role }: { clinicName: string; role: string }) {
+/**
+ * Item ativo: o de endereço mais longo que casa com a página. Sem isso, em
+ * /crm/leads o "Funil" (/crm) também acenderia, porque /crm/leads começa com /crm.
+ */
+export function activeHref(items: NavItem[], pathname: string): string | undefined {
+  return items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
+
+export function AppSidebar({
+  clinicName,
+  role,
+  space = 'clinic',
+  showSwitcher = false,
+  counts = {},
+}: {
+  clinicName: string;
+  role: string;
+  space?: Space;
+  /** A clínica tem os dois módulos e a pessoa alcança o CRM. */
+  showSwitcher?: boolean;
+  /** Números ao lado de um item (conversas não lidas), por endereço. */
+  counts?: Record<string, number>;
+}) {
   const pathname = usePathname();
-  const itens = navFor(role);
+  const itens = navFor(role, space);
+  const unread = useLiveUnread(counts['/crm/conversas'] ?? 0);
+  const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
+  const ativo = activeHref(itens, pathname);
+
+  if (space === 'crm') {
+    return <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} />;
+  }
 
   return (
     <nav aria-label="Menu principal" className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex print:!hidden">
@@ -53,13 +106,23 @@ export function AppSidebar({ clinicName, role }: { clinicName: string; role: str
         <LogoMark size="md" />
         <div className="flex flex-col leading-none">
           <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
-          <span className="mt-1 text-[11px] text-muted-foreground">Gestão clínica</span>
+          {!showSwitcher && (
+            <span className="mt-1 text-[11px] text-muted-foreground">
+              Gestão clínica
+            </span>
+          )}
         </div>
       </div>
 
+      {showSwitcher && (
+        <div className="px-3 pb-2">
+          <ModuleSwitcher space={space} />
+        </div>
+      )}
+
       <ul className="flex-1 space-y-1 overflow-y-auto px-3 pb-3 pt-1">
         {itens.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = item.href === ativo;
           const Icon = item.icon;
           return (
             <li key={item.href}>
@@ -78,6 +141,12 @@ export function AppSidebar({ clinicName, role }: { clinicName: string; role: str
                 )}
                 <Icon className="h-[18px] w-[18px] shrink-0 transition-transform group-hover:scale-110" aria-hidden="true" />
                 {item.label}
+                {(contagem[item.href] ?? 0) > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                    {contagem[item.href]}
+                    <span className="sr-only"> não lida(s)</span>
+                  </span>
+                )}
                 {item.badge && (
                   <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
                     {item.badge}

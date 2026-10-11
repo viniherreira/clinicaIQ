@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4",
+    "@clerk/testing": "^2.2.43",
     "@playwright/test": "^1",
     "@tailwindcss/typography": "^0.5",
     "@types/node": "^22",
