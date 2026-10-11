@@ -21,6 +21,8 @@ import {
   type InboxTab,
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
+import { activeCloudAccount } from '@/crm/cloud';
+import { renderTemplateBody } from '@clinicaiq/whatsapp';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
@@ -68,7 +70,8 @@ export async function loadThreadAction(conversationId: string): Promise<Result<{
 export async function sendChatAction(conversationId: string, text: string): Promise<Result> {
   const g = await guardCrmAction('crm');
   if (!g.ok) return g;
-  const r = await writeChatMessage(g.db, g, conversationId, text);
+  const cloud = await activeCloudAccount(g.tenantId);
+  const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
   if (!r.ok) return r;
   // Responde já; a entrega ao WhatsApp segue depois.
   after(() => dispatchChat(g.tenantId, r.messageId));
@@ -89,7 +92,8 @@ export async function startLeadChatAction(leadId: string, text: string): Promise
   if (!g.ok) return g;
   const conv = await ensureConversationForLead(g.db, g.tenantId, leadId);
   if (!conv.ok) return conv;
-  const r = await writeChatMessage(g.db, g, conv.conversationId, text);
+  const cloud = await activeCloudAccount(g.tenantId);
+  const r = await writeChatMessage(g.db, g, conv.conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
   if (!r.ok) return r;
   after(() => dispatchChat(g.tenantId, r.messageId));
   return { ok: true, conversationId: conv.conversationId };
@@ -156,4 +160,53 @@ export async function searchLinkTargetsAction(q: string): Promise<Result<{ targe
       ...patients.map((p) => ({ kind: 'patient' as const, id: p.id, label: p.name, detail: `Paciente nº ${p.controlNumber}` })),
     ],
   };
+}
+
+export interface TemplateOption {
+  id: string;
+  name: string;
+  category: string;
+  body: string;
+  variables: number;
+}
+
+/** Modelos aprovados, para a caixa de texto fora da janela de 24 horas. */
+export async function approvedTemplatesAction(): Promise<Result<{ templates: TemplateOption[] }>> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  const rows = await g.db.messageTemplate.findMany({
+    where: { status: 'APPROVED' },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, category: true, body: true, variables: true },
+  });
+  return { ok: true, templates: rows };
+}
+
+/** Manda um modelo aprovado (API oficial): o único jeito fora da janela de 24 horas. */
+export async function sendTemplateAction(
+  target: { conversationId: string } | { leadId: string },
+  templateId: string,
+  params: string[],
+): Promise<Result<{ conversationId: string }>> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  const t = await g.db.messageTemplate.findFirst({ where: { id: templateId, status: 'APPROVED' } });
+  if (!t) return { ok: false, message: 'Modelo não encontrado ou ainda não aprovado.' };
+  const values = params.slice(0, t.variables).map((p) => p.trim());
+  if (values.length < t.variables || values.some((v) => !v)) return { ok: false, message: 'Preencha todas as variáveis do modelo.' };
+
+  let conversationId: string;
+  if ('leadId' in target) {
+    const conv = await ensureConversationForLead(g.db, g.tenantId, target.leadId);
+    if (!conv.ok) return conv;
+    conversationId = conv.conversationId;
+  } else {
+    conversationId = target.conversationId;
+  }
+  const r = await writeChatMessage(g.db, g, conversationId, renderTemplateBody(t.body, values), new Date(), {
+    template: { name: t.name, lang: t.language, params: values },
+  });
+  if (!r.ok) return r;
+  after(() => dispatchChat(g.tenantId, r.messageId));
+  return { ok: true, conversationId };
 }

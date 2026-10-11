@@ -35,6 +35,7 @@ describe.skipIf(!ready)('envio pelo CRM (banco)', async () => {
         externalId: `3EB0SEND${suffix}${seq++}`,
         status: 'PENDING',
         createdAt,
+        at: createdAt,
       },
     });
 
@@ -86,6 +87,16 @@ describe.skipIf(!ready)('envio pelo CRM (banco)', async () => {
     const row = await prisma.chatMessage.findUniqueOrThrow({ where: { id: m.id } });
     expect(row.status).toBe('FAILED');
     expect(row.errorMessage).toMatch(/WhatsApp não encontrado/);
+  });
+
+  it('clínica na API oficial: o gateway não manda', async () => {
+    const m = await pending();
+    await prisma.whatsAppCloudAccount.create({
+      data: { tenantId: tenant.id, wabaId: 'W', phoneNumberId: `PN_${suffix}`, accessTokenEncrypted: 'x' },
+    });
+    expect(await sendChat(tenant.id, m.id)).toEqual({ ok: false, error: 'not-pending' });
+    expect(send).not.toHaveBeenCalled();
+    await prisma.whatsAppCloudAccount.deleteMany({ where: { tenantId: tenant.id } });
   });
 
   it('passou de 1 hora: desiste sem mandar', async () => {

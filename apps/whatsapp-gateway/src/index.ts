@@ -284,6 +284,18 @@ app.listen(env.PORT, '0.0.0.0', () => {
   retry();
   setInterval(retry, 30_000).unref();
 
+  // O relógio do CRM: automações com atraso, transmissões, fila da API oficial
+  // e robôs parados moram no app; o gateway, que nunca dorme, dá o compasso.
+  if (env.APP_URL) {
+    const tick = () =>
+      void fetch(`${env.APP_URL}/api/cron/crm-tick`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${env.GATEWAY_TOKEN}` },
+        signal: AbortSignal.timeout(55_000),
+      }).catch((e) => console.error('[gateway] relogio do CRM falhou:', e?.message ?? e));
+    setInterval(tick, 60_000).unref();
+  }
+
   // As respostas do CRM têm a própria fila, com a mesma ideia.
   const retryChats = () =>
     void retryPendingChats().catch((e) => console.error('[gateway] fila do CRM falhou:', e?.message ?? e));

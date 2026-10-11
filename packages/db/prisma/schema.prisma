@@ -1283,8 +1283,10 @@ model ChatMessage {
   /// Hora da mensagem no WhatsApp.
   at            DateTime      @default(now())
 
-  /// Modelo aprovado usado (API oficial).
-  templateName  String?
+  /// Modelo aprovado usado (API oficial) e os valores das variáveis, em ordem.
+  templateName   String?
+  templateLang   String?
+  templateParams Json?
   /// Mídia na API oficial: id na Meta, buscado sob demanda (nada é guardado).
   mediaRef      String?
   mimeType      String?

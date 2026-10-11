@@ -6,7 +6,9 @@
  * pega a mensagem depois. Mandar sempre com o mesmo id faz uma segunda tentativa
  * não virar uma segunda mensagem.
  */
-import { decrypt, prisma } from './db.js';
+import type { Prisma } from '@prisma/client';
+import { previewOf } from './chat-describe.js';
+import { decrypt, encrypt, prisma } from './db.js';
 import { env } from './env.js';
 import { PERMANENT, REASON } from './outbox.js';
 import { send } from './session-manager.js';
@@ -18,6 +20,16 @@ const BACKOFF_MS = [30_000, 2 * 60_000, 5 * 60_000, 15 * 60_000];
 const OFFLINE_RETRY_MS = 2 * 60_000;
 /** Tempo de reserva: acima do pior caso de um primeiro envio (45s). */
 const CLAIM_MS = 90_000;
+
+/** O que o CRM manda: a equipe, as transmissões e o robô. */
+const SENDABLE = ['CRM', 'BROADCAST', 'BOT'] as const;
+
+/** Clínica na API oficial: quem envia é o app, não o gateway. */
+const NOT_CLOUD: Prisma.TenantWhereInput = {
+  OR: [{ whatsappCloudAccount: { is: null } }, { whatsappCloudAccount: { is: { active: false } } }],
+};
+/** A rotina só olha clínicas com a linha de QR. */
+const ON_GATEWAY: Prisma.TenantWhereInput = { whatsappSession: { isNot: null }, ...NOT_CLOUD };
 
 export type ChatSendResult = { ok: true } | { ok: false; error: string };
 
@@ -34,9 +46,10 @@ export async function sendChat(tenantId: string, chatMessageId: string, now: Dat
       id: chatMessageId,
       tenantId,
       direction: 'OUTBOUND',
-      origin: 'CRM',
+      origin: { in: [...SENDABLE] },
       status: 'PENDING',
       acceptedAt: null,
+      tenant: NOT_CLOUD,
       OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }],
     },
     data: { claimedUntil: new Date(now.getTime() + CLAIM_MS) },
@@ -50,13 +63,15 @@ export async function sendChat(tenantId: string, chatMessageId: string, now: Dat
       externalId: true,
       textEncrypted: true,
       attempts: true,
-      createdAt: true,
-      conversation: { select: { phoneEncrypted: true } },
+      at: true,
+      buttons: true,
+      conversation: { select: { id: true, phoneEncrypted: true } },
     },
   });
   if (!row) return { ok: false, error: 'not-found' };
 
-  if (now.getTime() - row.createdAt.getTime() > GIVE_UP_AFTER_MS) {
+  // Contado da hora marcada: transmissão espaçada sai depois de criada.
+  if (now.getTime() - row.at.getTime() > GIVE_UP_AFTER_MS) {
     await fail(row.id, 'Não foi enviada a tempo. Tente de novo.');
     return { ok: false, error: 'expired' };
   }
@@ -71,13 +86,28 @@ export async function sendChat(tenantId: string, chatMessageId: string, now: Dat
     return { ok: false, error: 'unreadable' };
   }
 
-  const result = await send(tenantId, phone, { text, messageId: row.externalId, origin: 'CRM' });
+  // Opções do robô: até 3 viram botões (o texto já traz as opções numeradas,
+  // então funciona mesmo onde os botões não aparecem).
+  const options = Array.isArray(row.buttons) ? (row.buttons as { id: string; title: string }[]) : [];
+  const buttons = options.length > 0 && options.length <= 3 ? options : undefined;
+  const result = await send(tenantId, phone, { text, messageId: row.externalId, origin: 'CRM', buttons });
 
   if (result.success) {
+    const acceptedAt = new Date();
     await prisma.chatMessage.update({
       where: { id: row.id },
-      data: { acceptedAt: new Date(), attempts: row.attempts + 1, claimedUntil: null, nextAttemptAt: null, errorMessage: null },
+      data: { acceptedAt, attempts: row.attempts + 1, claimedUntil: null, nextAttemptAt: null, errorMessage: null },
     });
+    // Transmissão e robô: a conversa mostra a mensagem quando ela sai.
+    await prisma.conversation
+      .updateMany({
+        where: { id: row.conversation.id, lastMessageAt: { lte: acceptedAt } },
+        data: {
+          lastMessageAt: acceptedAt,
+          lastPreviewEncrypted: encrypt(previewOf({ kind: 'TEXT', text }), env.ENCRYPTION_MASTER_KEY, tenantId),
+        },
+      })
+      .catch(() => undefined);
     return { ok: true };
   }
 
@@ -121,20 +151,20 @@ export async function retryPendingChats(now: Date = new Date()): Promise<number>
     const due = await prisma.chatMessage.findMany({
       where: {
         direction: 'OUTBOUND',
-        origin: 'CRM',
+        origin: { in: [...SENDABLE] },
         status: 'PENDING',
         acceptedAt: null,
         attempts: { lt: MAX_ATTEMPTS },
-        tenant: { whatsappSession: { isNot: null } },
+        tenant: ON_GATEWAY,
         AND: [
           { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
           { OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }] },
         ],
         // O pedido direto do app tem alguns segundos de vantagem.
-        createdAt: { lt: new Date(now.getTime() - 15_000) },
+        at: { lt: new Date(now.getTime() - 15_000) },
       },
       select: { id: true, tenantId: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { at: 'asc' },
       take: 50,
     });
     let sent = 0;
@@ -154,9 +184,10 @@ export async function sweepStuckChats(now: Date = new Date()): Promise<number> {
   const { count } = await prisma.chatMessage.updateMany({
     where: {
       direction: 'OUTBOUND',
-      origin: 'CRM',
+      origin: { in: [...SENDABLE] },
       status: 'PENDING',
       acceptedAt: { lt: new Date(now.getTime() - 10 * 60_000) },
+      tenant: ON_GATEWAY,
     },
     data: { status: 'FAILED', errorMessage: 'Sem confirmação do WhatsApp. Confira no celular.' },
   });

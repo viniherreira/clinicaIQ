@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
+import { activeCloudAccount, windowOpen } from './cloud';
 import { createLead, OPEN_LEAD, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 
@@ -249,6 +250,10 @@ export interface ChatLine {
   accepted: boolean;
   error: string | null;
   sentBy: string | null;
+  /** Mídia da API oficial: dá para abrir no CRM. */
+  hasMedia: boolean;
+  mimeType: string | null;
+  templateName: string | null;
 }
 
 export interface ChatThread {
@@ -256,6 +261,10 @@ export interface ChatThread {
   messages: ChatLine[];
   /** Há mensagens mais antigas que as mostradas. */
   truncated: boolean;
+  /** Por onde a clínica responde. */
+  channel: 'cloud' | 'gateway';
+  /** API oficial: dá para escrever livre (24 h desde a última mensagem da pessoa). */
+  windowOpen: boolean;
 }
 
 const THREAD_LIMIT = 200;
@@ -289,8 +298,18 @@ export async function loadThread(
       accepted: Boolean(m.acceptedAt),
       error: m.errorMessage,
       sentBy: m.sentBy?.name ?? null,
+      hasMedia: Boolean(m.mediaRef),
+      mimeType: m.mimeType,
+      templateName: m.templateName,
     }));
-  return { conversation: toSummary(conv, tenantId), messages, truncated };
+  const cloud = await activeCloudAccount(tenantId);
+  return {
+    conversation: toSummary(conv, tenantId),
+    messages,
+    truncated,
+    channel: cloud ? 'cloud' : 'gateway',
+    windowOpen: windowOpen(conv.lastInboundAt),
+  };
 }
 
 /** Quem abriu leu. Só no CRM: o celular continua mostrando como estava. */
@@ -352,47 +371,77 @@ export async function ensureConversationForLead(
 
 // ─── Responder ────────────────────────────────────────────────────────────────
 
+export interface WriteOptions {
+  /** Quem escreve: a equipe (padrão), o robô ou uma transmissão. */
+  origin?: 'CRM' | 'BOT' | 'BROADCAST';
+  /** Modelo aprovado (API oficial). O `text` é o corpo já preenchido, para a tela. */
+  template?: { name: string; lang: string; params: string[] };
+  /** Opções do robô. */
+  buttons?: { id: string; title: string }[];
+  /** Na API oficial, recusa texto livre fora da janela de 24 horas. */
+  checkWindow?: boolean;
+  /** Quando sai (transmissão espaçada). Padrão: agora. */
+  sendAt?: Date;
+}
+
+export const WINDOW_CLOSED_MESSAGE = 'Passaram 24 horas desde a última mensagem da pessoa. Na API oficial, use um modelo aprovado.';
+
 export async function writeChatMessage(
   db: TenantPrismaClient,
-  actor: { tenantId: string; userId: string },
+  actor: { tenantId: string; userId: string | null },
   conversationId: string,
   rawText: string,
   now: Date = new Date(),
+  opts: WriteOptions = {},
 ): Promise<{ ok: true; messageId: string } | { ok: false; message: string }> {
   const text = rawText.trim();
   if (!text) return { ok: false, message: 'Escreva a mensagem.' };
   if (text.length > MAX_CHAT_TEXT) return { ok: false, message: `A mensagem passa de ${MAX_CHAT_TEXT} caracteres.` };
 
   const { tenantId } = actor;
-  const conv = await db.conversation.findFirst({ where: { id: conversationId }, select: { id: true, status: true } });
+  const conv = await db.conversation.findFirst({ where: { id: conversationId }, select: { id: true, status: true, lastInboundAt: true } });
   if (!conv) return { ok: false, message: 'Conversa não encontrada.' };
   if (conv.status === 'DECLINED') return { ok: false, message: 'Esta conversa foi recusada.' };
+  if (opts.checkWindow && !opts.template && !windowOpen(conv.lastInboundAt, now)) {
+    return { ok: false, message: WINDOW_CLOSED_MESSAGE };
+  }
 
+  const origin = opts.origin ?? 'CRM';
+  const sendAt = opts.sendAt ?? now;
+  const later = sendAt.getTime() > now.getTime();
   const msg = await db.$transaction(async (tx) => {
     const created = await tx.chatMessage.create({
       data: {
         tenantId,
         conversationId,
         direction: 'OUTBOUND',
-        origin: 'CRM',
+        origin,
         kind: 'TEXT',
         textEncrypted: seal(text, tenantId),
         externalId: newMessageId(),
         status: 'PENDING',
-        sentById: actor.userId,
-        at: now,
+        sentById: origin === 'CRM' ? actor.userId : null,
+        at: sendAt,
+        ...(later ? { nextAttemptAt: sendAt } : {}),
+        ...(opts.template
+          ? { templateName: opts.template.name, templateLang: opts.template.lang, templateParams: opts.template.params }
+          : {}),
+        ...(opts.buttons?.length ? { buttons: opts.buttons } : {}),
       },
       select: { id: true },
     });
-    await tx.conversation.update({
-      where: { id: conversationId, tenantId },
-      data: {
-        lastMessageAt: now,
-        lastPreviewEncrypted: seal(text.replace(/\s+/g, ' ').slice(0, 120), tenantId),
-        unreadCount: 0,
-        awaitingReply: false,
-      },
-    });
+    // Mensagem para depois (transmissão) só aparece na lista quando sair.
+    if (!later) {
+      await tx.conversation.update({
+        where: { id: conversationId, tenantId },
+        data: {
+          lastMessageAt: now,
+          lastPreviewEncrypted: seal(text.replace(/\s+/g, ' ').slice(0, 120), tenantId),
+          // Quem responde é a equipe: leu e respondeu. O robô não conta.
+          ...(origin === 'CRM' ? { unreadCount: 0, awaitingReply: false } : {}),
+        },
+      });
+    }
     return created;
   });
   return { ok: true, messageId: msg.id };

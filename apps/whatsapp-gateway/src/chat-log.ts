@@ -16,14 +16,23 @@ import { chatKey } from './phone.js';
 const CRM_TTL_MS = 60_000;
 const crmCache = new Map<string, { on: boolean; at: number }>();
 
-/** Consulta em cache: a linha recebe muitas mensagens e o CRM liga raramente. */
+/**
+ * As conversas desta clínica passam pelo gateway? Precisa do CRM ligado e de
+ * não ter a API oficial ativa — com ela, quem grava é o webhook da Meta, e
+ * gravar aqui também duplicaria cada mensagem.
+ *
+ * Consulta em cache: a linha recebe muitas mensagens e isso muda raramente.
+ */
 export async function crmEnabled(tenantId: string): Promise<boolean> {
   const hit = crmCache.get(tenantId);
   if (hit && Date.now() - hit.at < CRM_TTL_MS) return hit.on;
-  const sub = await prisma.subscription
-    .findUnique({ where: { tenantId }, select: { crmEnabled: true } })
-    .catch(() => null);
-  const on = Boolean(sub?.crmEnabled);
+  const [sub, cloud] = await Promise.all([
+    prisma.subscription.findUnique({ where: { tenantId }, select: { crmEnabled: true } }).catch(() => null),
+    prisma.whatsAppCloudAccount
+      .findUnique({ where: { tenantId }, select: { active: true, status: true } })
+      .catch(() => null),
+  ]);
+  const on = Boolean(sub?.crmEnabled) && !(cloud?.active && cloud.status === 'CONNECTED');
   crmCache.set(tenantId, { on, at: Date.now() });
   return on;
 }
@@ -76,7 +85,7 @@ export interface IncomingChat {
 }
 
 export type RecordResult =
-  | { recorded: true; conversationId: string; needsClassification: boolean }
+  | { recorded: true; conversationId: string; needsClassification: boolean; fromContact: boolean }
   | { recorded: false; reason: 'not-chat' | 'crm-off' | 'no-phone' | 'duplicate' | 'error' };
 
 export async function recordChatMessage(
@@ -141,6 +150,7 @@ export async function recordChatMessage(
       data.lastPreviewEncrypted = encrypt(previewOf(entry), masterKey, tenantId);
     }
     if (origin === 'CONTACT') {
+      data.lastInboundAt = at;
       if (newest) {
         data.unreadCount = { increment: 1 };
         data.awaitingReply = true;
@@ -157,7 +167,12 @@ export async function recordChatMessage(
       await prisma.conversation.update({ where: { id: conv.id }, data });
     }
 
-    return { recorded: true, conversationId: conv.id, needsClassification: conv.classifiedAt === null };
+    return {
+      recorded: true,
+      conversationId: conv.id,
+      needsClassification: conv.classifiedAt === null,
+      fromContact: origin === 'CONTACT',
+    };
   } catch (error) {
     console.error('[gateway] conversa nao gravada:', error instanceof Error ? error.message : error);
     return { recorded: false, reason: 'error' };
@@ -188,15 +203,16 @@ export async function applyChatAck(tenantId: string, externalId: string, ack: nu
 // ─── Aviso ao app ─────────────────────────────────────────────────────────────
 
 /**
- * Conversa nova: o app liga ao lead ou ao paciente (ou manda para a Entrada).
+ * Mensagem do contato ou conversa nova: o app liga ao lead ou ao paciente (ou
+ * manda para a Entrada), registra o "SAIR" e deixa o robô responder.
  * Melhor esforço — se falhar, o app classifica quando alguém abrir a tela.
  */
-export async function notifyConversation(tenantId: string, conversationId: string): Promise<void> {
+export async function notifyConversation(tenantId: string, conversationId: string, externalId?: string): Promise<void> {
   if (!env.APP_URL) return;
   await fetch(`${env.APP_URL}/api/whatsapp/conversation`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${env.GATEWAY_TOKEN}` },
-    body: JSON.stringify({ tenantId, conversationId }),
+    body: JSON.stringify({ tenantId, conversationId, externalId }),
     signal: AbortSignal.timeout(10_000),
   }).catch(() => undefined);
 }

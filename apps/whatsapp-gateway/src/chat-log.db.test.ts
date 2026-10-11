@@ -49,6 +49,8 @@ describe.skipIf(!ready)('conversas do CRM (banco)', async () => {
     expect(r).toMatchObject({ recorded: true, needsClassification: true });
     const conv = await prisma.conversation.findFirstOrThrow({ where: { tenantId: tenant.id }, include: { messages: true } });
     expect(conv).toMatchObject({ status: 'INBOX', unreadCount: 1, awaitingReply: true, contactName: 'Ana Souza' });
+    // A janela de 24 horas da API oficial começa na última mensagem do contato.
+    expect(conv.lastInboundAt).not.toBeNull();
     // A chave tem o 9; o texto e o telefone não ficam legíveis no banco.
     expect(decrypt(conv.phoneEncrypted, key, tenant.id)).toBe('5511987654321');
     expect(conv.messages[0].textEncrypted).not.toContain('avaliação');
@@ -98,6 +100,14 @@ describe.skipIf(!ready)('conversas do CRM (banco)', async () => {
   it('nada é gravado sem o CRM, para grupo sem telefone ou para reação', async () => {
     expect(await recordChatMessage(tenant.id, msg({ message: { reactionMessage: { text: '👍' } } }))).toEqual({ recorded: false, reason: 'not-chat' });
     expect(await recordChatMessage(tenant.id, msg({ phone: '' }))).toEqual({ recorded: false, reason: 'no-phone' });
+    // Com a API oficial ativa, quem grava é o webhook da Meta: aqui duplicaria.
+    await prisma.whatsAppCloudAccount.create({
+      data: { tenantId: tenant.id, wabaId: 'W', phoneNumberId: `PN_${suffix}`, accessTokenEncrypted: 'x' },
+    });
+    resetChatCaches();
+    expect(await recordChatMessage(tenant.id, msg())).toEqual({ recorded: false, reason: 'crm-off' });
+    await prisma.whatsAppCloudAccount.deleteMany({ where: { tenantId: tenant.id } });
+
     await prisma.subscription.update({ where: { id: sub.id }, data: { crmEnabled: false } });
     resetChatCaches();
     expect(await recordChatMessage(tenant.id, msg())).toEqual({ recorded: false, reason: 'crm-off' });
