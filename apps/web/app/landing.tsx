@@ -23,6 +23,7 @@ import {
   Users, Heart, PlusCircle, TrendingUp,
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from '@/components/logo';
+import { companyLine } from '@/lib/company';
 
 const display = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -618,8 +619,14 @@ function Footer() {
 
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
-          <p>© {new Date().getFullYear()} ClinicaIQ. Todos os direitos reservados.</p>
-          <p>Feito no Brasil 🇧🇷</p>
+          <p>
+            © {new Date().getFullYear()} ClinicaIQ{companyLine() ? ` — ${companyLine()}` : ''}. Todos os direitos reservados.
+          </p>
+          <nav aria-label="Páginas legais" className="flex items-center gap-4">
+            <Link href="/privacidade" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Privacidade</Link>
+            <Link href="/termos" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Termos de uso</Link>
+            <span>Feito no Brasil 🇧🇷</span>
+          </nav>
         </div>
       </div>
     </footer>
