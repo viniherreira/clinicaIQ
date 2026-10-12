@@ -22,6 +22,9 @@ import {
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
 import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
+import { checkChatMedia } from '@/crm/media-rules';
+import { nudgeTick } from '@/crm/tick-nudge';
+import { deleteChatMedia, mediaStoreReady, saveChatMedia } from '@/crm/media-store';
 import { activeCloudAccount } from '@/crm/cloud';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 
@@ -42,6 +45,8 @@ const asTab = (t: string): InboxTab => ((INBOX_TABS as readonly string[]).includ
 export async function refreshInboxAction(input: { tab: string; q: string; selectedId: string | null }): Promise<Result<{ snapshot: InboxSnapshot }>> {
   const g = await guardCrmAction('crm', { write: false });
   if (!g.ok) return g;
+  // A tela de Conversas aberta também dá o compasso do relógio do CRM.
+  nudgeTick();
   const [list, counts, thread] = await Promise.all([
     listConversations(g.db, g, asTab(input.tab), input.q),
     inboxCounts(g.db),
@@ -82,6 +87,43 @@ export async function sendChatAction(conversationId: string, text: string): Prom
   const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
   if (!r.ok) return r;
   // Responde já; a entrega ao WhatsApp segue depois.
+  after(() => dispatchChat(g.tenantId, r.messageId));
+  return { ok: true };
+}
+
+/**
+ * Manda uma foto, documento, áudio ou vídeo, com legenda opcional. Por enquanto
+ * só pela API oficial (e simulado no desenvolvimento): o gateway de QR não manda arquivo.
+ */
+export async function sendMediaAction(conversationId: string, form: FormData): Promise<Result> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  const file = form.get('arquivo');
+  if (!(file instanceof File)) return { ok: false, message: 'Escolha um arquivo.' };
+  const check = checkChatMedia(file);
+  if (!check.ok) return check;
+
+  const cloud = await activeCloudAccount(g.tenantId);
+  if (!cloud && (process.env.WHATSAPP_GATEWAY_URL || process.env.NODE_ENV === 'production')) {
+    return { ok: false, message: 'Mandar arquivos pelo CRM precisa da API oficial do WhatsApp.' };
+  }
+  if (!mediaStoreReady()) return { ok: false, message: 'O envio de arquivos ainda não está configurado.' };
+
+  let ref: string;
+  try {
+    ref = await saveChatMedia(g.tenantId, conversationId, file);
+  } catch {
+    return { ok: false, message: 'Não foi possível guardar o arquivo. Tente de novo.' };
+  }
+  const caption = String(form.get('legenda') ?? '');
+  const r = await writeChatMessage(g.db, g, conversationId, caption, new Date(), {
+    checkWindow: Boolean(cloud),
+    media: { kind: check.kind, ref, mimeType: check.mimeType },
+  });
+  if (!r.ok) {
+    await deleteChatMedia(ref).catch(() => {});
+    return r;
+  }
   after(() => dispatchChat(g.tenantId, r.messageId));
   return { ok: true };
 }

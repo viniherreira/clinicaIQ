@@ -34,9 +34,11 @@ Funcionalidades e organização de tela inspiradas no Kommo; identidade do Clini
 - [x] **Etapa 2b — API oficial do WhatsApp (pronta para ligar)**
   - Cadastro incorporado da Meta com coexistência, conexão de teste, modelos (sincronizar e criar), janela de 24h, mídia recebida aberta no CRM
   - [ ] Ligar de verdade: aprovação do ClinicaIQ como Tech Provider na Meta e as variáveis `META_*`
-  - [ ] Enviar mídia; anonimização do lead a pedido do titular
+  - [x] Enviar arquivos (foto, documento, áudio, vídeo) pelo CRM; apagar os dados de uma pessoa a pedido dela (LGPD)
 - [x] **Etapa 3 — Transmissões** (QR espaçado; modelo aprovado na API oficial; agendar, cancelar, números)
 - [x] **Etapa 4 — Robô por botões e automações por etapa**
+- [x] **Painel do CRM** e visual no jeito do Kommo (menu escuro, funil, Conversas com o lead à direita)
+- [x] **Relógio do CRM sem depender do gateway** (pelo uso do CRM; pg_cron do Supabase pronto para ligar)
 - [x] **Cortesia inclui o CRM**, ligado e aberto a toda a equipe com perfil de CRM
 - ~~Etapa 5 — plano "só CRM"~~ (descartado: o CRM é adicional do sistema de agenda)
 

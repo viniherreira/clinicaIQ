@@ -151,6 +151,40 @@ export class CloudApi {
     });
   }
 
+  /**
+   * Sobe um arquivo para a Meta e devolve o id dele, para mandar logo em
+   * seguida (`sendMedia`). A Meta guarda por 30 dias.
+   */
+  async uploadMedia(bytes: ArrayBuffer, mimeType: string, fileName: string): Promise<string> {
+    const form = new FormData();
+    form.set('messaging_product', 'whatsapp');
+    form.set('type', mimeType);
+    form.set('file', new Blob([bytes], { type: mimeType }), fileName);
+    let res: Response;
+    try {
+      res = await this.f(`${this.base}/${this.cfg.phoneNumberId}/media`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${this.cfg.token}` },
+        body: form,
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (e) {
+      throw new CloudApiError(0, undefined, 'Sem resposta da Meta. Vamos tentar de novo.', true, false, String(e));
+    }
+    const data = (await res.json().catch(() => ({}))) as { id?: string };
+    if (!res.ok) throw describeGraphError(res.status, data);
+    if (!data.id) throw new CloudApiError(200, undefined, 'A Meta não devolveu o id do arquivo.', true, false, JSON.stringify(data));
+    return data.id;
+  }
+
+  /** Foto, vídeo, áudio ou documento já enviado (`uploadMedia`). Áudio não leva legenda. */
+  sendMedia(to: string, kind: 'image' | 'video' | 'audio' | 'document', mediaId: string, caption?: string, fileName?: string) {
+    const media: Record<string, string> = { id: mediaId };
+    if (caption && kind !== 'audio') media.caption = caption;
+    if (kind === 'document' && fileName) media.filename = fileName;
+    return this.send(to, { type: kind, [kind]: media });
+  }
+
   async markRead(messageId: string): Promise<void> {
     await this.call(`${this.cfg.phoneNumberId}/messages`, {
       body: { messaging_product: 'whatsapp', status: 'read', message_id: messageId },

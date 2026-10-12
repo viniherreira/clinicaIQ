@@ -39,7 +39,7 @@ captação (funil de leads no estilo Kommo).
 
 - `apps/web` — Next.js frontend app
   - `app/(app)` — gestão da clínica
-  - `app/(crm)` — telas do CRM (`/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/transmissoes`, `/crm/whatsapp`, `/crm/configuracoes`)
+  - `app/(crm)` — telas do CRM (`/crm/painel`, `/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/transmissoes`, `/crm/whatsapp`, `/crm/configuracoes`)
   - `crm/` — regras do CRM (funil, leads, tarefas, automação), sem telas
   - `e2e/regressao` — regressão da agenda e dos orçamentos; `e2e/crm` — CRM
 - `apps/whatsapp-gateway` — gateway de WhatsApp por QR code
@@ -80,11 +80,14 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **Canal por clínica** (`crm/cloud.ts`): com `WhatsAppCloudAccount` ativa e conectada, as conversas entram pelo webhook `/api/webhooks/meta` (assinatura conferida com `META_APP_SECRET`) e saem pela Cloud API (`crm/cloud-send.ts`); o gateway não grava nem envia para essa clínica. Sem ela, é o gateway de QR. Os lembretes da agenda não mudam.
 - `crm/chat-ingest.ts` espelha a gravação do gateway (`chat-log.ts`) — mudar os dois juntos.
 - Janela de 24 h: na API oficial, fora dela só modelo aprovado (`MessageTemplate`). Token da Meta cifrado; nunca vai para a tela.
-- **Relógio do CRM** (`crm/tick.ts`, `/api/cron/crm-tick`): o gateway chama a cada minuto (a Vercel Hobby só tem crons diários). Roda automações com atraso, transmissões agendadas, a fila da API oficial e expira robôs. Em desenvolvimento, `instrumentation.ts` faz esse papel e dá como enviadas as mensagens da fila (`crm/dev-clock.ts`, nunca em produção).
+- **Relógio do CRM** (`crm/tick.ts`, `/api/cron/crm-tick`): roda automações com atraso, transmissões agendadas, a fila da API oficial e expira robôs. Quem chama: o uso do CRM (`crm/tick-nudge.ts`, no `requireCrm` e no atualizar das Conversas, no máximo 1×/min), o Supabase pg_cron (`docs/producao/relogio-crm.sql`, a ligar) e o gateway, se estiver no ar. Em desenvolvimento, `instrumentation.ts` também chama e dá como enviadas as mensagens da fila (`crm/dev-clock.ts`, nunca em produção). Cada parte reserva o que vai fazer, então chamadas juntas não duplicam.
 - **Transmissões** (`crm/broadcasts.ts`): uma mensagem por lead na fila da conversa, com hora marcada (espaçada no QR). Respeitam `Lead.whatsappOptOut` ("SAIR", tratado em `crm/inbound.ts`).
 - **Automações por etapa** (`crm/stage-automations.ts`): `createLead`/`moveLead` agendam (`crm/stage-queue.ts`, na mesma transação); se o lead sair da etapa antes da hora, não roda.
 - **Robô** (`crm/bot-engine.ts` puro, `crm/bot.ts` executa): roda depois de cada mensagem do contato (`afterInbound`); para quando a equipe responde.
 - **Cortesia inclui o CRM**: `getTenantModules` liga o módulo e `crmWholeTeam` dispensa a chave por pessoa.
+- **Painel** (`/crm/painel`, `crm/dashboard.ts` + `crm/dashboard-math.ts` puro): leads novos, ganhos, perdidos, conversão, funil, origem, motivos de perda, equipe e tempo de resposta (mediana, só resposta de gente).
+- **Arquivos pelo CRM** (`crm/media-rules.ts` puro, `crm/media-store.ts`): foto, PDF/Office, áudio e vídeo até 10 MB, guardados no Supabase Storage (`store:`) ou, só no desenvolvimento, em `apps/web/.crm-media` (`local:`). Saem pela API oficial (`CloudApi.uploadMedia` + `sendMedia`); o gateway de QR não manda arquivo (filtra `mediaRef: null`).
+- **LGPD — apagar os dados de uma pessoa** (`crm/anonymize.ts`, botão no pé da ficha, só `crm_config`, confirmação "APAGAR"): todos os leads com o mesmo telefone ficam sem nome, telefone, e-mail, notas, tarefas, tags, conversas e arquivos; o negócio fechado continua nos números, o aberto sai do funil; a ficha de paciente não muda. Grava `LEAD_PERSONAL_DATA_ERASED` na auditoria.
 - Spec e plano: `docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md` e `docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
 
 ## Accessibility

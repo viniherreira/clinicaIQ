@@ -11,6 +11,7 @@ import { LeadFeed } from './_components/lead-feed';
 import { LeadPanel } from './_components/lead-panel';
 import { ConvertActions } from './_components/convert-actions';
 import { LeadRightPane } from './_components/lead-chat';
+import { EraseLeadData } from './_components/erase-lead-data';
 
 export async function generateMetadata() {
   return { title: 'Lead · ClinicaIQ' };
@@ -51,6 +52,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             lostReasons={basics.lostReasons}
             actions={<ConvertActions key="converter" leadId={lead.id} patient={lead.patient} />}
           />
+          {can(ctx.role, 'crm_config') && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
         </div>
         <LeadRightPane
           feed={<LeadFeed lead={lead} team={basics.team} meId={ctx.userId} />}

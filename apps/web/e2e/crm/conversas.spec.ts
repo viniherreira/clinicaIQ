@@ -1,3 +1,4 @@
+import { deflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
 import { uniqueName } from '../support/helpers';
 import { incomingMessage } from './chat';
@@ -52,4 +53,69 @@ test('responder pela tela Conversas e ver na ficha do lead', async ({ page }) =>
   await page.getByRole('tab', { name: /Conversa/ }).click();
   await expect(page.getByText('Tem horário amanhã?')).toBeVisible();
   await expect(page.getByText(resposta)).toBeVisible();
+});
+
+/** Uma foto de verdade (PNG 24×16, azul), feita na hora: o navegador precisa conseguir desenhar. */
+function png(): Buffer {
+  const crc = (buf: Buffer) => {
+    let c = ~0;
+    for (const b of buf) {
+      c ^= b;
+      for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+    return ~c >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const t = Buffer.from(type, 'ascii');
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(Buffer.concat([t, data])));
+    return Buffer.concat([len, t, data, sum]);
+  };
+  const [w, h] = [24, 16];
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  const linha = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, Buffer.from([22, 105, 199]))]);
+  const idat = deflateSync(Buffer.concat(Array.from({ length: h }, () => linha)));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
+}
+const PNG = png();
+
+test('mandar uma foto com legenda pela conversa', async ({ page }) => {
+  test.setTimeout(180_000);
+  const lead = await createLeadViaModal(page);
+  await incomingMessage(lead.phone, 'Contato da foto', 'Pode mandar o raio-x?');
+
+  await page.goto('/crm/conversas');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: new RegExp(lead.name) }).click();
+  const conversa = page.getByRole('region', { name: `Conversa com ${lead.name}` });
+  await expect(conversa.getByText('Pode mandar o raio-x?')).toBeVisible();
+
+  await conversa.locator('input[type=file]').setInputFiles({ name: 'raio-x.png', mimeType: 'image/png', buffer: PNG });
+  await expect(conversa.getByText('raio-x.png')).toBeVisible();
+  const legenda = `Segue o raio-x ${Date.now()}`;
+  await conversa.getByRole('combobox', { name: 'Mensagem' }).fill(legenda);
+  await page.keyboard.press('Enter');
+
+  const bolha = conversa.getByRole('listitem').filter({ hasText: legenda });
+  await expect(bolha).toBeVisible();
+  const foto = bolha.getByRole('img');
+  await expect(foto).toBeVisible();
+  await expect.poll(() => foto.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+  await expect(bolha.getByText('Enviada')).toBeAttached({ timeout: 20_000 });
+});
+
+test('arquivo de tipo que não vai pelo WhatsApp é recusado na hora', async ({ page }) => {
+  const lead = await createLeadViaModal(page);
+  await incomingMessage(lead.phone, 'Contato do zip', 'Oi');
+  await page.goto('/crm/conversas');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: new RegExp(lead.name) }).click();
+  const conversa = page.getByRole('region', { name: `Conversa com ${lead.name}` });
+  await conversa.locator('input[type=file]').setInputFiles({ name: 'fotos.zip', mimeType: 'application/zip', buffer: Buffer.from('PK') });
+  await expect(conversa.getByRole('alert')).toContainText('Esse tipo de arquivo não vai pelo WhatsApp');
 });
