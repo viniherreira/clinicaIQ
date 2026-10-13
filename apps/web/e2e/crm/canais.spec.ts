@@ -142,3 +142,28 @@ test('automações e robô: criar pela tela', async ({ page }) => {
   await prisma.stageAutomation.deleteMany({ where: { tenantId: tenant.id } });
   await prisma.chatbotFlow.deleteMany({ where: { tenantId: tenant.id, name: nome } });
 });
+
+test('captação: regra com palavra e tag nova, testada na hora', async ({ page }) => {
+  const nome = uniqueName('Captação E2E');
+  const tag = `cap${Date.now().toString(36)}`;
+  await page.goto('/crm/automacoes/bots');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Nova regra' }).click();
+  const form = page.getByRole('form', { name: 'Nova regra de captação' });
+  await form.getByLabel('Nome da regra').fill(nome);
+  await form.getByLabel(/^Palavras/).fill('Implante, dente fixo');
+  await expect(form.getByText('Procura: “implante”, “dente fixo”')).toBeVisible();
+  await form.getByLabel('Nome da nova tag').fill(tag);
+  await form.getByRole('button', { name: 'Criar tag' }).click();
+  await form.getByRole('button', { name: tag, exact: true }).click();
+  await form.getByLabel('Origem do lead').selectOption('INSTAGRAM');
+  await form.getByRole('button', { name: 'Salvar regra' }).click();
+  await expect(page.getByText(`“implante”, “dente fixo” → tag ${tag} · origem Instagram`)).toBeVisible();
+
+  await page.getByLabel('Testar uma primeira mensagem').fill('Oi, quero colocar IMPLANTES');
+  await expect(page.getByText(`Achou “implante” → tag ${tag} · origem Instagram.`)).toBeVisible();
+
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  await prisma.captureRule.deleteMany({ where: { tenantId: tenant.id, name: nome } });
+  await prisma.leadTag.deleteMany({ where: { tenantId: tenant.id, name: tag } });
+});

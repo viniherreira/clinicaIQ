@@ -41,7 +41,7 @@ export function hoursText(h: BotHours) {
  * robô é contado em frases ("quando… responde… e faz…"), começa de um modelo
  * pronto e pode ser testado no simulador ao lado antes de ligar.
  */
-export function BotsTab({ bots, stages, tags, team }: { bots: BotRow[] } & BotRefs) {
+export function BotsTab({ bots, stages, tags, team, children }: { bots: BotRow[]; children?: React.ReactNode } & BotRefs) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [aviso, setAviso] = useState('');
@@ -188,6 +188,7 @@ export function BotsTab({ bots, stages, tags, team }: { bots: BotRow[] } & BotRe
       <p role="status" aria-live="polite" className="mt-3 text-sm text-muted-foreground">
         {aviso}
       </p>
+      {children}
     </section>
   );
 }

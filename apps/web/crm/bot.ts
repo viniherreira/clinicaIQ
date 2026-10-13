@@ -20,7 +20,17 @@ function masterKey(): string {
 
 const CLEAR = { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 } as const;
 
-export async function runBotOnInbound(tenantId: string, conversationId: string, messageId: string, now: Date = new Date()): Promise<'started' | 'continued' | 'none'> {
+/**
+ * `opts.newContact`: quem chama já sabe se é a primeira mensagem de um número da
+ * Entrada (a captação pode ter acabado de criar o lead e tirado a conversa de lá).
+ */
+export async function runBotOnInbound(
+  tenantId: string,
+  conversationId: string,
+  messageId: string,
+  now: Date = new Date(),
+  opts: { newContact?: boolean } = {},
+): Promise<'started' | 'continued' | 'none'> {
   const db = getTenantClient(tenantId);
   const conv = await db.conversation.findFirst({
     where: { id: conversationId },
@@ -54,7 +64,8 @@ export async function runBotOnInbound(tenantId: string, conversationId: string, 
   );
   if (flows.length === 0) return 'none';
   const primeira =
-    conv.status === 'INBOX' && (await db.chatMessage.count({ where: { conversationId: conv.id, origin: 'CONTACT' } })) === 1;
+    opts.newContact ??
+    (conv.status === 'INBOX' && (await db.chatMessage.count({ where: { conversationId: conv.id, origin: 'CONTACT' } })) === 1);
   const flow =
     flows.find((f) => f.trigger === 'KEYWORD' && isKeyword(text, f.keywords)) ??
     (primeira ? flows.find((f) => f.trigger === 'NEW_CONTACT') : undefined);

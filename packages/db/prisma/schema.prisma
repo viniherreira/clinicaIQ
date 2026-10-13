@@ -159,6 +159,7 @@ model Tenant {
   stageAutomations     StageAutomation[]
   automationRuns       AutomationRun[]
   chatbotFlows         ChatbotFlow[]
+  captureRules         CaptureRule[]
 
   @@map("tenants")
 }
@@ -1633,4 +1634,28 @@ model ChatbotFlow {
 
   @@index([tenantId, active])
   @@map("chatbot_flows")
+}
+
+/// Captação: palavras na primeira mensagem de um número que viram lead já com
+/// tag, funil e origem (ex.: "implante" → tag implante no funil Implantes).
+/// Roda antes do robô (`crm/capture.ts`). `tagIds` e `pipelineId` sem chave
+/// estrangeira: tag apagada é ignorada e funil apagado cai no principal.
+model CaptureRule {
+  id         String      @id @default(cuid())
+  tenantId   String
+  name       String
+  active     Boolean     @default(true)
+  keywords   String[]    @default([])
+  tagIds     String[]    @default([])
+  pipelineId String?
+  source     LeadSource?
+  order      Int         @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active])
+  @@map("capture_rules")
 }
