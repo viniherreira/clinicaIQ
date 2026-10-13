@@ -2,7 +2,7 @@
 
 import { Lock } from 'lucide-react';
 import { wallClockTime, wallClockMinutes } from '@/lib/tz';
-import { GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES } from './constants';
+import { useGrid } from './grid-context';
 
 export interface BlockedSlotItem {
   id: string;
@@ -23,10 +23,9 @@ export function BlockedSlotBlock({
 }) {
   const start = new Date(slot.startTime);
   const end = new Date(slot.endTime);
-  const startMin = wallClockMinutes(start) - GRID_START_HOUR * 60;
-  const endMin = wallClockMinutes(end) - GRID_START_HOUR * 60;
-  const topPx = (startMin / SLOT_MINUTES) * SLOT_HEIGHT_PX;
-  const heightPx = Math.max(((endMin - startMin) / SLOT_MINUTES) * SLOT_HEIGHT_PX, SLOT_HEIGHT_PX * 1.5);
+  const grid = useGrid();
+  const topPx = grid.minToPx(wallClockMinutes(start));
+  const heightPx = Math.max(grid.minToPx(wallClockMinutes(end)) - topPx, 24);
   const compact = heightPx < 32;
 
   return (

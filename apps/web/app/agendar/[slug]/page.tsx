@@ -38,6 +38,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
         <p className="mt-1 text-sm text-muted-foreground">Escolha o profissional, o dia e o horário. A confirmação chega pelo WhatsApp.</p>
         <BookingFlow
           slug={slug}
+          units={info.units}
           professionals={info.professionals}
           procedures={info.procedures}
           today={clinicNow().date}

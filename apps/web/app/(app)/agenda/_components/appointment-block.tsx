@@ -5,7 +5,8 @@ import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope } fro
 import { wallClockTime, wallClockMinutes } from '@/lib/tz';
 import { stageOf, STAGE_LABELS } from '@/lib/appointment-flow';
 import { labelClasses } from '@/lib/label-colors';
-import { GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES, STATUS_STYLES } from './constants';
+import { STATUS_STYLES } from './constants';
+import { useGrid } from './grid-context';
 
 interface Appointment {
   id: string;
@@ -41,14 +42,11 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
   const start = new Date(appointment.startTime);
   const end = new Date(appointment.endTime);
 
+  const grid = useGrid();
   const { topPx, heightPx } = useMemo(() => {
-    const startMinutes = wallClockMinutes(start) - GRID_START_HOUR * 60;
-    const endMinutes = wallClockMinutes(end) - GRID_START_HOUR * 60;
-    return {
-      topPx: (startMinutes / SLOT_MINUTES) * SLOT_HEIGHT_PX,
-      heightPx: Math.max(((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT_PX, SLOT_HEIGHT_PX * 2),
-    };
-  }, [start, end]);
+    const topo = grid.minToPx(wallClockMinutes(start));
+    return { topPx: topo, heightPx: Math.max(grid.minToPx(wallClockMinutes(end)) - topo, 32) };
+  }, [start, end, grid]);
 
   const key = stageOf(appointment);
   const style = STATUS_STYLES[key] ?? STATUS_STYLES.SCHEDULED;

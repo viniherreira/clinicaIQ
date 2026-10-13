@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, Plus, Trash2 } from 'lucide-react';
 import { addPayment, deletePayment, type PaymentFormState } from '../actions';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DEFAULT_RECEIPT_METHODS } from '@/lib/payment-methods';
 
 interface PaymentRow {
   id: string;
@@ -48,7 +49,6 @@ const QUOTE_STATUS_PT: Record<string, { label: string; cls: string }> = {
   EXPIRED: { label: 'Expirado', cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300' },
 };
 
-const METHODS = ['PIX', 'Dinheiro', 'Cartão de crédito', 'Cartão de débito', 'Transferência', 'Boleto', 'Outro'];
 
 function brl(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -60,7 +60,9 @@ function maskBRL(raw: string): string {
   return (Number(digits) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function FinancialSection({ patientId, contracted, paid, balance, payments, acceptedQuotes, quotes }: Props) {
+export function FinancialSection({
+  patientId, contracted, paid, balance, payments, acceptedQuotes, quotes, methods = DEFAULT_RECEIPT_METHODS,
+}: Props & { methods?: string[] }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
@@ -190,7 +192,7 @@ export function FinancialSection({ patientId, contracted, paid, balance, payment
                 <Select value={method || undefined} onValueChange={setMethod}>
                   <SelectTrigger aria-labelledby="pay-method-label"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {methods.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

@@ -9,6 +9,8 @@ interface Props {
   professionalName: string;
   onClose: () => void;
   onSaved: () => void;
+  /** Unidades da clínica: com mais de uma, cada dia diz onde atende. */
+  units?: { id: string; name: string }[];
 }
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -25,10 +27,12 @@ function emptyWeek(): ProfessionalDay[] {
     end: '18:00',
     lunchStart: '',
     lunchEnd: '',
+    unitId: '',
   }));
 }
 
-export function ScheduleModal({ open, professionalId, professionalName, onClose, onSaved }: Props) {
+export function ScheduleModal({ open, professionalId, professionalName, onClose, onSaved, units = [] }: Props) {
+  const multi = units.length > 1;
   const titleId = useId();
   const [days, setDays] = useState<ProfessionalDay[]>(emptyWeek());
   const [loading, setLoading] = useState(false);
@@ -135,6 +139,21 @@ export function ScheduleModal({ open, professionalId, professionalName, onClose,
                         <span className="text-sm text-muted-foreground">Não atende</span>
                       )}
                     </div>
+                    {d.work && multi && (
+                      <div className="mt-2 flex items-center gap-1.5 pl-[calc(7rem+0.75rem)] max-sm:pl-0">
+                        <span className="text-xs text-muted-foreground">Unidade</span>
+                        <select
+                          value={d.unitId || units[0].id}
+                          onChange={(e) => update(dow, { unitId: e.target.value === units[0].id ? '' : e.target.value })}
+                          aria-label={`${DAY_LABELS[dow]} — unidade`}
+                          className={timeCls}
+                        >
+                          {units.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {d.work && (
                       <div className="mt-2 flex items-center gap-1.5 pl-[calc(7rem+0.75rem)] max-sm:pl-0">
                         <span className="text-xs text-muted-foreground">Almoço</span>

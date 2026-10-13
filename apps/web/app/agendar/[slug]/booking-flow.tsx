@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState, useTransition } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, UserRound } from 'lucide-react';
+import { Building2, CalendarCheck, CheckCircle2, ChevronLeft, ChevronRight, Clock, UserRound } from 'lucide-react';
 import { bookOnline, getFreeSlots, type BookingResult } from './actions';
 
 interface Professional {
@@ -11,6 +11,13 @@ interface Professional {
   name: string;
   specialty: string | null;
   color: string | null;
+  /** Unidades em que atende. */
+  unitIds: string[];
+}
+interface Unit {
+  id: string;
+  name: string;
+  address: string | null;
 }
 interface Procedure {
   id: string;
@@ -27,18 +34,23 @@ const DIAS_POR_PAGINA = 7;
  */
 export function BookingFlow({
   slug,
-  professionals,
+  units,
+  professionals: todos,
   procedures,
   today,
   maxDaysAhead,
 }: {
   slug: string;
+  units: Unit[];
   professionals: Professional[];
   procedures: Procedure[];
   today: string;
   maxDaysAhead: number;
 }) {
   const id = useId();
+  // Com várias unidades, a primeira escolha é onde; os profissionais são os de lá.
+  const [unitId, setUnitId] = useState(units.length === 1 ? units[0].id : '');
+  const professionals = useMemo(() => (unitId ? todos.filter((p) => p.unitIds.includes(unitId)) : []), [todos, unitId]);
   const [professionalId, setProfessionalId] = useState(professionals.length === 1 ? professionals[0].id : '');
   const [procedureId, setProcedureId] = useState('');
   const [inicio, setInicio] = useState(0);
@@ -65,9 +77,9 @@ export function BookingFlow({
     setTime('');
     if (!professionalId || !date) return setSlots(null);
     startBusca(async () => {
-      setSlots(await getFreeSlots(slug, professionalId, procedureId || null, date));
+      setSlots(await getFreeSlots(slug, professionalId, procedureId || null, date, unitId || null));
     });
-  }, [slug, professionalId, procedureId, date]);
+  }, [slug, professionalId, procedureId, date, unitId]);
 
   if (feito) {
     return (
@@ -87,6 +99,37 @@ export function BookingFlow({
 
   return (
     <div className="mt-6 space-y-4">
+      {units.length > 1 && (
+        <section className={passo} aria-labelledby={`${id}-p0`}>
+          <h2 id={`${id}-p0`} className="flex items-center gap-2 text-base font-semibold">
+            <Building2 className="h-4 w-4 text-primary" aria-hidden="true" /> Em qual unidade?
+          </h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-labelledby={`${id}-p0`}>
+            {units.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                role="radio"
+                aria-checked={unitId === u.id}
+                onClick={() => {
+                  setUnitId(u.id);
+                  const daqui = todos.filter((p) => p.unitIds.includes(u.id));
+                  setProfessionalId(daqui.length === 1 ? daqui[0].id : '');
+                  setDate('');
+                }}
+                className={opcao(unitId === u.id)}
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{u.name}</span>
+                  {u.address && <span className="block text-xs text-muted-foreground">{u.address}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {unitId && (
       <section className={passo} aria-labelledby={`${id}-p1`}>
         <h2 id={`${id}-p1`} className="flex items-center gap-2 text-base font-semibold">
           <UserRound className="h-4 w-4 text-primary" aria-hidden="true" /> 1. Com quem?
@@ -131,7 +174,11 @@ export function BookingFlow({
             </select>
           </div>
         )}
+        {professionals.length === 0 && (
+          <p className="text-sm text-muted-foreground">Nenhum profissional atende por aqui nesta unidade. Escolha outra unidade.</p>
+        )}
       </section>
+      )}
 
       {professionalId && (
         <section className={passo} aria-labelledby={`${id}-p2`}>
@@ -221,6 +268,7 @@ export function BookingFlow({
             setErro('');
             startEnvio(async () => {
               const r = await bookOnline(slug, {
+                unitId: unitId || null,
                 professionalId,
                 procedureId: procedureId || null,
                 date,
@@ -235,7 +283,7 @@ export function BookingFlow({
                 setErro(r.message);
                 if (r.message.includes('ocupado')) {
                   setTime('');
-                  setSlots(await getFreeSlots(slug, professionalId, procedureId || null, date));
+                  setSlots(await getFreeSlots(slug, professionalId, procedureId || null, date, unitId || null));
                 }
                 return;
               }

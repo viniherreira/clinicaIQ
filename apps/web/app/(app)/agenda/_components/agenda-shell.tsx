@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, addMonths, parseISO } from 'date-fns';
@@ -15,6 +15,8 @@ import { WaitingRoom } from './waiting-room';
 import { MonthGrid } from './month-grid';
 import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
+import { GridContext } from './grid-context';
+import { makeGrid } from '@/lib/agenda-rules';
 import { wallClockTime } from '@/lib/tz';
 
 type AgendaData = Awaited<ReturnType<typeof getAgendaData>>;
@@ -50,6 +52,8 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   const [view, setView] = useState<AgendaView>(initialView);
   const [mode, setMode] = useState<'grouped' | 'sidebyside'>('sidebyside');
   const [data, setData] = useState<AgendaData>(initialData);
+  // Início, fim e intervalo da grade: Configurações → Agenda → Regras da agenda.
+  const grid = useMemo(() => makeGrid(data.rules), [data.rules]);
   const [loading, setLoading] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState<EditingAppointment | null>(null);
@@ -182,7 +186,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   const hasProfessionals = data.professionals.length > 0;
 
   return (
-    <>
+    <GridContext.Provider value={grid}>
       <div className="flex h-full overflow-hidden bg-background">
         {/* Sidebar — hidden on small screens; header arrows/mini date nav cover mobile */}
         <aside className="hidden w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface p-4 lg:flex">
@@ -367,6 +371,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
         }}
         professionals={data.professionals}
         procedures={data.procedures}
+        defaultDuration={data.rules.defaultDurationMinutes}
         defaultDate={modal.defaultDate}
         defaultTime={modal.defaultTime}
         defaultProfessionalId={modal.defaultProfessionalId}
@@ -422,6 +427,6 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           </div>
         </div>
       )}
-    </>
+    </GridContext.Provider>
   );
 }

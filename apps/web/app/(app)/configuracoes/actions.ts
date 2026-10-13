@@ -176,7 +176,7 @@ export async function updateClinic(
       neighborhood: d.neighborhood || null,
       city: d.city || null,
       state: d.state ? d.state.toUpperCase() : null,
-      address: composeAddress(d),
+      address: composeAddress({ ...d, state: d.state ? d.state.toUpperCase() : null }),
     },
   });
 
@@ -400,6 +400,8 @@ export interface ProfessionalDay {
   end: string;
   lunchStart: string;
   lunchEnd: string;
+  /** Unidade em que atende nesse dia; '' = a principal. */
+  unitId: string;
 }
 
 const HHMM = /^\d{2}:\d{2}$/;
@@ -429,6 +431,7 @@ export async function getProfessionalSchedule(professionalId: string): Promise<P
       end: r?.endTime ?? '18:00',
       lunchStart: r?.lunchStart ?? '',
       lunchEnd: r?.lunchEnd ?? '',
+      unitId: r?.unitId ?? '',
     };
   });
 }
@@ -467,6 +470,10 @@ export async function updateProfessionalSchedule(
   }
 
   const working = days.filter((d) => d.work && d.dayOfWeek >= 0 && d.dayOfWeek <= 6);
+  const unidades = [...new Set(working.map((d) => d.unitId).filter(Boolean))];
+  if (unidades.length && (await prisma.clinicUnit.count({ where: { tenantId, id: { in: unidades } } })) !== unidades.length) {
+    return { ok: false, message: 'Unidade não encontrada.' };
+  }
   const workingDayNumbers = working.map((d) => d.dayOfWeek);
 
   await prisma.$transaction([
@@ -483,12 +490,14 @@ export async function updateProfessionalSchedule(
           endTime: d.end,
           lunchStart: d.lunchStart || null,
           lunchEnd: d.lunchEnd || null,
+          unitId: d.unitId || null,
         },
         update: {
           startTime: d.start,
           endTime: d.end,
           lunchStart: d.lunchStart || null,
           lunchEnd: d.lunchEnd || null,
+          unitId: d.unitId || null,
         },
       }),
     ),
@@ -545,6 +554,8 @@ export interface TeamMember {
   deactivatedAt: Date | null;
   /** Quem está olhando a tela. Não dá para rebaixar ou remover a si mesmo. */
   isSelf: boolean;
+  /** Unidades em que trabalha; vazio = todas. */
+  unitIds: string[];
 }
 
 export async function listTeam(): Promise<TeamMember[]> {
@@ -563,6 +574,7 @@ export async function listTeam(): Promise<TeamMember[]> {
       active: true,
       createdAt: true,
       deactivatedAt: true,
+      unitIds: true,
     },
   });
   return users.map((u) => ({ ...u, role: u.role as Role, isSelf: u.id === userId }));

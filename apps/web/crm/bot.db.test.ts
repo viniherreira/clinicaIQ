@@ -17,6 +17,8 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
   const { afterInbound } = await import('./inbound');
   const { writeChatMessage } = await import('./conversations');
   const { saveBot, toggleBot, cleanKeywords } = await import('./bot-admin');
+  const { saveCaptureRule } = await import('./capture');
+  const { createPipeline } = await import('./settings');
   const { chatKey } = await import('@/lib/phone');
   const key = process.env.ENCRYPTION_MASTER_KEY!;
 
@@ -70,6 +72,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await prisma.chatMessage.deleteMany({ where: t });
     await prisma.conversation.deleteMany({ where: t });
     await prisma.chatbotFlow.deleteMany({ where: t });
+    await prisma.captureRule.deleteMany({ where: t });
     await prisma.automationRun.deleteMany({ where: t });
     await prisma.leadTagOnLead.deleteMany({ where: t });
     await prisma.leadTag.deleteMany({ where: t });
@@ -159,6 +162,36 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     const antes = (await saidas(id)).length;
     await escreve('11 96666-0003', 'obrigada');
     expect((await saidas(id)).length).toBe(antes);
+  });
+
+  it('captação: palavra da primeira mensagem cria o lead com tag, funil e origem, e o robô ainda cumprimenta', async () => {
+    const funil = await createPipeline(db, tenant.id, 'Implantes');
+    if (!funil.ok) throw new Error(funil.message);
+    const implante = await db.leadTag.create({ data: { tenantId: tenant.id, name: 'implante', color: 'green' } });
+    expect(
+      await saveCaptureRule(db, tenant.id, {
+        name: 'Implante',
+        keywords: ['Implante', 'dente fixo'],
+        tagIds: [implante.id],
+        pipelineId: funil.id,
+        source: 'INSTAGRAM',
+        active: true,
+      }),
+    ).toEqual({ ok: true });
+
+    const id = await escreve('11 96666-0010', 'Oi! Vi no Instagram, quero saber dos implantes');
+    const conv = await db.conversation.findFirst({ where: { id }, include: { lead: { include: { tags: true, stage: true, activities: true } } } });
+    expect(conv?.lead).toMatchObject({ source: 'INSTAGRAM', name: 'Ana Souza' });
+    expect(conv?.lead?.stage.pipelineId).toBe(funil.id);
+    expect(conv?.lead?.tags.map((t) => t.tagId)).toEqual([implante.id]);
+    expect(conv?.lead?.activities.some((a) => a.type === 'NOTE' && JSON.stringify(a.data).includes('implante'))).toBe(true);
+    // O lead nasceu antes do robô, mas para o robô continua sendo um número novo.
+    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?\n\n1 - Agendar avaliação\n2 - Valores']);
+
+    // Só a primeira mensagem conta.
+    const id2 = await escreve('11 96666-0011', 'Boa tarde');
+    await escreve('11 96666-0011', 'implante');
+    expect((await db.conversation.findFirst({ where: { id: id2 }, include: { lead: { include: { tags: true } } } }))?.lead?.tags ?? []).toEqual([]);
   });
 
   it('robô desligado não responde', async () => {

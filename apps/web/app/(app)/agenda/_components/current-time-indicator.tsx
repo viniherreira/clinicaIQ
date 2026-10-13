@@ -1,23 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES } from './constants';
+import { useGrid } from './grid-context';
 
 export function CurrentTimeIndicator() {
+  const grid = useGrid();
   const [top, setTop] = useState<number | null>(null);
 
-  function calcTop() {
-    const now = new Date();
-    const minutes = (now.getHours() - GRID_START_HOUR) * 60 + now.getMinutes();
-    if (minutes < 0 || minutes > (21 - GRID_START_HOUR) * 60) return null;
-    return (minutes / SLOT_MINUTES) * SLOT_HEIGHT_PX;
-  }
-
   useEffect(() => {
+    const calcTop = () => {
+      const now = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      if (minutes < grid.startHour * 60 || minutes > grid.endHour * 60) return null;
+      return grid.minToPx(minutes);
+    };
     setTop(calcTop());
     const id = setInterval(() => setTop(calcTop()), 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [grid]);
 
   if (top === null) return null;
 

@@ -8,6 +8,7 @@ import { QuotePayments } from '../_components/quote-payments';
 import { QUOTE_STATUS, formatBRL, quoteCode } from '../_components/constants';
 import { requireCapability } from '@/lib/guard';
 import { describePayment } from '@/lib/payment-terms';
+import { getReceiptMethods } from '@/lib/clinic-settings';
 import { wallDateBR } from '@/lib/tz';
 
 export const metadata = { title: 'Orçamento · ClinicaIQ' };
@@ -18,7 +19,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
   await requireCapability('financeiro');
 
   const { id } = await params;
-  const [quote, gaps] = await Promise.all([getQuote(id), getContractGaps(id)]);
+  const [quote, gaps, methods] = await Promise.all([getQuote(id), getContractGaps(id), getReceiptMethods()]);
   if (!quote) notFound();
 
   const meta = QUOTE_STATUS[quote.status] ?? QUOTE_STATUS.DRAFT;
@@ -132,7 +133,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
         </div>
       </section>
 
-      <QuotePayments quoteId={quote.id} total={Number(quote.total)} payments={quote.payments} />
+      <QuotePayments quoteId={quote.id} total={Number(quote.total)} payments={quote.payments} methods={methods} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-4 text-sm">

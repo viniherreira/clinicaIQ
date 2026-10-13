@@ -48,6 +48,8 @@ interface AppointmentModalProps {
   onClose: () => void;
   professionals: Professional[];
   procedures: Procedure[];
+  /** Duração sem procedimento (Regras da agenda). */
+  defaultDuration?: number;
   defaultDate: string;
   defaultTime?: string;
   defaultProfessionalId?: string;
@@ -75,6 +77,7 @@ const labelCls = 'text-xs font-medium text-foreground';
 
 export function AppointmentModal({
   open, onClose, professionals, procedures,
+  defaultDuration = 30,
   defaultDate, defaultTime = '08:00', defaultProfessionalId,
   editing = null,
   defaultPatient = null,
@@ -98,7 +101,7 @@ export function AppointmentModal({
   // Form fields
   const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState(defaultTime);
-  const [endTime, setEndTime] = useState(addMinutesToTime(defaultTime, 30));
+  const [endTime, setEndTime] = useState(addMinutesToTime(defaultTime, defaultDuration));
   const [profId, setProfId] = useState(defaultProfessionalId ?? professionals[0]?.id ?? '');
   const [procId, setProcId] = useState('');
   const [notes, setNotes] = useState('');
@@ -127,7 +130,7 @@ export function AppointmentModal({
     } else {
       setDate(defaultDate);
       setStartTime(defaultTime);
-      setEndTime(addMinutesToTime(defaultTime, 30));
+      setEndTime(addMinutesToTime(defaultTime, defaultDuration));
       setProfId(defaultProfessionalId ?? professionals[0]?.id ?? '');
       setProcId('');
       setType('PARTICULAR');
@@ -184,7 +187,7 @@ export function AppointmentModal({
   function onStartTimeChange(t: string) {
     setStartTime(t);
     const proc = procedures.find((p) => p.id === procId);
-    setEndTime(addMinutesToTime(t, proc?.durationMinutes ?? 30));
+    setEndTime(addMinutesToTime(t, proc?.durationMinutes ?? defaultDuration));
   }
 
   const errorFor = (field: string) =>

@@ -1,12 +1,13 @@
 import { decrypt, getTenantClient } from '@clinicaiq/db';
 import { runBotOnInbound } from './bot';
+import { applyCapture } from './capture';
 import { classifyConversation } from './conversations';
 
 /**
  * O que acontece no CRM depois de gravada uma mensagem do contato — venha ela
  * do gateway de QR (aviso em /api/whatsapp/conversation) ou da API oficial
- * (webhook da Meta): ligar a conversa, registrar o pedido de sair e deixar o
- * robô responder.
+ * (webhook da Meta): ligar a conversa, registrar o pedido de sair, a captação
+ * (palavras da primeira mensagem viram lead com tag) e deixar o robô responder.
  */
 
 export const OPT_OUT = /^\s*(sair|parar|descadastrar|remover|stop)\b/i;
@@ -47,8 +48,20 @@ export async function afterInbound(tenantId: string, conversationId: string, mes
     return;
   }
 
+  // Primeira mensagem deste número? A captação roda antes do robô e pode criar
+  // o lead (a conversa sai da Entrada) — o robô de contato novo continua valendo.
+  const conv = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
+  const first = (await db.chatMessage.count({ where: { conversationId, origin: 'CONTACT' } })) === 1;
+  if (first) {
+    try {
+      await applyCapture(db, tenantId, conversationId, text);
+    } catch (e) {
+      console.error('[crm] captação falhou', e instanceof Error ? e.message : e);
+    }
+  }
+
   try {
-    await runBotOnInbound(tenantId, conversationId, msg.id);
+    await runBotOnInbound(tenantId, conversationId, msg.id, new Date(), { newContact: first && conv?.status === 'INBOX' });
   } catch (e) {
     console.error('[crm] robô falhou', e instanceof Error ? e.message : e);
   }

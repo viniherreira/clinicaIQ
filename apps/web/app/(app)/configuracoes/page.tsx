@@ -13,6 +13,8 @@ import {
 } from './actions';
 import { Suspense } from 'react';
 import { SettingsView } from './_components/settings-view';
+import { listUnitsForSettings } from './unit-actions';
+import { getClinicRules } from './rules-actions';
 import { BillingPanel } from './_components/billing-panel';
 import { CrmSeatsSection } from '@/components/crm-seats-section';
 
@@ -32,7 +34,7 @@ export default async function ConfiguracoesPage() {
 
   // As abas de administração nem são buscadas para quem não vai vê-las. Esconder
   // a aba mas mandar a lista da equipe junto no HTML seria esconder com a mão.
-  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents] =
+  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents, units, rules] =
     await Promise.all([
       listProfessionals(),
       suggestColor(),
@@ -47,6 +49,8 @@ export default async function ConfiguracoesPage() {
         select: { status: true, phoneNumber: true },
       }),
       getDocumentSettings(),
+      listUnitsForSettings(),
+      getClinicRules(),
     ]);
 
   return (
@@ -56,6 +60,8 @@ export default async function ConfiguracoesPage() {
       suggestedColor={suggestedColor}
       businessHours={businessHours}
       team={team}
+      units={units}
+      rules={rules}
       privacy={privacy}
       audit={audit}
       invites={invites}

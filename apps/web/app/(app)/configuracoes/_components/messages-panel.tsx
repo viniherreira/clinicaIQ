@@ -32,7 +32,7 @@ function Variaveis({ lista }: { lista: typeof VARIAVEIS_AGENDAMENTO }) {
         <span key={v.chave}>
           {i > 0 && ', '}
           <code className="rounded bg-surface-alt px-1 py-0.5">{v.chave}</code>{' '}
-          <span className="opacity-80">({v.o})</span>
+          <span>({v.o})</span>
         </span>
       ))}
     </p>

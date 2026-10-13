@@ -78,17 +78,17 @@ enum ToothStatus {
 // ─── Models ──────────────────────────────────────────────
 
 model Tenant {
-  id         String   @id @default(cuid())
-  clerkOrgId String   @unique
-  name       String
-  slug       String   @unique
-  document   String?
-  phone      String?
-  email      String?
+  id            String  @id @default(cuid())
+  clerkOrgId    String  @unique
+  name          String
+  slug          String  @unique
+  document      String?
+  phone         String?
+  email         String?
   /// Endereço em uma linha, montado a partir dos campos abaixo ao salvar.
   /// Existe porque é o que o PDF do orçamento lê — manter a composição aqui
   /// evita que a geração do PDF precise saber como se escreve um endereço.
-  address    String?
+  address       String?
   zipCode       String?
   street        String?
   addressNumber String?
@@ -98,7 +98,7 @@ model Tenant {
   state         String?
   /// Caminho do logotipo no storage privado (não é URL pública). Os PDFs
   /// baixam os bytes no servidor; a tela de configurações assina um link curto.
-  logoUrl    String?
+  logoUrl       String?
 
   /// Responsável técnico e o registro dele no conselho (ex.: "CRO-SP 12345").
   /// O conselho exige os dois nos documentos da clínica — saem no rodapé de
@@ -110,11 +110,12 @@ model Tenant {
   /// Cláusulas próprias da clínica, acrescentadas ao contrato padrão.
   contractTerms         String?
 
-  settings   Json?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users               User[]
+  units               ClinicUnit[]
   patients            Patient[]
   professionals       Professional[]
   procedures          Procedure[]
@@ -137,19 +138,19 @@ model Tenant {
   invitations         Invitation[]
 
   // CRM (etapa 1)
-  leads               Lead[]
-  pipelines           Pipeline[]
-  pipelineStages      PipelineStage[]
-  leadTasks           LeadTask[]
-  leadTags            LeadTag[]
-  leadTagOnLeads      LeadTagOnLead[]
-  lostReasons         LostReason[]
-  leadActivities      LeadActivity[]
+  leads          Lead[]
+  pipelines      Pipeline[]
+  pipelineStages PipelineStage[]
+  leadTasks      LeadTask[]
+  leadTags       LeadTag[]
+  leadTagOnLeads LeadTagOnLead[]
+  lostReasons    LostReason[]
+  leadActivities LeadActivity[]
 
   // CRM (etapa 2)
-  conversations       Conversation[]
-  chatMessages        ChatMessage[]
-  quickReplies        QuickReply[]
+  conversations Conversation[]
+  chatMessages  ChatMessage[]
+  quickReplies  QuickReply[]
 
   // CRM (API oficial, transmissões, robô e automações)
   whatsappCloudAccount WhatsAppCloudAccount?
@@ -159,6 +160,7 @@ model Tenant {
   stageAutomations     StageAutomation[]
   automationRuns       AutomationRun[]
   chatbotFlows         ChatbotFlow[]
+  captureRules         CaptureRule[]
 
   @@map("tenants")
 }
@@ -180,14 +182,16 @@ model User {
   /// "era a mesma pessoa?" quando alguém é reconvidado meses depois.
   previousClerkUserId String?
 
-  name   String
-  email  String
-  role   Role    @default(RECEPTIONIST)
+  name    String
+  email   String
+  role    Role     @default(RECEPTIONIST)
   /// Tem acesso ao CRM e conta na cobrança do adicional (R$ por usuário).
-  crmSeat Boolean @default(false)
+  crmSeat Boolean  @default(false)
+  /// Unidades em que a pessoa trabalha (agenda). Vazio = todas.
+  unitIds String[] @default([])
   /// Bandeira operacional: é ela que todas as consultas filtram.
   /// `deactivatedAt` é o registro do fato; as duas são escritas juntas.
-  active Boolean @default(true)
+  active  Boolean  @default(true)
 
   /// Quando o acesso foi encerrado, por quem e por quê. Nulo enquanto ativo.
   deactivatedAt      DateTime?
@@ -197,11 +201,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  patientNotes PatientNote[]
-  auditLogs    AuditLog[]
-  assignedLeads Lead[]     @relation("LeadAssignee")
-  assignedTasks LeadTask[] @relation("LeadTaskAssignee")
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  patientNotes     PatientNote[]
+  auditLogs        AuditLog[]
+  assignedLeads    Lead[]        @relation("LeadAssignee")
+  assignedTasks    LeadTask[]    @relation("LeadTaskAssignee")
   chatMessagesSent ChatMessage[]
 
   @@index([tenantId])
@@ -210,30 +214,30 @@ model User {
 }
 
 model Patient {
-  id              String    @id @default(cuid())
-  tenantId        String
-  controlNumber   Int
-  name            String
-  nickname        String?
-  cpfEncrypted    String?   @map("cpf")
-  phoneEncrypted  String    @map("phone")
-  phone2Encrypted String?   @map("phone2")
-  email           String?
-  birthDate       DateTime?
-  gender          String?
-  maritalStatus   String?
-  profession      String?
-  referredBy      String?
-  notes           String?
-  zipCode         String?
-  street          String?
-  addressNumber   String?
-  complement      String?
-  neighborhood    String?
-  city            String?
-  state           String?
+  id                 String    @id @default(cuid())
+  tenantId           String
+  controlNumber      Int
+  name               String
+  nickname           String?
+  cpfEncrypted       String?   @map("cpf")
+  phoneEncrypted     String    @map("phone")
+  phone2Encrypted    String?   @map("phone2")
+  email              String?
+  birthDate          DateTime?
+  gender             String?
+  maritalStatus      String?
+  profession         String?
+  referredBy         String?
+  notes              String?
+  zipCode            String?
+  street             String?
+  addressNumber      String?
+  complement         String?
+  neighborhood       String?
+  city               String?
+  state              String?
   /// Aceite do tratamento dos dados para o atendimento. Obrigatório no cadastro.
-  lgpdConsentAt   DateTime?
+  lgpdConsentAt      DateTime?
   /// Aceite separado para receber campanha promocional. Nulo = nunca autorizou.
   ///
   /// Separado do `lgpdConsentAt` de propósito: aquele cobre tratar o paciente e
@@ -243,24 +247,24 @@ model Patient {
   /// número não ser derrubado por denúncia.
   marketingConsentAt DateTime?
   /// Patient asked to stop receiving campaigns (replied SAIR/PARAR).
-  whatsappOptOut  Boolean   @default(false)
-  active          Boolean   @default(true)
-  deletedAt       DateTime?
-  createdById     String?
-  updatedById     String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  whatsappOptOut     Boolean   @default(false)
+  active             Boolean   @default(true)
+  deletedAt          DateTime?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  patientNotes PatientNote[]
-  appointments Appointment[]
-  quotes       Quote[]
-  messages     WhatsAppMessage[]
-  toothRecords ToothRecord[]
-  payments     Payment[]
-  anamnesis    Anamnesis?
-  evolutions   Evolution[]
-  files        PatientFile[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  patientNotes       PatientNote[]
+  appointments       Appointment[]
+  quotes             Quote[]
+  messages           WhatsAppMessage[]
+  toothRecords       ToothRecord[]
+  payments           Payment[]
+  anamnesis          Anamnesis?
+  evolutions         Evolution[]
+  files              PatientFile[]
   campaignRecipients CampaignRecipient[]
   leads              Lead[]
   conversations      Conversation[]
@@ -290,20 +294,20 @@ model PatientNote {
 }
 
 model Professional {
-  id        String   @id @default(cuid())
-  tenantId  String
-  userId    String?  @unique
-  name      String
-  specialty String?
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String?  @unique
+  name              String
+  specialty         String?
   /// Registro no conselho de classe (ex.: "CRO-SP 12345"). Sai nos documentos
   /// em que este profissional é o responsável pelo tratamento.
-  registration String?
-  color     String?
+  registration      String?
+  color             String?
   /// Percentual de comissão (repasse) sobre a produção do profissional. Nulo = sem comissão.
   commissionPercent Decimal? @db.Decimal(5, 2)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   tenant       Tenant                 @relation(fields: [tenantId], references: [id])
   schedules    ProfessionalSchedule[]
@@ -325,8 +329,11 @@ model ProfessionalSchedule {
   endTime        String
   lunchStart     String?
   lunchEnd       String?
+  /// Em que unidade atende nesse dia. Nulo = a principal.
+  unitId         String?
 
   professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  unit         ClinicUnit?  @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
   @@unique([professionalId, dayOfWeek])
   @@map("professional_schedules")
@@ -374,18 +381,18 @@ model Procedure {
   /// pessoa está atrasada de verdade.
   recurrenceGraceDays    Int? @default(120)
 
-  active             Boolean  @default(true)
-  deletedAt          DateTime?
-  createdById        String?
-  updatedById        String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  active      Boolean   @default(true)
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id])
-  category      ProcedureCategory? @relation(fields: [categoryId], references: [id])
-  professionals Professional[]     @relation("ProcedureProfessionals")
-  appointments  Appointment[]
-  quoteItems    QuoteItem[]
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  category        ProcedureCategory? @relation(fields: [categoryId], references: [id])
+  professionals   Professional[]     @relation("ProcedureProfessionals")
+  appointments    Appointment[]
+  quoteItems      QuoteItem[]
   interestedLeads Lead[]
 
   @@unique([tenantId, name])
@@ -415,6 +422,8 @@ model Appointment {
   startedAt      DateTime?
   /// Terminou o atendimento (junto com status ATTENDED).
   finishedAt     DateTime?
+  /// Unidade onde acontece. Nulo = a principal (agendamentos de antes das unidades).
+  unitId         String?
   createdById    String?
   updatedById    String?
   createdAt      DateTime          @default(now())
@@ -425,9 +434,11 @@ model Appointment {
   professional Professional      @relation(fields: [professionalId], references: [id])
   procedure    Procedure?        @relation(fields: [procedureId], references: [id])
   label        AppointmentLabel? @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  unit         ClinicUnit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
   messages     WhatsAppMessage[]
 
   @@index([tenantId, professionalId, startTime])
+  @@index([tenantId, unitId, startTime])
   @@index([tenantId, startTime])
   @@index([tenantId, status])
   @@map("appointments")
@@ -498,17 +509,17 @@ model Quote {
   downPayment    Decimal @default(0) @db.Decimal(10, 2)
   installments   Int     @default(1)
 
-  createdById   String?
-  updatedById   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id])
   patient      Patient           @relation(fields: [patientId], references: [id])
   professional Professional?     @relation(fields: [professionalId], references: [id])
   items        QuoteItem[]
-  messages WhatsAppMessage[]
-  payments Payment[]
+  messages     WhatsAppMessage[]
+  payments     Payment[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -548,18 +559,18 @@ model WhatsAppMessage {
   /// WhatsApp's own id for the message. Doubles as the "this was really handed
   /// to WhatsApp" marker: the gateway stamps it the moment the socket accepts,
   /// so a retry can tell an unsent row from one whose HTTP reply we simply lost.
-  externalId    String?
+  externalId String?
 
-  sentAt        DateTime?
-  deliveredAt   DateTime?
-  readAt        DateTime?
-  errorMessage  String?
-  createdAt     DateTime         @default(now())
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
 
   /// Outbox bookkeeping. The row is written *before* the first attempt, so a
   /// crash, a timeout or a redeploy mid-send leaves something to retry instead
   /// of a patient who was never told and a clinic that never found out.
-  attempts      Int              @default(0)
+  attempts      Int       @default(0)
   lastAttemptAt DateTime?
   /// When the next attempt becomes due. Null once the row is settled — either
   /// handed to WhatsApp or failed for a reason no retry would fix.
@@ -597,8 +608,10 @@ model ToothRecord {
   @@map("tooth_records")
 }
 
-/** Health questionnaire (one per patient). Answers stored as JSON:
- *  { items: { [key]: { value: 'yes'|'no', detail?: string } }, obs?: string } */
+/**
+ * Health questionnaire (one per patient). Answers stored as JSON:
+ * { items: { [key]: { value: 'yes'|'no', detail?: string } }, obs?: string }
+ */
 model Anamnesis {
   id          String   @id @default(cuid())
   tenantId    String
@@ -615,7 +628,9 @@ model Anamnesis {
   @@map("anamneses")
 }
 
-/** Clinical evolution entry — what was done in a visit/session. */
+/**
+ * Clinical evolution entry — what was done in a visit/session.
+ */
 model Evolution {
   id             String   @id @default(cuid())
   tenantId       String
@@ -634,7 +649,9 @@ model Evolution {
   @@map("evolutions")
 }
 
-/** Image/document attached to a patient (stored in Supabase Storage). */
+/**
+ * Image/document attached to a patient (stored in Supabase Storage).
+ */
 model PatientFile {
   id          String   @id @default(cuid())
   tenantId    String
@@ -901,7 +918,7 @@ model Subscription {
 
   /// Módulo CRM contratado. Desligado por padrão: clínica sem CRM não vê
   /// nada novo e a automação do funil não faz nada para ela.
-  crmEnabled Boolean @default(false)
+  crmEnabled       Boolean   @default(false)
   /// Fim dos 14 dias grátis do CRM. Preenchido também marca que o teste já foi
   /// usado: ligar e desligar não dá um teste novo.
   crmTrialEndsAt   DateTime?
@@ -1069,18 +1086,18 @@ model Lead {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant            Tenant          @relation(fields: [tenantId], references: [id])
-  stage             PipelineStage   @relation(fields: [stageId], references: [id])
-  assignedTo        User?           @relation("LeadAssignee", fields: [assignedToId], references: [id])
-  interestProcedure Procedure?      @relation(fields: [interestProcedureId], references: [id])
-  patient           Patient?        @relation(fields: [patientId], references: [id])
-  lostReason        LostReason?     @relation(fields: [lostReasonId], references: [id])
-  tasks             LeadTask[]
-  tags              LeadTagOnLead[]
-  activities        LeadActivity[]
-  conversations     Conversation[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  stage               PipelineStage        @relation(fields: [stageId], references: [id])
+  assignedTo          User?                @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  interestProcedure   Procedure?           @relation(fields: [interestProcedureId], references: [id])
+  patient             Patient?             @relation(fields: [patientId], references: [id])
+  lostReason          LostReason?          @relation(fields: [lostReasonId], references: [id])
+  tasks               LeadTask[]
+  tags                LeadTagOnLead[]
+  activities          LeadActivity[]
+  conversations       Conversation[]
   broadcastRecipients BroadcastRecipient[]
-  automationRuns    AutomationRun[]
+  automationRuns      AutomationRun[]
 
   @@index([tenantId, stageId, position])
   @@index([tenantId, phoneHash])
@@ -1115,10 +1132,10 @@ model PipelineStage {
   pipelineId String
   name       String
   /// Nome de um token da paleta do app, não um hex livre.
-  color    String
-  order    Int
+  color      String
+  order      Int
   /// Null = etapa criada pela clínica, que a automação não conhece.
-  role     StageRole?
+  role       StageRole?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1285,12 +1302,12 @@ model Conversation {
   /// Quando o app já tentou ligar a lead ou paciente. Nulo = falta tentar.
   classifiedAt DateTime?
 
-  unreadCount          Int      @default(0)
+  unreadCount          Int       @default(0)
   /// A última palavra é do contato: ninguém da clínica respondeu ainda.
-  awaitingReply        Boolean  @default(false)
-  lastMessageAt        DateTime @default(now())
+  awaitingReply        Boolean   @default(false)
+  lastMessageAt        DateTime  @default(now())
   /// Começo da última mensagem, cifrado (é conversa de clínica).
-  lastPreviewEncrypted String?  @map("lastPreview")
+  lastPreviewEncrypted String?   @map("lastPreview")
   /// Última mensagem do contato. Na API oficial, define a janela de 24 horas.
   lastInboundAt        DateTime?
 
@@ -1299,16 +1316,16 @@ model Conversation {
   botStepId    String?
   botStartedAt DateTime?
   /// Respostas que o robô não entendeu seguidas; na segunda, passa para a equipe.
-  botMisses    Int      @default(0)
+  botMisses    Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant        @relation(fields: [tenantId], references: [id])
-  lead     Lead?         @relation(fields: [leadId], references: [id])
-  patient  Patient?      @relation(fields: [patientId], references: [id])
-  botFlow  ChatbotFlow?  @relation(fields: [botFlowId], references: [id], onDelete: SetNull)
-  messages ChatMessage[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  lead                Lead?                @relation(fields: [leadId], references: [id])
+  patient             Patient?             @relation(fields: [patientId], references: [id])
+  botFlow             ChatbotFlow?         @relation(fields: [botFlowId], references: [id], onDelete: SetNull)
+  messages            ChatMessage[]
   broadcastRecipients BroadcastRecipient[]
 
   @@unique([tenantId, phoneHash])
@@ -1325,33 +1342,33 @@ model ChatMessage {
 
   direction     MessageDirection
   origin        ChatOrigin
-  kind          ChatKind      @default(TEXT)
+  kind          ChatKind         @default(TEXT)
   /// Texto ou legenda, cifrado. Nulo em mídia sem legenda.
-  textEncrypted String?       @map("text")
+  textEncrypted String?          @map("text")
   /// Id da mensagem no WhatsApp. Único por clínica: é o que impede gravar duas
   /// vezes a mesma mensagem (o gateway vê a própria saída de volta).
   externalId    String
-  status        MessageStatus @default(SENT)
+  status        MessageStatus    @default(SENT)
   /// Quem escreveu, quando foi pelo CRM.
   sentById      String?
   /// Hora da mensagem no WhatsApp.
-  at            DateTime      @default(now())
+  at            DateTime         @default(now())
 
   /// Modelo aprovado usado (API oficial) e os valores das variáveis, em ordem.
   templateName   String?
   templateLang   String?
   templateParams Json?
   /// Mídia na API oficial: id na Meta, buscado sob demanda (nada é guardado).
-  mediaRef      String?
-  mimeType      String?
+  mediaRef       String?
+  mimeType       String?
   /// Opções do robô: [{ id, title }]. Botões na API oficial; no QR o texto já
   /// traz as opções numeradas.
-  buttons       Json?
+  buttons        Json?
 
   /// Fila do envio pelo CRM. `acceptedAt` = o WhatsApp aceitou; daí em diante
   /// quem manda no status são os acks.
   acceptedAt    DateTime?
-  attempts      Int           @default(0)
+  attempts      Int       @default(0)
   nextAttemptAt DateTime?
   /// Reserva de quem está enviando agora, para o envio direto e a rotina de
   /// reenvio não mandarem a mesma linha ao mesmo tempo.
@@ -1360,9 +1377,9 @@ model ChatMessage {
 
   createdAt DateTime @default(now())
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id])
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-  sentBy       User?        @relation(fields: [sentById], references: [id])
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  conversation       Conversation        @relation(fields: [conversationId], references: [id])
+  sentBy             User?               @relation(fields: [sentById], references: [id])
   broadcastRecipient BroadcastRecipient?
 
   @@unique([tenantId, externalId])
@@ -1405,21 +1422,21 @@ model WhatsAppCloudAccount {
   id       String @id @default(cuid())
   tenantId String @unique
 
-  wabaId        String
+  wabaId               String
   /// Único no sistema: é por ele que o webhook da Meta descobre a clínica.
-  phoneNumberId String  @unique
-  displayPhone  String?
-  verifiedName  String?
+  phoneNumberId        String             @unique
+  displayPhone         String?
+  verifiedName         String?
   /// Token de acesso, cifrado com a chave da clínica. Nunca vai para a tela.
-  accessTokenEncrypted String @map("accessToken")
+  accessTokenEncrypted String             @map("accessToken")
   /// O número continua no app WhatsApp Business do celular (coexistência).
-  coexistence Boolean @default(false)
+  coexistence          Boolean            @default(false)
   /// Conectada pelo formulário de teste (número de teste da Meta).
-  manual      Boolean @default(false)
-  active      Boolean @default(true)
-  status      CloudAccountStatus @default(CONNECTED)
-  lastError   String?
-  connectedAt DateTime @default(now())
+  manual               Boolean            @default(false)
+  active               Boolean            @default(true)
+  status               CloudAccountStatus @default(CONNECTED)
+  lastError            String?
+  connectedAt          DateTime           @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1562,16 +1579,16 @@ enum AutomationRunStatus {
 
 /// O que acontece quando um lead entra numa etapa (o "funil digital" do Kommo).
 model StageAutomation {
-  id       String           @id @default(cuid())
-  tenantId String
-  stageId  String
-  action   AutomationAction
+  id           String           @id @default(cuid())
+  tenantId     String
+  stageId      String
+  action       AutomationAction
   /// SEND_MESSAGE { text } ou { templateId, params } · CREATE_TASK { text, dueHours,
   /// assignTo: "responsible" | userId } · ADD_TAG { tagId } · ASSIGN_USER { userId }
   config       Json
-  delayMinutes Int     @default(0)
-  active       Boolean @default(true)
-  order        Int     @default(0)
+  delayMinutes Int              @default(0)
+  active       Boolean          @default(true)
+  order        Int              @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1585,16 +1602,16 @@ model StageAutomation {
 }
 
 model AutomationRun {
-  id           String              @id @default(cuid())
-  tenantId     String
-  automationId String
-  leadId       String
-  dueAt        DateTime
+  id             String              @id @default(cuid())
+  tenantId       String
+  automationId   String
+  leadId         String
+  dueAt          DateTime
   /// A entrada na etapa que disparou. Se o lead saiu e voltou, é outra execução.
   stageEnteredAt DateTime
-  status       AutomationRunStatus @default(PENDING)
-  error        String?
-  doneAt       DateTime?
+  status         AutomationRunStatus @default(PENDING)
+  error          String?
+  doneAt         DateTime?
 
   createdAt DateTime @default(now())
 
@@ -1633,4 +1650,63 @@ model ChatbotFlow {
 
   @@index([tenantId, active])
   @@map("chatbot_flows")
+}
+
+/// Captação: palavras na primeira mensagem de um número que viram lead já com
+/// tag, funil e origem (ex.: "implante" → tag implante no funil Implantes).
+/// Roda antes do robô (`crm/capture.ts`). `tagIds` e `pipelineId` sem chave
+/// estrangeira: tag apagada é ignorada e funil apagado cai no principal.
+model CaptureRule {
+  id         String      @id @default(cuid())
+  tenantId   String
+  name       String
+  active     Boolean     @default(true)
+  keywords   String[]    @default([])
+  tagIds     String[]    @default([])
+  pipelineId String?
+  source     LeadSource?
+  order      Int         @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active])
+  @@map("capture_rules")
+}
+
+/// Unidade da clínica (filial), como no Clínica nas Nuvens: endereço, telefone,
+/// horário e agenda próprios. Pacientes, orçamentos, financeiro e CRM são da
+/// clínica toda. A principal é a de menor `order` (nunca desativada); toda
+/// clínica tem uma, criada a partir dos dados da clínica (`lib/units.ts`).
+model ClinicUnit {
+  id            String  @id @default(cuid())
+  tenantId      String
+  name          String
+  phone         String?
+  email         String?
+  /// Endereço em uma linha, montado ao salvar (mensagens e agendamento online).
+  address       String?
+  zipCode       String?
+  street        String?
+  addressNumber String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  /// Horário de funcionamento próprio (mesmo formato de `Tenant.settings.businessHours`). Nulo = o da clínica.
+  businessHours Json?
+  active        Boolean @default(true)
+  order         Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id])
+  appointments Appointment[]
+  schedules    ProfessionalSchedule[]
+
+  @@index([tenantId, order])
+  @@map("clinic_units")
 }

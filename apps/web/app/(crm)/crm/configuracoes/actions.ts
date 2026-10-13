@@ -8,6 +8,7 @@ import type { AutomationAction } from '@clinicaiq/db';
 import { deleteBot, saveBot, toggleBot } from '@/crm/bot-admin';
 import { toSteps, type UiMenu } from '@/crm/bot-form';
 import type { BotHours } from '@/crm/bot-engine';
+import { deleteCaptureRule, saveCaptureRule, toggleCaptureRule, type CaptureRuleInput } from '@/crm/capture';
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -80,3 +81,7 @@ export async function createPipelineAction(name: string): Promise<{ ok: true; id
   if (r.ok) revalidatePath('/crm');
   return r;
 }
+
+export const saveCaptureRuleAction = async (input: CaptureRuleInput) => run((g) => saveCaptureRule(g.db, g.tenantId, input));
+export const toggleCaptureRuleAction = async (id: string, active: boolean) => run((g) => toggleCaptureRule(g.db, id, active));
+export const deleteCaptureRuleAction = async (id: string) => run((g) => deleteCaptureRule(g.db, id));

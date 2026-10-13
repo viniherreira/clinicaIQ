@@ -94,6 +94,11 @@ test('automações por etapa e bots (com o editor aberto) sem violações', asyn
   await page.getByRole('button', { name: /Fora do horário/ }).click();
   await expect(page.getByRole('log', { name: 'Conversa de teste' })).toBeVisible();
   expect((await axe(page)).violations).toEqual([]);
+  await page.goto('/crm/automacoes/bots');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Nova regra' }).click();
+  await expect(page.getByRole('form', { name: 'Nova regra de captação' })).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
 });
 
 test('painel de filtros do funil sem violações', async ({ page }) => {

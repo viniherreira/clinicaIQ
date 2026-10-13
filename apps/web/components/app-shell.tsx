@@ -7,6 +7,7 @@ import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
 import { getTenantAccess, getTenantModules } from '@/lib/access';
 import { can } from '@/lib/permissions';
+import { getUnitContext } from '@/lib/units';
 
 /** Os mesmos rótulos da tela de Equipe — o perfil precisa se chamar igual nos
  *  dois lugares, senão a pessoa não relaciona um com o outro. */
@@ -50,7 +51,7 @@ export async function AppShell({
   // Clerk: assim o nome no topo e o que a pessoa consegue fazer nunca divergem.
   const me = await prisma.user.findFirst({
     where: { clerkUserId: userId, tenantId: tenant.id, active: true },
-    select: { name: true, email: true, role: true, crmSeat: true },
+    select: { id: true, name: true, email: true, role: true, crmSeat: true },
   });
 
   const [access, modules] = await Promise.all([
@@ -73,6 +74,13 @@ export async function AppShell({
           .catch(() => 0)
       : 0;
 
+  // Várias unidades: o seletor no topo (só no espaço da clínica; o CRM é da clínica toda).
+  const unidades = space === 'clinic' && me ? await getUnitContext(tenant.id, me.id) : null;
+  const units =
+    unidades?.multi && unidades.allowed.length > 1
+      ? { current: unidades.current.id, options: unidades.allowed.map((u) => ({ id: u.id, name: u.name })) }
+      : null;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar
@@ -93,6 +101,7 @@ export async function AppShell({
           canPlanos={can(me?.role, 'planos')}
           space={space}
           showSwitcher={showSwitcher}
+          units={units}
         />
         <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto bg-canvas">

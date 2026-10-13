@@ -1,9 +1,4 @@
-export const GRID_START_HOUR = 7;
-export const GRID_END_HOUR = 21;
-export const SLOT_MINUTES = 10;
-export const SLOT_HEIGHT_PX = 16;
-export const TOTAL_MINUTES = (GRID_END_HOUR - GRID_START_HOUR) * 60;
-export const TOTAL_HEIGHT_PX = (TOTAL_MINUTES / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+// A geometria da grade (início, fim e intervalo) vem das Regras da agenda: `lib/agenda-rules.ts` e `grid-context.tsx`.
 
 /** Per-status visual treatment for appointment blocks. Soft tinted surface +
  *  matching text + a status dot. Dark-mode aware. The professional's own color
