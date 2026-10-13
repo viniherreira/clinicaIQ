@@ -65,9 +65,13 @@ export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHo
 
   // Recomeça quando o robô muda (o texto do menu, um botão…).
   const chave = JSON.stringify(flow.steps);
-  useEffect(recomecar, [chave]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    recomecar();
+  }, [chave]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => fim.current?.scrollIntoView({ block: 'nearest' }), [linhas]);
+  useEffect(() => {
+    fim.current?.scrollIntoView({ block: 'nearest' });
+  }, [linhas]);
 
   const responder = (t: string, buttonId?: string) => {
     if (!estado || !t.trim()) return;

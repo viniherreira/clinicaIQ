@@ -26,7 +26,9 @@ const ICON: Record<TimelineKind, typeof CircleDot> = {
  */
 export function LeadFeed({ lead, team, meId }: { lead: LeadDetail; team: BoardPerson[]; meId: string }) {
   const fimRef = useRef<HTMLDivElement>(null);
-  useEffect(() => fimRef.current?.scrollIntoView({ block: 'end' }), [lead.timeline.length]);
+  useEffect(() => {
+    fimRef.current?.scrollIntoView({ block: 'end' });
+  }, [lead.timeline.length]);
 
   return (
     <section aria-label="Tarefas e histórico" className="flex min-h-0 flex-1 flex-col">

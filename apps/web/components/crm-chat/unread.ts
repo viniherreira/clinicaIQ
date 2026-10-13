@@ -15,7 +15,9 @@ export function announceUnread(count: number): void {
 
 export function useLiveUnread(fromServer: number): number {
   const [count, setCount] = useState(fromServer);
-  useEffect(() => setCount(fromServer), [fromServer]);
+  useEffect(() => {
+    setCount(fromServer);
+  }, [fromServer]);
   useEffect(() => {
     const on = (e: Event) => setCount((e as CustomEvent<number>).detail);
     window.addEventListener(EVENT, on);
