@@ -1,5 +1,5 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
-import { isClosedStage, stageByRole, type StageLike } from './pipeline';
+import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipeline';
 import { conversationHash, encryptPhone, phoneHash } from './phone';
 import { queueStageAutomations } from './stage-queue';
 
@@ -187,8 +187,9 @@ export interface NewLeadInput {
   notes?: string | null;
   assignedToId?: string | null;
   patientId?: string | null;
-  /** Etapa inicial; padrão: a de papel NEW. */
+  /** Etapa inicial; padrão: a de papel NEW do funil (`pipelineId` ou o principal). */
   stageId?: string | null;
+  pipelineId?: string | null;
 }
 
 export async function createLead(
@@ -198,8 +199,14 @@ export async function createLead(
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const { tenantId } = actor;
   return db.$transaction(async (tx) => {
-    const stages = await tx.pipelineStage.findMany({ where: { tenantId } });
-    const stage = input.stageId ? stages.find((s) => s.id === input.stageId) : stageByRole(stages, 'NEW');
+    const [stages, funis] = await Promise.all([
+      tx.pipelineStage.findMany({ where: { tenantId } }),
+      tx.pipeline.findMany({ where: { tenantId } }),
+    ]);
+    const funil = (input.pipelineId && funis.find((p) => p.id === input.pipelineId)) || mainPipeline(funis);
+    const stage = input.stageId
+      ? stages.find((s) => s.id === input.stageId)
+      : stageByRole(stages.filter((s) => s.pipelineId === funil?.id), 'NEW');
     if (!stage || isClosedStage(stage)) return { ok: false as const, message: 'Escolha uma etapa aberta do funil.' };
 
     // Novo entra no topo da coluna, como no Kommo: é o que precisa de atenção.

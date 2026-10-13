@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { KanbanSquare, List, Plus, Search, X } from 'lucide-react';
-import type { BoardFilters, BoardPerson, BoardTag } from '@/crm/types';
-import { formatCents, SOURCE_LABEL } from '@/crm/format';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { KanbanSquare, List, MoreHorizontal, Pencil, Plus, Tags, Megaphone, Zap } from 'lucide-react';
+import type { BoardFilters, BoardPerson, BoardPipeline } from '@/crm/types';
+import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
+import { PipelineMenu } from './pipeline-menu';
+import { FilterSearch, type TagWithCount } from './filter-panel';
 
 /**
- * Barra do topo do funil e da lista, como a do Kommo: o nome da tela, Quadro |
- * Lista, a busca larga, quantos leads e quanto valem, e "Novo lead"; embaixo,
- * os filtros rápidos. Os filtros moram na URL, então o voltar do navegador e
- * um link copiado mostram a mesma coisa.
+ * A barra do topo do funil e da lista, como a do Kommo: o nome do funil (que
+ * abre a troca de funil), Quadro | Lista, a busca larga que abre os filtros,
+ * quantos leads e quanto valem, o menu "⋯" e "Novo lead".
+ *
+ * Os filtros moram na URL: o voltar do navegador e um link copiado mostram a
+ * mesma coisa.
  */
 export function CrmToolbar({
   view,
@@ -22,145 +27,146 @@ export function CrmToolbar({
   procedures,
   meId,
   summary,
+  pipelines,
+  currentPipeline,
+  canConfig,
 }: {
   view: 'quadro' | 'lista';
-  /** Quantos leads abertos a tela mostra e quanto somam. */
-  summary?: { count: number; valueCents: number };
   filters: BoardFilters;
-  tags: BoardTag[];
+  tags: TagWithCount[];
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
   meId: string;
+  /** Quantos leads a tela mostra e quanto somam. */
+  summary?: { count: number; valueCents: number };
+  pipelines: BoardPipeline[];
+  /** O funil do quadro. Na lista, nenhum (o filtro escolhe). */
+  currentPipeline?: BoardPipeline;
+  canConfig: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const [busca, setBusca] = useState(filters.q);
   const [novo, setNovo] = useState(false);
   const [aviso, setAviso] = useState('');
 
-  function setParam(changes: Record<string, string>) {
-    const sp = new URLSearchParams(params.toString());
-    for (const [k, v] of Object.entries(changes)) {
-      if (v) sp.set(k, v);
-      else sp.delete(k);
-    }
-    const qs = sp.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }
+  // Trocar de Quadro para Lista leva os filtros junto (menos o modo de edição).
+  const sp = new URLSearchParams(params.toString());
+  sp.delete('editar');
+  const qs = sp.toString() ? `?${sp.toString()}` : '';
 
-  // A busca espera a pessoa parar de digitar.
-  useEffect(() => {
-    if (busca === filters.q) return;
-    const t = setTimeout(() => setParam({ q: busca.trim() }), 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busca]);
-
-  const qs = params.toString() ? `?${params.toString()}` : '';
-  const chip = (ativo: boolean) =>
-    [
-      'inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-      ativo ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-surface text-muted-foreground hover:text-foreground',
-    ].join(' ');
-  const selectCls =
-    'h-8 rounded-lg border border-border bg-surface px-2 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-
-  const temFiltro = filters.q || filters.resp !== 'all' || filters.tarefa || filters.tag || filters.origem;
+  const editarHref = currentPipeline ? `/crm?funil=${currentPipeline.id}&editar=1` : '/crm?editar=1';
+  const item =
+    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-surface-alt';
 
   return (
-    <div className="space-y-2.5 border-b border-border bg-surface px-4 py-3 sm:px-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-base font-semibold uppercase tracking-wide">{view === 'quadro' ? 'Funil' : 'Leads'}</h1>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface px-3 py-2 sm:px-4">
+      {view === 'quadro' && currentPipeline ? (
+        <PipelineMenu pipelines={pipelines} current={currentPipeline} canConfig={canConfig} />
+      ) : (
+        <h1 className="px-1 text-sm font-bold uppercase tracking-wide">Leads</h1>
+      )}
 
-        <nav aria-label="Modo de visualização" className="segmented">
-          <Link href={`/crm${qs}`} aria-current={view === 'quadro' ? 'page' : undefined} className="segmented-item inline-flex items-center gap-1.5">
-            <KanbanSquare className="h-3.5 w-3.5" aria-hidden="true" /> Quadro
-          </Link>
-          <Link href={`/crm/leads${qs}`} aria-current={view === 'lista' ? 'page' : undefined} className="segmented-item inline-flex items-center gap-1.5">
-            <List className="h-3.5 w-3.5" aria-hidden="true" /> Lista
-          </Link>
-        </nav>
+      <nav aria-label="Modo de visualização" className="flex items-center gap-0.5">
+        <Link
+          href={`/crm${qs}`}
+          aria-current={view === 'quadro' ? 'page' : undefined}
+          title="Quadro"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:text-link"
+        >
+          <KanbanSquare className="h-[18px] w-[18px]" aria-hidden="true" />
+          <span className="sr-only">Quadro</span>
+        </Link>
+        <Link
+          href={`/crm/leads${qs}`}
+          aria-current={view === 'lista' ? 'page' : undefined}
+          title="Lista"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:text-link"
+        >
+          <List className="h-[18px] w-[18px]" aria-hidden="true" />
+          <span className="sr-only">Lista</span>
+        </Link>
+      </nav>
 
-        <div className="relative w-full sm:max-w-md sm:flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <label htmlFor="crm-busca" className="sr-only">Buscar por nome ou telefone</label>
-          <input
-            id="crm-busca"
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar nome ou telefone"
-            className="h-9 w-full rounded-md border border-border bg-surface-alt pl-8 pr-3 text-sm focus:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          />
-        </div>
+      <FilterSearch
+        view={view}
+        filters={filters}
+        tags={tags}
+        team={team}
+        stages={currentPipeline ? currentPipeline.columns : pipelines.flatMap((p) => p.columns.map((s) => ({ ...s, name: pipelines.length > 1 ? `${p.name} · ${s.name}` : s.name })))}
+        pipelines={view === 'lista' ? pipelines : []}
+        canConfig={canConfig}
+        onApply={(next) => {
+          const q = new URLSearchParams();
+          // Na lista, a ordem continua; a situação também, se o atalho não trocou.
+          if (view === 'lista') {
+            const ordem = params.get('ordem');
+            const situacao = params.get('situacao');
+            if (ordem) q.set('ordem', ordem);
+            if (situacao && !('situacao' in next)) q.set('situacao', situacao);
+          }
+          if (currentPipeline) q.set('funil', currentPipeline.id);
+          for (const [k, v] of Object.entries(next)) if (v) q.set(k, v);
+          const s = q.toString();
+          router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+        }}
+      />
 
-        <div className="flex-1" />
+      <div className="flex-1" />
 
-        {summary && (
-          <p className="text-sm tabular-nums text-muted-foreground">
-            <span className="font-semibold text-foreground">{summary.count}</span> {summary.count === 1 ? 'lead' : 'leads'}:{' '}
-            <span className="font-semibold text-foreground">{formatCents(summary.valueCents)}</span>
-          </p>
-        )}
+      {summary && (
+        <p className="text-sm tabular-nums text-muted-foreground">
+          <span className="font-semibold text-foreground">{summary.count}</span> {summary.count === 1 ? 'lead' : 'leads'}:{' '}
+          <span className="font-semibold text-foreground">{formatCents(summary.valueCents)}</span>
+        </p>
+      )}
 
-        <button type="button" onClick={() => setNovo(true)} className="btn-primary btn-md inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-          <Plus className="h-4 w-4" aria-hidden="true" /> Novo lead
-        </button>
-      </div>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger
+          aria-label="Mais opções"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content align="end" sideOffset={6} className="z-[60] min-w-56 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+            {canConfig && view === 'quadro' && (
+              <DropdownMenu.Item asChild className={item}>
+                <Link href={editarHref}>
+                  <Pencil className="h-4 w-4" aria-hidden="true" /> Editar funil
+                </Link>
+              </DropdownMenu.Item>
+            )}
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                <Link href="/crm/configuracoes?aba=tags">
+                  <Tags className="h-4 w-4" aria-hidden="true" /> Gerenciar tags
+                </Link>
+              </DropdownMenu.Item>
+            )}
+            <DropdownMenu.Item asChild className={item}>
+              <Link href="/crm/automacoes/transmissoes">
+                <Megaphone className="h-4 w-4" aria-hidden="true" /> Transmissões
+              </Link>
+            </DropdownMenu.Item>
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                <Link href="/crm/automacoes">
+                  <Zap className="h-4 w-4" aria-hidden="true" /> Automações
+                </Link>
+              </DropdownMenu.Item>
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
-      <div role="group" aria-label="Filtros" className="flex flex-wrap items-center gap-2">
-        <button type="button" aria-pressed={filters.resp === 'me'} className={chip(filters.resp === 'me')} onClick={() => setParam({ resp: filters.resp === 'me' ? '' : 'me' })}>
-          Meus leads
-        </button>
-        <button type="button" aria-pressed={filters.tarefa === 'none'} className={chip(filters.tarefa === 'none')} onClick={() => setParam({ tarefa: filters.tarefa === 'none' ? '' : 'none' })}>
-          Sem tarefa
-        </button>
-        <button type="button" aria-pressed={filters.tarefa === 'overdue'} className={chip(filters.tarefa === 'overdue')} onClick={() => setParam({ tarefa: filters.tarefa === 'overdue' ? '' : 'overdue' })}>
-          Atrasadas
-        </button>
-
-        <label htmlFor="crm-filtro-resp" className="sr-only">Responsável</label>
-        <select id="crm-filtro-resp" className={selectCls} value={filters.resp === 'me' || filters.resp === 'all' ? '' : filters.resp} onChange={(e) => setParam({ resp: e.target.value })}>
-          <option value="">Todos os responsáveis</option>
-          {team.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-
-        {tags.length > 0 && (
-          <>
-            <label htmlFor="crm-filtro-tag" className="sr-only">Tag</label>
-            <select id="crm-filtro-tag" className={selectCls} value={filters.tag} onChange={(e) => setParam({ tag: e.target.value })}>
-              <option value="">Todas as tags</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </>
-        )}
-
-        <label htmlFor="crm-filtro-origem" className="sr-only">Origem</label>
-        <select id="crm-filtro-origem" className={selectCls} value={filters.origem} onChange={(e) => setParam({ origem: e.target.value })}>
-          <option value="">Todas as origens</option>
-          {Object.entries(SOURCE_LABEL).map(([v, l]) => (
-            <option key={v} value={v}>{l}</option>
-          ))}
-        </select>
-
-        {temFiltro && (
-          <button
-            type="button"
-            className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            onClick={() => {
-              setBusca('');
-              router.replace(pathname, { scroll: false });
-            }}
-          >
-            <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpar filtros
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => setNovo(true)}
+        className="btn-primary btn-md inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" /> Novo lead
+      </button>
 
       <NewLeadModal
         open={novo}
@@ -172,6 +178,7 @@ export function CrmToolbar({
         team={team}
         procedures={procedures}
         meId={meId}
+        stages={currentPipeline?.columns}
       />
       <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
     </div>

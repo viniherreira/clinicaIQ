@@ -77,6 +77,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await prisma.lead.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
     await prisma.pipelineStage.deleteMany({ where: t });
+    await prisma.pipeline.deleteMany({ where: t });
     await prisma.user.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();

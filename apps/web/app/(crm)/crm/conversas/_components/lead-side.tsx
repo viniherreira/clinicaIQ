@@ -4,13 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import type { LeadDetail } from '@/crm/lead-detail';
-import type { BoardPerson, BoardStage, BoardTag, LostReasonOption } from '@/crm/types';
+import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { LeadPanel } from '../../leads/[id]/_components/lead-panel';
 import { leadDetailAction } from '../actions';
 
 export interface LeadSideBasics {
-  stages: BoardStage[];
-  closedStages: { won: string; lost: string };
+  pipelines: BoardPipeline[];
   tags: BoardTag[];
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
@@ -42,8 +41,7 @@ export function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics
       {lead ? (
         <LeadPanel
           lead={lead}
-          stages={basics.stages}
-          closedStages={basics.closedStages}
+          pipelines={basics.pipelines}
           allTags={basics.tags}
           team={basics.team}
           procedures={basics.procedures}

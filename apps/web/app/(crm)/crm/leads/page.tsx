@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireCrm } from '@/crm/guard';
-import { loadLeadList, parseFilters, parseListParams, type ListOrder, type ListStatus } from '@/crm/board-data';
+import { loadLeadList, parseFilters, parseListParams, tagCounts, type ListOrder, type ListStatus } from '@/crm/board-data';
+import { can } from '@/lib/permissions';
 import { loadCrmBasics } from '@/crm/page-data';
 import { colorClasses } from '@/crm/colors';
 import { formatCents, formatDue, SOURCE_LABEL } from '@/crm/format';
@@ -28,7 +29,7 @@ export default async function LeadsPage({
   const sp = await searchParams;
   const filters = parseFilters(sp);
   const { status, order } = parseListParams(sp);
-  const [basics, leads] = await Promise.all([loadCrmBasics(ctx), loadLeadList(ctx, filters, status, order)]);
+  const [basics, leads, counts] = await Promise.all([loadCrmBasics(ctx), loadLeadList(ctx, filters, status, order), tagCounts(ctx)]);
 
   const link = (changes: Record<string, string>) => {
     const q = new URLSearchParams();
@@ -60,7 +61,17 @@ export default async function LeadsPage({
 
   return (
     <div className="flex h-full flex-col gap-4 pb-6">
-      <CrmToolbar view="lista" filters={filters} tags={basics.tags} team={basics.team} procedures={basics.procedures} meId={ctx.userId} />
+      <CrmToolbar
+        view="lista"
+        filters={filters}
+        tags={basics.tags.map((t) => ({ ...t, count: counts.get(t.id) ?? 0 }))}
+        team={basics.team}
+        procedures={basics.procedures}
+        meId={ctx.userId}
+        summary={{ count: leads.length, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
+        pipelines={basics.pipelines}
+        canConfig={can(ctx.role, 'crm_config')}
+      />
 
       <div className="px-4 sm:px-6">
         <nav aria-label="Situação" className="segmented">

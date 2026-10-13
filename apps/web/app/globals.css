@@ -67,6 +67,8 @@
     --rail-active: 214 40% 26%;
     --board: 214 30% 94%;
     --bubble-out: 207 90% 93%;
+    /* Telefone e links dentro dos cards do CRM. */
+    --link: 212 80% 40%;
 
     --radius: 0.5rem;
   }
@@ -120,6 +122,7 @@
     --rail-active: 222 25% 14%;
     --board: 222 28% 9%;
     --bubble-out: 212 45% 22%;
+    --link: 207 90% 68%;
   }
 
   .high-contrast {
@@ -156,6 +159,7 @@
     --rail-active: 212 100% 30%;
     --board: 0 0% 100%;
     --bubble-out: 0 0% 92%;
+    --link: 212 100% 28%;
   }
 
   .dark.high-contrast {
@@ -192,6 +196,54 @@
     --rail-active: 0 0% 20%;
     --board: 0 0% 0%;
     --bubble-out: 0 0% 15%;
+    --link: 205 100% 70%;
+  }
+
+  /*
+   * O CRM é escuro, azul-marinho, como o Kommo das clínicas: o espaço do CRM
+   * liga `dark crm-navy` na página (components/crm-theme.tsx). O alto
+   * contraste, se ligado, continua mandando.
+   */
+  .dark.crm-navy:not(.high-contrast) {
+    --background: 206 52% 11%;
+    --foreground: 205 30% 95%;
+
+    --surface: 206 44% 16%;
+    --surface-alt: 206 38% 20%;
+
+    --border: 205 32% 26%;
+    --border-strong: 205 28% 34%;
+    --input: 205 32% 28%;
+
+    --secondary: 206 38% 20%;
+    --secondary-foreground: 205 30% 95%;
+    --muted: 206 38% 20%;
+    --muted-foreground: 205 22% 72%;
+
+    --popover: 206 46% 15%;
+    --popover-foreground: 205 30% 95%;
+    --card: 206 44% 16%;
+    --card-foreground: 205 30% 95%;
+
+    --canvas: 206 52% 11%;
+    --rail: 206 62% 7%;
+    --rail-foreground: 205 25% 76%;
+    --rail-active: 206 46% 16%;
+    --board: 206 52% 11%;
+    --bubble-out: 206 55% 26%;
+    --link: 207 90% 68%;
+
+    /* Vermelho mais claro para ler sobre o marinho; texto escuro nos botões vermelhos. */
+    --destructive: 0 84% 70%;
+    --destructive-foreground: 206 52% 11%;
+  }
+
+  /*
+   * No marinho, o azul dos botões (com texto branco) fica escuro demais como
+   * texto: link e texto azul usam o azul claro do CRM.
+   */
+  .dark.crm-navy:not(.high-contrast) .text-primary {
+    color: hsl(var(--link));
   }
 
   * {

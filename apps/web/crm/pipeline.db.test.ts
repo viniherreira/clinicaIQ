@@ -21,6 +21,7 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
 
   afterAll(async () => {
     await prisma.pipelineStage.deleteMany({ where: { tenantId: tenant.id } });
+    await prisma.pipeline.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.lostReason.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();
@@ -29,6 +30,7 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
   it('duas aberturas ao mesmo tempo criam o funil uma vez só', async () => {
     await Promise.all([ensureDefaultPipeline(db, tenant.id), ensureDefaultPipeline(db, tenant.id)]);
     expect(await db.pipelineStage.count()).toBe(DEFAULT_STAGES.length);
+    expect(await db.pipeline.count()).toBe(1);
     expect(await db.lostReason.count()).toBe(DEFAULT_LOST_REASONS.length);
   });
 
@@ -36,6 +38,7 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
     await db.pipelineStage.updateMany({ where: { role: 'NEW' }, data: { name: 'Chegou agora' } });
     await ensureDefaultPipeline(db, tenant.id);
     expect(await db.pipelineStage.count()).toBe(DEFAULT_STAGES.length);
+    expect(await db.pipeline.count()).toBe(1);
     expect((await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))?.name).toBe('Chegou agora');
   });
 });

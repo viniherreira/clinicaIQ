@@ -23,11 +23,11 @@ export default async function TransmissoesPage() {
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto">
-          <h1 className="text-xl font-semibold tracking-tight">Transmissões</h1>
+          <h2 className="text-xl font-semibold tracking-tight">Transmissões</h2>
           <p className="mt-1 text-sm text-muted-foreground">Uma mensagem para um grupo de leads. Quem respondeu SAIR não recebe.</p>
         </div>
         {pode && (
-          <Link href="/crm/transmissoes/nova" className="btn-primary btn-md">
+          <Link href="/crm/automacoes/transmissoes/nova" className="btn-primary btn-md">
             <Plus className="h-4 w-4" aria-hidden="true" /> Nova transmissão
           </Link>
         )}
@@ -46,7 +46,7 @@ export default async function TransmissoesPage() {
             return (
               <li key={b.id} className="rounded-xl border border-border bg-surface p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Link href={`/crm/transmissoes/${b.id}`} className="mr-auto font-medium hover:text-primary hover:underline">
+                  <Link href={`/crm/automacoes/transmissoes/${b.id}`} className="mr-auto font-medium hover:text-primary hover:underline">
                     {b.name}
                   </Link>
                   <span className="text-xs text-muted-foreground">{quando}</span>

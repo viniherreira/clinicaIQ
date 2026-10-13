@@ -1,10 +1,10 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
-import { CRM_COLORS } from './defaults';
-import { canDeleteStage, isClosedStage } from './pipeline';
+import { CRM_COLORS, NEW_PIPELINE_STAGES } from './defaults';
+import { canDeleteStage, isClosedStage, mainPipeline } from './pipeline';
 import { MAX_QUICK_REPLY, normalizeShortcut } from './quick-replies';
 
 /**
- * O que dono e admin mudam no CRM: etapas, tags, motivos de perda e
+ * O que dono e admin mudam no CRM: funis, etapas, tags, motivos de perda e
  * respostas rápidas.
  * Quem chama já passou por `guardCrmAction('crm_config')`.
  */
@@ -14,19 +14,116 @@ const ok: Result = { ok: true };
 const isColor = (c: string) => (CRM_COLORS as readonly string[]).includes(c);
 const cleanName = (n: string) => n.trim().replace(/\s+/g, ' ').slice(0, 40);
 
+// ─── Funis ───────────────────────────────────────────────────────────────────
+
+/** Um funil novo já nasce com entrada, duas colunas, ganho e perda. */
+export async function createPipeline(
+  db: TenantPrismaClient,
+  tenantId: string,
+  name: string,
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const nome = cleanName(name);
+  if (!nome) return { ok: false, message: 'Escreva o nome do funil.' };
+  const funis = await db.pipeline.findMany();
+  if (funis.some((p) => p.name.toLowerCase() === nome.toLowerCase())) {
+    return { ok: false, message: 'Já existe um funil com esse nome.' };
+  }
+  if (funis.length >= 20) return { ok: false, message: 'Limite de 20 funis.' };
+  const ordem = Math.max(0, ...funis.map((p) => p.order)) + 10;
+  const funil = await db.$transaction(async (tx) => {
+    const p = await tx.pipeline.create({ data: { tenantId, name: nome, order: ordem } });
+    await tx.pipelineStage.createMany({
+      data: NEW_PIPELINE_STAGES.map((s) => ({ tenantId, pipelineId: p.id, name: s.name, color: s.color, order: s.order, role: s.role })),
+    });
+    return p;
+  });
+  return { ok: true, id: funil.id };
+}
+
+export async function renamePipeline(db: TenantPrismaClient, pipelineId: string, name: string): Promise<Result> {
+  const nome = cleanName(name);
+  if (!nome) return { ok: false, message: 'Escreva o nome do funil.' };
+  const funil = await db.pipeline.findFirst({ where: { id: pipelineId } });
+  if (!funil) return { ok: false, message: 'Funil não encontrado.' };
+  const igual = await db.pipeline.findFirst({ where: { id: { not: pipelineId }, name: { equals: nome, mode: 'insensitive' } } });
+  if (igual) return { ok: false, message: 'Já existe um funil com esse nome.' };
+  await db.pipeline.updateMany({ where: { id: pipelineId }, data: { name: nome } });
+  return ok;
+}
+
+/**
+ * Apaga um funil levando todos os leads para outro: os ganhos para o "Fechou"
+ * de lá, os perdidos para o "Perdeu" e os abertos para a entrada. O principal
+ * não se apaga — é onde entra o lead novo e o que a agenda move.
+ */
+export async function deletePipeline(
+  db: TenantPrismaClient,
+  tenantId: string,
+  pipelineId: string,
+  targetId: string,
+): Promise<Result> {
+  return db.$transaction(async (tx) => {
+    const funis = await tx.pipeline.findMany({ where: { tenantId } });
+    const funil = funis.find((p) => p.id === pipelineId);
+    const destino = funis.find((p) => p.id === targetId);
+    if (!funil) return { ok: false as const, message: 'Funil não encontrado.' };
+    if (mainPipeline(funis)?.id === funil.id) return { ok: false as const, message: 'O funil principal não pode ser apagado.' };
+    if (!destino || destino.id === funil.id) return { ok: false as const, message: 'Escolha para qual funil vão os leads.' };
+
+    const [daqui, dela] = await Promise.all([
+      tx.pipelineStage.findMany({ where: { tenantId, pipelineId: funil.id } }),
+      tx.pipelineStage.findMany({ where: { tenantId, pipelineId: destino.id } }),
+    ]);
+    const papel = (role: 'NEW' | 'WON' | 'LOST') => dela.find((s) => s.role === role);
+    const entrada = papel('NEW');
+    if (!entrada || !papel('WON') || !papel('LOST')) return { ok: false as const, message: 'O funil de destino está incompleto.' };
+
+    for (const s of daqui) {
+      const para = s.role === 'WON' ? papel('WON')! : s.role === 'LOST' ? papel('LOST')! : entrada;
+      const leads = await tx.lead.findMany({ where: { tenantId, stageId: s.id }, select: { id: true } });
+      if (!leads.length) continue;
+      await tx.lead.updateMany({ where: { tenantId, stageId: s.id }, data: { stageId: para.id, stageEnteredAt: new Date() } });
+      await tx.leadActivity.createMany({
+        data: leads.map((l) => ({
+          tenantId,
+          leadId: l.id,
+          type: 'STAGE_CHANGED' as const,
+          actorId: null,
+          data: { from: s.id, to: para.id, reason: 'pipeline_deleted' },
+        })),
+      });
+    }
+    await tx.pipelineStage.deleteMany({ where: { tenantId, pipelineId: funil.id } });
+    await tx.pipeline.deleteMany({ where: { id: funil.id, tenantId } });
+    return ok;
+  });
+}
+
 // ─── Etapas ──────────────────────────────────────────────────────────────────
 
-/** Nova etapa entra por último entre as colunas — antes de Fechou e Perdeu. */
-export async function createStage(db: TenantPrismaClient, tenantId: string, name: string, color: string): Promise<Result> {
+/**
+ * Nova etapa entra por último entre as colunas do funil — antes de Fechou e
+ * Perdeu. Sem funil, vai para o principal.
+ */
+export async function createStage(
+  db: TenantPrismaClient,
+  tenantId: string,
+  name: string,
+  color: string,
+  pipelineId?: string,
+): Promise<Result> {
   const nome = cleanName(name);
   if (!nome) return { ok: false, message: 'Escreva o nome da etapa.' };
   if (!isColor(color)) return { ok: false, message: 'Cor inválida.' };
-  const stages = await db.pipelineStage.findMany();
+  const funil = pipelineId ? await db.pipeline.findFirst({ where: { id: pipelineId } }) : mainPipeline(await db.pipeline.findMany());
+  if (!funil) return { ok: false, message: 'Funil não encontrado.' };
+  const stages = await db.pipelineStage.findMany({ where: { pipelineId: funil.id } });
   if (stages.some((s) => s.name.toLowerCase() === nome.toLowerCase())) {
-    return { ok: false, message: 'Já existe uma etapa com esse nome.' };
+    return { ok: false, message: 'Já existe uma etapa com esse nome neste funil.' };
   }
+  if (stages.length >= 30) return { ok: false, message: 'Limite de 30 etapas por funil.' };
   const ultima = Math.max(0, ...stages.filter((s) => !isClosedStage(s)).map((s) => s.order));
-  await db.pipelineStage.create({ data: { tenantId, name: nome, color, order: ultima + 10, role: null } });
+  await db.pipelineStage.create({ data: { tenantId, pipelineId: funil.id, name: nome, color, order: ultima + 10, role: null } });
   return ok;
 }
 
@@ -41,8 +138,10 @@ export async function updateStage(
   if (patch.name !== undefined) {
     const nome = cleanName(patch.name);
     if (!nome) return { ok: false, message: 'Escreva o nome da etapa.' };
-    const igual = await db.pipelineStage.findFirst({ where: { id: { not: stageId }, name: { equals: nome, mode: 'insensitive' } } });
-    if (igual) return { ok: false, message: 'Já existe uma etapa com esse nome.' };
+    const igual = await db.pipelineStage.findFirst({
+      where: { id: { not: stageId }, pipelineId: stage.pipelineId, name: { equals: nome, mode: 'insensitive' } },
+    });
+    if (igual) return { ok: false, message: 'Já existe uma etapa com esse nome neste funil.' };
     data.name = nome;
   }
   if (patch.color !== undefined) {
@@ -58,7 +157,11 @@ export async function updateStage(
  * sempre no fim, como barra de "solte aqui".
  */
 export async function moveStage(db: TenantPrismaClient, tenantId: string, stageId: string, direction: -1 | 1): Promise<Result> {
-  const colunas = (await db.pipelineStage.findMany({ orderBy: { order: 'asc' } })).filter((s) => !isClosedStage(s));
+  const stage = await db.pipelineStage.findFirst({ where: { id: stageId }, select: { pipelineId: true } });
+  if (!stage) return { ok: false, message: 'Etapa não encontrada.' };
+  const colunas = (await db.pipelineStage.findMany({ where: { pipelineId: stage.pipelineId }, orderBy: { order: 'asc' } })).filter(
+    (s) => !isClosedStage(s),
+  );
   const i = colunas.findIndex((s) => s.id === stageId);
   const j = i + direction;
   if (i < 0) return { ok: false, message: 'Etapa não encontrada.' };
@@ -80,7 +183,8 @@ export async function deleteStage(
   return db.$transaction(async (tx) => {
     const stage = await tx.pipelineStage.findFirst({ where: { id: stageId, tenantId } });
     if (!stage) return { ok: false as const, message: 'Etapa não encontrada.' };
-    const target = targetId ? await tx.pipelineStage.findFirst({ where: { id: targetId, tenantId } }) : null;
+    // Os leads ficam no mesmo funil.
+    const target = targetId ? await tx.pipelineStage.findFirst({ where: { id: targetId, tenantId, pipelineId: stage.pipelineId } }) : null;
     const leads = await tx.lead.count({ where: { tenantId, stageId } });
 
     const check = canDeleteStage(stage, leads, target);

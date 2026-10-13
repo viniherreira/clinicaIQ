@@ -16,8 +16,8 @@ export interface TimelineNames {
   tags: Map<string, string>;
   people: Map<string, string>;
   reasons: Map<string, string>;
-  /** A etapa de ganho: chegar nela vira "Negócio fechado". */
-  wonStageId: string | null;
+  /** As etapas de ganho (uma por funil): chegar nelas vira "Negócio fechado". */
+  wonStageIds: ReadonlySet<string>;
 }
 
 export type TimelineKind = 'event' | 'note' | 'task' | 'clinic' | 'won' | 'lost';
@@ -61,7 +61,7 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
         return { ...base, kind: 'event', text: `Lead criado${d.source ? ` (${SOURCE[d.source] ?? d.source})` : ''}` };
       case 'STAGE_CHANGED': {
         const motivo = d.event && CLINIC_TEXT[d.event] ? ` — ${CLINIC_TEXT[d.event].toLowerCase()}` : '';
-        if (d.to && d.to === names.wonStageId) {
+        if (d.to && names.wonStageIds.has(d.to)) {
           return { ...base, kind: 'won', text: `Negócio fechado${motivo}` };
         }
         return { ...base, kind: 'event', text: `Moveu de ${stage(d.from)} para ${stage(d.to)}${motivo}` };

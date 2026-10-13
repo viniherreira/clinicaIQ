@@ -6,7 +6,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, UserPlus, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SOURCE_LABEL } from '@/crm/format';
-import type { BoardPerson } from '@/crm/types';
+import type { BoardPerson, BoardStage } from '@/crm/types';
 import { createLeadAction, type NewLeadForm } from '../actions';
 
 const NENHUM = '__nenhum__';
@@ -21,6 +21,7 @@ export function NewLeadModal({
   team,
   procedures,
   meId,
+  stages,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,7 +29,10 @@ export function NewLeadModal({
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
   meId: string;
+  /** Colunas do funil aberto: o lead entra na primeira. Sem elas, no funil principal. */
+  stages?: BoardStage[];
 }) {
+  const entrada = stages?.[0];
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -67,6 +71,7 @@ export function NewLeadModal({
       interestProcedureId: form.interestProcedureId === NENHUM ? null : form.interestProcedureId,
       estimatedValue: valor ? Number(valor) : null,
       assignedToId: form.assignedToId === NENHUM ? null : form.assignedToId,
+      stageId: entrada?.id ?? null,
       force,
     };
     start(async () => {
@@ -75,7 +80,7 @@ export function NewLeadModal({
         onCreated(
           r.linkedPatient
             ? `Lead criado e ligado à ficha de ${r.linkedPatient}, que já é paciente.`
-            : `Lead ${form.name.trim()} criado em Novo.`,
+            : `Lead ${form.name.trim()} criado em ${entrada?.name ?? 'Novo'}.`,
         );
         onClose();
       } else if ('duplicate' in r) {

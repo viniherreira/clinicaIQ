@@ -35,6 +35,22 @@ export const DEFAULT_STAGES: readonly DefaultStage[] = [
   { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
 ];
 
+/** Nome do primeiro funil de toda clínica. */
+export const MAIN_PIPELINE_NAME = 'Funil principal';
+
+/**
+ * As etapas com que nasce um funil criado pela clínica. Só entrada, ganho e
+ * perda têm papel: "Avaliação agendada" e "Em negociação" com papel ficam no
+ * funil principal, que é o que a agenda e os orçamentos movem.
+ */
+export const NEW_PIPELINE_STAGES: readonly DefaultStage[] = [
+  { name: 'Novo', color: 'gray', order: 10, role: 'NEW' },
+  { name: 'Em conversa', color: 'blue', order: 20, role: null },
+  { name: 'Em negociação', color: 'amber', order: 30, role: null },
+  { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
+  { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
+];
+
 export const DEFAULT_LOST_REASONS: readonly string[] = [
   'Achou caro',
   'Sem resposta',

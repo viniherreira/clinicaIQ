@@ -89,7 +89,7 @@ test('transmissão para uma tag: público contado, fila e detalhes', async ({ pa
   const l = await prisma.lead.findFirstOrThrow({ where: { tenantId: tenant.id, title: lead.title } });
   await prisma.leadTagOnLead.create({ data: { tenantId: tenant.id, leadId: l.id, tagId: tag.id } });
 
-  await page.goto('/crm/transmissoes/nova');
+  await page.goto('/crm/automacoes/transmissoes/nova');
   await page.waitForLoadState('networkidle');
   const nome = uniqueName('Transmissão E2E');
   await page.getByLabel('Nome (só para a equipe)').fill(nome);
@@ -99,7 +99,7 @@ test('transmissão para uma tag: público contado, fila e detalhes', async ({ pa
   await expect(page.getByText(`Oi Ana! Temos horário na quinta.`)).toBeVisible();
   await page.getByRole('button', { name: 'Enviar para 1 pessoa' }).click();
 
-  await page.waitForURL(/\/crm\/transmissoes\/(?!nova)[^/]+$/);
+  await page.waitForURL(/\/crm\/automacoes\/transmissoes\/(?!nova)[^/]+$/);
   await expect(page.getByRole('heading', { name: nome })).toBeVisible();
   await expect(async () => {
     await page.reload();
@@ -108,11 +108,10 @@ test('transmissão para uma tag: público contado, fila e detalhes', async ({ pa
 });
 
 test('automações e robô: criar pela tela', async ({ page }) => {
-  await page.goto('/crm/configuracoes');
+  await page.goto('/crm/automacoes/etapas');
   await page.waitForLoadState('networkidle');
 
-  await page.getByRole('tab', { name: 'Automações' }).click();
-  await page.getByRole('button', { name: 'Adicionar automação em Em negociação' }).click();
+  await page.getByRole('button', { name: /^Adicionar automação em (.* · )?Em negociação$/ }).first().click();
   await page.getByLabel('O que fazer').selectOption('ADD_TAG');
   const semTag = await page.getByText('Crie uma tag primeiro').count();
   if (semTag === 0) {
@@ -121,7 +120,8 @@ test('automações e robô: criar pela tela', async ({ page }) => {
     await expect(page.getByText(/Na hora:.*Põe a tag/).first()).toBeVisible();
   }
 
-  await page.getByRole('tab', { name: 'Robô' }).click();
+  await page.goto('/crm/automacoes/bots');
+  await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Novo robô' }).click();
   const nome = uniqueName('Robô E2E');
   await page.getByLabel('Nome do robô').fill(nome);

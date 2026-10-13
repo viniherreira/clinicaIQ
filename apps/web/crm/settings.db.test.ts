@@ -28,6 +28,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     await prisma.lostReason.deleteMany({ where: t });
     await prisma.quickReply.deleteMany({ where: t });
     await prisma.pipelineStage.deleteMany({ where: t });
+    await prisma.pipeline.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();
   });
@@ -69,6 +70,38 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     await db.leadTagOnLead.create({ data: { tenantId: tenant.id, leadId: lia.id, tagId: tag.id } });
     expect(await s.deleteTag(db, tenant.id, tag.id)).toEqual({ ok: true });
     expect(await db.leadTagOnLead.count({ where: { leadId: lia.id } })).toBe(0);
+  });
+
+  it('funil novo nasce com entrada, ganho e perda; nome repetido é recusado', async () => {
+    const r = await s.createPipeline(db, tenant.id, 'Harmonização');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const etapas = await db.pipelineStage.findMany({ where: { pipelineId: r.id } });
+    expect(etapas.map((x) => x.role).filter(Boolean).sort()).toEqual(['LOST', 'NEW', 'WON']);
+    expect((await s.createPipeline(db, tenant.id, ' harmonização ')).ok).toBe(false);
+    // A mesma etapa pode existir em funis diferentes.
+    expect(await s.createStage(db, tenant.id, 'Em conversa', 'blue', r.id)).toEqual({ ok: false, message: 'Já existe uma etapa com esse nome neste funil.' });
+    expect(await s.createStage(db, tenant.id, 'Retorno', 'blue', r.id)).toEqual({ ok: true });
+  });
+
+  it('excluir funil leva os leads: abertos para a entrada, ganhos para o Fechou', async () => {
+    const funil = (await db.pipeline.findFirst({ where: { name: 'Harmonização' } }))!;
+    const principal = (await db.pipeline.findFirst({ where: { name: 'Funil principal' } }))!;
+    const retorno = (await db.pipelineStage.findFirst({ where: { pipelineId: funil.id, name: 'Retorno' } }))!;
+    const fechou = (await db.pipelineStage.findFirst({ where: { pipelineId: funil.id, role: 'WON' } }))!;
+    const ator = { tenantId: tenant.id, userId: null };
+    const aberto = await createLead(db, ator, { name: 'Bia', phone: '11987650888', stageId: retorno.id });
+    const ganho = await createLead(db, ator, { name: 'Caio', phone: '11987650999', stageId: retorno.id });
+    if (!aberto.ok || !ganho.ok) throw new Error('lead');
+    await db.lead.updateMany({ where: { id: ganho.leadId }, data: { stageId: fechou.id, wonAt: new Date() } });
+
+    expect((await s.deletePipeline(db, tenant.id, principal.id, funil.id)).ok).toBe(false);
+    expect(await s.deletePipeline(db, tenant.id, funil.id, principal.id)).toEqual({ ok: true });
+    const destino = await db.pipelineStage.findMany({ where: { pipelineId: principal.id } });
+    const papel = (id: string) => destino.find((x) => x.id === id)?.role;
+    expect(papel((await db.lead.findFirst({ where: { id: aberto.leadId } }))!.stageId)).toBe('NEW');
+    expect(papel((await db.lead.findFirst({ where: { id: ganho.leadId } }))!.stageId)).toBe('WON');
+    expect(await db.pipeline.count()).toBe(1);
   });
 
   it('motivo de perda se desativa, não se apaga', async () => {

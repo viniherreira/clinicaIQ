@@ -33,8 +33,9 @@ describe.skipIf(!hasDb)('isolamento entre clínicas — CRM', async () => {
     const user = await prisma.user.create({
       data: { tenantId: tenantA.id, name: 'Dono A', email: `a-${suffix}@teste.local`, role: 'OWNER' },
     });
+    const funil = await prisma.pipeline.create({ data: { tenantId: tenantA.id, name: 'Funil principal' } });
     const stage = await prisma.pipelineStage.create({
-      data: { tenantId: tenantA.id, name: 'Novo', color: 'gray', order: 1, role: 'NEW' },
+      data: { tenantId: tenantA.id, pipelineId: funil.id, name: 'Novo', color: 'gray', order: 1, role: 'NEW' },
     });
     const lead = await prisma.lead.create({
       data: { tenantId: tenantA.id, name: 'Lead A', phoneEncrypted: 'x', phoneHash: 'h', stageId: stage.id },
@@ -57,6 +58,7 @@ describe.skipIf(!hasDb)('isolamento entre clínicas — CRM', async () => {
     await prisma.leadTask.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.lead.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.pipelineStage.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.pipeline.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.user.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
     await prisma.$disconnect();

@@ -111,7 +111,7 @@ export function BroadcastForm({
             scheduledLocal: quando === 'depois' ? data : '',
           });
           if (!r.ok) return setErro(r.message);
-          router.push(`/crm/transmissoes/${r.broadcastId}`);
+          router.push(`/crm/automacoes/transmissoes/${r.broadcastId}`);
         });
       }}
     >

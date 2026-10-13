@@ -22,7 +22,10 @@ export default async function PainelPage({
   const sp = await searchParams;
   const period = asPeriod(typeof sp.periodo === 'string' ? sp.periodo : undefined);
   const basics = await loadCrmBasics(ctx);
-  const d = await loadDashboard(ctx, period, basics.columns, basics.team);
+  // O funil do painel mostra as colunas de todos os funis (com o nome do funil, se houver mais de um).
+  const varios = basics.pipelines.length > 1;
+  const etapas = basics.pipelines.flatMap((p) => p.columns.map((s) => ({ ...s, name: varios ? `${p.name} · ${s.name}` : s.name })));
+  const d = await loadDashboard(ctx, period, etapas, basics.team);
   const k = d.kpis;
   const maiorEtapa = Math.max(1, ...d.funnel.map((f) => f.count));
 

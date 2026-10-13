@@ -16,8 +16,12 @@ for (const path of [
   '/crm/leads',
   '/crm/painel',
   '/crm/tarefas',
-  '/crm/transmissoes',
-  '/crm/transmissoes/nova',
+  '/crm/automacoes/transmissoes',
+  '/crm/automacoes/transmissoes/nova',
+  '/crm/automacoes/bots',
+  '/crm/automacoes/modelos',
+  '/crm/automacoes/etapas',
+  '/crm?editar=1',
   '/crm/whatsapp',
   '/crm/configuracoes',
   '/dashboard',
@@ -78,13 +82,21 @@ test('conversa aberta e aba Conversa da ficha sem violações', async ({ page })
   expect((await axe(page)).violations).toEqual([]);
 });
 
-test('abas Automações e Robô (com o editor aberto) sem violações', async ({ page }) => {
-  await page.goto('/crm/configuracoes');
+test('automações por etapa e bots (com o editor aberto) sem violações', async ({ page }) => {
+  await page.goto('/crm/automacoes/etapas');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: 'Automações' }).click();
   await page.getByRole('button', { name: /^Adicionar automação em/ }).first().click();
   expect((await axe(page)).violations).toEqual([]);
-  await page.getByRole('tab', { name: 'Robô' }).click();
+  await page.goto('/crm/automacoes/bots');
+  await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Novo robô' }).click();
+  expect((await axe(page)).violations).toEqual([]);
+});
+
+test('painel de filtros do funil sem violações', async ({ page }) => {
+  await page.goto('/crm');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /abrir filtros/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Filtros' })).toBeVisible();
   expect((await axe(page)).violations).toEqual([]);
 });

@@ -44,8 +44,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <div className="overflow-y-auto bg-surface lg:border-r lg:border-border">
           <LeadPanel
             lead={lead}
-            stages={basics.columns}
-            closedStages={basics.closedStages}
+            pipelines={basics.pipelines}
             allTags={basics.tags}
             team={basics.team}
             procedures={basics.procedures}

@@ -74,7 +74,9 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
   if (!lead) return;
 
   const [stages, futuros, orcamentosAbertos, orcamento] = await Promise.all([
-    db.pipelineStage.findMany(),
+    // Só as etapas do funil do lead: a agenda move dentro dele. Num funil sem
+    // "Avaliação agendada", o agendamento não move o card.
+    db.pipelineStage.findMany({ where: { pipeline: { stages: { some: { id: lead.stageId } } } } }),
     db.appointment.count({
       where: {
         patientId: event.patientId,

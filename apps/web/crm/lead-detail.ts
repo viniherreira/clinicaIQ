@@ -71,7 +71,7 @@ export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date 
     tags: new Map(tags.map((t) => [t.id, t.name])),
     people: new Map(people.map((p) => [p.id, p.name])),
     reasons: new Map(reasons.map((r) => [r.id, r.name])),
-    wonStageId: stages.find((s) => s.role === 'WON')?.id ?? null,
+    wonStageIds: new Set(stages.filter((s) => s.role === 'WON').map((s) => s.id)),
   });
 
   return {

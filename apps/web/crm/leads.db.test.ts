@@ -41,6 +41,7 @@ describe.skipIf(!process.env.DATABASE_URL)('leads e tarefas (banco)', async () =
     await prisma.patient.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
     await prisma.pipelineStage.deleteMany({ where: t });
+    await prisma.pipeline.deleteMany({ where: t });
     await prisma.user.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });
     await prisma.$disconnect();
