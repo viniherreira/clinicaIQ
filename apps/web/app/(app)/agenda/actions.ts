@@ -13,6 +13,13 @@ import { PROFESSIONAL_COLORS } from './_components/constants';
 import { buildWorkingHoursMap } from '@/lib/working-hours';
 import { getUnitContext } from '@/lib/units';
 import { unitAppointmentWhere } from '@/lib/unit-rules';
+import { readAgendaRules } from '@/lib/agenda-rules';
+
+/** Regras da agenda da clínica (Configurações → Agenda → Regras da agenda). */
+async function agendaRules(tenantId: string) {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  return readAgendaRules(t?.settings);
+}
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
 import { applyAction, type FlowAction } from '@/lib/appointment-flow';
 import { isLabelColor } from '@/lib/label-colors';
@@ -104,6 +111,8 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   // index for any created before colors existed.
   const professionalsWithColor = professionals.map((p, i) => ({
     ...p,
+    // Decimal não atravessa para o navegador.
+    commissionPercent: p.commissionPercent != null ? Number(p.commissionPercent) : null,
     color: p.color ?? PROFESSIONAL_COLORS[i % PROFESSIONAL_COLORS.length],
   }));
 
@@ -116,7 +125,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     maxDiscountPercent: p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : null,
   }));
 
-  const [workingHours, whatsappHealth] = await Promise.all([
+  const [workingHours, whatsappHealth, rules] = await Promise.all([
     buildWorkingHoursMap(
       tenantId,
       professionals.map((p) => p.id),
@@ -126,6 +135,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     // dead WhatsApp means confirmations stop going out, and the clinic would
     // otherwise only notice by visiting the WhatsApp tab.
     getWhatsAppHealth(tenantId),
+    agendaRules(tenantId),
   ]);
 
   // Com várias unidades, a agenda mostra quem atende nesta (algum dia do
@@ -140,6 +150,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
     blockedSlots,
     professionals: daUnidade,
     unit: { id: unit.id, name: unit.name, multi: units.multi },
+    rules,
     procedures: serializedProcedures,
     workingHours,
     whatsappHealth,
@@ -287,7 +298,7 @@ export async function createAppointment(
     return { success: false, errors: {}, message: refErrorMessage(foreign) };
   }
 
-  const conflict = await checkConflict(tenantId, professionalId, start, end);
+  const conflict = (await agendaRules(tenantId)).allowOverlap ? null : await checkConflict(tenantId, professionalId, start, end);
   if (conflict) {
     return {
       success: false,
@@ -386,7 +397,7 @@ export async function updateAppointment(
     return { success: false, errors: {}, message: refErrorMessage(foreign) };
   }
 
-  const conflict = await checkConflict(tenantId, professionalId, start, end, id);
+  const conflict = (await agendaRules(tenantId)).allowOverlap ? null : await checkConflict(tenantId, professionalId, start, end, id);
   if (conflict) {
     return {
       success: false,
@@ -446,7 +457,7 @@ export async function moveAppointment(
     return { success: false, message: refErrorMessage(foreign) };
   }
 
-  const conflict = await checkConflict(tenantId, professionalId, start, end, id);
+  const conflict = (await agendaRules(tenantId)).allowOverlap ? null : await checkConflict(tenantId, professionalId, start, end, id);
   if (conflict) {
     return { success: false, message: `Conflito com ${conflict.patient.name}` };
   }

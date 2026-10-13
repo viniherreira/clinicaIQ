@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { addQuotePayment, deleteQuotePayment, type QuotePaymentState } from '../actions';
 import { formatBRL, maskBRLInput } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DEFAULT_RECEIPT_METHODS } from '@/lib/payment-methods';
 
 interface PaymentRow {
   id: string;
@@ -21,9 +22,8 @@ interface Props {
   payments: PaymentRow[];
 }
 
-const METHODS = ['PIX', 'Dinheiro', 'Cartão de crédito', 'Cartão de débito', 'Transferência', 'Boleto', 'Outro'];
 
-export function QuotePayments({ quoteId, total, payments }: Props) {
+export function QuotePayments({ quoteId, total, payments, methods = DEFAULT_RECEIPT_METHODS }: Props & { methods?: string[] }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState('');
@@ -138,7 +138,7 @@ export function QuotePayments({ quoteId, total, payments }: Props) {
               <Select value={method || undefined} onValueChange={setMethod}>
                 <SelectTrigger aria-labelledby="qpay-method-label"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {methods.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

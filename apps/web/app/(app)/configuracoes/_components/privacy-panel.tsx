@@ -250,7 +250,9 @@ export function PrivacyPanel({
         {audit.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">Nada registrado ainda.</p>
         ) : (
-          <div className="max-h-[28rem] overflow-auto">
+          // A lista rola dentro da caixa: precisa receber foco para rolar pelo teclado (axe: scrollable-region-focusable).
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          <div className="max-h-[28rem] overflow-auto focus-visible:outline-2 focus-visible:outline-ring" tabIndex={0} role="region" aria-label="Registro de atividades (rolável)">
             <table className="w-full text-sm">
               <caption className="sr-only">
                 Quem fez o quê, da ação mais recente para a mais antiga

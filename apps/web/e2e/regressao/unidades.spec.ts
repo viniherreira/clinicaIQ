@@ -19,7 +19,7 @@ test('unidades: cadastrar, trocar no topo e a agenda de cada uma', async ({ page
   let unitId = '';
   let profId = '';
   try {
-    await page.goto('/configuracoes#clinica');
+    await page.goto('/configuracoes#unidades');
     await page.getByRole('button', { name: 'Nova unidade' }).click();
     const form = page.getByRole('form', { name: 'Nova unidade' });
     await form.getByLabel(/^Nome da unidade/).fill(nome);

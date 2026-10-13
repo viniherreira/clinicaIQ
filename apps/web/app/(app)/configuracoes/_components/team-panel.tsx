@@ -69,7 +69,7 @@ function Avatar({ name, apagado }: { name: string; apagado?: boolean }) {
 
 function Etiqueta({ tom, children }: { tom: 'ativo' | 'pendente' | 'removido'; children: React.ReactNode }) {
   const cls = {
-    ativo: 'bg-success/10 text-success',
+    ativo: 'bg-success/10 text-green-800 dark:text-green-300',
     pendente: 'bg-warning/15 text-foreground',
     removido: 'bg-surface-alt text-muted-foreground',
   }[tom];

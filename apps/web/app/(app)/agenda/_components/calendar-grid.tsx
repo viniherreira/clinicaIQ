@@ -1,12 +1,9 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import {
-  GRID_START_HOUR, GRID_END_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES,
-  TOTAL_HEIGHT_PX,
-} from './constants';
+import { useGrid } from './grid-context';
 import { AppointmentBlock } from './appointment-block';
 import { CurrentTimeIndicator } from './current-time-indicator';
 import { WorkingHoursOverlay } from './working-hours-overlay';
@@ -51,26 +48,28 @@ function weekdayOf(iso: string): number {
   return parseISO(iso).getDay();
 }
 
-const HOUR_PX = (60 / SLOT_MINUTES) * SLOT_HEIGHT_PX;
 const HEADER_H = 44;
 
 /** Hour + half-hour lines as two repeating gradients — a single painted layer
  *  per column instead of ~84 absolutely-positioned divs, which keeps wheel
  *  scrolling smooth even with many professionals. */
-const GRID_BG: React.CSSProperties = {
-  backgroundImage: [
-    `repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px ${HOUR_PX}px)`,
-    `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_PX / 2}px, hsl(var(--border) / 0.45) ${HOUR_PX / 2}px calc(${HOUR_PX / 2}px + 1px), transparent calc(${HOUR_PX / 2}px + 1px) ${HOUR_PX}px)`,
-  ].join(', '),
-};
+function gridBackground(hourPx: number): React.CSSProperties {
+  return {
+    backgroundImage: [
+      `repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px ${hourPx}px)`,
+      `repeating-linear-gradient(to bottom, transparent 0 ${hourPx / 2}px, hsl(var(--border) / 0.45) ${hourPx / 2}px calc(${hourPx / 2}px + 1px), transparent calc(${hourPx / 2}px + 1px) ${hourPx}px)`,
+    ].join(', '),
+  };
+}
 
 function TimeColumn() {
+  const { startHour, endHour, hourPx, totalHeight } = useGrid();
   const hours: React.ReactNode[] = [];
-  for (let h = GRID_START_HOUR; h <= GRID_END_HOUR; h++) {
-    const top = ((h - GRID_START_HOUR) * 60 / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+  for (let h = startHour; h <= endHour; h++) {
+    const top = (h - startHour) * hourPx;
     // Clamp first/last labels inside the column so they don't get clipped by
     // the sticky header above or the scroll edge below.
-    const labelTop = h === GRID_START_HOUR ? top + 3 : h === GRID_END_HOUR ? top - 16 : top - 7;
+    const labelTop = h === startHour ? top + 3 : h === endHour ? top - 16 : top - 7;
     hours.push(
       <span
         key={h}
@@ -83,7 +82,7 @@ function TimeColumn() {
     );
   }
   return (
-    <div className="relative w-14 shrink-0 border-r border-border" style={{ height: TOTAL_HEIGHT_PX }}>
+    <div className="relative w-14 shrink-0 border-r border-border" style={{ height: totalHeight }}>
       {hours}
     </div>
   );
@@ -114,6 +113,9 @@ export function CalendarGrid({
   dateStr, view, professionals, appointments, blockedSlots, workingHours, visibleProfessionals, mode,
   onAppointmentClick, onBlockedSlotClick, onSlotClick, onDayClick,
 }: CalendarGridProps) {
+  const grid = useGrid();
+  const TOTAL_HEIGHT_PX = grid.totalHeight;
+  const GRID_BG = useMemo(() => gridBackground(grid.hourPx), [grid.hourPx]);
   const visibleProfs = professionals.filter((p) => visibleProfessionals.has(p.id));
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -132,13 +134,13 @@ export function CalendarGrid({
       if (!onSlotClick) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const y = Math.max(0, e.clientY - rect.top);
-      const minutes = Math.floor(y / SLOT_HEIGHT_PX) * SLOT_MINUTES;
-      const hours = GRID_START_HOUR + Math.floor(minutes / 60);
+      const minutes = Math.floor(y / grid.slotHeight) * grid.slotMinutes;
+      const hours = grid.startHour + Math.floor(minutes / 60);
       const mins = minutes % 60;
       const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
       onSlotClick(professionalId, slotDate, timeStr);
     },
-    [onSlotClick]
+    [onSlotClick, grid]
   );
 
   // ── Week view: 7 day columns (Mon–Sun), appointments grouped by day ──

@@ -13,7 +13,10 @@ import {
 import Link from 'next/link';
 import { ProfessionalModal, type ProfessionalModalData } from './professional-modal';
 import { ScheduleModal } from './schedule-modal';
-import { Tabs, type TabDef } from './tabs';
+import { SettingsLayout, type SettingsSection } from './settings-layout';
+import { AgendaRulesPanel } from './agenda-rules-panel';
+import { PaymentMethodsPanel } from './payment-methods-panel';
+import type { AgendaRules } from '@/lib/agenda-rules';
 import { TeamPanel } from './team-panel';
 import { PrivacyPanel } from './privacy-panel';
 import type {
@@ -64,6 +67,8 @@ interface Props {
   businessHours: DayHours[];
   team: TeamMember[];
   units: UnitRow[];
+  /** Regras da agenda e formas de recebimento (`Tenant.settings`). */
+  rules: { agenda: AgendaRules; paymentMethods: string[] };
   invites: PendingInvite[];
   messages: MessageSettings;
   documents: DocumentSettings;
@@ -88,6 +93,7 @@ export function SettingsView({
   businessHours,
   team,
   units,
+  rules,
   invites,
   messages,
   documents,
@@ -101,100 +107,88 @@ export function SettingsView({
   podePrivacidade,
 }: Props) {
   const unidadesAtivas = units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
-  const tabs: TabDef[] = [
+  // Os grupos e as seções do menu lateral, na ordem do dia a dia da clínica.
+  // Equipe, Plano e Privacidade só para quem alcança (e só esses recebem os dados).
+  const sections: SettingsSection[] = [
+    { id: 'clinica', group: 'Clínica', label: 'Dados da clínica', panel: <ClinicSection clinic={clinic} /> },
     {
-      id: 'clinica',
-      label: 'Clínica',
-      panel: (
-        <div className="space-y-6">
-          <ClinicSection clinic={clinic} />
-          <UnitsPanel units={units} clinicHours={businessHours} />
-          <AppearanceSection />
-        </div>
-      ),
+      id: 'unidades',
+      group: 'Clínica',
+      label: 'Unidades',
+      badge: unidadesAtivas.length > 1 ? unidadesAtivas.length : undefined,
+      panel: <UnitsPanel units={units} clinicHours={businessHours} />,
     },
-    // Profissionais é cadastro de quem atende — fica com quem cuida da equipe,
-    // junto com convidar e tirar acesso.
+    { id: 'aparencia', group: 'Clínica', label: 'Aparência', panel: <AppearanceSection /> },
     ...(podeEquipe
       ? [
           {
             id: 'equipe',
-            label: 'Equipe',
+            group: 'Equipe',
+            label: 'Usuários e acessos',
             badge: team.filter((m) => m.active).length,
             panel: (
-              <div className="space-y-6">
+              <>
                 <TeamPanel team={team} invites={invites} />
                 {unidadesAtivas.length > 1 && <UserUnitsPanel team={team} units={unidadesAtivas} />}
                 {crmSeats}
-                <ProfessionalsSection
-                  professionals={professionals}
-                  suggestedColor={suggestedColor}
-                  units={unidadesAtivas}
-                />
-              </div>
+              </>
             ),
-          } satisfies TabDef,
+          },
+          // Profissionais é cadastro de quem atende — fica com quem cuida da equipe.
+          {
+            id: 'profissionais',
+            group: 'Equipe',
+            label: 'Profissionais',
+            badge: professionals.filter((p) => p.active).length,
+            panel: <ProfessionalsSection professionals={professionals} suggestedColor={suggestedColor} units={unidadesAtivas} />,
+          },
         ]
       : []),
     {
-      id: 'atendimento',
-      label: 'Atendimento',
+      id: 'horarios',
+      group: 'Agenda',
+      label: 'Horário de funcionamento',
+      aliases: ['atendimento'],
+      panel: <BusinessHoursSection initialHours={businessHours} />,
+    },
+    { id: 'regras', group: 'Agenda', label: 'Regras da agenda', panel: <AgendaRulesPanel rules={rules.agenda} /> },
+    { id: 'rotulos', group: 'Agenda', label: 'Rótulos', panel: <LabelsPanel /> },
+    { id: 'online', group: 'Agenda', label: 'Agendamento online', panel: <OnlineBookingPanel /> },
+    {
+      id: 'procedimentos',
+      group: 'Atendimento',
+      label: 'Procedimentos e preços',
       panel: (
-        <div className="space-y-6">
-          <BusinessHoursSection initialHours={businessHours} />
-          <OnlineBookingPanel />
-          <LabelsPanel />
-          <LinkCard
-            title="Procedimentos e preços"
-            description="Duração, valor, categoria e quais profissionais executam cada procedimento."
-            href="/procedimentos"
-            cta="Abrir procedimentos"
-          />
-        </div>
+        <LinkCard
+          title="Procedimentos e preços"
+          description="Duração, valor, categoria e quais profissionais executam cada procedimento."
+          href="/procedimentos"
+          cta="Abrir procedimentos"
+        />
       ),
     },
-    {
-      id: 'documentos',
-      label: 'Documentos',
-      panel: <DocumentsPanel settings={documents} />,
-    },
+    { id: 'documentos', group: 'Atendimento', label: 'Documentos', panel: <DocumentsPanel settings={documents} /> },
+    { id: 'pagamentos', group: 'Financeiro', label: 'Formas de recebimento', panel: <PaymentMethodsPanel methods={rules.paymentMethods} /> },
     {
       id: 'comunicacao',
-      label: 'Comunicação',
+      group: 'Comunicação',
+      label: 'WhatsApp e mensagens',
       panel: <CommunicationPanel whatsapp={whatsapp} messages={messages} />,
     },
-    ...(podePlano
-      ? [
-          {
-            id: 'plano',
-            label: 'Plano',
-            panel: <div className="space-y-6">{billing}</div>,
-          } satisfies TabDef,
-        ]
-      : []),
+    ...(podePlano ? [{ id: 'plano', group: 'Conta', label: 'Plano e cobrança', panel: billing }] : []),
     ...(podePrivacidade && privacy
-      ? [
-          {
-            id: 'privacidade',
-            label: 'Privacidade',
-            panel: <PrivacyPanel summary={privacy} audit={audit} />,
-          } satisfies TabDef,
-        ]
+      ? [{ id: 'privacidade', group: 'Conta', label: 'Privacidade e LGPD', panel: <PrivacyPanel summary={privacy} audit={audit} /> }]
       : []),
   ];
 
   return (
-    <div className="mx-auto max-w-4xl p-6 lg:p-8">
+    <div className="mx-auto max-w-6xl p-6 lg:p-8">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {podeEquipe
-            ? 'Dados da clínica, equipe, atendimento, documentos, comunicação, plano e privacidade.'
-            : 'Dados da clínica, atendimento, documentos e comunicação.'}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Tudo o que a clínica ajusta no sistema, organizado por assunto.</p>
       </header>
 
-      <Tabs tabs={tabs} ariaLabel="Seções das configurações" />
+      <SettingsLayout sections={sections} />
     </div>
   );
 }

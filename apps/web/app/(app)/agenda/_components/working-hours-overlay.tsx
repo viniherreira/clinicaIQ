@@ -1,14 +1,13 @@
 'use client';
 
-import { GRID_START_HOUR, GRID_END_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES } from './constants';
 import { nonWorkingIntervals, type DaySchedule } from '@/lib/schedule';
-
-const minToPx = (m: number) => ((m - GRID_START_HOUR * 60) / SLOT_MINUTES) * SLOT_HEIGHT_PX;
+import { useGrid } from './grid-context';
 
 /** Dims the hours outside the professional's working day (and the lunch break)
  *  so the agenda visually "ends" at the expediente. Purely decorative. */
 export function WorkingHoursOverlay({ day }: { day: DaySchedule | null }) {
-  const intervals = nonWorkingIntervals(day, GRID_START_HOUR * 60, GRID_END_HOUR * 60);
+  const { minToPx, startHour, endHour } = useGrid();
+  const intervals = nonWorkingIntervals(day, startHour * 60, endHour * 60);
   if (intervals.length === 0) return null;
   return (
     <>

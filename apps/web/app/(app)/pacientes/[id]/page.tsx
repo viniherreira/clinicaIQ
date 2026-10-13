@@ -14,6 +14,7 @@ import { EvolutionsSection } from './_components/evolutions-section';
 import { ImagesSection } from './_components/images-section';
 import { wallClockTime } from '@/lib/tz';
 import { CrmPatientDeals } from '@/components/crm-patient-deals';
+import { getReceiptMethods } from '@/lib/clinic-settings';
 
 export const metadata = { title: 'Ficha do paciente' };
 
@@ -71,7 +72,7 @@ const APPT_STATUS: Record<string, { label: string; cls: string; dot: string }> =
 
 export default async function PatientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [patient, record] = await Promise.all([getPatient(id), getPatientRecord(id)]);
+  const [patient, record, methods] = await Promise.all([getPatient(id), getPatientRecord(id), getReceiptMethods()]);
   if (!patient) notFound();
 
   const age = calcAge(patient.birthDate);
@@ -345,6 +346,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 payments={record.financial.payments}
                 acceptedQuotes={record.financial.acceptedQuotes}
                 quotes={record.financial.quotes}
+                methods={methods}
               />
             ),
           },
