@@ -121,6 +121,27 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect((await saidas(id)).at(-1)).toBe('Já vou te passar para a recepção.');
   });
 
+  it('pergunta: guarda o nome no lead e anota a resposta no histórico', async () => {
+    const pergunta = {
+      start: 'inicio',
+      steps: {
+        inicio: { id: 'inicio', text: 'Oi!', options: [{ id: 'nome', label: 'Quero falar', next: 'q_nome', actions: [{ type: 'createLead' }] }] },
+        q_nome: { id: 'q_nome', kind: 'question', text: 'Qual é o seu nome?', options: [], saveTo: 'name', answer: { reply: 'Obrigado!' } },
+      },
+    };
+    expect(await saveBot(db, tenant.id, { name: 'Nome', trigger: 'KEYWORD', keywords: ['nome'], steps: pergunta, active: true })).toEqual({ ok: true });
+    const id = await escreve('11 96666-0009', 'nome');
+    await escreve('11 96666-0009', '1');
+    expect((await saidas(id)).at(-1)).toBe('Qual é o seu nome?');
+    await escreve('11 96666-0009', 'Beatriz Lima');
+    expect((await saidas(id)).at(-1)).toBe('Obrigado!');
+    const conv = await db.conversation.findFirst({ where: { id }, include: { lead: { include: { activities: true } } } });
+    expect(conv?.lead?.name).toBe('Beatriz Lima');
+    expect(conv?.contactName).toBe('Beatriz Lima');
+    expect(conv?.lead?.activities.some((a) => a.type === 'NOTE' && JSON.stringify(a.data).includes('Beatriz Lima'))).toBe(true);
+    await db.chatbotFlow.deleteMany({ where: { name: 'Nome' } });
+  });
+
   it('não entendeu duas vezes: chama a equipe', async () => {
     const id = await escreve('11 96666-0003', 'Oi');
     await escreve('11 96666-0003', 'quanto custa?');

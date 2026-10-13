@@ -1,9 +1,9 @@
-import { getTenantClient, prisma, type LeadSource, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
+import { getTenantClient, prisma, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 import { activeCloudAccount } from './cloud';
 import { ensureConversationForLead, writeChatMessage } from './conversations';
-import { OPEN_LEAD } from './leads';
-import { decryptPhone, isValidPhone } from './phone';
+import { audienceWhere, parseAudience, type Audience } from './audience';
+import { decryptPhone, isValidPhone, maskPhone } from './phone';
 
 /**
  * Transmissões: uma mensagem para um grupo de leads, como no Kommo.
@@ -13,39 +13,7 @@ import { decryptPhone, isValidPhone } from './phone';
  * é banido); na API oficial, só dá para mandar modelo aprovado.
  */
 
-export interface Audience {
-  stageIds: string[];
-  tagIds: string[];
-  sources: LeadSource[];
-  assignedToIds: string[];
-}
-
-export const EMPTY_AUDIENCE: Audience = { stageIds: [], tagIds: [], sources: [], assignedToIds: [] };
-
-const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
-
-/** Lê o público vindo da tela sem confiar em nada. */
-export function parseAudience(raw: unknown): Audience {
-  const a = (raw ?? {}) as Record<string, unknown>;
-  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 50) : []);
-  return {
-    stageIds: ids(a.stageIds),
-    tagIds: ids(a.tagIds),
-    sources: ids(a.sources).filter((s): s is LeadSource => (SOURCES as readonly string[]).includes(s)),
-    assignedToIds: ids(a.assignedToIds),
-  };
-}
-
-/** Leads abertos que batem com o público (lista vazia = sem filtro). */
-export function audienceWhere(a: Audience): Prisma.LeadWhereInput {
-  return {
-    ...OPEN_LEAD,
-    ...(a.stageIds.length ? { stageId: { in: a.stageIds } } : {}),
-    ...(a.tagIds.length ? { tags: { some: { tagId: { in: a.tagIds } } } } : {}),
-    ...(a.sources.length ? { source: { in: a.sources } } : {}),
-    ...(a.assignedToIds.length ? { assignedToId: { in: a.assignedToIds } } : {}),
-  };
-}
+export { audienceWhere, EMPTY_AUDIENCE, parseAudience, type Audience } from './audience';
 
 /** Quanto tempo a transmissão leva no QR, para a tela avisar. */
 export function gatewayDurationMinutes(n: number): number {
@@ -78,6 +46,17 @@ export interface AudiencePreview {
   total: number;
   optedOut: number;
   reachable: number;
+}
+
+/** Alguns nomes de quem recebe, para a tela mostrar (telefone mascarado). */
+export async function sampleAudience(db: TenantPrismaClient, tenantId: string, a: Audience, take = 8) {
+  const rows = await db.lead.findMany({
+    where: { ...audienceWhere(a), whatsappOptOut: false },
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: { id: true, name: true, phoneEncrypted: true, stage: { select: { name: true } } },
+  });
+  return rows.map((r) => ({ id: r.id, name: r.name, phone: maskPhone(decryptPhone(r.phoneEncrypted, tenantId)), stage: r.stage.name }));
 }
 
 export async function previewAudience(db: TenantPrismaClient, a: Audience): Promise<AudiencePreview> {

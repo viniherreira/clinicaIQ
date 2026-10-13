@@ -65,7 +65,7 @@ function refsOf(steps: BotSteps) {
   const stages = new Set<string>();
   const users = new Set<string>();
   for (const s of Object.values(steps.steps)) {
-    for (const o of s.options) {
+    for (const o of [...s.options, ...(s.answer ? [s.answer] : [])]) {
       for (const a of o.actions ?? []) {
         if (a.type === 'tag') tags.add(a.tagId);
         if (a.type === 'stage' || (a.type === 'createLead' && a.stageId)) stages.add(a.type === 'stage' ? a.stageId : a.stageId!);

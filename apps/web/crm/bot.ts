@@ -1,5 +1,5 @@
 import { decrypt, getTenantClient, prisma, type TenantPrismaClient } from '@clinicaiq/db';
-import { botExpired, continueBot, isKeyword, parseSteps, startBot, type BotAction, type BotDecision } from './bot-engine';
+import { botExpired, continueBot, isKeyword, parseSteps, shouldStart, startBot, type BotAction, type BotDecision } from './bot-engine';
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { createLead, moveLead, OPEN_LEAD } from './leads';
@@ -48,7 +48,10 @@ export async function runBotOnInbound(tenantId: string, conversationId: string, 
   if (conv.botFlowId) await db.conversation.updateMany({ where: { id: conv.id }, data: CLEAR });
 
   // Começa um? Contato novo: primeira mensagem de um número da Entrada.
-  const flows = await db.chatbotFlow.findMany({ where: { active: true }, orderBy: { createdAt: 'asc' } });
+  // Só os que podem começar agora (horário de atendimento de cada robô).
+  const flows = (await db.chatbotFlow.findMany({ where: { active: true }, orderBy: { createdAt: 'asc' } })).filter((f) =>
+    shouldStart(parseSteps(f.steps)?.hours, now),
+  );
   if (flows.length === 0) return 'none';
   const primeira =
     conv.status === 'INBOX' && (await db.chatMessage.count({ where: { conversationId: conv.id, origin: 'CONTACT' } })) === 1;
@@ -114,6 +117,18 @@ async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: BotA
   } else if (a.type === 'assign') {
     const user = await db.user.findFirst({ where: { id: a.userId, active: true }, select: { id: true } });
     if (user) await db.lead.updateMany({ where: { id: leadId }, data: { assignedToId: user.id } });
+  } else if (a.type === 'save') {
+    // A resposta da pergunta: nome e e-mail vão para o lead; tudo fica no histórico.
+    const valor = a.value.trim().slice(0, 500);
+    if (a.field === 'name' && valor.length >= 2) {
+      const nome = valor.slice(0, 120);
+      await db.lead.updateMany({ where: { id: leadId }, data: { name: nome } });
+      await db.conversation.updateMany({ where: { id: conv.id }, data: { contactName: nome } });
+    }
+    if (a.field === 'email') await db.lead.updateMany({ where: { id: leadId }, data: { email: valor.slice(0, 200) } });
+    await db.leadActivity.create({
+      data: { tenantId, leadId, type: 'NOTE', actorId: null, data: { text: `Robô — ${a.question.slice(0, 200)}\nResposta: ${valor}` } },
+    });
   }
 }
 

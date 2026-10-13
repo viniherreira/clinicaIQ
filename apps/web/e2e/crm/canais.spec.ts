@@ -123,9 +123,14 @@ test('automações e robô: criar pela tela', async ({ page }) => {
   await page.goto('/crm/automacoes/bots');
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Novo robô' }).click();
+  await page.getByRole('button', { name: /Em branco/ }).click();
   const nome = uniqueName('Robô E2E');
   await page.getByLabel('Nome do robô').fill(nome);
-  await page.getByLabel('Quando responde').selectOption('KEYWORD');
+  await page.getByRole('radio', { name: /Palavra-chave/ }).check();
+  // O simulador responde na hora, sem gravar nada.
+  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Oi! Como posso ajudar?');
+  await page.getByRole('log', { name: 'Conversa de teste' }).getByRole('button', { name: 'Opção 1' }).click();
+  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Robô encerrado');
   await page.getByLabel(/^Palavras-chave/).fill(`e2e${Date.now()}`);
   // Desligado: um robô ligado responderia nos outros testes.
   await page.getByRole('checkbox', { name: 'Ligado' }).uncheck();

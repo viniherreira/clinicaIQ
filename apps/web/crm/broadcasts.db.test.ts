@@ -21,11 +21,17 @@ describe('transmissões: regras puras', async () => {
   });
 
   it('público: só o que é válido passa', () => {
-    expect(parseAudience({ stageIds: ['a', 3], sources: ['WHATSAPP', 'HACK'], tagIds: 'x' })).toEqual({
+    expect(parseAudience({ stageIds: ['a', 3], sources: ['WHATSAPP', 'HACK'], tagIds: 'x', createdFrom: '2026-13-99', status: 'x' })).toEqual({
+      pipelineIds: [],
       stageIds: ['a'],
       tagIds: [],
+      tagMode: 'any',
+      excludeTagIds: [],
       sources: ['WHATSAPP'],
       assignedToIds: [],
+      createdFrom: '',
+      createdTo: '',
+      status: 'abertos',
     });
   });
 

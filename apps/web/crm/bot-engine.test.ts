@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_HOURS,
+  EMAIL_RETRY_TEXT,
   HANDOFF_TEXT,
+  isOpenAt,
+  shouldStart,
   botExpired,
   continueBot,
   isKeyword,
@@ -121,5 +125,49 @@ describe('gatilho, validade e cadastro', () => {
     expect(stepsProblem({ start: 'x', steps: {} })).toMatch(/menu inicial/);
     expect(stepsProblem({ start: 'a', steps: { a: { id: 'a', text: 'Oi', options: [{ id: '1', label: 'Uma opção com o nome comprido demais', reply: '' }] } } })).toMatch(/24/);
     expect(stepsProblem({ start: 'a', steps: { a: { id: 'a', text: 'Oi', options: [{ id: '1', label: 'X', next: 'z' }] } } })).toMatch(/não existe/);
+  });
+});
+
+describe('pergunta aberta e horário', () => {
+  const flow: BotSteps = {
+    start: 'q',
+    steps: { q: { id: 'q', kind: 'question', text: 'Qual seu e-mail?', options: [], saveTo: 'email', answer: { reply: 'Valeu!' } } },
+  };
+
+  it('e-mail que não parece e-mail: pede de novo uma vez; na segunda, segue sem guardar', () => {
+    const d1 = continueBot(flow, { stepId: 'q', misses: 0 }, { text: 'ana' });
+    expect(d1.messages[0].text).toBe(EMAIL_RETRY_TEXT);
+    expect(d1.next).toEqual({ stepId: 'q', misses: 1 });
+    const d2 = continueBot(flow, { stepId: 'q', misses: 1 }, { text: 'ana' });
+    expect(d2.actions).toEqual([]);
+    expect(d2.messages.map((m) => m.text)).toEqual(['Valeu!']);
+    expect(d2.next).toBeNull();
+  });
+
+  it('pergunta não tem botões', () => {
+    expect(startBot(flow).messages[0]).toEqual({ text: 'Qual seu e-mail?', buttons: undefined });
+  });
+
+  // Segunda, 13/10/2026: 10h e 20h em Brasília.
+  const dezHoras = new Date('2026-10-13T13:00:00Z');
+  const vinteHoras = new Date('2026-10-13T23:00:00Z');
+  const domingo = new Date('2026-10-11T13:00:00Z');
+
+  it('horário de atendimento no fuso de Brasília', () => {
+    expect(isOpenAt(DEFAULT_HOURS, dezHoras)).toBe(true);
+    expect(isOpenAt(DEFAULT_HOURS, vinteHoras)).toBe(false);
+    expect(isOpenAt(DEFAULT_HOURS, domingo)).toBe(false);
+  });
+
+  it('robô de fora do horário só começa com a clínica fechada', () => {
+    const fora = { ...DEFAULT_HOURS, mode: 'outside' as const };
+    expect(shouldStart(fora, dezHoras)).toBe(false);
+    expect(shouldStart(fora, vinteHoras)).toBe(true);
+    expect(shouldStart({ ...DEFAULT_HOURS, mode: 'inside' }, dezHoras)).toBe(true);
+    expect(shouldStart(undefined, vinteHoras)).toBe(true);
+  });
+
+  it('horário invertido não salva', () => {
+    expect(stepsProblem({ ...flow, hours: { ...DEFAULT_HOURS, mode: 'outside', start: '18:00', end: '08:00' } })).toMatch(/horário/);
   });
 });
