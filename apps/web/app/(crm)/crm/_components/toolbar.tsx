@@ -55,6 +55,10 @@ export function CrmToolbar({
   sp.delete('editar');
   const qs = sp.toString() ? `?${sp.toString()}` : '';
 
+  const filtrosTransmissao = new URLSearchParams(sp);
+  if (currentPipeline) filtrosTransmissao.set('funil', currentPipeline.id);
+  const transmissaoQs = filtrosTransmissao.toString() ? `?${filtrosTransmissao.toString()}` : '';
+
   const editarHref = currentPipeline ? `/crm?funil=${currentPipeline.id}&editar=1` : '/crm?editar=1';
   const item =
     'flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-surface-alt';
@@ -144,11 +148,14 @@ export function CrmToolbar({
                 </Link>
               </DropdownMenu.Item>
             )}
-            <DropdownMenu.Item asChild className={item}>
-              <Link href="/crm/automacoes/transmissoes">
-                <Megaphone className="h-4 w-4" aria-hidden="true" /> Transmissões
-              </Link>
-            </DropdownMenu.Item>
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                {/* O público da transmissão já vem com os filtros desta busca. */}
+                <Link href={`/crm/automacoes/transmissoes/nova${transmissaoQs}`}>
+                  <Megaphone className="h-4 w-4" aria-hidden="true" /> Enviar transmissão para estes leads
+                </Link>
+              </DropdownMenu.Item>
+            )}
             {canConfig && (
               <DropdownMenu.Item asChild className={item}>
                 <Link href="/crm/automacoes">

@@ -1,6 +1,6 @@
 import { requireCrm } from '@/crm/guard';
 import { loadCrmBasics, stageOptions } from '@/crm/page-data';
-import { parseSteps } from '@/crm/bot-engine';
+import { DEFAULT_HOURS, parseSteps } from '@/crm/bot-engine';
 import { fromSteps } from '@/crm/bot-form';
 import { BotsTab } from '../../configuracoes/_components/bots-tab';
 
@@ -15,12 +15,14 @@ export default async function BotsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <div>
         <BotsTab
           bots={bots.flatMap((b) => {
             const steps = parseSteps(b.steps);
-            return steps ? [{ id: b.id, name: b.name, trigger: b.trigger, keywords: b.keywords, active: b.active, menu: fromSteps(steps) }] : [];
+            return steps
+              ? [{ id: b.id, name: b.name, trigger: b.trigger, keywords: b.keywords, active: b.active, menu: fromSteps(steps), hours: steps.hours ?? DEFAULT_HOURS }]
+              : [];
           })}
           stages={stageOptions(basics.pipelines)}
           tags={basics.tags.map((t) => ({ id: t.id, name: t.name }))}

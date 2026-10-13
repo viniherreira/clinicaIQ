@@ -3,15 +3,19 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
-import { cancelBroadcast, createBroadcast, parseAudience, previewAudience, startBroadcast, type AudiencePreview } from '@/crm/broadcasts';
+import { cancelBroadcast, createBroadcast, parseAudience, previewAudience, sampleAudience, startBroadcast, type AudiencePreview } from '@/crm/broadcasts';
 import { clinicLocalToInstant } from '@/crm/clock';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
-export async function previewAudienceAction(audience: unknown): Promise<Result<{ preview: AudiencePreview }>> {
+export type AudienceSample = { id: string; name: string; phone: string; stage: string }[];
+
+export async function previewAudienceAction(audience: unknown): Promise<Result<{ preview: AudiencePreview; sample: AudienceSample }>> {
   const g = await guardCrmAction('crm_config', { write: false });
   if (!g.ok) return g;
-  return { ok: true, preview: await previewAudience(g.db, parseAudience(audience)) };
+  const a = parseAudience(audience);
+  const [preview, sample] = await Promise.all([previewAudience(g.db, a), sampleAudience(g.db, g.tenantId, a)]);
+  return { ok: true, preview, sample };
 }
 
 export async function createBroadcastAction(input: {

@@ -7,6 +7,7 @@ import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-
 import type { AutomationAction } from '@clinicaiq/db';
 import { deleteBot, saveBot, toggleBot } from '@/crm/bot-admin';
 import { toSteps, type UiMenu } from '@/crm/bot-form';
+import type { BotHours } from '@/crm/bot-engine';
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -56,6 +57,7 @@ export const saveBotAction = async (input: {
   trigger: 'NEW_CONTACT' | 'KEYWORD';
   keywords: string;
   menu: UiMenu;
+  hours?: BotHours;
   active: boolean;
 }) =>
   run((g) =>
@@ -64,7 +66,7 @@ export const saveBotAction = async (input: {
       name: input.name,
       trigger: input.trigger === 'KEYWORD' ? 'KEYWORD' : 'NEW_CONTACT',
       keywords: input.keywords.split(','),
-      steps: toSteps(input.menu),
+      steps: toSteps(input.menu, input.hours),
       active: input.active,
     }),
   );
