@@ -237,7 +237,9 @@ function LinkPicker({ onPick }: { onPick: (t: LinkTarget) => void }) {
   const [buscando, setBuscando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => inputRef.current?.focus(), []);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   useEffect(() => {
     if (q.trim().length < 2) {
       setItens([]);

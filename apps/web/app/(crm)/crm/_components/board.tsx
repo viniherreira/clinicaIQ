@@ -47,7 +47,9 @@ export function Board({
   const [aviso, setAviso] = useState('');
   const [pending, start] = useTransition();
 
-  useEffect(() => setLeads(initial), [initial]);
+  useEffect(() => {
+    setLeads(initial);
+  }, [initial]);
 
   // O card já mudou de lugar na tela antes de o servidor confirmar. Sair da
   // página nesse meio-tempo cancelaria o envio — o navegador avisa antes.

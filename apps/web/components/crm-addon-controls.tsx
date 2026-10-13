@@ -42,7 +42,9 @@ export function CrmSeatToggle({ userId, name, on, hint }: { userId: string; name
   const [erro, setErro] = useState('');
   // A chave muda na hora do clique; se o servidor recusar, volta.
   const [ligada, setLigada] = useState(on);
-  useEffect(() => setLigada(on), [on]);
+  useEffect(() => {
+    setLigada(on);
+  }, [on]);
   return (
     <div className="flex flex-col items-end gap-1">
       <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
