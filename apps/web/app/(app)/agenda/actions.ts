@@ -1,17 +1,21 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient } from '@clinicaiq/db';
+import { prisma, getTenantClient, decrypt } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { z } from 'zod';
 import {
-  startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO,
+  startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
-import type { WeekSchedule } from '@/lib/schedule';
-import { writeBlocked } from '@/lib/access';
+import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
+import { applyAction, type FlowAction } from '@/lib/appointment-flow';
+import { isLabelColor } from '@/lib/label-colors';
+import { formatPhoneBR } from '@/lib/document-content';
+import { normalizeBrazilPhone } from '@/lib/phone';
 import { getWhatsAppHealth, prepareAppointmentMessage, deliverPrepared } from '@/lib/whatsapp';
 import type { Preparation } from '@/lib/whatsapp';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
@@ -42,13 +46,24 @@ async function requireTenant() {
 
 // ─── Get agenda data ──────────────────────────────────────────────────────────
 
-export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day') {
+export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'month' = 'day') {
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
 
   const date = parseISO(dateStr);
-  const from = view === 'week' ? startOfWeek(date, { weekStartsOn: 1 }) : startOfDay(date);
-  const to = view === 'week' ? endOfWeek(date, { weekStartsOn: 1 }) : endOfDay(date);
+  // O mês mostra as semanas inteiras: começa na segunda antes do dia 1 e vai até o domingo depois do último.
+  const from =
+    view === 'month'
+      ? startOfWeek(startOfMonth(date), { weekStartsOn: 1 })
+      : view === 'week'
+        ? startOfWeek(date, { weekStartsOn: 1 })
+        : startOfDay(date);
+  const to =
+    view === 'month'
+      ? endOfWeek(endOfMonth(date), { weekStartsOn: 1 })
+      : view === 'week'
+        ? endOfWeek(date, { weekStartsOn: 1 })
+        : endOfDay(date);
 
   const [appointments, blockedSlots, professionals, procedures] = await Promise.all([
     db.appointment.findMany({
@@ -57,6 +72,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
         patient: { select: { id: true, name: true } },
         professional: { select: { id: true, name: true, specialty: true } },
         procedure: { select: { id: true, name: true, durationMinutes: true } },
+        label: { select: { id: true, name: true, color: true } },
       },
       orderBy: { startTime: 'asc' },
     }),
@@ -73,6 +89,11 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
       orderBy: { name: 'asc' },
     }),
   ]);
+  const labels = await db.appointmentLabel.findMany({
+    where: { active: true },
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
+    select: { id: true, name: true, color: true },
+  });
 
   // Each professional keeps its own chosen color; fall back to the palette by
   // index for any created before colors existed.
@@ -105,72 +126,8 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' = 'day
     procedures: serializedProcedures,
     workingHours,
     whatsappHealth,
+    labels,
   };
-}
-
-// ─── Working hours ─────────────────────────────────────────────────────────────
-
-interface DayHoursLike { open: boolean; start: string; end: string }
-
-function isDayHoursLike(v: unknown): v is DayHoursLike {
-  return (
-    !!v && typeof v === 'object' &&
-    typeof (v as DayHoursLike).open === 'boolean' &&
-    typeof (v as DayHoursLike).start === 'string' &&
-    typeof (v as DayHoursLike).end === 'string'
-  );
-}
-
-/** Reads the clinic-wide business hours (settings JSON) as a 7-day fallback. */
-function readBusinessWeek(settings: Record<string, unknown>): WeekSchedule {
-  const bh = settings.businessHours;
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = Array.isArray(bh) ? bh[i] : undefined;
-    if (isDayHoursLike(day) && day.open) return { start: day.start, end: day.end };
-    return null;
-  });
-}
-
-/**
- * Effective weekly working hours per professional. A professional with saved
- * `ProfessionalSchedule` rows uses them (days without a row = closed); otherwise
- * it falls back to the clinic's business hours. Index 0..6 = Sunday..Saturday.
- */
-async function buildWorkingHoursMap(
-  tenantId: string,
-  professionalIds: string[],
-): Promise<Record<string, WeekSchedule>> {
-  if (professionalIds.length === 0) return {};
-
-  const [schedules, tenant] = await Promise.all([
-    prisma.professionalSchedule.findMany({
-      where: { professionalId: { in: professionalIds }, professional: { tenantId } },
-    }),
-    prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
-  ]);
-
-  const businessWeek = readBusinessWeek((tenant?.settings ?? {}) as Record<string, unknown>);
-
-  const byProf = new Map<string, WeekSchedule>();
-  for (const s of schedules) {
-    let week = byProf.get(s.professionalId);
-    if (!week) {
-      week = Array.from({ length: 7 }, () => null);
-      byProf.set(s.professionalId, week);
-    }
-    week[s.dayOfWeek] = {
-      start: s.startTime,
-      end: s.endTime,
-      lunchStart: s.lunchStart,
-      lunchEnd: s.lunchEnd,
-    };
-  }
-
-  const map: Record<string, WeekSchedule> = {};
-  for (const pid of professionalIds) {
-    map[pid] = byProf.get(pid) ?? businessWeek;
-  }
-  return map;
 }
 
 // ─── Search patients (autocomplete) ──────────────────────────────────────────
@@ -655,4 +612,205 @@ export async function getAppointment(id: string) {
       procedure: { select: { id: true, name: true, durationMinutes: true, basePrice: true } },
     },
   });
+}
+
+// ─── O dia do atendimento: chegou, em atendimento, atendido ──────────────────
+
+/**
+ * Avança o paciente no dia (ver `lib/appointment-flow.ts`). Chegada e início são
+ * horas gravadas no agendamento; a situação só muda quando confirma, termina,
+ * falta, cancela ou volta para agendado — e aí o CRM é avisado, como sempre.
+ */
+export async function advanceAppointment(
+  id: string,
+  action: FlowAction,
+  cancelReason?: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const appt = await prisma.appointment.findFirst({
+    where: { id, tenantId },
+    select: { id: true, patientId: true, status: true, arrivedAt: true, startedAt: true },
+  });
+  if (!appt) return { ok: false, message: 'Agendamento não encontrado.' };
+
+  const mudanca = applyAction(appt, action, new Date());
+  if (!mudanca) return { ok: false, message: 'Essa ação não cabe agora. Atualize a agenda.' };
+
+  await prisma.appointment.update({
+    where: { id, tenantId },
+    data: {
+      ...mudanca,
+      ...(mudanca.status === 'CANCELLED' ? { cancelReason: cancelReason?.trim() || null } : {}),
+      ...(mudanca.status && mudanca.status !== 'CANCELLED' ? { cancelReason: null } : {}),
+      updatedById: userId,
+    },
+  });
+  if (mudanca.status && mudanca.status !== appt.status) {
+    const status = mudanca.status;
+    after(() => notifyCrm(tenantId, { type: appointmentStatusEvent(status), patientId: appt.patientId, appointmentId: id }));
+  }
+  revalidatePath('/agenda');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+/** Põe ou tira o rótulo de um horário. */
+export async function setAppointmentLabel(id: string, labelId: string | null): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (labelId) {
+    const existe = await prisma.appointmentLabel.findFirst({ where: { id: labelId, tenantId }, select: { id: true } });
+    if (!existe) return { ok: false, message: 'Rótulo não encontrado.' };
+  }
+  const r = await prisma.appointment.updateMany({ where: { id, tenantId }, data: { labelId, updatedById: userId } });
+  if (!r.count) return { ok: false, message: 'Agendamento não encontrado.' };
+  revalidatePath('/agenda');
+  return { ok: true };
+}
+
+/**
+ * Tudo o que a janela de detalhes mostra, como a do Clínica nas Nuvens: o
+ * agendamento, a ficha resumida do paciente, o histórico dele na clínica e,
+ * para quem tem o financeiro, quanto está em aberto.
+ */
+export async function getAppointmentDetail(id: string) {
+  const { tenantId } = await requireTenant();
+  const db = getTenantClient(tenantId);
+  const appointment = await db.appointment.findFirst({
+    where: { id },
+    include: {
+      patient: { select: { id: true, name: true, controlNumber: true, birthDate: true, phoneEncrypted: true, email: true } },
+      professional: { select: { id: true, name: true } },
+      procedure: { select: { id: true, name: true, durationMinutes: true, basePrice: true } },
+      label: { select: { id: true, name: true, color: true } },
+    },
+  });
+  if (!appointment) return null;
+
+  const key = process.env.ENCRYPTION_MASTER_KEY ?? '';
+  let phone = '';
+  try {
+    phone = decrypt(appointment.patient.phoneEncrypted, key, tenantId);
+  } catch {
+    phone = '';
+  }
+
+  const patientId = appointment.patient.id;
+  const [historico, ultimo, veFinanceiro, quem] = await Promise.all([
+    db.appointment.findMany({
+      where: { patientId, id: { not: id } },
+      orderBy: { startTime: 'desc' },
+      take: 8,
+      select: {
+        id: true,
+        startTime: true,
+        status: true,
+        arrivedAt: true,
+        startedAt: true,
+        professional: { select: { name: true } },
+        procedure: { select: { name: true } },
+      },
+    }),
+    db.appointment.findFirst({
+      where: { patientId, status: 'ATTENDED', id: { not: id } },
+      orderBy: { startTime: 'desc' },
+      select: { startTime: true, professional: { select: { name: true } } },
+    }),
+    hasCapability(tenantId, 'financeiro'),
+    db.user.findMany({
+      where: { id: { in: [appointment.createdById, appointment.updatedById].filter((x): x is string => Boolean(x)) } },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  let financeiro: { contracted: number; paid: number; balance: number; lastPayment: { amount: number; paidAt: Date } | null } | null = null;
+  if (veFinanceiro) {
+    const [aceitos, pagos] = await Promise.all([
+      db.quote.findMany({ where: { patientId, status: 'ACCEPTED' }, select: { total: true } }),
+      db.payment.findMany({ where: { patientId }, orderBy: { paidAt: 'desc' }, select: { amount: true, paidAt: true } }),
+    ]);
+    const contracted = aceitos.reduce((s, q) => s + Number(q.total), 0);
+    const paid = pagos.reduce((s, p) => s + Number(p.amount), 0);
+    financeiro = {
+      contracted,
+      paid,
+      balance: Math.max(0, contracted - paid),
+      lastPayment: pagos[0] ? { amount: Number(pagos[0].amount), paidAt: pagos[0].paidAt } : null,
+    };
+  }
+
+  const nomeDe = (uid: string | null) => quem.find((u) => u.id === uid)?.name ?? null;
+  const p = appointment.patient;
+  const paciente = { id: p.id, name: p.name, controlNumber: p.controlNumber, birthDate: p.birthDate, email: p.email };
+  return {
+    appointment: {
+      ...appointment,
+      patient: { id: paciente.id, name: paciente.name, controlNumber: paciente.controlNumber },
+      procedure: appointment.procedure ? { ...appointment.procedure, basePrice: Number(appointment.procedure.basePrice) } : null,
+    },
+    patient: {
+      ...paciente,
+      phone: formatPhoneBR(phone) ?? '',
+      whatsapp: phone ? normalizeBrazilPhone(phone) : '',
+    },
+    lastVisit: ultimo ? { at: ultimo.startTime, professional: ultimo.professional.name } : null,
+    history: historico,
+    financial: financeiro,
+    createdBy: nomeDe(appointment.createdById),
+    updatedBy: nomeDe(appointment.updatedById),
+  };
+}
+
+// ─── Rótulos da agenda (Configurações) ───────────────────────────────────────
+
+const labelSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1, 'Dê um nome ao rótulo.').max(40, 'Nome de até 40 caracteres.'),
+  color: z.string().refine(isLabelColor, 'Cor inválida.'),
+});
+
+export async function listAppointmentLabels() {
+  const { tenantId } = await requireTenant();
+  return getTenantClient(tenantId).appointmentLabel.findMany({
+    orderBy: [{ active: 'desc' }, { order: 'asc' }, { name: 'asc' }],
+    select: { id: true, name: true, color: true, active: true, _count: { select: { appointments: true } } },
+  });
+}
+
+export async function saveAppointmentLabel(input: z.input<typeof labelSchema>): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { tenantId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'configuracoes'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  const parsed = labelSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  const { id, name, color } = parsed.data;
+  const igual = await prisma.appointmentLabel.findFirst({ where: { tenantId, name: { equals: name, mode: 'insensitive' }, ...(id ? { id: { not: id } } : {}) }, select: { id: true } });
+  if (igual) return { ok: false, message: 'Já existe um rótulo com esse nome.' };
+  if (id) {
+    const r = await prisma.appointmentLabel.updateMany({ where: { id, tenantId }, data: { name, color, active: true } });
+    if (!r.count) return { ok: false, message: 'Rótulo não encontrado.' };
+  } else {
+    const ultimo = await prisma.appointmentLabel.findFirst({ where: { tenantId }, orderBy: { order: 'desc' }, select: { order: true } });
+    await prisma.appointmentLabel.create({ data: { tenantId, name, color, order: (ultimo?.order ?? 0) + 1 } });
+  }
+  revalidatePath('/agenda');
+  revalidatePath('/configuracoes');
+  return { ok: true };
+}
+
+/** Rótulo em uso só é desligado (os horários antigos guardam a cor); sem uso, some. */
+export async function deleteAppointmentLabel(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { tenantId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'configuracoes'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  const usos = await prisma.appointment.count({ where: { tenantId, labelId: id } });
+  if (usos) await prisma.appointmentLabel.updateMany({ where: { id, tenantId }, data: { active: false } });
+  else await prisma.appointmentLabel.deleteMany({ where: { id, tenantId } });
+  revalidatePath('/agenda');
+  revalidatePath('/configuracoes');
+  return { ok: true };
 }

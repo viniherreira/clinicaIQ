@@ -45,12 +45,25 @@ export const STATUS_STYLES = {
     dot: 'bg-amber-500',
     icon: 'text-amber-600 dark:text-amber-400',
   },
+  // As etapas do dia (ver lib/appointment-flow.ts): não são situações no banco.
+  ARRIVED: {
+    bg: 'bg-violet-100 dark:bg-violet-950/60',
+    text: 'text-violet-900 dark:text-violet-100',
+    dot: 'bg-violet-500',
+    icon: 'text-violet-600 dark:text-violet-400',
+  },
+  IN_PROGRESS: {
+    bg: 'bg-blue-100 dark:bg-blue-950/60',
+    text: 'text-blue-900 dark:text-blue-100',
+    dot: 'bg-blue-600',
+    icon: 'text-blue-700 dark:text-blue-300',
+  },
 } as const;
 
 export const STATUS_LABELS = {
   SCHEDULED: 'Agendado',
   CONFIRMED: 'Confirmado',
-  ATTENDED: 'Compareceu',
+  ATTENDED: 'Atendido',
   CANCELLED: 'Cancelado',
   MISSED: 'Faltou',
   RESCHEDULED: 'Remarcado',

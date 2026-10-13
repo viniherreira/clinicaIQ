@@ -54,6 +54,16 @@ Every tenant-scoped table has `tenantId`. Use `getTenantClient(tenantId)` from `
 
 A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela nova, inclusive de ligação, precisa ter `tenantId`.
 
+## Agenda e gestão (referência: Clínica nas Nuvens)
+
+- **Visual:** menu branco com busca, grupos que abrem e fecham e opção de recolher (`components/clinic-sidebar.tsx`, grupos em `CLINIC_NAV`), topo com o caminho e a busca de paciente (`app-header.tsx`), fundo `bg-canvas` nas telas. Cor azul mantida.
+- **O dia do paciente** (`lib/appointment-flow.ts`, puro e testado): agendado → confirmado → na sala de espera → em atendimento → atendido. "Chegou" e "em atendimento" são horas (`Appointment.arrivedAt`/`startedAt`/`finishedAt`), não situações novas — confirmação, relatórios e CRM não mudam. `advanceAppointment` grava.
+- **Janela de detalhes do agendamento** (`agenda/_components/appointment-detail-modal.tsx`): ficha resumida do paciente, abas Detalhes/Financeiro/Histórico, rótulo, opções e o próximo passo do dia. Faltou e cancelar fecham a janela; cancelar pede o motivo ali mesmo.
+- **Sala de espera** na lateral da agenda (`waiting-room.tsx`), **visão por mês** (`month-grid.tsx`, `view=month`) e **rótulos** coloridos (`AppointmentLabel`, cores em `lib/label-colors.ts`, cadastro em Configurações → Atendimento).
+- **Agendamento online** (`/agendar/[slug]`, público): regras em `Tenant.settings.onlineBooking` (`lib/availability.ts`: `readOnlineBooking`, `freeSlots`), painel em Configurações → Atendimento. Confere tudo de novo no servidor e numa transação; paciente novo vira cadastro (mesmo nome + telefone reaproveita); máximo 2 horários futuros pelo site por pessoa; campo-isca contra robô.
+- **Comissões:** `Professional.commissionPercent` sobre a produção (atendimentos concluídos × preço-base), tabela no Financeiro.
+- O expediente de cada profissional sai de `lib/working-hours.ts` (agenda e agendamento online).
+
 ## CRM
 
 - **O CRM é um adicional pago** do sistema de agenda: R$ 39 por usuário/mês (`Plan.crmSeatPriceCents`), 14 dias grátis uma vez, cortesia inclui. Uma cobrança só no Asaas (plano + CRM) — `crm/billing.ts` (regras puras) e `crm/addon.ts` (ligar, desligar, acesso, `syncBillingValue`). Qualquer mudança que afete o valor chama `syncBillingValue`; a rotina diária também.

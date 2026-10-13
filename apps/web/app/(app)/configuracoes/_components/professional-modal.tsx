@@ -10,6 +10,7 @@ export interface ProfessionalModalData {
   specialty: string | null;
   registration: string | null;
   color: string | null;
+  commissionPercent: number | null;
 }
 
 interface Props {
@@ -154,6 +155,26 @@ export function ProfessionalModal({ open, onClose, onSuccess, professional, defa
             />
             <p id="prof-registration-help" className="text-xs text-muted-foreground">
               Sai nos orçamentos, contratos e recibos em que este profissional é o responsável.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="prof-commission" className="text-sm font-medium">
+              Comissão (%) <span className="font-normal text-muted-foreground">(opcional)</span>
+            </label>
+            <input
+              id="prof-commission"
+              name="commissionPercent"
+              type="text"
+              inputMode="decimal"
+              maxLength={6}
+              defaultValue={professional?.commissionPercent != null ? String(professional.commissionPercent).replace('.', ',') : ''}
+              placeholder="Ex: 35"
+              aria-describedby="prof-commission-help"
+              className="h-10 w-full max-w-[10rem] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            />
+            <p id="prof-commission-help" className="text-xs text-muted-foreground">
+              Repasse sobre a produção (atendimentos concluídos), calculado no Financeiro.
             </p>
           </div>
 

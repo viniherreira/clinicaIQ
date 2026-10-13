@@ -22,6 +22,7 @@ async function sincronizarCobranca(tenantId: string) {
   }
 }
 import { composeAddress } from '@/lib/address';
+import { readOnlineBooking, type OnlineBookingSettings } from '@/lib/availability';
 import { documentError, formatDocument, onlyDigits } from '@/lib/document';
 import { contractTitle, DEFAULT_QUOTE_TERMS } from '@/lib/document-content';
 import { loadClinicInfo } from '@/lib/documents';
@@ -87,6 +88,13 @@ const professionalSchema = z.object({
   name: z.string().trim().min(2, 'Nome deve ter ao menos 2 caracteres').max(100),
   specialty: z.string().trim().max(80).optional().or(z.literal('')),
   registration: z.string().trim().max(40).optional().or(z.literal('')),
+  // Vazio = sem comissão. Aceita vírgula: "35,5".
+  commissionPercent: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? Number(v.replace(',', '.')) : null))
+    .refine((v) => v === null || (Number.isFinite(v) && v >= 0 && v <= 100), 'Comissão entre 0 e 100%'),
   color: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida'),
 });
 
@@ -186,7 +194,7 @@ export async function updateClinic(
 export async function listProfessionals() {
   const { tenantId } = await requireOwner();
   const db = getTenantClient(tenantId);
-  return db.professional.findMany({
+  const rows = await db.professional.findMany({
     orderBy: [{ active: 'desc' }, { name: 'asc' }],
     select: {
       id: true,
@@ -194,10 +202,13 @@ export async function listProfessionals() {
       specialty: true,
       registration: true,
       color: true,
+      commissionPercent: true,
       active: true,
       _count: { select: { appointments: true } },
     },
   });
+  // Decimal não atravessa para o navegador: vira número.
+  return rows.map((r) => ({ ...r, commissionPercent: r.commissionPercent != null ? Number(r.commissionPercent) : null }));
 }
 
 /** Picks the first palette color not yet used by an active professional, so new
@@ -234,10 +245,10 @@ export async function createProfessional(
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
   }
-  const { name, specialty, registration, color } = parsed.data;
+  const { name, specialty, registration, color, commissionPercent } = parsed.data;
 
   const professional = await prisma.professional.create({
-    data: { tenantId, name, specialty: specialty || null, registration: registration || null, color },
+    data: { tenantId, name, specialty: specialty || null, registration: registration || null, color, commissionPercent },
   });
 
   await prisma.auditLog.create({
@@ -265,11 +276,11 @@ export async function updateProfessional(
   if (!parsed.success) {
     return { success: false, errors: parsed.error.flatten().fieldErrors };
   }
-  const { name, specialty, registration, color } = parsed.data;
+  const { name, specialty, registration, color, commissionPercent } = parsed.data;
 
   await prisma.professional.update({
     where: { id, tenantId },
-    data: { name, specialty: specialty || null, registration: registration || null, color },
+    data: { name, specialty: specialty || null, registration: registration || null, color, commissionPercent },
   });
 
   await prisma.auditLog.create({
@@ -1515,4 +1526,52 @@ export async function getSampleDocument(kind: string): Promise<SampleDocument | 
   }
 
   return null;
+}
+
+// ─── Agendamento online ──────────────────────────────────────────────────────
+
+/** As regras do agendamento online, o endereço público e o que dá para liberar. */
+export async function getOnlineBookingSettings() {
+  const { tenantId } = await requireOwner();
+  const db = getTenantClient(tenantId);
+  const [tenant, professionals, procedures] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, settings: true } }),
+    db.professional.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.procedure.findMany({ where: { active: true, deletedAt: null }, orderBy: { name: 'asc' }, select: { id: true, name: true, durationMinutes: true } }),
+  ]);
+  return {
+    slug: tenant?.slug ?? '',
+    settings: readOnlineBooking(tenant?.settings),
+    professionals,
+    procedures,
+  };
+}
+
+export async function saveOnlineBookingSettings(input: OnlineBookingSettings): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { tenantId, userId } = await requireOwner();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'configuracoes'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+  // Passa pela mesma leitura da página pública: o que não fizer sentido volta ao padrão.
+  const limpo = readOnlineBooking({ onlineBooking: input });
+  // Só ids desta clínica.
+  const db = getTenantClient(tenantId);
+  const [profs, procs] = await Promise.all([
+    db.professional.findMany({ where: { id: { in: limpo.professionalIds } }, select: { id: true } }),
+    db.procedure.findMany({ where: { id: { in: limpo.procedureIds } }, select: { id: true } }),
+  ]);
+  limpo.professionalIds = profs.map((p) => p.id);
+  limpo.procedureIds = procs.map((p) => p.id);
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { settings: JSON.parse(JSON.stringify({ ...settings, onlineBooking: limpo })) },
+  });
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'UPDATE_ONLINE_BOOKING', entity: 'Tenant', entityId: tenantId, metadata: { enabled: limpo.enabled } },
+  });
+  revalidatePath('/configuracoes');
+  return { ok: true };
 }

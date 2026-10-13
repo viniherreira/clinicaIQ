@@ -120,6 +120,7 @@ model Tenant {
   procedures          Procedure[]
   procedureCategories ProcedureCategory[]
   appointments        Appointment[]
+  appointmentLabels   AppointmentLabel[]
   quotes              Quote[]
   messages            WhatsAppMessage[]
   auditLogs           AuditLog[]
@@ -297,6 +298,8 @@ model Professional {
   /// em que este profissional é o responsável pelo tratamento.
   registration String?
   color     String?
+  /// Percentual de comissão (repasse) sobre a produção do profissional. Nulo = sem comissão.
+  commissionPercent Decimal? @db.Decimal(5, 2)
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -403,6 +406,14 @@ model Appointment {
   type           AppointmentType   @default(PARTICULAR)
   notes          String?
   cancelReason   String?
+  /// Rótulo colorido do horário (atraso, débito, primeira vez…), escolhido pela clínica.
+  labelId        String?
+  /// Chegou na clínica: entra na sala de espera.
+  arrivedAt      DateTime?
+  /// Entrou para o atendimento.
+  startedAt      DateTime?
+  /// Terminou o atendimento (junto com status ATTENDED).
+  finishedAt     DateTime?
   createdById    String?
   updatedById    String?
   createdAt      DateTime          @default(now())
@@ -412,12 +423,32 @@ model Appointment {
   patient      Patient           @relation(fields: [patientId], references: [id])
   professional Professional      @relation(fields: [professionalId], references: [id])
   procedure    Procedure?        @relation(fields: [procedureId], references: [id])
+  label        AppointmentLabel? @relation(fields: [labelId], references: [id], onDelete: SetNull)
   messages     WhatsAppMessage[]
 
   @@index([tenantId, professionalId, startTime])
   @@index([tenantId, startTime])
   @@index([tenantId, status])
   @@map("appointments")
+}
+
+/// Rótulos da agenda: etiquetas coloridas que a clínica cria e põe nos horários.
+model AppointmentLabel {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  /// Uma das cores do CRM (`CRM_COLORS`): gray, blue, teal, green, amber, orange, red, pink, violet.
+  color     String
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  appointments Appointment[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, order])
+  @@map("appointment_labels")
 }
 
 model BlockedSlot {

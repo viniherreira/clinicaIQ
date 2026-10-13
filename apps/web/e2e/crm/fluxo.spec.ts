@@ -47,6 +47,7 @@ test('lead → paciente → agendou → cancelou → reagendou → orçamento �
   await page.goto(`/agenda?date=${date}`);
   await page.getByRole('button', { name: new RegExp(`${lead.name}.*Agendado`) }).click();
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar cancelamento' }).click();
   // Espera a agenda confirmar antes de sair da página (sair cancelaria o envio).
   await expect(page.getByRole('button', { name: new RegExp(`${lead.name}.*Cancelado`) })).toBeVisible();
   await expectColumn(page, lead.title, 'Em conversa');

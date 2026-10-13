@@ -10,7 +10,7 @@ interface PageProps {
 export default async function AgendaPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const dateStr = params.date ?? clinicToday();
-  const view = (params.view === 'week' ? 'week' : 'day') as 'day' | 'week';
+  const view = (params.view === 'week' || params.view === 'month' ? params.view : 'day') as 'day' | 'week' | 'month';
 
   const [data, prefillPatient] = await Promise.all([
     getAgendaData(dateStr, view),
