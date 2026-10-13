@@ -6,6 +6,8 @@ import { prisma, encrypt, decrypt } from '@clinicaiq/db';
 import { addDays, format, parseISO } from 'date-fns';
 import { clinicNow, freeSlots, readOnlineBooking, type OnlineBookingSettings } from '@/lib/availability';
 import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { listUnits } from '@/lib/units';
+import { mainUnit } from '@/lib/unit-rules';
 import { prepareAppointmentMessage, deliverPrepared, type Preparation } from '@/lib/whatsapp';
 import { notifyCrm } from '@/crm/notify';
 
@@ -45,32 +47,62 @@ async function allowedProcedures(tenantId: string, rules: OnlineBookingSettings)
   });
 }
 
+/** As unidades abertas ao público e a principal. */
+async function bookingUnits(tenantId: string) {
+  const all = await listUnits(tenantId);
+  return { ativas: all.filter((u) => u.active), main: mainUnit(all) };
+}
+
+/** A unidade pedida, se existe e está ativa. Com uma unidade só, é ela. */
+async function unitFor(tenantId: string, unitId: string | null | undefined) {
+  const { ativas, main } = await bookingUnits(tenantId);
+  const unit = unitId ? ativas.find((u) => u.id === unitId) : ativas.length === 1 ? ativas[0] : undefined;
+  return unit && main ? { unit, main } : null;
+}
+
 /** O que a página pública mostra: a clínica, quem atende e o que dá para marcar. */
 export async function getBookingInfo(slug: string) {
   const found = await clinicBySlug(slug);
   if (!found) return null;
   const { clinic, rules } = found;
-  const [professionals, procedures, endereco] = await Promise.all([
+  const [professionals, procedures, endereco, { ativas, main }] = await Promise.all([
     allowedProfessionals(clinic.id, rules),
     allowedProcedures(clinic.id, rules),
     prisma.tenant.findUnique({ where: { id: clinic.id }, select: { address: true, phone: true } }),
+    bookingUnits(clinic.id),
   ]);
+  // Em quais unidades cada um atende: as dos dias do expediente; sem expediente, todas.
+  const escalas = await prisma.professionalSchedule.findMany({
+    where: { professionalId: { in: professionals.map((p) => p.id) } },
+    select: { professionalId: true, unitId: true },
+  });
+  const ondeAtende = (id: string) => {
+    const dias = escalas.filter((e) => e.professionalId === id);
+    return dias.length ? [...new Set(dias.map((e) => e.unitId ?? main?.id ?? ''))] : ativas.map((u) => u.id);
+  };
   return {
     name: clinic.name,
     address: endereco?.address ?? null,
     phone: endereco?.phone ?? null,
-    professionals,
+    units: ativas.map((u) => ({ id: u.id, name: u.name, address: u.address })),
+    professionals: professionals.map((p) => ({ ...p, unitIds: ondeAtende(p.id) })),
     procedures,
     maxDaysAhead: rules.maxDaysAhead,
     defaultDurationMinutes: rules.defaultDurationMinutes,
   };
 }
 
-/** Os horários livres de um profissional num dia. */
-export async function getFreeSlots(slug: string, professionalId: string, procedureId: string | null, date: string): Promise<string[]> {
+/** Os horários livres de um profissional num dia, na unidade escolhida. */
+export async function getFreeSlots(
+  slug: string,
+  professionalId: string,
+  procedureId: string | null,
+  date: string,
+  unitId: string | null = null,
+): Promise<string[]> {
   const found = await clinicBySlug(slug);
   if (!found || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
-  return slotsFor(found.clinic.id, found.rules, professionalId, procedureId, date);
+  return slotsFor(found.clinic.id, found.rules, professionalId, procedureId, date, unitId);
 }
 
 async function slotsFor(
@@ -79,7 +111,10 @@ async function slotsFor(
   professionalId: string,
   procedureId: string | null,
   date: string,
+  unitId: string | null,
 ): Promise<string[]> {
+  const onde = await unitFor(tenantId, unitId);
+  if (!onde) return [];
   const profs = await allowedProfessionals(tenantId, rules);
   if (!profs.some((p) => p.id === professionalId)) return [];
 
@@ -101,7 +136,12 @@ async function slotsFor(
   const inicioDia = new Date(`${date}T00:00:00.000Z`);
   const fimDia = new Date(`${date}T23:59:59.999Z`);
   const [map, appts, bloqueios] = await Promise.all([
-    buildWorkingHoursMap(tenantId, [professionalId]),
+    // O expediente desta unidade; os horários ocupados valem em todas (a pessoa não está em dois lugares).
+    buildWorkingHoursMap(tenantId, [professionalId], {
+      unitId: onde.unit.id,
+      mainId: onde.main.id,
+      businessHours: onde.unit.businessHours,
+    }),
     prisma.appointment.findMany({
       where: { tenantId, professionalId, status: { notIn: ['CANCELLED', 'RESCHEDULED'] }, startTime: { lt: fimDia }, endTime: { gt: inicioDia } },
       select: { startTime: true, endTime: true },
@@ -125,6 +165,7 @@ async function slotsFor(
 }
 
 const bookingSchema = z.object({
+  unitId: z.string().nullable().optional(),
   professionalId: z.string().min(1),
   procedureId: z.string().nullable(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -149,7 +190,9 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
   const { clinic, rules } = found;
   const tenantId = clinic.id;
 
-  const livres = await slotsFor(tenantId, rules, d.professionalId, d.procedureId, d.date);
+  const onde = await unitFor(tenantId, d.unitId);
+  if (!onde) return { ok: false, message: 'Escolha a unidade.' };
+  const livres = await slotsFor(tenantId, rules, d.professionalId, d.procedureId, d.date, onde.unit.id);
   if (!livres.includes(d.time)) return { ok: false, message: 'Esse horário acabou de ser ocupado. Escolha outro.' };
 
   const procs = d.procedureId ? await allowedProcedures(tenantId, rules) : [];
@@ -212,6 +255,7 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
     return tx.appointment.create({
       data: {
         tenantId,
+        unitId: onde.unit.id,
         patientId: patientId!,
         professionalId: d.professionalId,
         procedureId: d.procedureId,

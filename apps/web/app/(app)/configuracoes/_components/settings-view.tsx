@@ -28,6 +28,9 @@ import { MessagesPanel } from './messages-panel';
 import { DocumentsPanel } from './documents-panel';
 import { LabelsPanel } from './labels-panel';
 import { OnlineBookingPanel } from './online-booking-panel';
+import { UnitsPanel } from './units-panel';
+import { UserUnitsPanel } from './user-units-panel';
+import type { UnitRow } from '../unit-actions';
 
 interface Professional {
   id: string;
@@ -60,6 +63,7 @@ interface Props {
   suggestedColor: string;
   businessHours: DayHours[];
   team: TeamMember[];
+  units: UnitRow[];
   invites: PendingInvite[];
   messages: MessageSettings;
   documents: DocumentSettings;
@@ -83,6 +87,7 @@ export function SettingsView({
   suggestedColor,
   businessHours,
   team,
+  units,
   invites,
   messages,
   documents,
@@ -95,6 +100,7 @@ export function SettingsView({
   podePlano,
   podePrivacidade,
 }: Props) {
+  const unidadesAtivas = units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
   const tabs: TabDef[] = [
     {
       id: 'clinica',
@@ -102,6 +108,7 @@ export function SettingsView({
       panel: (
         <div className="space-y-6">
           <ClinicSection clinic={clinic} />
+          <UnitsPanel units={units} clinicHours={businessHours} />
           <AppearanceSection />
         </div>
       ),
@@ -117,10 +124,12 @@ export function SettingsView({
             panel: (
               <div className="space-y-6">
                 <TeamPanel team={team} invites={invites} />
+                {unidadesAtivas.length > 1 && <UserUnitsPanel team={team} units={unidadesAtivas} />}
                 {crmSeats}
                 <ProfessionalsSection
                   professionals={professionals}
                   suggestedColor={suggestedColor}
+                  units={unidadesAtivas}
                 />
               </div>
             ),
@@ -558,9 +567,11 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
 function ProfessionalsSection({
   professionals,
   suggestedColor,
+  units,
 }: {
   professionals: Professional[];
   suggestedColor: string;
+  units: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -640,6 +651,7 @@ function ProfessionalsSection({
         open={!!scheduleFor}
         professionalId={scheduleFor?.id ?? null}
         professionalName={scheduleFor?.name ?? ''}
+        units={units}
         onClose={() => setScheduleFor(null)}
         onSaved={() => {
           setScheduleFor(null);

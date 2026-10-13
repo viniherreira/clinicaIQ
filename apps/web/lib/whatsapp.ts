@@ -383,16 +383,21 @@ export async function prepareAppointmentMessage(
       professional: { select: { name: true } },
       procedure: { select: { name: true } },
       tenant: { select: { name: true } },
+      unit: { select: { name: true } },
     },
   });
   if (!appt) return { kind: 'done', result: { success: false, error: 'appointment-not-found' } };
+  // Com mais de uma unidade, o paciente precisa saber qual: "Clínica Sorriso – Centro".
+  const unidades = appt.unit ? await prisma.clinicUnit.count({ where: { tenantId: appt.tenantId, active: true } }) : 0;
+  const clinicName =
+    appt.unit && unidades > 1 && appt.unit.name !== appt.tenant.name ? `${appt.tenant.name} – ${appt.unit.name}` : appt.tenant.name;
 
   const phone = safeDecrypt(appt.patient.phoneEncrypted, appt.tenantId);
   if (!phone) return { kind: 'done', result: { success: false, error: 'patient-without-phone' } };
 
   const data: AppointmentMessageData = {
     patientName: appt.patient.name,
-    clinicName: appt.tenant.name,
+    clinicName,
     professionalName: appt.professional.name,
     procedureName: appt.procedure?.name ?? null,
     dateLabel: format(appt.startTime, "EEEE, dd/MM", { locale: ptBR }),

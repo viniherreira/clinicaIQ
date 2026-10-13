@@ -10,7 +10,9 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO,
 } from 'date-fns';
 import { PROFESSIONAL_COLORS } from './_components/constants';
-import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { buildWorkingHoursMap } from '@/lib/working-hours';
+import { getUnitContext } from '@/lib/units';
+import { unitAppointmentWhere } from '@/lib/unit-rules';
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
 import { applyAction, type FlowAction } from '@/lib/appointment-flow';
 import { isLabelColor } from '@/lib/label-colors';
@@ -47,8 +49,11 @@ async function requireTenant() {
 // ─── Get agenda data ──────────────────────────────────────────────────────────
 
 export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'month' = 'day') {
-  const { tenantId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
   const db = getTenantClient(tenantId);
+  // A agenda é da unidade escolhida no topo; os bloqueios são do profissional (valem em todas).
+  const units = await getUnitContext(tenantId, userId);
+  const unit = units.current;
 
   const date = parseISO(dateStr);
   // O mês mostra as semanas inteiras: começa na segunda antes do dia 1 e vai até o domingo depois do último.
@@ -67,7 +72,7 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
 
   const [appointments, blockedSlots, professionals, procedures] = await Promise.all([
     db.appointment.findMany({
-      where: { startTime: { gte: from, lte: to } },
+      where: { startTime: { gte: from, lte: to }, ...unitAppointmentWhere(unit.id, units.main.id) },
       include: {
         patient: { select: { id: true, name: true } },
         professional: { select: { id: true, name: true, specialty: true } },
@@ -112,17 +117,29 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   }));
 
   const [workingHours, whatsappHealth] = await Promise.all([
-    buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)),
+    buildWorkingHoursMap(
+      tenantId,
+      professionals.map((p) => p.id),
+      { unitId: unit.id, mainId: units.main.id, businessHours: unit.businessHours },
+    ),
     // Surfaced here because this is where appointments are booked: a silently
     // dead WhatsApp means confirmations stop going out, and the clinic would
     // otherwise only notice by visiting the WhatsApp tab.
     getWhatsAppHealth(tenantId),
   ]);
 
+  // Com várias unidades, a agenda mostra quem atende nesta (algum dia do
+  // expediente aqui) ou já tem horário marcado aqui no período.
+  const comHorario = new Set(appointments.map((a) => a.professionalId));
+  const daUnidade = units.multi
+    ? professionalsWithColor.filter((p) => comHorario.has(p.id) || (workingHours[p.id] ?? []).some(Boolean))
+    : professionalsWithColor;
+
   return {
     appointments,
     blockedSlots,
-    professionals: professionalsWithColor,
+    professionals: daUnidade,
+    unit: { id: unit.id, name: unit.name, multi: units.multi },
     procedures: serializedProcedures,
     workingHours,
     whatsappHealth,
@@ -219,7 +236,8 @@ async function checkConflict(
         { endTime: { gt: start } },
       ],
     },
-    include: { patient: { select: { name: true } } },
+    // O profissional não está em duas unidades ao mesmo tempo: confere em todas.
+    include: { patient: { select: { name: true } }, unit: { select: { name: true } } },
   });
   return conflict;
 }
@@ -246,7 +264,7 @@ export async function createAppointment(
   _prev: AppointmentFormState | null,
   formData: FormData,
 ): Promise<AppointmentFormState> {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
@@ -274,7 +292,7 @@ export async function createAppointment(
     return {
       success: false,
       errors: {},
-      message: `Conflito com agendamento de ${conflict.patient.name} às ${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      message: `Conflito com agendamento de ${conflict.patient.name} às ${start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${conflict.unit ? ` (${conflict.unit.name})` : ''}`,
     };
   }
 
@@ -287,9 +305,11 @@ export async function createAppointment(
     };
   }
 
+  const { current: unit } = await getUnitContext(tenantId, userId);
   const appointment = await prisma.appointment.create({
     data: {
       tenantId,
+      unitId: unit.id,
       patientId,
       professionalId,
       procedureId: procedureId || null,
@@ -343,7 +363,7 @@ export async function updateAppointment(
   _prev: AppointmentFormState | null,
   formData: FormData,
 ): Promise<AppointmentFormState> {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, errors: {}, message: bloqueio };
@@ -371,7 +391,7 @@ export async function updateAppointment(
     return {
       success: false,
       errors: {},
-      message: `Conflito com agendamento de ${conflict.patient.name}`,
+      message: `Conflito com agendamento de ${conflict.patient.name}${conflict.unit ? ` (${conflict.unit.name})` : ''}`,
     };
   }
 
@@ -413,7 +433,7 @@ export async function moveAppointment(
   newEndISO: string,
   professionalId: string,
 ) {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, message: bloqueio };
@@ -472,7 +492,7 @@ export async function createBlockedSlot(
   _prev: BlockFormState | null,
   formData: FormData,
 ): Promise<BlockFormState> {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false, message: bloqueio };
@@ -522,7 +542,7 @@ export async function createBlockedSlot(
 }
 
 export async function deleteBlockedSlot(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
@@ -537,7 +557,7 @@ export async function updateAppointmentStatus(
   status: 'SCHEDULED' | 'CONFIRMED' | 'RESCHEDULED' | 'CANCELLED' | 'ATTENDED' | 'MISSED',
   cancelReason?: string,
 ) {
-  const { tenantId, userId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
@@ -569,7 +589,7 @@ export async function cancelAppointment(id: string, cancelReason?: string) {
  * foreign key. Tenant-scoped: only the owner's row can be removed.
  */
 export async function deleteAppointment(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenant();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { success: false as const, error: 'blocked' as const };

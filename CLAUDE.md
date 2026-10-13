@@ -63,6 +63,7 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **Agendamento online** (`/agendar/[slug]`, público): regras em `Tenant.settings.onlineBooking` (`lib/availability.ts`: `readOnlineBooking`, `freeSlots`), painel em Configurações → Atendimento. Confere tudo de novo no servidor e numa transação; paciente novo vira cadastro (mesmo nome + telefone reaproveita); máximo 2 horários futuros pelo site por pessoa; campo-isca contra robô.
 - **Comissões:** `Professional.commissionPercent` sobre a produção (atendimentos concluídos × preço-base), tabela no Financeiro.
 - O expediente de cada profissional sai de `lib/working-hours.ts` (agenda e agendamento online).
+- **Unidades** (várias clínicas na mesma conta, `ClinicUnit`): pacientes, orçamentos, financeiro e CRM são da clínica toda; cada unidade tem endereço, telefone, horário (`businessHours` próprio ou o da clínica) e agenda. A principal é a de menor `order` (`un_<tenantId>`, criada sozinha por `lib/units.ts` se faltar); agendamento ou expediente sem unidade = principal (`lib/unit-rules.ts`, puro e testado). Seletor no topo (`components/unit-switcher.tsx`, cookie `clinicaiq-unidade`, só com 2+ ativas); a agenda filtra pela unidade e cada dia do expediente do profissional diz a unidade (`ProfessionalSchedule.unitId`); conflito de horário confere em todas. `User.unitIds` restringe quem vê o quê (vazio = todas). Agendamento online pergunta a unidade. Produção: `docs/producao/2026-10-14-unidades.sql`.
 
 ## CRM
 

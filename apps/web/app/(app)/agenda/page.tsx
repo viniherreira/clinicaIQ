@@ -19,7 +19,9 @@ export default async function AgendaPage({ searchParams }: PageProps) {
 
   return (
     <Suspense>
+      {/* Trocar a unidade no topo recomeça a agenda com os dados da outra unidade. */}
       <AgendaShell
+        key={data.unit.id}
         initialDate={dateStr}
         initialView={view}
         initialData={data}

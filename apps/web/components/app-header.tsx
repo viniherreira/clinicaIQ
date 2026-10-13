@@ -10,6 +10,7 @@ import { ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
 import { LogoMark, LogoWordmark } from './logo';
 import { UserMenu } from './user-menu';
+import { UnitSwitcher, type UnitChoice } from './unit-switcher';
 
 export function AppHeader({
   clinicName,
@@ -21,6 +22,7 @@ export function AppHeader({
   canPlanos,
   space = 'clinic',
   showSwitcher = false,
+  units = null,
 }: {
   clinicName: string;
   /** Quem está logado agora — não a clínica, não o dono. */
@@ -32,6 +34,8 @@ export function AppHeader({
   canPlanos: boolean;
   space?: Space;
   showSwitcher?: boolean;
+  /** Mais de uma unidade que a pessoa vê: o seletor de unidade. */
+  units?: UnitChoice | null;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -74,6 +78,8 @@ export function AppHeader({
         )}
 
         <div className="flex-1" />
+
+        {units && <UnitSwitcher units={units} />}
 
         {buscaPaciente && (
           <form
