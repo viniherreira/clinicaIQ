@@ -99,7 +99,8 @@ export function AppHeader({
           </form>
         )}
 
-        <ThemeToggle />
+        {/* O CRM é sempre escuro (components/crm-theme.tsx). */}
+        {space !== 'crm' && <ThemeToggle />}
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
 
         <UserMenu

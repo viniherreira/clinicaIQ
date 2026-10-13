@@ -39,7 +39,7 @@ captação (funil de leads no estilo Kommo).
 
 - `apps/web` — Next.js frontend app
   - `app/(app)` — gestão da clínica
-  - `app/(crm)` — telas do CRM (`/crm/painel`, `/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/transmissoes`, `/crm/whatsapp`, `/crm/configuracoes`)
+  - `app/(crm)` — telas do CRM (`/crm/painel`, `/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/automacoes` (bots, modelos, transmissões, por etapa), `/crm/whatsapp`, `/crm/configuracoes`)
   - `crm/` — regras do CRM (funil, leads, tarefas, automação), sem telas
   - `e2e/regressao` — regressão da agenda e dos orçamentos; `e2e/crm` — CRM
 - `apps/whatsapp-gateway` — gateway de WhatsApp por QR code
@@ -72,7 +72,10 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **A agenda e os orçamentos nunca dependem do CRM.** A única ligação é `after(() => notifyCrm(tenantId, evento))` depois de salvar (`apps/web/crm/notify.ts`), que não faz nada sem o módulo e nunca lança. Não importe nada mais de `crm/` em código da clínica.
 - As regras de automação ficam em `crm/automation.ts` (puras, testadas por tabela): avançar só para frente, voltar só no cancelamento ou falta, nunca perder sozinho.
 - O que o card mostra da clínica (próxima avaliação, orçamento em aberto) é lido ao vivo (`crm/live.ts`), nunca copiado para o CRM.
-- **Visual no jeito do Kommo** (só no espaço do CRM): menu escuro estreito (`components/crm-rail.tsx`), quadro sobre fundo cinza-azulado e cards compactos, e nas Conversas o lead à direita (`conversas/_components/lead-side.tsx`, o mesmo `LeadPanel` da ficha). Cores em `--rail`, `--board` e `--bubble-out` (`app/globals.css`), com modo escuro e alto contraste.
+- **Visual no jeito do Kommo** (só no espaço do CRM): sempre escuro, azul-marinho — o layout do CRM liga `dark crm-navy` no `<html>` (`components/crm-theme.tsx`; tokens em `.dark.crm-navy` no `app/globals.css`, `--link` para telefone e links; o alto contraste continua mandando). Menu estreito (`components/crm-rail.tsx`), cards com avatar, data, telefone e "Sem tarefas" (`_components/lead-card.tsx`), e nas Conversas o lead à direita (`conversas/_components/lead-side.tsx`, o mesmo `LeadPanel` da ficha).
+- **Vários funis** (`Pipeline`; `PipelineStage.pipelineId`): cada funil tem Novo/Fechou/Perdeu com papel (`@@unique([pipelineId, role])`); "Avaliação agendada" e "Em negociação" com papel só no principal (o de menor `order`, `mainPipeline`). A agenda move o lead só dentro do funil dele (`notify.ts` lê as etapas do funil do lead). Lead novo sem etapa entra no principal. O quadro usa `?funil=` (ou o cookie `crm-funil`); trocar e criar funil pelo nome do funil (`pipeline-menu.tsx`); **Editar funil** é o próprio quadro (`?editar=1`, `pipeline-editor.tsx`); excluir funil leva os leads (abertos → entrada, ganhos → Fechou, perdidos → Perdeu). Regras em `crm/settings.ts`; telas recebem `basics.pipelines` (`crm/page-data.ts`), listas de etapa com o funil na frente (`stageOptions`).
+- **Pesquisar e filtrar** (`_components/filter-panel.tsx`): atalhos, propriedades (nome/telefone, criado, etapa, funil na lista, origem, responsável, tarefas, valor) e tags com contagem. Tudo na URL (`crm/filters.ts`, puro e testado; `tag` aceita várias separadas por vírgula).
+- **Automações** (`/crm/automacoes`): Bots, Modelos (criar e mandar para a Meta aprovar, com prévia), Transmissões (`/crm/transmissoes` redireciona) e Por etapa do funil. As Configurações do CRM ficaram com Funis, Tags, Motivos e Respostas.
 - Horários: agendamentos são "hora de parede em UTC" (`lib/tz.ts`); tarefas do CRM são instantes reais. Conversões em `crm/clock.ts`.
 - Spec e plano: `docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md` e `docs/superpowers/plans/2026-10-07-crm-etapa1-plan.md`.
 
@@ -98,6 +101,7 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **Painel** (`/crm/painel`, `crm/dashboard.ts` + `crm/dashboard-math.ts` puro): leads novos, ganhos, perdidos, conversão, funil, origem, motivos de perda, equipe e tempo de resposta (mediana, só resposta de gente).
 - **Arquivos pelo CRM** (`crm/media-rules.ts` puro, `crm/media-store.ts`): foto, PDF/Office, áudio e vídeo até 10 MB, guardados no Supabase Storage (`store:`) ou, só no desenvolvimento, em `apps/web/.crm-media` (`local:`). Saem pela API oficial (`CloudApi.uploadMedia` + `sendMedia`); o gateway de QR não manda arquivo (filtra `mediaRef: null`).
 - **LGPD — apagar os dados de uma pessoa** (`crm/anonymize.ts`, botão no pé da ficha, só `crm_config`, confirmação "APAGAR"): todos os leads com o mesmo telefone ficam sem nome, telefone, e-mail, notas, tarefas, tags, conversas e arquivos; o negócio fechado continua nos números, o aberto sai do funil; a ficha de paciente não muda. Grava `LEAD_PERSONAL_DATA_ERASED` na auditoria.
+- Banco de produção dos funis: `docs/producao/2026-10-13-funis.sql` (cria `pipelines`, põe as etapas no "Funil principal" e troca o índice de papel).
 - Spec e plano: `docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md` e `docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
 
 ## Accessibility

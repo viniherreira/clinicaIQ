@@ -1,58 +1,44 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, ArrowUp, Lock, Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
 import { COLOR_LABEL, colorClasses } from '@/crm/colors';
 import { CRM_COLORS } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
-import { AutomationsTab, type AutomationRow } from './automations-tab';
-import { BotsTab, type BotRow } from './bots-tab';
 import {
-  createStageAction, deleteQuickReplyAction, deleteStageAction, deleteTagAction, moveStageAction, toggleLostReasonAction,
-  updateStageAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
+  deleteQuickReplyAction, deleteTagAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
 } from '../actions';
 
-type Stage = { id: string; name: string; color: string; role: string | null; leads: number };
+type PipelineRow = { id: string; name: string; stages: number; leads: number };
 type Tag = { id: string; name: string; color: string; leads: number };
 type Reason = { id: string; name: string; active: boolean };
 type QuickReply = { id: string; title: string; body: string };
 type Result = { ok: true } | { ok: false; message: string };
-
-const ROLE_HINT: Record<string, string> = {
-  NEW: 'Onde todo lead novo entra',
-  SCHEDULED: 'O card vem para cá quando a avaliação é agendada',
-  NEGOTIATION: 'O card vem para cá quando o orçamento é criado',
-  WON: 'Orçamento aprovado; no quadro é a barra “Ganho”',
-  LOST: 'No quadro é a barra “Perdido”',
-};
 
 const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 const iconBtn =
   'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40';
 
-/** As abas das configurações do CRM. */
+export type SettingsTab = 'funis' | 'tags' | 'motivos' | 'respostas';
+
+/** As abas das configurações do CRM. Automações, robôs e modelos ficam em Automações. */
 export function CrmSettings({
-  stages,
+  pipelines,
   tags,
   reasons,
   quickReplies,
-  automations,
-  team,
-  templates,
-  bots,
+  initialTab = 'funis',
 }: {
-  stages: Stage[];
+  pipelines: PipelineRow[];
   tags: Tag[];
   reasons: Reason[];
   quickReplies: QuickReply[];
-  automations: AutomationRow[];
-  team: { id: string; name: string }[];
-  templates: { id: string; name: string; variables: number }[];
-  bots: BotRow[];
+  initialTab?: SettingsTab;
 }) {
-  const [aba, setAba] = useState<'etapas' | 'automacoes' | 'robo' | 'tags' | 'motivos' | 'respostas'>('etapas');
+  const [aba, setAba] = useState<SettingsTab>(initialTab);
   const [aviso, setAviso] = useState('');
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -66,9 +52,7 @@ export function CrmSettings({
     });
 
   const abas = [
-    { key: 'etapas' as const, label: 'Etapas do funil' },
-    { key: 'automacoes' as const, label: 'Automações' },
-    { key: 'robo' as const, label: 'Robô' },
+    { key: 'funis' as const, label: 'Funis' },
     { key: 'tags' as const, label: 'Tags' },
     { key: 'motivos' as const, label: 'Motivos de perda' },
     { key: 'respostas' as const, label: 'Respostas rápidas' },
@@ -86,7 +70,7 @@ export function CrmSettings({
             aria-selected={aba === a.key}
             aria-controls={`${id}-painel`}
             onClick={() => setAba(a.key)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring ${aba === a.key ? 'border-primary font-medium text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring ${aba === a.key ? 'border-primary font-medium text-link' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
           >
             {a.label}
           </button>
@@ -94,27 +78,10 @@ export function CrmSettings({
       </div>
 
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} className="pt-5">
-        {aba === 'etapas' && <Etapas stages={stages} pending={pending} agir={agir} />}
+        {aba === 'funis' && <Funis pipelines={pipelines} />}
         {aba === 'tags' && <Tags tags={tags} pending={pending} agir={agir} />}
         {aba === 'motivos' && <Motivos reasons={reasons} pending={pending} agir={agir} />}
         {aba === 'respostas' && <Respostas items={quickReplies} pending={pending} agir={agir} />}
-        {aba === 'robo' && (
-          <BotsTab
-            bots={bots}
-            stages={stages.filter((s) => s.role !== 'WON' && s.role !== 'LOST').map((s) => ({ id: s.id, name: s.name }))}
-            tags={tags.map((t) => ({ id: t.id, name: t.name }))}
-            team={team}
-          />
-        )}
-        {aba === 'automacoes' && (
-          <AutomationsTab
-            stages={stages.map((s) => ({ id: s.id, name: s.name }))}
-            automations={automations}
-            tags={tags.map((t) => ({ id: t.id, name: t.name }))}
-            team={team}
-            templates={templates}
-          />
-        )}
       </div>
 
       {aviso && (
@@ -155,108 +122,31 @@ function NameInput({ value, label, onSave }: { value: string; label: string; onS
   );
 }
 
-function Etapas({ stages, pending, agir }: { stages: Stage[]; pending: boolean; agir: Agir }) {
-  const colunas = stages.filter((s) => s.role !== 'WON' && s.role !== 'LOST');
-  const fechadas = stages.filter((s) => s.role === 'WON' || s.role === 'LOST');
-  const [apagando, setApagando] = useState<Stage | null>(null);
-  const [destino, setDestino] = useState('');
-  const [nova, setNova] = useState({ name: '', color: 'blue' });
-
-  const linha = (s: Stage, i: number, total: number, movivel: boolean) => (
-    <li key={s.id} className="rounded-lg border border-border bg-surface p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`h-3 w-3 shrink-0 rounded-full ${colorClasses(s.color).dot}`} aria-hidden="true" />
-        <div className="min-w-40 flex-1">
-          <NameInput value={s.name} label={`Nome da etapa ${s.name}`} onSave={(v) => agir(() => updateStageAction(s.id, { name: v }), 'Etapa renomeada.')} />
-        </div>
-        <ColorSelect value={s.color} label={`Cor da etapa ${s.name}`} onChange={(v) => agir(() => updateStageAction(s.id, { color: v }), 'Cor alterada.')} />
-        {movivel && (
-          <>
-            <button type="button" className={iconBtn} disabled={pending || i === 0} onClick={() => agir(() => moveStageAction(s.id, -1), `${s.name} subiu.`)} aria-label={`Subir ${s.name}`}>
-              <ArrowUp className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button type="button" className={iconBtn} disabled={pending || i === total - 1} onClick={() => agir(() => moveStageAction(s.id, 1), `${s.name} desceu.`)} aria-label={`Descer ${s.name}`}>
-              <ArrowDown className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </>
-        )}
-        {s.role ? (
-          <span className="flex h-8 w-8 items-center justify-center text-muted-foreground" title="Usada pela integração com a agenda e os orçamentos">
-            <Lock className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only">Não pode ser apagada</span>
-          </span>
-        ) : (
-          <button type="button" className={`${iconBtn} hover:text-destructive`} disabled={pending} onClick={() => { setApagando(s); setDestino(''); }} aria-label={`Apagar ${s.name}`}>
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </div>
-      <p className="mt-1.5 pl-5 text-xs text-muted-foreground">
-        {s.leads} {s.leads === 1 ? 'lead' : 'leads'}
-        {s.role && ROLE_HINT[s.role] ? ` · ${ROLE_HINT[s.role]}` : ''}
-      </p>
-
-      {apagando?.id === s.id && (
-        <div role="alert" className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-          {s.leads > 0 ? (
-            <>
-              <label htmlFor={`destino-${s.id}`} className="block font-medium">Para onde vão os {s.leads} leads de “{s.name}”?</label>
-              <select id={`destino-${s.id}`} value={destino} onChange={(e) => setDestino(e.target.value)} className={`${inputCls} mt-2`}>
-                <option value="">Escolha a etapa</option>
-                {colunas.filter((c) => c.id !== s.id).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </>
-          ) : (
-            <p className="font-medium">Apagar a etapa “{s.name}”?</p>
-          )}
-          <div className="mt-3 flex gap-2">
-            <button type="button" className="btn-outline btn-sm" onClick={() => setApagando(null)}>Cancelar</button>
-            <button
-              type="button"
-              className="btn-danger btn-sm"
-              disabled={pending}
-              onClick={() => { agir(() => deleteStageAction(s.id, destino || null), `Etapa ${s.name} apagada.`); setApagando(null); }}
-            >
-              Apagar etapa
-            </button>
-          </div>
-        </div>
-      )}
-    </li>
-  );
-
+function Funis({ pipelines }: { pipelines: PipelineRow[] }) {
   return (
-    <div className="space-y-6">
-      <section aria-labelledby="cfg-colunas">
-        <h2 id="cfg-colunas" className="text-sm font-semibold">Colunas do funil</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">Na ordem em que aparecem no quadro. As com cadeado são usadas pela integração: dá para renomear e recolorir, não apagar.</p>
-        <ol className="mt-3 space-y-2">{colunas.map((s, i) => linha(s, i, colunas.length, true))}</ol>
-
-        <form
-          className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            agir(() => createStageAction(nova.name, nova.color), `Etapa ${nova.name.trim()} criada.`);
-            setNova({ name: '', color: 'blue' });
-          }}
-        >
-          <div className="min-w-40 flex-1">
-            <label htmlFor="cfg-nova-etapa" className="block text-xs font-medium text-muted-foreground">Nova etapa</label>
-            <input id="cfg-nova-etapa" value={nova.name} onChange={(e) => setNova((n) => ({ ...n, name: e.target.value }))} placeholder="Retorno, Pós-venda…" className={`${inputCls} mt-1`} />
-          </div>
-          <ColorSelect value={nova.color} label="Cor da nova etapa" onChange={(v) => setNova((n) => ({ ...n, color: v }))} />
-          <button type="submit" disabled={pending || !nova.name.trim()} className="btn-primary btn-md inline-flex items-center gap-1.5">
-            <Plus className="h-4 w-4" aria-hidden="true" /> Criar etapa
-          </button>
-        </form>
-      </section>
-
-      <section aria-labelledby="cfg-fechadas">
-        <h2 id="cfg-fechadas" className="text-sm font-semibold">Fechamento</h2>
-        <ul className="mt-3 space-y-2">{fechadas.map((s, i) => linha(s, i, fechadas.length, false))}</ul>
-      </section>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        As etapas se editam no próprio quadro, como no Kommo: abra o funil e use <strong className="font-medium text-foreground">⋯ › Editar funil</strong>.
+        Para criar um funil, clique no nome do funil, no canto do quadro, e em <strong className="font-medium text-foreground">Novo funil</strong>.
+      </p>
+      <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+        {pipelines.map((f, i) => (
+          <li key={f.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {f.name}
+                {i === 0 && <span className="ml-2 rounded bg-surface-alt px-1.5 py-0.5 text-xs font-normal text-muted-foreground">principal</span>}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {f.stages} etapas · {f.leads} {f.leads === 1 ? 'lead' : 'leads'}
+              </p>
+            </div>
+            <Link href={`/crm?funil=${f.id}&editar=1`} className="btn-outline btn-sm">
+              Editar funil
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

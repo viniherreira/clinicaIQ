@@ -14,7 +14,7 @@ test('lead → paciente → agendou → cancelou → reagendou → orçamento �
   const lead = await createLeadViaModal(page);
 
   // Sem próxima ação, o card avisa.
-  await expect(page.getByRole('link', { name: lead.title, exact: true }).locator('..').locator('..')).toContainText('Sem tarefa');
+  await expect(page.getByRole('article', { name: `${lead.name}, ${lead.title}` })).toContainText('Sem tarefas');
 
   // Ficha do lead → Agendar avaliação → cadastro preenchido → agenda já com o paciente.
   await page.getByRole('link', { name: lead.title, exact: true }).click();

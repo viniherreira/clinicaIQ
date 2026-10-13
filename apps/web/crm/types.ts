@@ -8,6 +8,15 @@ export interface BoardStage {
   name: string;
   color: string;
   role: string | null;
+  pipelineId: string;
+}
+
+/** Um funil: as colunas e as etapas de ganho e perda (que não são colunas). */
+export interface BoardPipeline {
+  id: string;
+  name: string;
+  columns: BoardStage[];
+  closed: { won: string; lost: string };
 }
 
 export interface BoardTag {
@@ -39,6 +48,7 @@ export interface BoardLead {
   assignee: BoardPerson | null;
   task: BoardTaskStatus;
   stageEnteredAt: string;
+  createdAt: string;
   /** Hora de parede da agenda, em ISO. */
   nextAppointment: { startTime: string; professionalName: string } | null;
   openQuote: { number: number; totalCents: number } | null;
@@ -46,13 +56,23 @@ export interface BoardLead {
   lostAt: string | null;
 }
 
+export type CreatedFilter = '' | 'hoje' | '7d' | '30d' | 'mes';
+
 export interface BoardFilters {
   q: string;
   /** 'all' (padrão), 'me' ou o id de alguém da equipe. */
   resp: string;
   tarefa: '' | 'none' | 'overdue';
-  tag: string;
+  /** Tags marcadas: o lead aparece se tiver qualquer uma delas. */
+  tags: string[];
   origem: string;
+  /** Funil. No quadro é sempre o da tela; na lista, vazio = todos. */
+  funil: string;
+  etapa: string;
+  criado: CreatedFilter;
+  /** Valor de venda em reais, mínimo e máximo. */
+  valorMin: number | null;
+  valorMax: number | null;
 }
 
 export interface LostReasonOption {

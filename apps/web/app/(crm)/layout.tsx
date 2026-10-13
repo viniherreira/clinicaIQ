@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/app-shell';
+import { CrmTheme, CRM_THEME_SCRIPT } from '@/components/crm-theme';
 import { CrmTrialBanner } from '@/components/crm-trial-banner';
 import { CRM_NOT_CONTRACTED_PATH } from '@/crm/guard';
 import { can } from '@/lib/permissions';
@@ -21,6 +22,9 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
         if (!seat) redirect(CRM_NOT_CONTRACTED_PATH);
       }}
     >
+      {/* Escuro antes de pintar; o CrmTheme mantém e desfaz ao sair. */}
+      <script dangerouslySetInnerHTML={{ __html: CRM_THEME_SCRIPT }} />
+      <CrmTheme />
       <CrmTrialBanner />
       {children}
     </AppShell>

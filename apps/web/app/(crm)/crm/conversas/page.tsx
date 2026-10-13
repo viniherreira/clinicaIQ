@@ -54,8 +54,7 @@ export default async function ConversasPage({
       canConfigWhatsapp={can(ctx.role, 'configuracoes')}
       canManage={can(ctx.role, 'crm_config')}
       basics={{
-        stages: basics.columns,
-        closedStages: basics.closedStages,
+        pipelines: basics.pipelines,
         tags: basics.tags,
         team: basics.team,
         procedures: basics.procedures,

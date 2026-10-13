@@ -71,6 +71,7 @@ const config: Config = {
         board: 'hsl(var(--board))',
         canvas: 'hsl(var(--canvas))',
         'bubble-out': 'hsl(var(--bubble-out))',
+        link: 'hsl(var(--link))',
       },
       borderRadius: {
         lg: 'var(--radius)',

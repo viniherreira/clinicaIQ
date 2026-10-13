@@ -138,6 +138,7 @@ model Tenant {
 
   // CRM (etapa 1)
   leads               Lead[]
+  pipelines           Pipeline[]
   pipelineStages      PipelineStage[]
   leadTasks           LeadTask[]
   leadTags            LeadTag[]
@@ -1089,10 +1090,30 @@ model Lead {
   @@map("leads")
 }
 
-model PipelineStage {
-  id       String     @id @default(cuid())
+/// Um funil do CRM ("Funil principal", "Harmonização"…), como no Kommo. Toda
+/// clínica tem ao menos um; o de menor `order` é o principal, onde entra o lead
+/// novo quando ninguém diz o funil.
+model Pipeline {
+  id       String @id @default(cuid())
   tenantId String
   name     String
+  order    Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  stages PipelineStage[]
+
+  @@index([tenantId, order])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id         String     @id @default(cuid())
+  tenantId   String
+  pipelineId String
+  name       String
   /// Nome de um token da paleta do app, não um hex livre.
   color    String
   order    Int
@@ -1103,13 +1124,15 @@ model PipelineStage {
   updatedAt DateTime @updatedAt
 
   tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  pipeline    Pipeline          @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   leads       Lead[]
   automations StageAutomation[]
 
-  /// Cada papel no máximo uma vez por clínica. No Postgres nulos não colidem
+  /// Cada papel no máximo uma vez por funil. No Postgres nulos não colidem
   /// num índice único, então as etapas sem papel ficam livres.
-  @@unique([tenantId, role])
+  @@unique([pipelineId, role])
   @@index([tenantId, order])
+  @@index([pipelineId, order])
   @@map("pipeline_stages")
 }
 

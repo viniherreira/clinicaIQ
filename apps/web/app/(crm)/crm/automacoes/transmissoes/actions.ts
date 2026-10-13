@@ -41,7 +41,7 @@ export async function createBroadcastAction(input: {
   if (!r.ok) return r;
   const { broadcastId, startNow } = r;
   if (startNow) after(() => startBroadcast(g.tenantId, broadcastId));
-  revalidatePath('/crm/transmissoes');
+  revalidatePath('/crm/automacoes/transmissoes');
   return { ok: true, broadcastId };
 }
 
@@ -50,8 +50,8 @@ export async function cancelBroadcastAction(broadcastId: string): Promise<Result
   if (!g.ok) return g;
   const r = await cancelBroadcast(g.db, broadcastId);
   if (r.ok) {
-    revalidatePath('/crm/transmissoes');
-    revalidatePath(`/crm/transmissoes/${broadcastId}`);
+    revalidatePath('/crm/automacoes/transmissoes');
+    revalidatePath(`/crm/automacoes/transmissoes/${broadcastId}`);
   }
   return r.ok ? { ok: true } : r;
 }

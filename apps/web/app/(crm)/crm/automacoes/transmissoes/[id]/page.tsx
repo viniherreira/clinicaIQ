@@ -60,11 +60,11 @@ export default async function TransmissaoPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <AutoRefresh active={b.status === 'SENDING'} />
-      <Link href="/crm/transmissoes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/crm/automacoes/transmissoes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Transmissões
       </Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-xl font-semibold tracking-tight">{b.name}</h1>
+        <h2 className="mr-auto text-xl font-semibold tracking-tight">{b.name}</h2>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.cls}`}>{st.label}</span>
         {ativa && can(ctx.role, 'crm_config') && <CancelBroadcast id={b.id} />}
       </div>

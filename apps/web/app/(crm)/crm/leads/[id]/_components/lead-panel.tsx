@@ -7,7 +7,8 @@ import { Check, Eye, Pencil, Plus, RotateCcw, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import { formatCents, formatWallDateTime, SOURCE_LABEL, timeAgo } from '@/crm/format';
 import type { LeadDetail } from '@/crm/lead-detail';
-import type { BoardPerson, BoardStage, BoardTag, LostReasonOption } from '@/crm/types';
+import { pipelineOfStage } from '@/crm/pipeline-options';
+import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { moveLeadAction } from '../../../actions';
 import { LostReasonModal } from '../../../_components/lost-reason-modal';
 import { createTagAction, revealPhoneAction, setLeadTagsAction, updateLeadAction } from '../actions';
@@ -19,8 +20,7 @@ import { createTagAction, revealPhoneAction, setLeadTagsAction, updateLeadAction
  */
 export function LeadPanel({
   lead,
-  stages,
-  closedStages,
+  pipelines,
   allTags,
   team,
   procedures,
@@ -29,8 +29,8 @@ export function LeadPanel({
   onSaved,
 }: {
   lead: LeadDetail;
-  stages: BoardStage[];
-  closedStages: { won: string; lost: string };
+  /** Todos os funis: a ficha mostra o do lead e deixa trocar de funil. */
+  pipelines: BoardPipeline[];
   allTags: BoardTag[];
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
@@ -45,6 +45,9 @@ export function LeadPanel({
   const [aviso, setAviso] = useState('');
   const [perder, setPerder] = useState(false);
   const fechado = Boolean(lead.wonAt || lead.lostAt);
+  const funil = pipelineOfStage(pipelines, lead.stageId) ?? pipelines[0];
+  const stages = funil?.columns ?? [];
+  const closedStages = funil?.closed ?? { won: '', lost: '' };
   const indice = stages.findIndex((s) => s.id === lead.stageId);
 
   function salvar(patch: Parameters<typeof updateLeadAction>[1], msg: string) {
@@ -108,6 +111,27 @@ export function LeadPanel({
               <span key={s.id} className={`h-1.5 flex-1 rounded-full ${i <= indice ? colorClasses(s.color).dot : 'bg-border'}`} />
             ))}
           </div>
+          {pipelines.length > 1 && (
+            <>
+              <label htmlFor="lead-funil" className="mt-3 block text-xs font-medium text-muted-foreground">
+                Funil
+              </label>
+              <select
+                id="lead-funil"
+                value={funil?.id}
+                disabled={pending}
+                onChange={(e) => {
+                  const destino = pipelines.find((p) => p.id === e.target.value);
+                  if (destino?.columns[0]) mover(destino.columns[0].id, undefined, `Movido para o funil ${destino.name}.`);
+                }}
+                className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </>
+          )}
           <label htmlFor="lead-etapa" className="mt-3 block text-xs font-medium text-muted-foreground">
             Etapa <span className="font-normal">· {timeAgo(new Date(lead.stageEnteredAt))}</span>
           </label>

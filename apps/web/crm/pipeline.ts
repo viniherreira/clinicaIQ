@@ -1,5 +1,5 @@
 import type { StageRole, TenantPrismaClient } from '@clinicaiq/db';
-import { DEFAULT_LOST_REASONS, DEFAULT_STAGES } from './defaults';
+import { DEFAULT_LOST_REASONS, DEFAULT_STAGES, MAIN_PIPELINE_NAME } from './defaults';
 
 /** O mínimo de uma etapa que as regras precisam. */
 export interface StageLike {
@@ -65,10 +65,16 @@ export function canDeleteStage(
   leadCount: number,
   target?: StageLike | null,
 ): DeleteCheck {
-  if (stage.role) {
+  if (stage.role === 'SCHEDULED' || stage.role === 'NEGOTIATION') {
     return {
       ok: false,
       message: `"${stage.name}" é usada pela integração com a agenda e os orçamentos. Dá para renomear, mas não apagar.`,
+    };
+  }
+  if (stage.role) {
+    return {
+      ok: false,
+      message: `"${stage.name}" é etapa fixa do funil (entrada, ganho ou perda). Dá para renomear, mas não apagar.`,
     };
   }
   if (leadCount > 0) {
@@ -82,6 +88,11 @@ export function canDeleteStage(
   return { ok: true };
 }
 
+/** O funil principal: o de menor ordem (empate: o mais antigo). */
+export function mainPipeline<T extends { order: number; createdAt: Date }>(pipelines: readonly T[]): T | undefined {
+  return [...pipelines].sort((a, b) => a.order - b.order || a.createdAt.getTime() - b.createdAt.getTime())[0];
+}
+
 /**
  * Cria o funil padrão e os motivos de perda da clínica, se faltarem.
  *
@@ -90,15 +101,23 @@ export function canDeleteStage(
  * clínica faz a segunda esperar a primeira e encontrar tudo pronto.
  */
 export async function ensureDefaultPipeline(db: TenantPrismaClient, tenantId: string): Promise<void> {
-  const [stages, reasons] = await Promise.all([db.pipelineStage.count(), db.lostReason.count()]);
-  if (stages > 0 && reasons > 0) return;
+  const [pipelines, reasons] = await Promise.all([db.pipeline.count(), db.lostReason.count()]);
+  if (pipelines > 0 && reasons > 0) return;
 
   await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`crm-pipeline:${tenantId}`}))`;
 
-    if ((await tx.pipelineStage.count({ where: { tenantId } })) === 0) {
+    if ((await tx.pipeline.count({ where: { tenantId } })) === 0) {
+      const funil = await tx.pipeline.create({ data: { tenantId, name: MAIN_PIPELINE_NAME, order: 10 } });
       await tx.pipelineStage.createMany({
-        data: DEFAULT_STAGES.map((s) => ({ tenantId, name: s.name, color: s.color, order: s.order, role: s.role })),
+        data: DEFAULT_STAGES.map((s) => ({
+          tenantId,
+          pipelineId: funil.id,
+          name: s.name,
+          color: s.color,
+          order: s.order,
+          role: s.role,
+        })),
       });
     }
     if ((await tx.lostReason.count({ where: { tenantId } })) === 0) {

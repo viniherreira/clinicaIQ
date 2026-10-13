@@ -61,6 +61,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     await prisma.professional.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
     await prisma.pipelineStage.deleteMany({ where: t });
+    await prisma.pipeline.deleteMany({ where: t });
     await prisma.user.deleteMany({ where: t });
     await prisma.subscription.deleteMany({ where: t });
     await prisma.tenant.delete({ where: { id: tenant.id } });

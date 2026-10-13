@@ -10,7 +10,7 @@ const names: TimelineNames = {
   tags: new Map([['t1', 'implante']]),
   people: new Map([['u1', 'Rita Campos']]),
   reasons: new Map([['r1', 'Achou caro']]),
-  wonStageId: 's9',
+  wonStageIds: new Set(['s9']),
 };
 const at = new Date('2026-10-08T12:00:00Z');
 const a = (type: string, data: unknown, actorId: string | null = 'u1'): ActivityLike => ({ id: type, type, data, actorId, createdAt: at });

@@ -7,30 +7,27 @@ import { liveInfoForLeads } from './live';
 import { canonicalPhone, decryptPhone, maskPhone, phoneHash } from './phone';
 import { taskStatus } from './tasks-status';
 import type { BoardFilters, BoardLead, BoardTaskStatus } from './types';
+import { createdSince } from './filters';
 
-const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
-
-/** Lê os filtros da URL, sem confiar em nada que venha dela. */
-export function parseFilters(sp: Record<string, string | string[] | undefined>): BoardFilters {
-  const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
-  const tarefa = one('tarefa');
-  const origem = one('origem');
-  return {
-    q: one('q').trim().slice(0, 80),
-    resp: one('resp') || 'all',
-    tarefa: tarefa === 'none' || tarefa === 'overdue' ? tarefa : '',
-    tag: one('tag'),
-    origem: (SOURCES as readonly string[]).includes(origem) ? origem : '',
-  };
-}
+export { parseFilters, createdSince } from './filters';
 
 /** A parte do filtro que o banco resolve. Situação de tarefa é filtrada depois. */
 export function leadWhere(ctx: Pick<CrmContext, 'tenantId' | 'userId'>, f: BoardFilters): Prisma.LeadWhereInput {
   const where: Prisma.LeadWhereInput = { deletedAt: null };
   if (f.resp === 'me') where.assignedToId = ctx.userId;
   else if (f.resp !== 'all') where.assignedToId = f.resp;
-  if (f.tag) where.tags = { some: { tagId: f.tag } };
+  if (f.tags.length) where.tags = { some: { tagId: { in: f.tags } } };
   if (f.origem) where.source = f.origem as LeadSource;
+  if (f.etapa) where.stageId = f.etapa;
+  else if (f.funil) where.stage = { pipelineId: f.funil };
+  const desde = createdSince(f.criado);
+  if (desde) where.createdAt = { gte: desde };
+  if (f.valorMin != null || f.valorMax != null) {
+    where.estimatedValueCents = {
+      ...(f.valorMin != null ? { gte: Math.round(f.valorMin * 100) } : {}),
+      ...(f.valorMax != null ? { lte: Math.round(f.valorMax * 100) } : {}),
+    };
+  }
   if (f.q) {
     const digits = f.q.replace(/\D/g, '');
     // Com DDD e número, procura pelo telefone (índice cego); senão, pelo nome.
@@ -75,6 +72,7 @@ export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date =
       assignee: r.assignedTo,
       task: toTaskStatus(r, now),
       stageEnteredAt: r.stageEnteredAt.toISOString(),
+      createdAt: r.createdAt.toISOString(),
       nextAppointment: info?.nextAppointment
         ? { startTime: info.nextAppointment.startTime.toISOString(), professionalName: info.nextAppointment.professionalName }
         : null,
@@ -98,6 +96,16 @@ export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, now: Date
 }
 
 export { leadInclude };
+
+/** Quantos leads (não excluídos) cada tag tem, para o painel de filtros. */
+export async function tagCounts(ctx: CrmContext): Promise<Map<string, number>> {
+  const rows = await ctx.db.leadTagOnLead.groupBy({
+    by: ['tagId'],
+    where: { tenantId: ctx.tenantId, lead: { deletedAt: null } },
+    _count: { _all: true },
+  });
+  return new Map(rows.map((r) => [r.tagId, r._count._all]));
+}
 
 export type ListStatus = 'abertos' | 'ganhos' | 'perdidos' | 'todos';
 export type ListOrder = 'recentes' | 'nome' | 'valor' | 'etapa';
@@ -135,8 +143,7 @@ export async function loadLeadList(
   });
   const leads = await toBoardLeads(ctx, rows, now);
   const stageName = new Map(rows.map((r) => [r.id, r.stage.name]));
-  const createdAt = new Map(rows.map((r) => [r.id, r.createdAt.toISOString()]));
-  const list = leads.map((l) => ({ ...l, stageName: stageName.get(l.id) ?? '', createdAt: createdAt.get(l.id) ?? '' }));
+  const list = leads.map((l) => ({ ...l, stageName: stageName.get(l.id) ?? '' }));
   return f.tarefa ? list.filter((l) => l.task.kind === f.tarefa) : list;
 }
 
