@@ -95,7 +95,7 @@ export async function AppShell({
           showSwitcher={showSwitcher}
         />
         <SubscriptionBanner access={access} />
-        <main id="main-content" className="flex-1 overflow-auto">
+        <main id="main-content" className="flex-1 overflow-auto bg-canvas">
           {children}
         </main>
       </div>

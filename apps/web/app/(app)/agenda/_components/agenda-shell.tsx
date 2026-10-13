@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, addDays, subDays, parseISO } from 'date-fns';
+import { format, addDays, addMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Columns2, CalendarDays, Lock, FileBarChart, AlertTriangle } from 'lucide-react';
 import { MiniCalendar } from './mini-calendar';
@@ -11,11 +11,14 @@ import { ProfessionalFilter } from './professional-filter';
 import { CalendarGrid } from './calendar-grid';
 import { AppointmentModal, type EditingAppointment, type Patient } from './appointment-modal';
 import { AppointmentDetailModal } from './appointment-detail-modal';
+import { WaitingRoom } from './waiting-room';
+import { MonthGrid } from './month-grid';
 import { BlockSlotModal } from './block-slot-modal';
 import { getAgendaData, deleteBlockedSlot } from '../actions';
 import { wallClockTime } from '@/lib/tz';
 
 type AgendaData = Awaited<ReturnType<typeof getAgendaData>>;
+type AgendaView = 'day' | 'week' | 'month';
 
 interface ModalState {
   open: boolean;
@@ -34,7 +37,7 @@ interface BlockModalState {
 
 interface AgendaShellProps {
   initialDate: string;
-  initialView: 'day' | 'week';
+  initialView: AgendaView;
   initialData: AgendaData;
   /** Abre o "Novo agendamento" já com este paciente (link "Agendar avaliação" do CRM). */
   prefillPatient?: Patient | null;
@@ -44,7 +47,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = useState(initialDate);
-  const [view, setView] = useState<'day' | 'week'>(initialView);
+  const [view, setView] = useState<AgendaView>(initialView);
   const [mode, setMode] = useState<'grouped' | 'sidebyside'>('sidebyside');
   const [data, setData] = useState<AgendaData>(initialData);
   const [loading, setLoading] = useState(false);
@@ -78,7 +81,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
     });
   }, [data.professionals]);
 
-  async function navigate(dateStr: string, nextView?: 'day' | 'week') {
+  async function navigate(dateStr: string, nextView?: AgendaView) {
     setLoading(true);
     try {
       const v = nextView ?? view;
@@ -96,8 +99,14 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
     setData(await getAgendaData(currentDate, view));
   }
 
-  function goPrev() { navigate(format(subDays(parseISO(currentDate), 1), 'yyyy-MM-dd')); }
-  function goNext() { navigate(format(addDays(parseISO(currentDate), 1), 'yyyy-MM-dd')); }
+  // As setas andam um dia, uma semana ou um mês, conforme a visão.
+  function passo(sentido: 1 | -1) {
+    const d = parseISO(currentDate);
+    const nova = view === 'month' ? addMonths(d, sentido) : view === 'week' ? addDays(d, 7 * sentido) : addDays(d, sentido);
+    return format(nova, 'yyyy-MM-dd');
+  }
+  function goPrev() { navigate(passo(-1)); }
+  function goNext() { navigate(passo(1)); }
   function goToday() { navigate(format(new Date(), 'yyyy-MM-dd')); }
 
   function openNewModal(professionalId?: string, timeStr?: string, dateOverride?: string) {
@@ -158,6 +167,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       else if (e.key === 't' || e.key === 'T') goToday();
       else if (e.key === 'd' || e.key === 'D') navigate(currentDate, 'day');
       else if (e.key === 's' || e.key === 'S') navigate(currentDate, 'week');
+      else if (e.key === 'm' || e.key === 'M') navigate(currentDate, 'month');
       else if (e.key === 'n' || e.key === 'N') openNewModal();
     }
     window.addEventListener('keydown', onKey);
@@ -184,6 +194,9 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               onChange={setVisibleProfessionals}
             />
           </div>
+          <div className="border-t border-border pt-4">
+            <WaitingRoom appointments={data.appointments} onOpen={setDetailId} />
+          </div>
         </aside>
 
         {/* Main */}
@@ -191,7 +204,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
           {/* Top bar */}
           <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:px-4">
             <div className="segmented" role="group" aria-label="Navegar entre dias">
-              <button type="button" onClick={goPrev} className="segmented-item !px-2" aria-label="Dia anterior (seta esquerda)">
+              <button type="button" onClick={goPrev} className="segmented-item !px-2" aria-label={`${view === 'month' ? 'Mês anterior' : view === 'week' ? 'Semana anterior' : 'Dia anterior'} (seta esquerda)`}>
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
@@ -203,7 +216,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               >
                 Hoje
               </button>
-              <button type="button" onClick={goNext} className="segmented-item !px-2" aria-label="Próximo dia (seta direita)">
+              <button type="button" onClick={goNext} className="segmented-item !px-2" aria-label={`${view === 'month' ? 'Próximo mês' : view === 'week' ? 'Próxima semana' : 'Próximo dia'} (seta direita)`}>
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
@@ -211,10 +224,12 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
             {/* Date — own centered row on mobile (tap opens the native picker),
                 inline on desktop. */}
             <div className="relative order-last min-w-full text-center sm:order-none sm:min-w-0 sm:flex-1 sm:text-left">
-              <h1 className="inline-flex items-center gap-1.5 text-[15px] font-semibold capitalize text-foreground sm:text-sm" aria-live="polite">
+              <h1 className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground first-letter:uppercase sm:text-sm" aria-live="polite">
                 <CalendarDays className="h-4 w-4 text-primary sm:hidden" aria-hidden="true" />
                 <span className="sm:hidden">{format(parseISO(currentDate), 'EEEE, dd/MM/yyyy', { locale: ptBR })}</span>
-                <span className="hidden sm:inline">{dateLabel}</span>
+                <span className="hidden sm:inline">
+                  {view === 'month' ? format(parseISO(currentDate), "MMMM 'de' yyyy", { locale: ptBR }) : dateLabel}
+                </span>
                 {loading && <span className="text-xs font-normal text-muted-foreground" aria-hidden="true">…</span>}
               </h1>
               <input
@@ -229,6 +244,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
             <div className="segmented" role="group" aria-label="Modo de visualização">
               <button type="button" onClick={() => navigate(currentDate, 'day')} className="segmented-item" aria-pressed={view === 'day'}>Dia</button>
               <button type="button" onClick={() => navigate(currentDate, 'week')} className="segmented-item" aria-pressed={view === 'week'}>Semana</button>
+              <button type="button" onClick={() => navigate(currentDate, 'month')} className="segmented-item" aria-pressed={view === 'month'}>Mês</button>
             </div>
 
             <div className="segmented hidden sm:inline-flex" role="group" aria-label="Layout das agendas">
@@ -293,11 +309,20 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
 
           {/* Grid / empty state */}
           <div className="flex-1 overflow-auto overscroll-contain bg-surface">
-            {hasProfessionals ? (
+            {hasProfessionals && view === 'month' ? (
+              <MonthGrid
+                dateStr={currentDate}
+                appointments={data.appointments}
+                professionalColors={Object.fromEntries(data.professionals.map((p) => [p.id, p.color]))}
+                visibleProfessionals={visibleProfessionals}
+                onDayClick={(d) => navigate(d, 'day')}
+                onAppointmentClick={(id) => setDetailId(id)}
+              />
+            ) : hasProfessionals ? (
               <>
                 <CalendarGrid
                   dateStr={currentDate}
-                  view={view}
+                  view={view === 'month' ? 'week' : view}
                   professionals={data.professionals}
                   appointments={data.appointments}
                   blockedSlots={data.blockedSlots}
@@ -356,6 +381,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
       <AppointmentDetailModal
         open={!!detailId}
         appointmentId={detailId}
+        labels={data.labels}
         onClose={() => setDetailId(null)}
         onChanged={refreshData}
         onEdit={startEdit}

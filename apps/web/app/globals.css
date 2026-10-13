@@ -40,7 +40,8 @@
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 40%;
 
-    --destructive: 0 72% 51%;
+    /* Escurecido para passar de 4,5:1 também sobre o fundo cinza das telas. */
+    --destructive: 0 72% 44%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 71% 35%;
@@ -59,6 +60,8 @@
      * CRM no jeito do Kommo: menu escuro estreito à esquerda e o quadro sobre
      * um cinza-azulado, com os cards brancos por cima.
      */
+    /* Fundo das telas do sistema: um cinza claro, para os cartões brancos se destacarem. */
+    --canvas: 216 22% 95.5%;
     --rail: 214 45% 17%;
     --rail-foreground: 214 30% 80%;
     --rail-active: 214 40% 26%;
@@ -111,6 +114,7 @@
     --card: 222 25% 11%;
     --card-foreground: 210 30% 94%;
 
+    --canvas: 222 30% 7%;
     --rail: 222 32% 6%;
     --rail-foreground: 215 20% 72%;
     --rail-active: 222 25% 14%;
@@ -146,6 +150,7 @@
     --success: 142 100% 25%;
     --success-foreground: 0 0% 100%;
 
+    --canvas: 0 0% 100%;
     --rail: 0 0% 0%;
     --rail-foreground: 0 0% 100%;
     --rail-active: 212 100% 30%;
@@ -181,6 +186,7 @@
     --success: 142 100% 45%;
     --success-foreground: 0 0% 0%;
 
+    --canvas: 0 0% 0%;
     --rail: 0 0% 0%;
     --rail-foreground: 0 0% 100%;
     --rail-active: 0 0% 20%;

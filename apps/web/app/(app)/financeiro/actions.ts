@@ -129,7 +129,7 @@ export async function getFinanceData(params: FinanceParams) {
         ...(procFilter ? { procedureId: procFilter } : {}),
       },
       select: {
-        professional: { select: { id: true, name: true, color: true } },
+        professional: { select: { id: true, name: true, color: true, commissionPercent: true } },
         procedure: { select: { id: true, name: true, basePrice: true } },
       },
     }),
@@ -164,7 +164,7 @@ export async function getFinanceData(params: FinanceParams) {
     .sort((a, b) => b.value - a.value);
 
   // ── Production by professional (attended × base price) ──────────
-  const profMap = new Map<string, { id: string; name: string; color: string | null; count: number; value: number }>();
+  const profMap = new Map<string, { id: string; name: string; color: string | null; count: number; value: number; commissionPercent: number | null }>();
   for (const a of attended) {
     const cur = profMap.get(a.professional.id) ?? {
       id: a.professional.id,
@@ -172,6 +172,7 @@ export async function getFinanceData(params: FinanceParams) {
       color: a.professional.color,
       count: 0,
       value: 0,
+      commissionPercent: a.professional.commissionPercent != null ? Number(a.professional.commissionPercent) : null,
     };
     cur.count += 1;
     cur.value += a.procedure ? Number(a.procedure.basePrice) : 0;

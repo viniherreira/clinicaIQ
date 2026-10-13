@@ -26,6 +26,8 @@ import type {
 } from '../actions';
 import { MessagesPanel } from './messages-panel';
 import { DocumentsPanel } from './documents-panel';
+import { LabelsPanel } from './labels-panel';
+import { OnlineBookingPanel } from './online-booking-panel';
 
 interface Professional {
   id: string;
@@ -33,6 +35,7 @@ interface Professional {
   specialty: string | null;
   registration: string | null;
   color: string | null;
+  commissionPercent: number | null;
   active: boolean;
   _count: { appointments: number };
 }
@@ -130,6 +133,8 @@ export function SettingsView({
       panel: (
         <div className="space-y-6">
           <BusinessHoursSection initialHours={businessHours} />
+          <OnlineBookingPanel />
+          <LabelsPanel />
           <LinkCard
             title="Procedimentos e preços"
             description="Duração, valor, categoria e quais profissionais executam cada procedimento."
@@ -567,7 +572,7 @@ function ProfessionalsSection({
     setModalOpen(true);
   }
   function openEdit(p: Professional) {
-    setEditing({ id: p.id, name: p.name, specialty: p.specialty, registration: p.registration, color: p.color });
+    setEditing({ id: p.id, name: p.name, specialty: p.specialty, registration: p.registration, color: p.color, commissionPercent: p.commissionPercent });
     setModalOpen(true);
   }
 

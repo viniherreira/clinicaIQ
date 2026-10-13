@@ -160,18 +160,86 @@ export default async function FinanceiroPage({ searchParams }: PageProps) {
         />
       </div>
 
+      <CommissionsCard rows={byProfessional} />
+
       <FinancialDetail type={type} status={status} from={from} to={to} data={report} />
 
       <p className="text-xs text-muted-foreground print:hidden">
         <strong className="font-medium text-foreground">Recebido</strong> vem dos pagamentos registrados nos orçamentos.{' '}
         <strong className="font-medium text-foreground">A receber</strong> é o saldo de orçamentos aprovados.{' '}
-        <strong className="font-medium text-foreground">Produção</strong> soma os atendimentos concluídos, pelo preço-base do procedimento.
+        <strong className="font-medium text-foreground">Produção</strong> soma os atendimentos concluídos, pelo preço-base do procedimento.{' '}
+        <strong className="font-medium text-foreground">Comissão</strong> é o percentual de cada profissional (Configurações → Equipe) sobre a produção dele.
       </p>
     </div>
   );
 }
 
 // ─── UI bits ─────────────────────────────────────────────────────────────────
+
+/**
+ * Comissões e repasses do período, como no Clínica nas Nuvens: o percentual de
+ * cada profissional sobre a produção dele (atendimentos concluídos).
+ */
+function CommissionsCard({
+  rows,
+}: {
+  rows: { id: string; name: string; count: number; value: number; commissionPercent: number | null }[];
+}) {
+  const total = rows.reduce((s, r) => s + (r.commissionPercent != null ? (r.value * r.commissionPercent) / 100 : 0), 0);
+  const semPercentual = rows.some((r) => r.commissionPercent == null);
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-card print:break-inside-avoid" aria-labelledby="comissoes-titulo">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="comissoes-titulo" className="text-sm font-semibold">
+          Comissões dos profissionais
+        </h2>
+        <p className="text-sm">
+          Total a repassar: <strong className="tabular-nums">{brl(total)}</strong>
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">Sem atendimentos concluídos no período.</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="py-2 font-medium">Profissional</th>
+                <th scope="col" className="py-2 text-right font-medium">Atendimentos</th>
+                <th scope="col" className="py-2 text-right font-medium">Produção</th>
+                <th scope="col" className="py-2 text-right font-medium">Comissão</th>
+                <th scope="col" className="py-2 text-right font-medium">A repassar</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/70">
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <th scope="row" className="py-2 text-left font-medium">{r.name}</th>
+                  <td className="py-2 text-right tabular-nums">{r.count}</td>
+                  <td className="py-2 text-right tabular-nums">{brl(r.value)}</td>
+                  <td className="py-2 text-right tabular-nums">
+                    {r.commissionPercent != null ? `${r.commissionPercent.toLocaleString('pt-BR')}%` : '—'}
+                  </td>
+                  <td className="py-2 text-right font-semibold tabular-nums">
+                    {r.commissionPercent != null ? brl((r.value * r.commissionPercent) / 100) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {semPercentual && rows.length > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground print:hidden">
+          Profissional sem percentual não entra no total.{' '}
+          <Link href="/configuracoes" className="font-medium text-primary underline-offset-2 hover:underline">
+            Definir comissão na Equipe
+          </Link>
+        </p>
+      )}
+    </section>
+  );
+}
 
 function RevenueChart({ points, total }: { points: SeriesPoint[]; total: number }) {
   if (points.length === 0) return null;

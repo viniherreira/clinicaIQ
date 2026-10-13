@@ -69,6 +69,7 @@ const config: Config = {
           active: 'hsl(var(--rail-active))',
         },
         board: 'hsl(var(--board))',
+        canvas: 'hsl(var(--canvas))',
         'bubble-out': 'hsl(var(--bubble-out))',
       },
       borderRadius: {

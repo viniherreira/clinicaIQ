@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/orcamento/(.*)',
   '/privacidade',
   '/termos',
+  '/agendar/(.*)', // agendamento online: público, sem login
   '/api/webhooks/(.*)',
   '/api/cron/(.*)', // Vercel Cron authenticates via CRON_SECRET, not Clerk
   '/api/whatsapp/(.*)', // gateway authenticates via WHATSAPP_GATEWAY_TOKEN

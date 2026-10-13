@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ChevronRight, Menu, Search, X } from 'lucide-react';
+import { can } from '@/lib/permissions';
 import { activeHref, navFor } from './app-sidebar';
 import { ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
@@ -34,13 +35,19 @@ export function AppHeader({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const buscaId = useId();
+  const [busca, setBusca] = useState('');
   // O menu do celular precisa esconder exatamente o mesmo que a lateral.
   const itens = navFor(role, space);
   const ativo = activeHref(itens, pathname);
+  const atual = itens.find((i) => i.href === ativo);
+  // A busca rápida de paciente, como a do topo do Clínica nas Nuvens: Enter abre a lista filtrada.
+  const buscaPaciente = space === 'clinic' && can(role, 'pacientes');
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 sm:px-6 print:hidden">
         {/* Mobile menu + brand */}
         <button
           type="button"
@@ -54,7 +61,43 @@ export function AppHeader({
           <LogoMark size="sm" />
         </div>
 
+        {atual && (
+          <nav aria-label="Você está em" className="hidden min-w-0 items-center gap-1.5 text-sm md:flex">
+            {atual.group && atual.group !== atual.label && (
+              <>
+                <span className="text-muted-foreground">{atual.group}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden="true" />
+              </>
+            )}
+            <span className="truncate font-medium text-foreground" aria-current="page">{atual.label}</span>
+          </nav>
+        )}
+
         <div className="flex-1" />
+
+        {buscaPaciente && (
+          <form
+            role="search"
+            className="relative hidden w-72 lg:block"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = busca.trim();
+              setBusca('');
+              router.push(q ? `/pacientes?q=${encodeURIComponent(q)}` : '/pacientes');
+            }}
+          >
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <label htmlFor={buscaId} className="sr-only">Buscar paciente</label>
+            <input
+              id={buscaId}
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar paciente…"
+              className="h-9 w-full rounded-lg border border-border bg-surface-alt/60 pl-8 pr-2 text-sm placeholder:text-muted-foreground focus:bg-surface focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            />
+          </form>
+        )}
 
         <ThemeToggle />
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />

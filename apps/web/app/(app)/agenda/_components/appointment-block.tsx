@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, CheckCheck, X, Ban, Clock, RotateCw } from 'lucide-react';
+import { Check, CheckCheck, X, Ban, Clock, RotateCw, Armchair, Stethoscope } from 'lucide-react';
 import { wallClockTime, wallClockMinutes } from '@/lib/tz';
-import {
-  GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES, STATUS_STYLES, STATUS_LABELS,
-} from './constants';
+import { stageOf, STAGE_LABELS } from '@/lib/appointment-flow';
+import { labelClasses } from '@/lib/label-colors';
+import { GRID_START_HOUR, SLOT_HEIGHT_PX, SLOT_MINUTES, STATUS_STYLES } from './constants';
 
 interface Appointment {
   id: string;
@@ -16,6 +16,9 @@ interface Appointment {
   professional: { id: string; name: string; specialty?: string | null };
   procedure?: { id: string; name: string; durationMinutes: number } | null;
   professionalColor?: string;
+  arrivedAt?: Date | string | null;
+  startedAt?: Date | string | null;
+  label?: { id: string; name: string; color: string } | null;
 }
 
 interface AppointmentBlockProps {
@@ -26,6 +29,8 @@ interface AppointmentBlockProps {
 const STATUS_ICON = {
   SCHEDULED: Clock,
   CONFIRMED: Check,
+  ARRIVED: Armchair,
+  IN_PROGRESS: Stethoscope,
   ATTENDED: CheckCheck,
   CANCELLED: Ban,
   MISSED: X,
@@ -45,10 +50,11 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
     };
   }, [start, end]);
 
-  const key = appointment.status as keyof typeof STATUS_STYLES;
+  const key = stageOf(appointment);
   const style = STATUS_STYLES[key] ?? STATUS_STYLES.SCHEDULED;
-  const statusLabel = STATUS_LABELS[key as keyof typeof STATUS_LABELS] ?? appointment.status;
+  const statusLabel = STAGE_LABELS[key];
   const Icon = STATUS_ICON[key] ?? Clock;
+  const label = appointment.label;
   const timeLabel = wallClockTime(start);
   const isCancelled = appointment.status === 'CANCELLED';
   const compact = heightPx < 34;
@@ -70,7 +76,7 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
         borderLeftWidth: 3,
         borderLeftColor: appointment.professionalColor ?? '#94a3b8',
       }}
-      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}`}
+      aria-label={`${timeLabel} ${appointment.patient.name}, ${appointment.professional.name}, ${statusLabel}${label ? `, rótulo ${label.name}` : ''}`}
     >
       <div className="flex min-w-0 items-center gap-1">
         <Icon className={`h-3.5 w-3.5 shrink-0 ${style.icon}`} aria-hidden="true" />
@@ -78,6 +84,11 @@ export function AppointmentBlock({ appointment, onClick }: AppointmentBlockProps
         <span className={`truncate text-xs font-semibold leading-tight ${isCancelled ? 'line-through' : ''}`}>
           {appointment.patient.name}
         </span>
+        {label && (
+          <span className={`ml-auto shrink-0 rounded px-1 text-[10px] font-semibold leading-4 ${labelClasses(label.color).chip}`} aria-hidden="true">
+            {label.name}
+          </span>
+        )}
       </div>
       {!compact && (
         <span className="truncate pl-[18px] text-[11px] leading-tight opacity-70">
