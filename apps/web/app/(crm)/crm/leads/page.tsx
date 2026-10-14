@@ -1,10 +1,23 @@
 import Link from 'next/link';
 import { requireCrm } from '@/crm/guard';
-import { loadLeadList, parseFilters, parseListParams, tagCounts, type ListOrder, type ListStatus } from '@/crm/board-data';
+import {
+  countLeads,
+  effectiveStatus,
+  LIST_LIMIT,
+  loadLeadList,
+  parseFilters,
+  parseListParams,
+  statusWhere,
+  tagCounts,
+  type ListOrder,
+  type ListStatus,
+} from '@/crm/board-data';
 import { can } from '@/lib/permissions';
+import { instantDateBR, clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
 import { colorClasses } from '@/crm/colors';
 import { formatCents, formatDue, SOURCE_LABEL } from '@/crm/format';
+import { hasPeriod } from '@/crm/period';
 import { CrmToolbar } from '../_components/toolbar';
 
 export const metadata = { title: 'Leads · DreamClin' };
@@ -28,8 +41,15 @@ export default async function LeadsPage({
   const ctx = await requireCrm('crm');
   const sp = await searchParams;
   const filters = parseFilters(sp);
-  const { status, order } = parseListParams(sp);
-  const [basics, leads, counts] = await Promise.all([loadCrmBasics(ctx), loadLeadList(ctx, filters, status, order), tagCounts(ctx)]);
+  const { status: pedida, order } = parseListParams(sp);
+  const status = effectiveStatus(pedida, filters);
+  const porFechamento = filters.periodo.field === 'fechado' && hasPeriod(filters.periodo);
+  const [basics, leads, total, counts] = await Promise.all([
+    loadCrmBasics(ctx),
+    loadLeadList(ctx, filters, status, order),
+    countLeads(ctx, filters, statusWhere(status)),
+    tagCounts(ctx),
+  ]);
 
   const link = (changes: Record<string, string>) => {
     const q = new URLSearchParams();
@@ -59,6 +79,8 @@ export default async function LeadsPage({
     </th>
   );
 
+  const mostraFechado = status !== 'abertos';
+
   return (
     <div className="flex h-full flex-col gap-4 pb-6">
       <CrmToolbar
@@ -68,25 +90,36 @@ export default async function LeadsPage({
         team={basics.team}
         procedures={basics.procedures}
         meId={ctx.userId}
-        summary={{ count: leads.length, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
+        summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
         pipelines={basics.pipelines}
         canConfig={can(ctx.role, 'crm_config')}
+        today={clinicToday()}
       />
 
-      <div className="px-4 sm:px-6">
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6">
         <nav aria-label="Situação" className="segmented">
           {SITUACOES.map((s) => (
-            <Link key={s.key} href={link({ situacao: s.key === 'abertos' ? '' : s.key })} aria-current={status === s.key ? 'page' : undefined} className="segmented-item">
+            <Link
+              key={s.key}
+              // Abertos não têm data de fechamento: o período volta a contar pela entrada.
+              href={link({ situacao: s.key === 'abertos' ? '' : s.key, ...(s.key === 'abertos' && porFechamento ? { data: '' } : {}) })}
+              aria-current={status === s.key ? 'page' : undefined}
+              className="segmented-item"
+            >
               {s.label}
             </Link>
           ))}
         </nav>
+        {porFechamento && status === 'todos' && (
+          <p className="text-xs text-muted-foreground">Ganhos e perdidos no período.</p>
+        )}
       </div>
 
       <div className="mx-4 overflow-x-auto rounded-xl border border-border bg-surface sm:mx-6">
         <table className="w-full min-w-[760px] text-sm">
           <caption className="sr-only">
-            {leads.length} leads {SITUACOES.find((s) => s.key === status)?.label.toLowerCase()}
+            {total} leads {SITUACOES.find((s) => s.key === status)?.label.toLowerCase()}
+            {leads.length < total ? `, mostrando ${leads.length}` : ''}
           </caption>
           <thead className="border-b border-border bg-surface-alt/50">
             <tr>
@@ -96,7 +129,8 @@ export default async function LeadsPage({
               <Th label="Valor" by="valor" />
               <Th label="Próxima ação" />
               <Th label="Origem" />
-              <Th label="Criado" by="recentes" />
+              <Th label="Criado em" by="recentes" />
+              {mostraFechado && <Th label="Fechado em" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -133,12 +167,23 @@ export default async function LeadsPage({
                   )}
                 </td>
                 <td className="px-3 py-2.5">{SOURCE_LABEL[l.source] ?? l.source}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{formatDue(new Date(l.createdAt))}</td>
+                <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{instantDateBR(l.createdAt)}</td>
+                {mostraFechado && (
+                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+                    {l.wonAt ? instantDateBR(l.wonAt) : l.lostAt ? instantDateBR(l.lostAt) : '—'}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
         {leads.length === 0 && <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhum lead com esses filtros.</p>}
+        {leads.length < total && (
+          <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            Mostrando os {LIST_LIMIT.toLocaleString('pt-BR')} primeiros de {total.toLocaleString('pt-BR')} leads. Para ver os outros, filtre
+            por período, etapa ou tags.
+          </p>
+        )}
       </div>
     </div>
   );
