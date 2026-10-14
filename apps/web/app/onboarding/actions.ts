@@ -2,6 +2,7 @@
 
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
+import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -175,6 +176,15 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
 
   const clerk = await clerkClient();
   const u = await clerk.users.getUser(userId);
+
+  // Mesmo e-mail confirmado, código novo no Clerk (troca da instância de
+  // desenvolvimento para a de produção, ou conta recriada): volta para a clínica dela.
+  const religada = await relinkByVerifiedEmail(
+    userId,
+    u.emailAddresses.filter((e) => e.verification?.status === 'verified').map((e) => e.emailAddress),
+  );
+  if (religada) return religada;
+
   const emailPrincipal =
     u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ??
     u.emailAddresses[0]?.emailAddress ??
