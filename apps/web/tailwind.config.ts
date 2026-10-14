@@ -12,12 +12,18 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-geist-sans)'],
+        sans: ['var(--font-inter)'],
         mono: ['var(--font-geist-mono)'],
       },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        heading: 'hsl(var(--heading))',
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          navy: 'hsl(var(--brand-navy))',
+          mint: 'hsl(var(--brand-mint))',
+        },
         surface: {
           DEFAULT: 'hsl(var(--surface))',
           alt: 'hsl(var(--surface-alt))',

@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ptBR } from '@clerk/localizations';
-import { GeistSans } from 'geist/font/sans';
+import { Inter } from 'next/font/google';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
+
+// A fonte do manual de marca.
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: {
@@ -36,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }}
           />
         </head>
-        <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
+        <body className={`${inter.variable} ${GeistMono.variable} font-sans antialiased`}>
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:outline-none"

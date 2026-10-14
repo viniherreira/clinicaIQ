@@ -47,7 +47,7 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
       </main>
 
       <footer className="mx-auto flex max-w-3xl items-center justify-center gap-2 px-4 pb-8 text-xs text-muted-foreground">
-        <LogoMark size="sm" />
+        <LogoMark size="xs" />
         <span>Agendamento por DreamClin</span>
         <span aria-hidden="true">·</span>
         <a href="/privacidade" className="underline underline-offset-2 hover:text-foreground">

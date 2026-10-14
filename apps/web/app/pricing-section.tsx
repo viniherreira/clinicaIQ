@@ -6,11 +6,8 @@
  * kind of mismatch that costs trust exactly when someone is deciding to pay.
  */
 import Link from 'next/link';
-import { Bricolage_Grotesque } from 'next/font/google';
 import { ArrowRight, Check, Sparkles } from 'lucide-react';
 import { prisma } from '@clinicaiq/db';
-
-const display = Bricolage_Grotesque({ subsets: ['latin'], display: 'swap' });
 
 const brl = (cents: number) =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -69,7 +66,7 @@ export async function Pricing() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Planos</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             Um preço que acompanha o tamanho da sua clínica
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
@@ -94,7 +91,7 @@ export async function Pricing() {
                     </span>
                   )}
 
-                  <h3 className={`${display.className} mt-1 text-xl font-bold tracking-tight`}>
+                  <h3 className="mt-1 text-xl font-bold tracking-tight">
                     {plan.name}
                   </h3>
                   <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-muted-foreground">
