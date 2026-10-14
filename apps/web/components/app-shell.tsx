@@ -78,7 +78,7 @@ export async function AppShell({
   const unidades = space === 'clinic' && me ? await getUnitContext(tenant.id, me.id) : null;
   const units =
     unidades?.multi && unidades.allowed.length > 1
-      ? { current: unidades.current.id, options: unidades.allowed.map((u) => ({ id: u.id, name: u.name })) }
+      ? { current: unidades.current.id, options: unidades.allowed.map((u) => ({ id: u.id, name: u.name, address: u.address })) }
       : null;
 
   return (

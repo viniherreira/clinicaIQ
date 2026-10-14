@@ -40,3 +40,15 @@ export function inUnit(itemUnitId: string | null | undefined, unitId: string, ma
 export function unitAppointmentWhere(unitId: string, mainId: string) {
   return unitId === mainId ? { OR: [{ unitId }, { unitId: null }] } : { unitId };
 }
+
+/**
+ * O nome curto de cada unidade: tira as palavras que todas têm em comum no
+ * começo. "Odontologia Michele Herreira Suzano" e "… Ferraz" viram "Suzano" e
+ * "Ferraz" no botão; o menu mostra o nome inteiro.
+ */
+export function shortUnitNames(names: string[]): string[] {
+  const palavras = names.map((n) => n.trim().split(/\s+/));
+  let comum = 0;
+  while (palavras.every((p) => p.length > comum + 1 && p[comum].toLowerCase() === palavras[0][comum].toLowerCase())) comum++;
+  return palavras.map((p, i) => (names.length > 1 && comum > 0 ? p.slice(comum).join(' ') : names[i]));
+}

@@ -311,8 +311,9 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
             </div>
           )}
 
-          {/* Grid / empty state */}
-          <div className="flex-1 overflow-auto overscroll-contain bg-surface">
+          {/* Grid / empty state. `isolate`: as camadas da grade (cabeçalhos fixos) ficam
+              aqui dentro e não passam por cima do menu da unidade no topo. */}
+          <div className="isolate flex-1 overflow-auto overscroll-contain bg-surface">
             {hasProfessionals && view === 'month' ? (
               <MonthGrid
                 dateStr={currentDate}
@@ -324,6 +325,18 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
               />
             ) : hasProfessionals ? (
               <>
+                {data.unit.noneHere && (
+                  <div role="note" className="m-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      Ninguém tem dia de atendimento marcado em <strong className="font-semibold">{data.unit.name}</strong>. A agenda mostra todos os
+                      profissionais; para mostrar só quem atende aqui, marque a unidade de cada dia no horário do profissional.
+                    </span>
+                    <Link href="/configuracoes#profissionais" className="font-medium text-primary underline underline-offset-2">
+                      Marcar horários
+                    </Link>
+                  </div>
+                )}
                 <CalendarGrid
                   dateStr={currentDate}
                   view={view === 'month' ? 'week' : view}
@@ -350,7 +363,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                   Cadastre os profissionais da clínica para começar a agendar. Cada um recebe uma cor para identificação na agenda.
                 </p>
                 <Link
-                  href="/configuracoes"
+                  href="/configuracoes#profissionais"
                   className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />

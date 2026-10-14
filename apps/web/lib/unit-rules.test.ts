@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedUnits, inUnit, mainUnit, pickUnit, unitAppointmentWhere } from './unit-rules';
+import { allowedUnits, inUnit, mainUnit, pickUnit, shortUnitNames, unitAppointmentWhere } from './unit-rules';
 
 const u = (id: string, order: number, active = true) => ({ id, name: id, order, active });
 const UNIDADES = [u('sul', 2), u('centro', 0), u('norte', 1, false)];
@@ -31,5 +31,13 @@ describe('unidades', () => {
     expect(inUnit('sul', 'sul', 'centro')).toBe(true);
     expect(unitAppointmentWhere('centro', 'centro')).toEqual({ OR: [{ unitId: 'centro' }, { unitId: null }] });
     expect(unitAppointmentWhere('sul', 'centro')).toEqual({ unitId: 'sul' });
+  });
+});
+
+describe('nome curto no seletor do topo', () => {
+  it('tira as palavras que todas têm em comum no começo', () => {
+    expect(shortUnitNames(['Odontologia Michele Herreira Suzano', 'Odontologia Michele Herreira Ferraz'])).toEqual(['Suzano', 'Ferraz']);
+    expect(shortUnitNames(['Clínica Sorriso', 'Clínica Sorriso Zona Sul'])).toEqual(['Sorriso', 'Sorriso Zona Sul']);
+    expect(shortUnitNames(['Centro', 'Zona Sul'])).toEqual(['Centro', 'Zona Sul']);
   });
 });
