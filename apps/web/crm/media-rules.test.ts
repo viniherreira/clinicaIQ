@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { checkChatMedia, formatBytes, safeFileName } from './media-rules';
+import { checkChatMedia, formatBytes, mediaResponseHeaders, safeFileName } from './media-rules';
+
+describe('mediaResponseHeaders', () => {
+  it.each([
+    ['text/html', 'pagina.html'],
+    ['image/svg+xml', 'logo.svg'],
+    ['application/xhtml+xml', 'x.xhtml'],
+    ['text/xml', 'x.xml'],
+    ['application/javascript', 'x.js'],
+    ['', 'sem-tipo'],
+    [null, 'nulo'],
+  ])('%s não abre na tela: baixa como binário', (tipo, nome) => {
+    const h = mediaResponseHeaders(tipo, nome);
+    expect(h['content-type']).toBe('application/octet-stream');
+    expect(h['content-disposition']).toMatch(/^attachment;/);
+    expect(h['content-security-policy']).toMatch(/^sandbox/);
+  });
+
+  it.each(['image/jpeg', 'image/png', 'audio/ogg; codecs=opus', 'video/mp4'])('%s abre na tela, com sandbox', (tipo) => {
+    const h = mediaResponseHeaders(tipo, 'a');
+    expect(h['content-type']).toBe(tipo.split(';')[0]);
+    expect(h['content-disposition']).toMatch(/^inline;/);
+    expect(h['content-security-policy']).toMatch(/^sandbox/);
+  });
+
+  it('PDF abre na tela sem sandbox (o Chrome não mostra PDF com sandbox)', () => {
+    const h = mediaResponseHeaders('application/pdf', 'exame.pdf');
+    expect(h['content-disposition']).toBe('inline; filename="exame.pdf"');
+    expect(h['content-security-policy']).toBeUndefined();
+  });
+
+  it('o nome não quebra o cabeçalho', () => {
+    expect(mediaResponseHeaders('image/png', 'a"; x=1\r\n.png')['content-disposition']).toBe('inline; filename="a-x1.png"');
+  });
+});
 
 const MB = 1024 * 1024;
 const f = (type: string, size: number, name = 'x') => ({ type, size, name });
