@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Check, Copy } from 'lucide-react';
 import {
   inviteTeamMember,
   removeTeamMember,
@@ -81,6 +82,8 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Link do último convite, para mandar por WhatsApp se o e-mail não chegar.
+  const [linkConvite, setLinkConvite] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('ativos');
   const [removendo, setRemovendo] = useState<TeamMember | null>(null);
   // O perfil do convite virou estado porque o SelectField nao e um <select>
@@ -118,6 +121,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
         return;
       }
       setRemovendo(null);
+      setLinkConvite(null);
       setAviso(`${nome} não tem mais acesso.`);
       router.refresh();
     });
@@ -129,11 +133,13 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
     const email = emailConvite.trim();
     setErro(null);
     setAviso(null);
+    setLinkConvite(null);
     startTransition(async () => {
       const r = await inviteTeamMember({ email, role: papelConvite });
       if (!r.ok) setErro(r.message ?? 'Não foi possível convidar.');
       else {
         setAviso(`Convite enviado para ${email}. Ele vale por alguns dias.`);
+        setLinkConvite(r.inviteUrl ?? null);
         setEmailConvite('');
         form.reset();
         router.refresh();
@@ -144,11 +150,13 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
   function reenviar(c: PendingInvite) {
     setErro(null);
     setAviso(null);
+    setLinkConvite(null);
     startTransition(async () => {
       const r = await inviteTeamMember({ email: c.email, role: c.role });
       if (!r.ok) setErro(r.message ?? 'Não foi possível reenviar.');
       else {
         setAviso(`Convite reenviado para ${c.email}. O link anterior deixou de valer.`);
+        setLinkConvite(r.inviteUrl ?? null);
         router.refresh();
       }
     });
@@ -197,6 +205,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
                 {aviso}
               </p>
             )}
+            {linkConvite && !erro && <LinkDoConvite url={linkConvite} />}
           </div>
         )}
 
@@ -427,6 +436,58 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
           onConfirmar={confirmarRemocao}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * O link do convite, para quem convidou mandar por WhatsApp.
+ *
+ * O e-mail sai pelo Clerk e às vezes não chega (filtro do provedor, atraso).
+ * Sem este link, a única saída era reenviar e torcer. O campo fica selecionável
+ * para quem não tem área de transferência liberada no navegador.
+ */
+function LinkDoConvite({ url }: { url: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sem permissão de área de transferência: o campo continua lá para copiar à mão.
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-border bg-surface-alt/70 px-3 py-2 text-sm">
+      <label htmlFor="convite-link" className="font-medium">
+        O e-mail não chegou? Mande este link por WhatsApp
+      </label>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          id="convite-link"
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs"
+        />
+        <button
+          type="button"
+          onClick={copiar}
+          className="btn-outline btn-sm inline-flex items-center gap-1.5"
+        >
+          {copiado ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+          {copiado ? 'Copiado' : 'Copiar link'}
+        </button>
+      </div>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        O link é pessoal: quem abrir cria a conta e entra na clínica. Mande só para a pessoa convidada.
+      </p>
+      <span role="status" className="sr-only">
+        {copiado ? 'Link copiado' : ''}
+      </span>
     </div>
   );
 }
