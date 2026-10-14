@@ -3,6 +3,8 @@
  * mostrar: telefone já mascarado, datas como texto ISO, nada cifrado.
  */
 
+import type { Period } from './period';
+
 export interface BoardStage {
   id: string;
   name: string;
@@ -56,8 +58,6 @@ export interface BoardLead {
   lostAt: string | null;
 }
 
-export type CreatedFilter = '' | 'hoje' | '7d' | '30d' | 'mes';
-
 export interface BoardFilters {
   q: string;
   /** 'all' (padrão), 'me' ou o id de alguém da equipe. */
@@ -69,7 +69,8 @@ export interface BoardFilters {
   /** Funil. No quadro é sempre o da tela; na lista, vazio = todos. */
   funil: string;
   etapa: string;
-  criado: CreatedFilter;
+  /** Criados ou fechados entre dois dias (crm/period.ts). */
+  periodo: Period;
   /** Valor de venda em reais, mínimo e máximo. */
   valorMin: number | null;
   valorMax: number | null;

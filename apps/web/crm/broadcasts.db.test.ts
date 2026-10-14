@@ -29,9 +29,14 @@ describe('transmissões: regras puras', async () => {
       excludeTagIds: [],
       sources: ['WHATSAPP'],
       assignedToIds: [],
-      createdFrom: '',
-      createdTo: '',
+      dateField: 'criado',
+      dateFrom: '',
+      dateTo: '',
       status: 'abertos',
+      task: '',
+      valueMin: null,
+      valueMax: null,
+      search: '',
     });
   });
 
