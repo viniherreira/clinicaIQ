@@ -68,6 +68,45 @@ export function safeFileName(name: string): string {
   return limpo || 'arquivo';
 }
 
+/**
+ * Tipos que o navegador pode abrir dentro do DreamClin sem rodar código.
+ * HTML, SVG e XML ficam de fora de propósito: abertos no nosso domínio, rodariam
+ * script com a sessão de quem clicou.
+ */
+const INLINE_SAFE = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+]);
+
+/**
+ * Cabeçalhos para entregar um arquivo de conversa.
+ *
+ * O tipo do arquivo vem de fora: quem manda o documento pelo WhatsApp escolhe o
+ * que a Meta repassa, e quem sobe pelo CRM escolhe o `type` do navegador. Um
+ * contato podia mandar um `.html` e, quando a recepção clicasse para abrir, o
+ * script rodaria logado no CRM. Fora da lista segura, o arquivo só baixa, como
+ * binário; e o `sandbox` impede script mesmo se algo escapar.
+ */
+export function mediaResponseHeaders(mimeType: string | null | undefined, fileName?: string): Record<string, string> {
+  const tipo = (mimeType || '').toLowerCase().split(';')[0].trim();
+  const seguro = INLINE_SAFE.has(tipo) || tipo.startsWith('audio/') || tipo.startsWith('video/');
+  const nome = safeFileName(fileName || 'arquivo');
+  return {
+    'content-type': seguro ? tipo : 'application/octet-stream',
+    'content-disposition': `${seguro ? 'inline' : 'attachment'}; filename="${nome}"`,
+    // O Chrome não abre PDF numa página com sandbox; o leitor de PDF dele já não
+    // roda script no nosso domínio.
+    ...(tipo === 'application/pdf'
+      ? {}
+      : { 'content-security-policy': "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'" }),
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff',
+  };
+}
+
 /** "1,2 MB", "340 KB". */
 export function formatBytes(n: number): string {
   if (n >= MB) return `${(n / MB).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;

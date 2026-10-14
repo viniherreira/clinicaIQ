@@ -182,6 +182,15 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
   const religada = await relinkByVerifiedEmail(
     userId,
     u.emailAddresses.filter((e) => e.verification?.status === 'verified').map((e) => e.emailAddress),
+    async (antigo) => {
+      try {
+        await clerk.users.getUser(antigo);
+        return true;
+      } catch (e) {
+        // Só "não encontrado" libera; qualquer outro erro conta como existente.
+        return (e as { status?: number }).status !== 404;
+      }
+    },
   );
   if (religada) return religada;
 

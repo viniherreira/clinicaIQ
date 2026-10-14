@@ -11,8 +11,19 @@ import { prisma } from '@clinicaiq/db';
  * Só com e-mail **verificado** pelo Clerk (a pessoa provou que é dona dele) e
  * só quando há exatamente uma pessoa ativa com esse e-mail. O código antigo
  * fica em `previousClerkUserId` e a troca vai para a auditoria.
+ *
+ * E só quando o usuário antigo **não existe mais** neste Clerk
+ * (`oldUserExists`). Sem isso, qualquer conta nova com o mesmo e-mail tomava o
+ * lugar de uma conta que continua valendo — por exemplo, alguém que perdeu o
+ * acesso ao e-mail e o recuperou, ou um e-mail reaproveitado pelo provedor —
+ * e o dono original perdia o login sem aviso. Na dúvida (erro ao consultar), a
+ * resposta deve ser "existe", e nada é religado.
  */
-export async function relinkByVerifiedEmail(clerkUserId: string, emails: string[]): Promise<string | null> {
+export async function relinkByVerifiedEmail(
+  clerkUserId: string,
+  emails: string[],
+  oldUserExists: (oldClerkUserId: string) => Promise<boolean>,
+): Promise<string | null> {
   const limpos = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
   if (limpos.length === 0) return null;
   const linhas = await prisma.user.findMany({
@@ -26,6 +37,7 @@ export async function relinkByVerifiedEmail(clerkUserId: string, emails: string[
   });
   if (linhas.length !== 1) return null;
   const [l] = linhas;
+  if (l.clerkUserId && (await oldUserExists(l.clerkUserId))) return null;
   await prisma.user.update({ where: { id: l.id }, data: { clerkUserId, previousClerkUserId: l.clerkUserId } });
   await prisma.auditLog.create({
     data: { tenantId: l.tenantId, userId: l.id, action: 'LOGIN_RELINKED', entity: 'User', entityId: l.id },
