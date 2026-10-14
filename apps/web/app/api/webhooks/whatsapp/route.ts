@@ -7,6 +7,8 @@ import {
 } from '@/lib/whatsapp';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
 import { directShapeAllowed, legacyWebhookAuthorized } from '@/lib/legacy-webhook-auth';
+import { secretMatches } from '@/lib/bearer';
+
 export const runtime = 'nodejs';
 
 /**
@@ -20,7 +22,7 @@ export async function GET(req: Request) {
   const token = url.searchParams.get('hub.verify_token');
   const challenge = url.searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && token && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && secretMatches(token, process.env.WHATSAPP_VERIFY_TOKEN)) {
     return new NextResponse(challenge ?? '', { status: 200 });
   }
   return new NextResponse('Forbidden', { status: 403 });

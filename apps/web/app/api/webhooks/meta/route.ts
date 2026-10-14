@@ -4,6 +4,7 @@ import { accountByPhoneNumberId } from '@/crm/cloud';
 import { applyChatStatus, ingestChat } from '@/crm/chat-ingest';
 import { afterInbound } from '@/crm/inbound';
 import { getTenantModules } from '@/lib/access';
+import { secretMatches } from '@/lib/bearer';
 import { applyAppointmentResponse, resolveAppointmentByPhone } from '@/lib/whatsapp';
 
 export const runtime = 'nodejs';
@@ -21,8 +22,10 @@ export const maxDuration = 60;
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const expected = process.env.META_WEBHOOK_VERIFY_TOKEN;
-  if (url.searchParams.get('hub.mode') === 'subscribe' && expected && url.searchParams.get('hub.verify_token') === expected) {
+  if (
+    url.searchParams.get('hub.mode') === 'subscribe' &&
+    secretMatches(url.searchParams.get('hub.verify_token'), process.env.META_WEBHOOK_VERIFY_TOKEN)
+  ) {
     return new NextResponse(url.searchParams.get('hub.challenge') ?? '', { status: 200 });
   }
   return new NextResponse('Forbidden', { status: 403 });
