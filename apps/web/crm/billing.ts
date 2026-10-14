@@ -64,8 +64,8 @@ export function subscriptionValueCents(input: BillingInput): number {
 
 /** O texto que aparece na fatura do Asaas. */
 export function subscriptionDescription(planName: string, status: CrmStatus, seats: number): string {
-  if (status !== 'paid' || seats <= 0) return `ClinicaIQ — plano ${planName}`;
-  return `ClinicaIQ — plano ${planName} + CRM (${seats} ${seats === 1 ? 'usuário' : 'usuários'})`;
+  if (status !== 'paid' || seats <= 0) return `DreamClin — plano ${planName}`;
+  return `DreamClin — plano ${planName} + CRM (${seats} ${seats === 1 ? 'usuário' : 'usuários'})`;
 }
 
 /** Dias que faltam no teste (arredondado para cima), ou null fora do teste. */

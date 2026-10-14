@@ -5,7 +5,7 @@ import { SetupChecklist, type SetupStep } from './_components/setup-checklist';
 import { currentAccess } from '@/lib/guard';
 import { can } from '@/lib/permissions';
 
-export const metadata = { title: 'Dashboard · ClinicaIQ' };
+export const metadata = { title: 'Dashboard · DreamClin' };
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);

@@ -22,6 +22,7 @@ async function sincronizarCobranca(tenantId: string) {
   }
 }
 import { composeAddress } from '@/lib/address';
+import { siteUrl } from '@/lib/company';
 import { readOnlineBooking, type OnlineBookingSettings } from '@/lib/availability';
 import { documentError, formatDocument, onlyDigits } from '@/lib/document';
 import { contractTitle, DEFAULT_QUOTE_TERMS } from '@/lib/document-content';
@@ -870,7 +871,7 @@ export interface PendingInvite {
 
 /** O motivo, escrito uma vez só, porque aparece ao convidar e ao listar. */
 const CONTA_EM_OUTRA_CLINICA =
-  'Este e-mail já tem uma conta ClinicaIQ em outra clínica. Cada conta pertence a uma clínica só — convide a pessoa por outro e-mail.';
+  'Este e-mail já tem uma conta DreamClin em outra clínica. Cada conta pertence a uma clínica só — convide a pessoa por outro e-mail.';
 
 /**
  * E-mails desta lista que já têm conta em outra clínica.
@@ -968,14 +969,14 @@ export async function inviteTeamMember(input: {
   // convite ficaria "aguardando resposta" sem ninguém entender o motivo.
   //
   // Isto revela a quem administra uma clínica que um e-mail já está cadastrado
-  // no ClinicaIQ. É informação de menos para valer a pena esconder, e o silêncio
+  // no DreamClin. É informação de menos para valer a pena esconder, e o silêncio
   // custava caro demais.
   const presos = await emailsPresosEmOutraClinica(tenantId, [email]);
   if (presos.size > 0) {
     return { ok: false, message: CONTA_EM_OUTRA_CLINICA };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clinica-iq-web.vercel.app';
+  const appUrl = siteUrl();
 
   let clerkInvitationId: string | null = null;
   try {

@@ -2,7 +2,7 @@ import { requireCrm } from '@/crm/guard';
 import { ensureDefaultPipeline } from '@/crm/pipeline';
 import { CrmSettings, type SettingsTab } from './_components/crm-settings';
 
-export const metadata = { title: 'Configurações do CRM · ClinicaIQ' };
+export const metadata = { title: 'Configurações do CRM · DreamClin' };
 
 const ABAS: readonly SettingsTab[] = ['funis', 'tags', 'motivos', 'respostas'];
 

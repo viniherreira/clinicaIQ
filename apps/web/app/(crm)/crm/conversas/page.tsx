@@ -5,7 +5,7 @@ import { loadCrmBasics } from '@/crm/page-data';
 import { can } from '@/lib/permissions';
 import { Inbox } from './_components/inbox';
 
-export const metadata = { title: 'Conversas · ClinicaIQ' };
+export const metadata = { title: 'Conversas · DreamClin' };
 
 /**
  * A caixa de conversas do WhatsApp, como os chats do Kommo: lista à esquerda,

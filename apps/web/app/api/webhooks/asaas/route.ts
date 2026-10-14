@@ -7,7 +7,7 @@ import { bearerMatches, secretMatches } from '@/lib/bearer';
  * Asaas payment webhook.
  *
  * This is what turns a PIX that landed at 22h on a Sunday into a clinic that
- * can use its agenda on Monday morning without anyone at ClinicaIQ touching
+ * can use its agenda on Monday morning without anyone at DreamClin touching
  * anything.
  */
 

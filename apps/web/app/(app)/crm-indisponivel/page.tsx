@@ -7,7 +7,7 @@ import { loadCrmAddon } from '@/crm/addon';
 import { formatCents } from '@/crm/format';
 import { CrmTurnOnButton } from '@/components/crm-turn-on-button';
 
-export const metadata = { title: 'CRM · ClinicaIQ' };
+export const metadata = { title: 'CRM · DreamClin' };
 
 /**
  * Onde para quem abre /crm sem poder entrar. Dois casos:
@@ -45,7 +45,7 @@ export default async function CrmIndisponivelPage() {
   const preco = formatCents(addon?.seatPriceCents ?? 3900);
 
   return (
-    <Cartao icone={<KanbanSquare className="h-6 w-6 text-muted-foreground" aria-hidden="true" />} titulo="Conheça o CRM do ClinicaIQ">
+    <Cartao icone={<KanbanSquare className="h-6 w-6 text-muted-foreground" aria-hidden="true" />} titulo="Conheça o CRM do DreamClin">
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         Acompanhe cada interessado do primeiro contato até o orçamento aprovado, com o funil andando sozinho
         conforme a recepção usa a agenda. {preco} por usuário por mês, somado à mensalidade.

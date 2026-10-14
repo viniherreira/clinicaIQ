@@ -20,7 +20,7 @@ import { CrmSeatsSection } from '@/components/crm-seats-section';
 
 import { requireCapability } from '@/lib/guard';
 import { can } from '@/lib/permissions';
-export const metadata = { title: 'Configurações · ClinicaIQ' };
+export const metadata = { title: 'Configurações · DreamClin' };
 
 export default async function ConfiguracoesPage() {
   const { role } = await requireCapability('configuracoes');

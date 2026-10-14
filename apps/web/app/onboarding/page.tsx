@@ -3,7 +3,7 @@ import { acessoEncerrado, joinFromInviteIfAny } from './actions';
 import { CreateClinicForm } from './_components/create-clinic-form';
 import { AcessoEncerrado } from './_components/acesso-encerrado';
 
-export const metadata = { title: 'Configure sua clínica · ClinicaIQ' };
+export const metadata = { title: 'Configure sua clínica · DreamClin' };
 
 /**
  * Três pessoas chegam nesta rota por motivos diferentes.

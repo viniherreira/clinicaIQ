@@ -6,7 +6,7 @@ import { formatDue } from '@/crm/format';
 import { can } from '@/lib/permissions';
 import { BROADCAST_STATUS, StatsGrid } from './_components/stats';
 
-export const metadata = { title: 'Transmissões · ClinicaIQ' };
+export const metadata = { title: 'Transmissões · DreamClin' };
 
 /** As transmissões da clínica, mais novas em cima, com os números de cada uma. */
 export default async function TransmissoesPage() {

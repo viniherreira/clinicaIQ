@@ -1,5 +1,5 @@
 /**
- * Message templates for the three transactional flows ClinicaIQ sends.
+ * Message templates for the three transactional flows DreamClin sends.
  *
  * The `name` constants mirror the template names that must be registered and
  * approved in the Meta WhatsApp Manager (see docs/WHATSAPP_SETUP.md). The body

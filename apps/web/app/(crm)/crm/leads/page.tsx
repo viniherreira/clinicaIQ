@@ -7,7 +7,7 @@ import { colorClasses } from '@/crm/colors';
 import { formatCents, formatDue, SOURCE_LABEL } from '@/crm/format';
 import { CrmToolbar } from '../_components/toolbar';
 
-export const metadata = { title: 'Leads · ClinicaIQ' };
+export const metadata = { title: 'Leads · DreamClin' };
 
 const SITUACOES: { key: ListStatus; label: string }[] = [
   { key: 'abertos', label: 'Abertos' },

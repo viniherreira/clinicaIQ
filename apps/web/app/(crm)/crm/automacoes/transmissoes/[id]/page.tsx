@@ -8,7 +8,7 @@ import { can } from '@/lib/permissions';
 import { BROADCAST_STATUS, StatsGrid } from '../_components/stats';
 import { AutoRefresh, CancelBroadcast } from '../_components/detail-controls';
 
-export const metadata = { title: 'Transmissão · ClinicaIQ' };
+export const metadata = { title: 'Transmissão · DreamClin' };
 
 const MSG_STATUS: Record<string, string> = {
   PENDING: 'Na fila',

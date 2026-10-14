@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <div className="relative flex items-center gap-3">
           <LogoMark size="lg" variant="glass" />
-          <span className="text-lg font-semibold tracking-tight">ClinicaIQ</span>
+          <span className="text-lg font-semibold tracking-tight">DreamClin</span>
         </div>
 
         <div className="relative max-w-md">
@@ -46,7 +46,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </ul>
         </div>
 
-        <p className="relative text-xs text-white/60">© {new Date().getFullYear()} ClinicaIQ</p>
+        <p className="relative text-xs text-white/60">© {new Date().getFullYear()} DreamClin</p>
       </aside>
 
       {/* Form */}

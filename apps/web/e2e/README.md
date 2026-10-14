@@ -27,7 +27,7 @@ O jeito mais simples no Windows, sem instalar nada, é um projeto gratuito no Su
 ### 2. Clerk de desenvolvimento
 
 1. No painel do Clerk (https://dashboard.clerk.com), entre na aplicação do
-   ClinicaIQ e confira se está na instância **Development**, no seletor do topo.
+   DreamClin e confira se está na instância **Development**, no seletor do topo.
 2. Em **Configure → API keys**, copie a **Publishable key** (`pk_test_…`) e a
    **Secret key** (`sk_test_…`).
 3. Em **Users → Create user**, crie a conta de teste com um e-mail que tenha

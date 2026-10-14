@@ -8,7 +8,7 @@ import { audienceFromSearch } from '@/crm/audience';
 import { clinicToday } from '@/lib/tz';
 import { BroadcastForm } from '../_components/broadcast-form';
 
-export const metadata = { title: 'Nova transmissão · ClinicaIQ' };
+export const metadata = { title: 'Nova transmissão · DreamClin' };
 
 /**
  * Nova transmissão. Vindo do funil ou da lista ("Enviar transmissão para estes

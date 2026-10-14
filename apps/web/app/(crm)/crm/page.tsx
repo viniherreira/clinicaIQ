@@ -8,7 +8,7 @@ import { Board } from './_components/board';
 import { CrmToolbar } from './_components/toolbar';
 import { PipelineEditor } from './_components/pipeline-editor';
 
-export const metadata = { title: 'Funil · ClinicaIQ' };
+export const metadata = { title: 'Funil · DreamClin' };
 
 export default async function FunilPage({
   searchParams,

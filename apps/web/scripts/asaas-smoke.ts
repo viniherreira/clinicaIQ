@@ -30,14 +30,14 @@ async function main() {
   console.log('1. criando cliente…');
   const customerId = await ensureCustomer({
     tenantId,
-    name: 'Clínica Teste ClinicaIQ',
+    name: 'Clínica Teste DreamClin',
     cpfCnpj: '24971563792', // CPF válido de teste, aceito pelo sandbox
-    email: 'teste@clinicaiq.com.br',
+    email: 'teste@dreamclin.com',
   });
   console.log(`   customer: ${customerId}`);
 
   console.log('2. confirmando que não duplica…');
-  const again = await ensureCustomer({ tenantId, name: 'Clínica Teste ClinicaIQ' });
+  const again = await ensureCustomer({ tenantId, name: 'Clínica Teste DreamClin' });
   console.log(`   ${again === customerId ? 'OK — reaproveitou o mesmo cliente' : `FALHOU — criou ${again}`}`);
 
   console.log('3. criando assinatura mensal…');

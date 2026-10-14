@@ -30,7 +30,7 @@ export function CrmRail({
     <nav aria-label="Menu principal" className="hidden w-[92px] shrink-0 flex-col bg-rail text-rail-foreground md:flex print:!hidden">
       <div className="flex h-16 items-center justify-center">
         <LogoMark size="md" />
-        <span className="sr-only">ClinicaIQ CRM</span>
+        <span className="sr-only">DreamClin CRM</span>
       </div>
 
       <ul className="flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-3">

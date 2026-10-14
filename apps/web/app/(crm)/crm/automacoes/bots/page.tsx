@@ -5,7 +5,7 @@ import { fromSteps } from '@/crm/bot-form';
 import { BotsTab } from '../../configuracoes/_components/bots-tab';
 import { CaptureRules } from '../../configuracoes/_components/capture-rules';
 
-export const metadata = { title: 'Bots · ClinicaIQ' };
+export const metadata = { title: 'Bots · DreamClin' };
 
 /**
  * Os robôs de atendimento do WhatsApp (menu de opções, palavra-chave e o que

@@ -304,7 +304,7 @@ export async function sendTestMessage(rawPhone: string): Promise<TestMessageStat
   const result = await gateway.sendMessage({
     to: digits.startsWith('55') ? digits : `55${digits}`,
     body:
-      `✅ Teste do ClinicaIQ\n\n` +
+      `✅ Teste do DreamClin\n\n` +
       `Se você recebeu esta mensagem, o WhatsApp da *${tenant?.name ?? 'sua clínica'}* ` +
       `está conectado e pronto para enviar confirmações de agendamento.`,
   });

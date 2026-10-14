@@ -6,7 +6,7 @@ import { decryptPhone } from '@/crm/phone';
 import { PatientForm } from '@/app/(app)/pacientes/_components/patient-form';
 import { linkAfterCreateAction, type ConvertIntent } from '../actions';
 
-export const metadata = { title: 'Converter em paciente · ClinicaIQ' };
+export const metadata = { title: 'Converter em paciente · DreamClin' };
 
 /**
  * Cadastro de paciente a partir de um lead: o formulário de sempre, já com

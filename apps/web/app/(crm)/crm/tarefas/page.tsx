@@ -7,7 +7,7 @@ import { formatDue } from '@/crm/format';
 import { CompleteTaskButton } from './_components/complete-task-button';
 import { WhoFilter } from './_components/who-filter';
 
-export const metadata = { title: 'Tarefas · ClinicaIQ' };
+export const metadata = { title: 'Tarefas · DreamClin' };
 
 /**
  * O dia da recepção: o que venceu, o que vence hoje e o que vem depois.
