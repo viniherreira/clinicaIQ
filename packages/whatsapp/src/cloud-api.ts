@@ -240,7 +240,7 @@ export class CloudApi {
     });
   }
 
-  /** Inscreve o app do ClinicaIQ nos webhooks da conta da clínica. */
+  /** Inscreve o app do DreamClin nos webhooks da conta da clínica. */
   async subscribeApp(): Promise<void> {
     if (!this.cfg.wabaId) throw new Error('wabaId necessário');
     await this.call(`${this.cfg.wabaId}/subscribed_apps`, { method: 'POST', body: {} });

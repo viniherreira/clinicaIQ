@@ -42,7 +42,7 @@ function classifyTransportError(error: unknown): string {
 }
 
 /**
- * Talks to the ClinicaIQ WhatsApp gateway — the always-on service that holds one
+ * Talks to the DreamClin WhatsApp gateway — the always-on service that holds one
  * WhatsApp Web socket per clinic. Unlike the Meta Cloud API there are no
  * templates or 24h windows: whatever the clinic would type by hand, we send as
  * plain text from their own number.

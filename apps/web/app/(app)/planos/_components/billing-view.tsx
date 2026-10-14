@@ -191,7 +191,7 @@ function Cortesia({ data, embutido }: { data: BillingData; embutido: boolean }) 
               Cortesia ativa
             </h2>
             <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              Sua clínica tem acesso completo ao ClinicaIQ, sem mensalidade. Nenhuma cobrança é
+              Sua clínica tem acesso completo ao DreamClin, sem mensalidade. Nenhuma cobrança é
               gerada enquanto a cortesia estiver ativa.
             </p>
           </div>
@@ -390,7 +390,7 @@ export function BillingView({
                         : 'Acesso limitado'}
               </h2>
               <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                {data.access.warning ?? 'Tudo certo por aqui. Obrigado por usar o ClinicaIQ.'}
+                {data.access.warning ?? 'Tudo certo por aqui. Obrigado por usar o DreamClin.'}
               </p>
             </div>
           </div>

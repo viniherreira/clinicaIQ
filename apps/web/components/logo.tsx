@@ -1,5 +1,5 @@
 /**
- * ClinicaIQ brand mark: um dente branco num círculo azul-saúde.
+ * DreamClin brand mark: um dente branco num círculo azul-saúde.
  *
  * Desenhado em SVG a partir da arte da logo, e não usado como imagem: fica
  * nítido em qualquer tamanho, do ícone da aba ao cabeçalho da landing. O brilho
@@ -39,16 +39,16 @@ export function LogoMark({ size = 'md', variant = 'brand', className = '' }: Log
 }
 
 interface LogoWordmarkProps {
-  /** Use when rendered over the brand gradient (keeps "IQ" white). */
+  /** Use when rendered over the brand gradient (keeps "Clin" white). */
   onDark?: boolean;
   className?: string;
 }
 
-/** "ClinicaIQ" with the IQ in the brand color. Pass font classes via className. */
+/** "DreamClin" with "Clin" in the brand color. Pass font classes via className. */
 export function LogoWordmark({ onDark = false, className = '' }: LogoWordmarkProps) {
   return (
     <span className={className}>
-      Clinica<span className={onDark ? 'text-white/90' : 'text-primary'}>IQ</span>
+      Dream<span className={onDark ? 'text-white/90' : 'text-primary'}>Clin</span>
     </span>
   );
 }

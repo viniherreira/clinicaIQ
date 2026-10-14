@@ -1,6 +1,6 @@
-# ClinicaIQ
+# DreamClin (antes ClinicaIQ)
 
-SaaS B2B para clínicas odontológicas e estéticas no Brasil. Dois módulos: a
+O nome do produto é **DreamClin** (dreamclin.com); o repositório e os pacotes (`@clinicaiq/*`) mantêm o nome antigo, que ninguém vê. SaaS B2B para clínicas odontológicas e estéticas no Brasil. Dois módulos: a
 gestão da clínica (agenda, pacientes, orçamentos, financeiro) e o CRM de
 captação (funil de leads no estilo Kommo).
 

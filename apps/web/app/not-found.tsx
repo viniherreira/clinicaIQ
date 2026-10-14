@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { LogoMark } from '@/components/logo';
 
-export const metadata = { title: 'Página não encontrada · ClinicaIQ' };
+export const metadata = { title: 'Página não encontrada · DreamClin' };
 
 export default function NotFound() {
   return (

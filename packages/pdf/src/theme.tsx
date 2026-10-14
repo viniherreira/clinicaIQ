@@ -4,7 +4,7 @@ import { Font, Image, StyleSheet, Text, View } from '@react-pdf/renderer';
 /**
  * Peças comuns aos documentos da clínica: orçamento, contrato e recibo.
  *
- * O documento é da clínica, não do ClinicaIQ — por isso a paleta é sóbria (um
+ * O documento é da clínica, não do DreamClin — por isso a paleta é sóbria (um
  * azul-saúde de destaque sobre cinzas frios) e não há marca nossa em lugar
  * nenhum. O que identifica o papel é o logotipo e os dados de quem o emite.
  */

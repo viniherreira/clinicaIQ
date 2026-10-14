@@ -2,7 +2,7 @@ import { requireCrm } from '@/crm/guard';
 import { activeCloudAccount } from '@/crm/cloud';
 import { TemplatesManager } from './_components/templates-manager';
 
-export const metadata = { title: 'Modelos · ClinicaIQ' };
+export const metadata = { title: 'Modelos · DreamClin' };
 
 /**
  * Modelos de mensagem da API oficial. Fora das 24 horas depois da última

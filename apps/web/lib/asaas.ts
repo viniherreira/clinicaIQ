@@ -1,5 +1,5 @@
 /**
- * Asaas — cobrança das clínicas pelo ClinicaIQ.
+ * Asaas — cobrança das clínicas pelo DreamClin.
  *
  * Server-only. The API key grants full access to the account's money, so it
  * must never reach a Client Component or a bundle.
@@ -42,7 +42,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       'content-type': 'application/json',
       // Asaas asks integrations to identify themselves; without it some
       // accounts get throttled harder.
-      'User-Agent': 'ClinicaIQ',
+      'User-Agent': 'DreamClin',
       ...init?.headers,
     },
     cache: 'no-store',
@@ -173,7 +173,7 @@ export async function createSubscription(input: {
       value: input.priceCents / 100,
       nextDueDate: due.toISOString().slice(0, 10),
       cycle: 'MONTHLY',
-      description: `ClinicaIQ — plano ${input.planName}`,
+      description: `DreamClin — plano ${input.planName}`,
       externalReference: input.tenantId,
     }),
   });
@@ -188,7 +188,7 @@ export async function updateSubscriptionValue(
   priceCents: number,
   planName: string,
   /** Texto da fatura. Padrão: só o plano; com o CRM, "plano X + CRM (n usuários)". */
-  description: string = `ClinicaIQ — plano ${planName}`,
+  description: string = `DreamClin — plano ${planName}`,
 ): Promise<void> {
   await request(`/subscriptions/${subscriptionId}`, {
     method: 'PUT',

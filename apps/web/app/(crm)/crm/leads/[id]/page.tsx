@@ -14,7 +14,7 @@ import { LeadRightPane } from './_components/lead-chat';
 import { EraseLeadData } from './_components/erase-lead-data';
 
 export async function generateMetadata() {
-  return { title: 'Lead · ClinicaIQ' };
+  return { title: 'Lead · DreamClin' };
 }
 
 /** A ficha do lead, em duas metades: dados à esquerda; histórico e conversa à direita. */

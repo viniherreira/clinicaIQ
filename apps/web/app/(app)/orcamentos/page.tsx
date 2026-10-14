@@ -2,7 +2,7 @@ import { listQuotes } from './actions';
 import { QuotesView } from './_components/quotes-view';
 
 import { requireCapability } from '@/lib/guard';
-export const metadata = { title: 'Orçamentos · ClinicaIQ' };
+export const metadata = { title: 'Orçamentos · DreamClin' };
 
 export default async function OrcamentosPage({
   searchParams,

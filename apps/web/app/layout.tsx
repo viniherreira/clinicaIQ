@@ -7,8 +7,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'ClinicaIQ',
-    template: '%s | ClinicaIQ',
+    default: 'DreamClin',
+    template: '%s | DreamClin',
   },
   description: 'Gestão inteligente para clínicas odontológicas e estéticas',
   // Prova à Meta que o domínio dreamclin.com é nosso (verificação da empresa).

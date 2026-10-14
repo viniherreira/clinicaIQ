@@ -119,7 +119,7 @@ app.post(
         await probeSend(
           tenantIdOf(req),
           phone,
-          typeof text === 'string' && text.trim() ? text : 'Teste de diagnóstico ClinicaIQ.',
+          typeof text === 'string' && text.trim() ? text : 'Teste de diagnóstico DreamClin.',
         ),
       );
     } catch (e) {

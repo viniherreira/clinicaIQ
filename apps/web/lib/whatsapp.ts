@@ -20,6 +20,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { normalizeBrazilPhone } from './phone';
+import { siteUrl } from './company';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,9 +41,7 @@ function safeDecrypt(ciphertext: string | null | undefined, tenantId: string): s
 
 export { normalizeBrazilPhone };
 
-function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
-}
+const appUrl = siteUrl;
 
 /** Meta only accepts business-initiated messages via pre-approved templates.
  *  While templates aren't approved yet (or when testing inside a 24h session

@@ -8,7 +8,7 @@ export const maxDuration = 30;
 
 /**
  * Abre a foto, o áudio ou o documento de uma mensagem. O que a equipe mandou
- * está guardado no ClinicaIQ (`crm/media-store.ts`); o que chegou pela API
+ * está guardado no DreamClin (`crm/media-store.ts`); o que chegou pela API
  * oficial é buscado na Meta na hora e repassado, sem guardar. Mesmas travas do CRM.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

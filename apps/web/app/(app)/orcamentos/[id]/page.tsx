@@ -11,7 +11,7 @@ import { describePayment } from '@/lib/payment-terms';
 import { getReceiptMethods } from '@/lib/clinic-settings';
 import { wallDateBR } from '@/lib/tz';
 
-export const metadata = { title: 'Orçamento · ClinicaIQ' };
+export const metadata = { title: 'Orçamento · DreamClin' };
 
 export default async function OrcamentoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Mesma régua da listagem: orçamento é dinheiro, e esta página leva ao PDF e

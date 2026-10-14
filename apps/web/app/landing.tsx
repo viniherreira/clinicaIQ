@@ -1,5 +1,5 @@
 /**
- * ClinicaIQ marketing landing page (rendered at `/` for signed-out visitors).
+ * DreamClin marketing landing page (rendered at `/` for signed-out visitors).
  *
  * Design direction: clean professional health-SaaS with warmth and color. The
  * hero pairs a real photo (Pexels, free commercial license) of a smiling
@@ -37,7 +37,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="ClinicaIQ — página inicial">
+        <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin — página inicial">
           <LogoMark size="md" />
           <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
         </Link>
@@ -378,7 +378,7 @@ function Features() {
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
           <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
-            O que sua clínica ganha com o ClinicaIQ
+            O que sua clínica ganha com o DreamClin
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
             Cada módulo foi desenhado para o trabalho real de uma clínica: a recepção
@@ -420,7 +420,7 @@ function Differentiators() {
       title: 'Agendar deixa de ser malabarismo',
       points: ['Busca de paciente instantânea', 'Conflito de horário avisado na hora', 'Confirmação vai sozinha pelo WhatsApp'],
       chip: 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
-      accent: 'text-sky-600 dark:text-sky-400',
+      accent: 'text-sky-700 dark:text-sky-400',
     },
     {
       icon: Smile,
@@ -428,7 +428,7 @@ function Differentiators() {
       title: 'O prontuário na ponta dos dedos',
       points: ['Odontograma interativo por dente', 'Histórico completo de atendimentos', 'Agenda do dia com um olhar'],
       chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
-      accent: 'text-emerald-600 dark:text-emerald-400',
+      accent: 'text-emerald-700 dark:text-emerald-400',
     },
     {
       icon: Users,
@@ -448,7 +448,7 @@ function Differentiators() {
             Um sistema, três pessoas felizes
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
-            Sistemas de clínica costumam servir bem só uma pessoa. O ClinicaIQ foi
+            Sistemas de clínica costumam servir bem só uma pessoa. O DreamClin foi
             desenhado para a recepção, para o profissional e para quem gerencia,
             tudo ao mesmo tempo.
           </p>
@@ -485,12 +485,12 @@ function Differentiators() {
 function FAQ() {
   const faqs = [
     {
-      q: 'Quanto custa o ClinicaIQ?',
-      a: 'Durante o acesso antecipado, o ClinicaIQ é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais. Você será avisado com antecedência, sem surpresa na fatura.',
+      q: 'Quanto custa o DreamClin?',
+      a: 'Durante o acesso antecipado, o DreamClin é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais. Você será avisado com antecedência, sem surpresa na fatura.',
     },
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Não. O ClinicaIQ roda direto no navegador, no computador da recepção, no tablet do consultório e no celular. Basta criar a conta e entrar.',
+      a: 'Não. O DreamClin roda direto no navegador, no computador da recepção, no tablet do consultório e no celular. Basta criar a conta e entrar.',
     },
     {
       q: 'Como funciona a confirmação pelo WhatsApp?',
@@ -620,7 +620,7 @@ function Footer() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
           <p>
-            © {new Date().getFullYear()} ClinicaIQ{companyLine() ? ` — ${companyLine()}` : ''}. Todos os direitos reservados.
+            © {new Date().getFullYear()} DreamClin{companyLine() ? ` — ${companyLine()}` : ''}. Todos os direitos reservados.
           </p>
           <nav aria-label="Páginas legais" className="flex items-center gap-4">
             <Link href="/privacidade" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Privacidade</Link>

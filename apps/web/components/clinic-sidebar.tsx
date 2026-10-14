@@ -88,7 +88,7 @@ export function ClinicSidebar({
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           <LogoMark size="md" />
           {!recolhido && <LogoWordmark className="text-[15px] font-semibold tracking-tight" />}
-          {recolhido && <span className="sr-only">ClinicaIQ</span>}
+          {recolhido && <span className="sr-only">DreamClin</span>}
         </Link>
         {!recolhido && (
           <button

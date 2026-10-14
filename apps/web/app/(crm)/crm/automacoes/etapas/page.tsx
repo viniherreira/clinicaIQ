@@ -2,7 +2,7 @@ import { requireCrm } from '@/crm/guard';
 import { loadCrmBasics } from '@/crm/page-data';
 import { AutomationsTab, type AutomationRow } from '../../configuracoes/_components/automations-tab';
 
-export const metadata = { title: 'Automações por etapa · ClinicaIQ' };
+export const metadata = { title: 'Automações por etapa · DreamClin' };
 
 /** O "funil digital" do Kommo: o que acontece sozinho quando o lead entra em cada etapa. */
 export default async function AutomacoesEtapasPage() {

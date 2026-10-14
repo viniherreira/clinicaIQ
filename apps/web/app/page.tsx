@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { LandingPage } from './landing';
 
 export const metadata: Metadata = {
-  title: 'ClinicaIQ — Gestão inteligente para clínicas odontológicas e estéticas',
+  title: 'DreamClin — Gestão inteligente para clínicas odontológicas e estéticas',
   description:
     'Agenda por profissional, confirmação automática pelo WhatsApp, orçamentos com link e PDF, ficha clínica com odontograma e financeiro claro. Sistema de gestão para clínicas, grátis no acesso antecipado.',
   keywords: [
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     'odontograma digital',
   ],
   openGraph: {
-    title: 'ClinicaIQ — Gestão inteligente para clínicas',
+    title: 'DreamClin — Gestão inteligente para clínicas',
     description:
       'Agenda, WhatsApp automático, orçamentos, odontograma e financeiro em um só lugar. Grátis no acesso antecipado.',
     locale: 'pt_BR',

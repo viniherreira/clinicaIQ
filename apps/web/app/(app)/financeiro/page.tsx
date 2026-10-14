@@ -9,7 +9,7 @@ import { FinanceFilters } from './_components/finance-filters';
 import { FinancialDetail } from './_components/financial-detail';
 
 import { requireCapability } from '@/lib/guard';
-export const metadata = { title: 'Financeiro · ClinicaIQ' };
+export const metadata = { title: 'Financeiro · DreamClin' };
 
 const TYPES: ReportType[] = ['recebimentos', 'orcamentos', 'agendamentos'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

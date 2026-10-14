@@ -3,7 +3,7 @@ import { ChevronLeft } from 'lucide-react';
 import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient } from '../actions';
 import { QuoteBuilder } from '../_components/quote-builder';
 
-export const metadata = { title: 'Novo orçamento · ClinicaIQ' };
+export const metadata = { title: 'Novo orçamento · DreamClin' };
 
 export default async function NovoOrcamentoPage({
   searchParams,

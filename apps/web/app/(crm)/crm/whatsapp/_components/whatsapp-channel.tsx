@@ -145,7 +145,7 @@ export function WhatsAppChannel({
             <EmbeddedSignup signup={signup} onDone={(r) => (r.ok ? (setAviso('API oficial conectada.'), router.refresh()) : setErro(r.message))} />
           ) : (
             <p className="mt-3 rounded-lg bg-surface-alt px-3 py-2 text-sm">
-              A conexão pela Meta fica disponível quando a Meta aprovar o ClinicaIQ como parceiro oficial. Enquanto isso, dá para testar
+              A conexão pela Meta fica disponível quando a Meta aprovar o DreamClin como parceiro oficial. Enquanto isso, dá para testar
               com o número de teste da Meta abaixo.
             </p>
           )}

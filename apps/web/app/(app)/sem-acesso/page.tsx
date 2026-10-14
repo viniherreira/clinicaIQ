@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 import { capabilityDeniedMessage, type Capability } from '@/lib/permissions';
 
-export const metadata = { title: 'Sem acesso · ClinicaIQ' };
+export const metadata = { title: 'Sem acesso · DreamClin' };
 
 const MODULOS: Record<string, Capability> = {
   agenda: 'agenda',

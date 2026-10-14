@@ -838,7 +838,7 @@ model CampaignRecipient {
   @@map("campaign_recipients")
 }
 
-// ─── Assinatura (cobrança do ClinicaIQ pelas clínicas) ───────────────────────
+// ─── Assinatura (cobrança do DreamClin pelas clínicas) ───────────────────────
 // Distinto de `Payment`, que é o dinheiro que o *paciente* paga para a clínica.
 
 enum PlanTier {

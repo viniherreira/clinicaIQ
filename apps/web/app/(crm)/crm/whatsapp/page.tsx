@@ -3,7 +3,7 @@ import { graphVersion, metaSignupConfigured } from '@/crm/cloud';
 import { can } from '@/lib/permissions';
 import { WhatsAppChannel } from './_components/whatsapp-channel';
 
-export const metadata = { title: 'WhatsApp do CRM · ClinicaIQ' };
+export const metadata = { title: 'WhatsApp do CRM · DreamClin' };
 
 /** O canal das conversas do CRM: QR code ou API oficial, e os modelos aprovados. */
 export default async function CrmWhatsAppPage() {

@@ -6,7 +6,7 @@ import { asPeriod, formatMinutes, PERIODS, pct } from '@/crm/dashboard-math';
 import { colorClasses } from '@/crm/colors';
 import { formatCents } from '@/crm/format';
 
-export const metadata = { title: 'Painel · ClinicaIQ' };
+export const metadata = { title: 'Painel · DreamClin' };
 
 /**
  * O Painel do CRM, como o do Kommo: o que entrou, o que fechou e como a equipe
