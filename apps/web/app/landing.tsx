@@ -551,9 +551,10 @@ function FinalCTA() {
           em menos de 5 minutos. Sem cartão, sem fidelidade.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {/* O degradê não muda com o tema, então o teal do botão também não. */}
           <Link
             href="/sign-up"
-            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-primary shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-teal-700 shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Começar agora, é grátis
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
