@@ -30,7 +30,7 @@ function features(plan: PlanRow): string[] {
   return [
     plan.maxProfessionals === null
       ? 'Profissionais ilimitados'
-      : `${plan.maxProfessionals} profissional${plan.maxProfessionals > 1 ? 'is' : ''}`,
+      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`,
     'Agenda, pacientes e prontuário',
     'Orçamentos em PDF',
     plan.whatsappEnabled ? 'Confirmação por WhatsApp' : null,
