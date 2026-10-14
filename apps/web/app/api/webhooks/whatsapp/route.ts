@@ -6,6 +6,8 @@ import {
   resolveAppointmentByPhone,
 } from '@/lib/whatsapp';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
+import { directShapeAllowed, legacyWebhookAuthorized } from '@/lib/legacy-webhook-auth';
+import { secretMatches } from '@/lib/bearer';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +22,7 @@ export async function GET(req: Request) {
   const token = url.searchParams.get('hub.verify_token');
   const challenge = url.searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && token && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && secretMatches(token, process.env.WHATSAPP_VERIFY_TOKEN)) {
     return new NextResponse(challenge ?? '', { status: 200 });
   }
   return new NextResponse('Forbidden', { status: 403 });
@@ -33,6 +35,9 @@ export async function GET(req: Request) {
  * simplified mock shape `{ appointmentId, buttonReplyId | text }` used by the
  * dev mock flow and tests. Always returns 200 quickly so the provider does not
  * retry on transient app errors.
+ *
+ * Em produção só aceita o que a Meta assinou, e o atalho por id de agendamento
+ * não existe (ver `lib/legacy-webhook-auth.ts`).
  */
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
@@ -44,9 +49,14 @@ export async function POST(req: Request) {
     );
   }
 
+  const body = await req.text();
+  if (!legacyWebhookAuthorized(body, req.headers.get('x-hub-signature-256'), process.env)) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
   let raw: unknown;
   try {
-    raw = await req.json();
+    raw = JSON.parse(body);
   } catch {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
@@ -54,7 +64,7 @@ export async function POST(req: Request) {
   try {
     // Direct mock/test shape — lets dev simulate a patient response.
     const direct = raw as { appointmentId?: string; buttonReplyId?: string; text?: string };
-    if (direct.appointmentId && (direct.buttonReplyId || direct.text)) {
+    if (directShapeAllowed(process.env) && direct.appointmentId && (direct.buttonReplyId || direct.text)) {
       await applyAppointmentResponse(direct.appointmentId, {
         buttonReplyId: direct.buttonReplyId,
         text: direct.text,

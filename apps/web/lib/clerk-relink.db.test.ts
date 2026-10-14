@@ -27,8 +27,11 @@ describe.skipIf(!process.env.DATABASE_URL)('religar login pelo e-mail confirmado
     await prisma.$disconnect();
   });
 
+  /** O usuário antigo não existe mais neste Clerk (troca de instância). */
+  const sumiu = async () => false;
+
   it('mesmo e-mail (sem diferença de maiúscula) com usuário novo volta para a clínica dela', async () => {
-    expect(await relinkByVerifiedEmail(`user_prod_${s}`, [`dona-${s}@teste.local`])).toBe(tenant.id);
+    expect(await relinkByVerifiedEmail(`user_prod_${s}`, [`dona-${s}@teste.local`], sumiu)).toBe(tenant.id);
     const linha = await prisma.user.findUniqueOrThrow({ where: { id: dona.id } });
     expect(linha.clerkUserId).toBe(`user_prod_${s}`);
     expect(linha.previousClerkUserId).toBe(`user_dev_${s}`);
@@ -36,9 +39,23 @@ describe.skipIf(!process.env.DATABASE_URL)('religar login pelo e-mail confirmado
   });
 
   it('quem foi removido da equipe não volta pelo e-mail; e-mail desconhecido não faz nada', async () => {
-    expect(await relinkByVerifiedEmail(`user_x_${s}`, [`saiu-${s}@teste.local`])).toBeNull();
+    expect(await relinkByVerifiedEmail(`user_x_${s}`, [`saiu-${s}@teste.local`], sumiu)).toBeNull();
     expect((await prisma.user.findUniqueOrThrow({ where: { id: saiu.id } })).clerkUserId).toBeNull();
-    expect(await relinkByVerifiedEmail(`user_y_${s}`, [`ninguem-${s}@teste.local`])).toBeNull();
-    expect(await relinkByVerifiedEmail(`user_z_${s}`, [])).toBeNull();
+    expect(await relinkByVerifiedEmail(`user_y_${s}`, [`ninguem-${s}@teste.local`], sumiu)).toBeNull();
+    expect(await relinkByVerifiedEmail(`user_z_${s}`, [], sumiu)).toBeNull();
+  });
+
+  it('não toma o lugar de uma conta que continua existindo no Clerk', async () => {
+    const ativa = await prisma.user.create({
+      data: { tenantId: tenant.id, name: 'Ativa', email: `ativa-${s}@teste.local`, role: 'RECEPTIONIST', clerkUserId: `user_vivo_${s}` },
+    });
+    const consultados: string[] = [];
+    const existe = async (id: string) => {
+      consultados.push(id);
+      return true;
+    };
+    expect(await relinkByVerifiedEmail(`user_novo_${s}`, [`ativa-${s}@teste.local`], existe)).toBeNull();
+    expect(consultados).toEqual([`user_vivo_${s}`]);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: ativa.id } })).clerkUserId).toBe(`user_vivo_${s}`);
   });
 });

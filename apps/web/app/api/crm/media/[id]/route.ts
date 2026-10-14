@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { guardCrmAction } from '@/crm/guard';
 import { activeCloudAccount, cloudClient } from '@/crm/cloud';
 import { fileNameOf, isStoredRef, readChatMedia } from '@/crm/media-store';
+import { mediaResponseHeaders } from '@/crm/media-rules';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -23,12 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const file = await readChatMedia(msg.mediaRef);
     if (!file) return NextResponse.json({ error: 'O arquivo não está mais disponível.' }, { status: 410 });
     return new NextResponse(file.bytes, {
-      headers: {
-        'content-type': msg.mimeType || file.contentType,
-        'content-disposition': `inline; filename="${fileNameOf(msg.mediaRef)}"`,
-        'cache-control': 'private, no-store',
-        'x-content-type-options': 'nosniff',
-      },
+      headers: mediaResponseHeaders(msg.mimeType || file.contentType, fileNameOf(msg.mediaRef)),
     });
   }
 
@@ -39,12 +35,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const api = cloudClient(account);
     const info = await api.getMediaInfo(msg.mediaRef);
     const file = await api.downloadMedia(info.url);
+    // O tipo aqui é o que o contato mandou: só abre na tela o que é seguro.
     return new NextResponse(file.body, {
-      headers: {
-        'content-type': info.mime_type || msg.mimeType || 'application/octet-stream',
-        'cache-control': 'private, no-store',
-        'x-content-type-options': 'nosniff',
-      },
+      headers: mediaResponseHeaders(info.mime_type || msg.mimeType),
     });
   } catch {
     // A Meta guarda a mídia por um tempo limitado.

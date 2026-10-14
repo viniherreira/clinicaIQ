@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { prisma, encrypt, decrypt } from '@clinicaiq/db';
@@ -10,6 +11,7 @@ import { listUnits } from '@/lib/units';
 import { mainUnit } from '@/lib/unit-rules';
 import { prepareAppointmentMessage, deliverPrepared, type Preparation } from '@/lib/whatsapp';
 import { notifyCrm } from '@/crm/notify';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 /**
  * O agendamento online, aberto ao público (sem login): o paciente escolhe o
@@ -182,6 +184,16 @@ export type BookingResult = { ok: true; when: string; professional: string } | {
 
 /** Marca o horário. Paciente novo vira cadastro; quem já é paciente (mesmo nome e telefone) é reaproveitado. */
 export async function bookOnline(slug: string, input: z.input<typeof bookingSchema>): Promise<BookingResult> {
+  // A página é pública e cada envio cria paciente e agendamento. O campo-isca
+  // só pega robô burro; sem limite, um script enchia a agenda da clínica de
+  // horários falsos (com nomes diferentes, o freio de 2 por pessoa não vale).
+  const ip = clientIp(await headers());
+  const porMinuto = rateLimit(`agendar:${ip}`, 5, 60_000);
+  const porHora = rateLimit(`agendar-h:${ip}`, 20, 60 * 60_000);
+  if (!porMinuto.ok || !porHora.ok) {
+    return { ok: false, message: 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.' };
+  }
+
   const found = await clinicBySlug(slug);
   if (!found) return { ok: false, message: 'O agendamento online desta clínica não está disponível.' };
   const parsed = bookingSchema.safeParse(input);
