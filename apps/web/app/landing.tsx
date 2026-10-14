@@ -21,7 +21,7 @@ import {
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
   Users, Heart, PlusCircle, TrendingUp,
 } from 'lucide-react';
-import { LogoMark, LogoWordmark } from '@/components/logo';
+import { Logo } from '@/components/logo';
 import { companyLine } from '@/lib/company';
 
 // ─── Header ──────────────────────────────────────────────────────────────────
@@ -31,8 +31,7 @@ function Header() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin — página inicial">
-          <LogoMark size="md" />
-          <LogoWordmark className="text-lg font-bold tracking-tight" />
+          <Logo size="md" />
         </Link>
 
         <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
@@ -579,8 +578,7 @@ function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <LogoMark size="md" />
-            <LogoWordmark className="text-lg font-bold tracking-tight" />
+            <Logo size="md" />
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
             Gestão inteligente para clínicas odontológicas e estéticas.

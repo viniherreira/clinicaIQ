@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
-import { LogoMark, LogoWordmark } from './logo';
+import { Logo, LogoMark } from './logo';
 import { ModuleSwitcher } from './module-switcher';
 import type { LucideIcon } from 'lucide-react';
 
@@ -86,9 +86,14 @@ export function ClinicSidebar({
     >
       <div className={`flex h-14 items-center gap-2 ${recolhido ? 'justify-center px-2' : 'justify-between px-4'}`}>
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          <LogoMark size="md" />
-          {!recolhido && <LogoWordmark className="text-[15px] font-semibold tracking-tight" />}
-          {recolhido && <span className="sr-only">DreamClin</span>}
+          {recolhido ? (
+            <>
+              <LogoMark size="md" />
+              <span className="sr-only">DreamClin</span>
+            </>
+          ) : (
+            <Logo size="md" />
+          )}
         </Link>
         {!recolhido && (
           <button

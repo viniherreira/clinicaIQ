@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import { LogoMark } from '@/components/logo';
+import { Logo } from '@/components/logo';
 
 export const metadata = { title: 'Página não encontrada · DreamClin' };
 
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
-      <LogoMark size="lg" />
+      <Logo size="md" />
       <p className="mt-6 text-5xl font-bold tracking-tight text-primary">404</p>
       <h1 className="mt-2 text-xl font-semibold tracking-tight">Página não encontrada</h1>
       <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">

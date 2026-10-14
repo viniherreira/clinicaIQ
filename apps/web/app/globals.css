@@ -14,9 +14,9 @@
   :root {
     color-scheme: light;
     /* As cores exatas da logo, iguais em qualquer tema: a marca não muda no escuro. */
-    --brand: 173 80% 40%;
-    --brand-navy: 217 79% 28%;
-    --brand-mint: 146 51% 77%;
+    --brand: 173.4 80.4% 40%;
+    --brand-navy: 217.3 79.3% 28.4%;
+    --brand-mint: 145.7 51.4% 77.3%;
 
     /* Branco quente do manual. */
     --background: 60 14% 98%;

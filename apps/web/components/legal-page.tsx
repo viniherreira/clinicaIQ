@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { LogoMark, LogoWordmark } from './logo';
+import { Logo } from './logo';
 import { COMPANY, companyLine } from '@/lib/company';
 
 /** Moldura das páginas públicas de texto (Privacidade, Termos): logo, título, data e o texto. */
@@ -10,8 +10,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`${COMPANY.brand} — página inicial`}>
-            <LogoMark size="md" />
-            <LogoWordmark className="text-lg font-bold tracking-tight" />
+            <Logo size="md" />
           </Link>
           <Link href="/" className="inline-flex items-center gap-1 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Voltar ao site
