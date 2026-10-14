@@ -32,8 +32,17 @@ verde-menta #A7E3C1 e branco quente #FAFAF8. Fonte: Inter.
 - **Fonte:** Inter pelo `next/font/google`, no app, no site e no login do Clerk.
 - **PDF:** o documento é da clínica e continua sem marca DreamClin; só o destaque
   muda para o marinho #0F3B82.
-- **Logo e ícones** só com os arquivos originais do manual (SVG ou PNG de alta
-  resolução). Nada é redesenhado à mão.
+- **Logo redesenhada em SVG, aprovada pelo Thiago.** Os arquivos do manual eram
+  recortes de 399×231 px, pequenos demais para os ícones. O símbolo foi ajustado
+  ponto a ponto contra o recorte vertical, o de maior resolução: o D e o corpo
+  coincidem 99%, a cabeça 98% e a estrela 95%. O nome "Dreamclin" é a Outfit
+  700 (licença OFL) em contorno; das fontes testadas, é a que mais coincide com
+  a logo do manual. O desenho fica em `components/logo-paths.ts`.
+- **Logo no app:** colorida no tema claro; branca (a versão clara do manual) no
+  escuro, no CRM e sobre o degradê.
+- **Ícones:** quadrado teal com o símbolo branco. No favicon o símbolo ocupa 68%
+  da largura, para ler em 16 px; nos ícones de app, 55%, como no manual.
+  Arquivos para uso fora do app em `public/brand/`.
 - **E-mails:** não há template no código. Os do Clerk e do Asaas se configuram nos
   painéis deles.
 
@@ -41,4 +50,10 @@ verde-menta #A7E3C1 e branco quente #FAFAF8. Fonte: Inter.
 
 - `lib/theme-contrast.test.ts` lê os tokens do `globals.css` e confere os pares
   usados (texto, botão, link) em cada tema: claro, escuro, alto contraste e CRM.
-- axe nas telas principais pelos testes E2E de acessibilidade.
+- `components/logo-paths.test.ts` confere que o favicon e os arquivos de
+  `public/brand/` usam o mesmo desenho do código.
+- axe (WCAG 2.1 AA) sem violações na landing, no painel do login, nos menus da
+  gestão e do CRM e nos termos, nos temas claro e escuro (e, nos menus e nos
+  termos, também no alto contraste e no CRM marinho). Feito com o servidor de
+  desenvolvimento sem banco nem Clerk, então a seção de planos e as telas com
+  dados ficam para os testes E2E.
