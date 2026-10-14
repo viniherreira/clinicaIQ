@@ -7,6 +7,7 @@ import { Font, Image, StyleSheet, Text, View } from '@react-pdf/renderer';
  * O documento é da clínica, não do DreamClin — por isso a paleta é sóbria (um
  * azul-saúde de destaque sobre cinzas frios) e não há marca nossa em lugar
  * nenhum. O que identifica o papel é o logotipo e os dados de quem o emite.
+ * O destaque é o azul-marinho do manual, que imprime bem e passa de 10:1.
  */
 
 // O react-pdf hifeniza com regras do inglês e quebra "proce-dimento" em lugares
@@ -21,9 +22,8 @@ export const color = {
   line: '#E1E6EE',
   soft: '#F3F6FA',
   zebra: '#F9FBFD',
-  // Um tom abaixo do azul da logo (#1669C7): no papel, o azul claro desbota.
-  accent: '#1458A6',
-  accentSoft: '#E9F1FB',
+  accent: '#0F3B82',
+  accentSoft: '#EAF0FA',
 };
 
 export const s = StyleSheet.create({

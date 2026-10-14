@@ -30,8 +30,8 @@ export default function GlobalError({
           alignItems: 'center',
           justifyContent: 'center',
           fontFamily: 'system-ui, sans-serif',
-          background: '#f7f7f5',
-          color: '#1a1a19',
+          background: '#FAFAF8',
+          color: '#0F3B82',
           padding: '24px',
           textAlign: 'center',
         }}
@@ -55,7 +55,7 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: '#1669C7',
+              background: '#0F766E',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
