@@ -4,7 +4,7 @@ export const clerkAppearance = {
   variables: {
     colorPrimary: '#1669C7',
     borderRadius: '0.625rem',
-    fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+    fontFamily: 'var(--font-inter), system-ui, sans-serif',
   },
   elements: {
     rootBox: 'w-full',

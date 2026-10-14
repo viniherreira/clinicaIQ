@@ -6,9 +6,8 @@
  * professional inside a circle mask with floating dashboard cards and status
  * pills, over soft multicolor blobs. Feature icons and personas use a varied
  * pastel palette so the page reads hand-designed rather than monochrome.
- * Display font: Bricolage Grotesque; body stays Geist. Features use an
- * editorial numbered list with hairline dividers instead of cards. Motion:
- * staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
+ * Font: Inter, the brand typeface. Features use an editorial numbered list
+ * with hairline dividers instead of cards. Motion: staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
  *
  * Copy is intentionally honest: the product is in early access, so there are no
  * invented testimonials or user counts.
@@ -16,7 +15,6 @@
 import Link from 'next/link';
 import { Pricing } from './pricing-section';
 import Image from 'next/image';
-import { Bricolage_Grotesque } from 'next/font/google';
 import {
   ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
@@ -24,12 +22,6 @@ import {
 } from 'lucide-react';
 import { LogoMark, LogoWordmark } from '@/components/logo';
 import { companyLine } from '@/lib/company';
-
-const display = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  display: 'swap',
-});
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +31,7 @@ function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin — página inicial">
           <LogoMark size="md" />
-          <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
+          <LogoWordmark className={`text-lg font-bold tracking-tight`} />
         </Link>
 
         <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
@@ -126,7 +118,7 @@ function AppointmentsCard() {
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400" aria-hidden="true">
           <CalendarDays className="h-4 w-4" />
         </span>
-        <span className={`${display.className} text-3xl font-bold leading-none`}>450</span>
+        <span className={`text-3xl font-bold leading-none`}>450</span>
       </div>
       <div className="flex h-20 items-end gap-1.5" role="presentation">
         {BARS.map((b, i) => (
@@ -246,7 +238,7 @@ function Hero() {
           </p>
 
           <h1
-            className={`${display.className} animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]`}
+            className={`animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]`}
             style={{ animationDelay: '80ms' }}
           >
             <span className="text-primary">Gestão inteligente</span> para sua clínica, do agendamento ao pagamento
@@ -377,7 +369,7 @@ function Features() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className={`mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
             O que sua clínica ganha com o DreamClin
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
@@ -394,7 +386,7 @@ function Features() {
                 {String(i + 1).padStart(2, '0')}
               </span>
               <div>
-                <h3 className={`${display.className} flex items-center gap-3 text-lg font-bold tracking-tight`}>
+                <h3 className={`flex items-center gap-3 text-lg font-bold tracking-tight`}>
                   <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
                     <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                   </span>
@@ -444,7 +436,7 @@ function Differentiators() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Diferenciais</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className={`mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
             Um sistema, três pessoas felizes
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
@@ -463,7 +455,7 @@ function Differentiators() {
                 </span>
                 {who}
               </p>
-              <h3 className={`${display.className} mt-4 text-xl font-bold tracking-tight`}>{title}</h3>
+              <h3 className={`mt-4 text-xl font-bold tracking-tight`}>{title}</h3>
               <ul className="mt-4 space-y-2.5">
                 {points.map((p) => (
                   <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -514,7 +506,7 @@ function FAQ() {
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Perguntas frequentes</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className={`mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
             Ficou alguma dúvida?
           </h2>
         </div>
@@ -551,7 +543,7 @@ function FinalCTA() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full border border-white/15" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full border border-white/10" />
 
-        <h2 id="cta-final" className={`${display.className} mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl`}>
+        <h2 id="cta-final" className={`mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl`}>
           Pronto para simplificar a rotina da sua clínica?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
@@ -587,7 +579,7 @@ function Footer() {
         <div>
           <div className="flex items-center gap-2.5">
             <LogoMark size="md" />
-            <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
+            <LogoWordmark className={`text-lg font-bold tracking-tight`} />
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
             Gestão inteligente para clínicas odontológicas e estéticas.
