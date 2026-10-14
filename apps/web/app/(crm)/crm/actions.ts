@@ -4,7 +4,9 @@ import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { guardCrmAction } from '@/crm/guard';
-import { createLead, moveLead, softDeleteLead } from '@/crm/leads';
+import { createLead, moveLead, OPEN_LEAD, softDeleteLead } from '@/crm/leads';
+import { countLeads, effectiveStatus, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
+import { hasPeriod } from '@/crm/period';
 import { findOpenLeadByPhone, findPatientByPhone } from '@/crm/duplicates';
 import { isValidPhone } from '@/crm/phone';
 import { runDueAutomations } from '@/crm/stage-automations';
@@ -110,4 +112,23 @@ export async function deleteLeadAction(leadId: string): Promise<ActionResult> {
   const r = await softDeleteLead(g.db, g, leadId);
   if (r.ok) revalidatePath('/crm');
   return r;
+}
+
+/**
+ * Quantos leads a busca vai mostrar: o painel de filtros conta enquanto a
+ * pessoa mexe, antes do "Aplicar". Só lê.
+ */
+export async function countLeadsAction(
+  params: Record<string, string>,
+  view: 'quadro' | 'lista',
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  const sp: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params ?? {}).slice(0, 30)) if (typeof v === 'string') sp[k] = v.slice(0, 200);
+  const f = parseFilters(sp);
+  // Período de fechamento sai do quadro e vai para a lista (só ela tem fechados).
+  const fechados = f.periodo.field === 'fechado' && hasPeriod(f.periodo);
+  const situacao = view === 'quadro' && !fechados ? OPEN_LEAD : statusWhere(effectiveStatus(parseListParams(sp).status, f));
+  return { ok: true, count: await countLeads(g, f, situacao) };
 }
