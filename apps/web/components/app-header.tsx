@@ -8,7 +8,7 @@ import { can } from '@/lib/permissions';
 import { activeHref, navFor } from './app-sidebar';
 import { ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
-import { LogoMark, LogoWordmark } from './logo';
+import { Logo, LogoMark } from './logo';
 import { UserMenu } from './user-menu';
 import { UnitSwitcher, type UnitChoice } from './unit-switcher';
 
@@ -126,8 +126,7 @@ export function AppHeader({
           <nav aria-label="Menu principal" className="absolute inset-y-0 left-0 flex w-64 flex-col bg-surface shadow-2xl animate-fade-in">
             <div className="flex h-16 items-center justify-between px-5">
               <div className="flex items-center gap-2.5">
-                <LogoMark size="md" />
-                <LogoWordmark className="text-[15px] font-semibold tracking-tight" />
+                <Logo size="md" />
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar menu" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 <X className="h-5 w-5" aria-hidden="true" />

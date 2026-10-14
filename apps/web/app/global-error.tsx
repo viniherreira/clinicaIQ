@@ -2,7 +2,15 @@
 
 import { useEffect } from 'react';
 import { reportError } from '@/lib/observability';
-import { TOOTH_PATH } from '@/components/logo';
+import {
+  BRAND,
+  SYMBOL_BODY,
+  SYMBOL_D,
+  SYMBOL_HEAD,
+  SYMBOL_STAR,
+  SYMBOL_STAR_STROKE,
+  SYMBOL_VIEWBOX,
+} from '@/components/logo-paths';
 
 /**
  * Root error boundary — catches failures in the root layout itself, where the
@@ -30,22 +38,24 @@ export default function GlobalError({
           alignItems: 'center',
           justifyContent: 'center',
           fontFamily: 'system-ui, sans-serif',
-          background: '#f7f7f5',
-          color: '#1a1a19',
+          background: BRAND.warmWhite,
+          color: BRAND.navy,
           padding: '24px',
           textAlign: 'center',
         }}
       >
         <div style={{ maxWidth: 380 }}>
           <svg
-            viewBox="0 0 64 64"
-            width={48}
+            viewBox={SYMBOL_VIEWBOX}
+            width={54}
             height={48}
             aria-hidden="true"
             style={{ display: 'block', margin: '0 auto 16px' }}
           >
-            <circle cx="32" cy="32" r="32" fill="#1669C7" />
-            <path d={TOOTH_PATH} fill="#fff" fillRule="evenodd" />
+            <path fill={BRAND.teal} d={SYMBOL_D} />
+            <path fill={BRAND.navy} d={SYMBOL_BODY} />
+            <circle fill={BRAND.mint} cx={SYMBOL_HEAD.cx} cy={SYMBOL_HEAD.cy} r={SYMBOL_HEAD.r} />
+            <path fill={BRAND.teal} stroke={BRAND.teal} strokeWidth={SYMBOL_STAR_STROKE} strokeLinejoin="round" d={SYMBOL_STAR} />
           </svg>
           <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>Algo deu errado</h1>
           <p style={{ fontSize: 14, color: '#6b6b68', margin: '0 0 20px', lineHeight: 1.5 }}>
@@ -55,7 +65,7 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: '#1669C7',
+              background: '#0F766E',
               color: '#fff',
               border: 'none',
               borderRadius: 8,

@@ -4,11 +4,11 @@
  * Design direction: clean professional health-SaaS with warmth and color. The
  * hero pairs a real photo (Pexels, free commercial license) of a smiling
  * professional inside a circle mask with floating dashboard cards and status
- * pills, over soft multicolor blobs. Feature icons and personas use a varied
- * pastel palette so the page reads hand-designed rather than monochrome.
- * Display font: Bricolage Grotesque; body stays Geist. Features use an
- * editorial numbered list with hairline dividers instead of cards. Motion:
- * staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
+ * pills, over soft blobs. Feature icons and personas use the brand teal and
+ * navy plus a few supporting pastels, so the page reads hand-designed rather
+ * than monochrome.
+ * Font: Inter, the brand typeface. Features use an editorial numbered list
+ * with hairline dividers instead of cards. Motion: staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
  *
  * Copy is intentionally honest: the product is in early access, so there are no
  * invented testimonials or user counts.
@@ -16,20 +16,13 @@
 import Link from 'next/link';
 import { Pricing } from './pricing-section';
 import Image from 'next/image';
-import { Bricolage_Grotesque } from 'next/font/google';
 import {
   ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
   Users, Heart, PlusCircle, TrendingUp,
 } from 'lucide-react';
-import { LogoMark, LogoWordmark } from '@/components/logo';
+import { Logo } from '@/components/logo';
 import { companyLine } from '@/lib/company';
-
-const display = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  display: 'swap',
-});
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -38,8 +31,7 @@ function Header() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin — página inicial">
-          <LogoMark size="md" />
-          <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
+          <Logo size="md" />
         </Link>
 
         <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
@@ -107,12 +99,12 @@ const BARS = [
   { h: 30, c: 'bg-slate-800 dark:bg-slate-300' },
   { h: 72, c: 'bg-amber-400' },
   { h: 62, c: 'bg-rose-400' },
-  { h: 84, c: 'bg-violet-500' },
+  { h: 84, c: 'bg-teal-500' },
   { h: 48, c: 'bg-emerald-400' },
-  { h: 66, c: 'bg-sky-500' },
+  { h: 66, c: 'bg-blue-700' },
   { h: 90, c: 'bg-amber-500' },
   { h: 58, c: 'bg-emerald-600' },
-  { h: 74, c: 'bg-violet-400' },
+  { h: 74, c: 'bg-teal-400' },
 ];
 
 function AppointmentsCard() {
@@ -123,10 +115,10 @@ function AppointmentsCard() {
         <CardArrow />
       </div>
       <div className="mb-2 flex items-end justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400" aria-hidden="true">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400" aria-hidden="true">
           <CalendarDays className="h-4 w-4" />
         </span>
-        <span className={`${display.className} text-3xl font-bold leading-none`}>450</span>
+        <span className="text-3xl font-bold leading-none">450</span>
       </div>
       <div className="flex h-20 items-end gap-1.5" role="presentation">
         {BARS.map((b, i) => (
@@ -146,7 +138,7 @@ function AttendanceCard() {
       </div>
       <div className="flex items-center gap-3">
         <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90" aria-hidden="true">
-          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-sky-200 dark:stroke-sky-900" />
+          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-blue-200 dark:stroke-blue-900" />
           <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray="118 163" className="stroke-primary" />
         </svg>
         <div className="flex-1 space-y-1.5">
@@ -161,7 +153,7 @@ function AttendanceCard() {
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-[3px] bg-sky-400" aria-hidden="true" /> Convênios
+              <span className="h-2 w-2 rounded-[3px] bg-blue-400" aria-hidden="true" /> Convênios
             </span>
             <span className="font-semibold tabular-nums text-foreground">100</span>
           </div>
@@ -197,8 +189,8 @@ function HeroVisual() {
   return (
     <div className="relative mx-auto w-fit" aria-hidden="true">
       {/* soft color blobs */}
-      <div className="absolute -left-10 -top-8 h-40 w-40 rounded-full bg-amber-200/50 blur-2xl dark:bg-amber-400/10" />
-      <div className="absolute -bottom-10 -right-8 h-44 w-44 rounded-full bg-sky-200/50 blur-2xl dark:bg-sky-400/10" />
+      <div className="absolute -left-10 -top-8 h-40 w-40 rounded-full bg-brand-mint/50 blur-2xl dark:bg-brand-mint/10" />
+      <div className="absolute -bottom-10 -right-8 h-44 w-44 rounded-full bg-blue-200/50 blur-2xl dark:bg-blue-400/10" />
       {/* decorative ring */}
       <div className="absolute -inset-5 rounded-full border border-primary/15 sm:-inset-7" />
 
@@ -246,7 +238,7 @@ function Hero() {
           </p>
 
           <h1
-            className={`${display.className} animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]`}
+            className="animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]"
             style={{ animationDelay: '80ms' }}
           >
             <span className="text-primary">Gestão inteligente</span> para sua clínica, do agendamento ao pagamento
@@ -313,8 +305,8 @@ function Hero() {
 function TrustStrip() {
   const items = [
     { icon: ShieldCheck, label: 'LGPD por padrão', color: 'text-emerald-600 dark:text-emerald-400' },
-    { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-sky-600 dark:text-sky-400' },
-    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-violet-600 dark:text-violet-400' },
+    { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-blue-800 dark:text-blue-400' },
+    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-teal-700 dark:text-teal-400' },
     { icon: Heart, label: 'Feito no Brasil', color: 'text-rose-500 dark:text-rose-400' },
   ];
   return (
@@ -339,7 +331,7 @@ function Features() {
       icon: CalendarDays,
       title: 'Agenda inteligente',
       text: 'Visão por dia ou semana com os profissionais lado a lado. Bloqueio de horário, expediente visível na grade e aviso de conflito na hora de marcar.',
-      chip: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
+      chip: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400',
     },
     {
       icon: MessageCircle,
@@ -351,7 +343,7 @@ function Features() {
       icon: FileText,
       title: 'Orçamentos que fecham',
       text: 'Monte o orçamento em minutos, envie por link ou PDF com a sua marca e acompanhe o status: visualizado, aceito, pago. Com registro de pagamento parcial.',
-      chip: 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
+      chip: 'bg-blue-100 text-blue-800 dark:bg-blue-700/15 dark:text-blue-400',
     },
     {
       icon: Smile,
@@ -377,7 +369,7 @@ function Features() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             O que sua clínica ganha com o DreamClin
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
@@ -394,7 +386,7 @@ function Features() {
                 {String(i + 1).padStart(2, '0')}
               </span>
               <div>
-                <h3 className={`${display.className} flex items-center gap-3 text-lg font-bold tracking-tight`}>
+                <h3 className="flex items-center gap-3 text-lg font-bold tracking-tight">
                   <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
                     <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                   </span>
@@ -419,8 +411,8 @@ function Differentiators() {
       who: 'Para a recepção',
       title: 'Agendar deixa de ser malabarismo',
       points: ['Busca de paciente instantânea', 'Conflito de horário avisado na hora', 'Confirmação vai sozinha pelo WhatsApp'],
-      chip: 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
-      accent: 'text-sky-700 dark:text-sky-400',
+      chip: 'bg-blue-100 text-blue-800 dark:bg-blue-700/15 dark:text-blue-400',
+      accent: 'text-blue-800 dark:text-blue-400',
     },
     {
       icon: Smile,
@@ -435,8 +427,8 @@ function Differentiators() {
       who: 'Para quem gerencia',
       title: 'O dinheiro deixa de ser mistério',
       points: ['Conversão de orçamentos em tempo real', 'Pagamentos e saldo por paciente', 'Dados protegidos conforme a LGPD'],
-      chip: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
-      accent: 'text-violet-600 dark:text-violet-400',
+      chip: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400',
+      accent: 'text-teal-700 dark:text-teal-400',
     },
   ];
   return (
@@ -444,7 +436,7 @@ function Differentiators() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Diferenciais</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             Um sistema, três pessoas felizes
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
@@ -463,7 +455,7 @@ function Differentiators() {
                 </span>
                 {who}
               </p>
-              <h3 className={`${display.className} mt-4 text-xl font-bold tracking-tight`}>{title}</h3>
+              <h3 className="mt-4 text-xl font-bold tracking-tight">{title}</h3>
               <ul className="mt-4 space-y-2.5">
                 {points.map((p) => (
                   <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -514,7 +506,7 @@ function FAQ() {
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Perguntas frequentes</p>
-          <h2 className={`${display.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             Ficou alguma dúvida?
           </h2>
         </div>
@@ -551,7 +543,7 @@ function FinalCTA() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full border border-white/15" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full border border-white/10" />
 
-        <h2 id="cta-final" className={`${display.className} mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl`}>
+        <h2 id="cta-final" className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
           Pronto para simplificar a rotina da sua clínica?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
@@ -559,9 +551,10 @@ function FinalCTA() {
           em menos de 5 minutos. Sem cartão, sem fidelidade.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {/* O degradê não muda com o tema, então o teal do botão também não. */}
           <Link
             href="/sign-up"
-            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-primary shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-teal-700 shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Começar agora, é grátis
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -586,8 +579,7 @@ function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <LogoMark size="md" />
-            <LogoWordmark className={`${display.className} text-lg font-bold tracking-tight`} />
+            <Logo size="md" />
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
             Gestão inteligente para clínicas odontológicas e estéticas.
@@ -611,8 +603,8 @@ function Footer() {
           <p className="text-sm font-semibold">Compromissos</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Conformidade com a LGPD</li>
-            <li className="flex items-center gap-2"><Lock className="h-4 w-4 text-sky-600 dark:text-sky-400" aria-hidden="true" /> Dados sensíveis criptografados</li>
-            <li className="flex items-center gap-2"><Accessibility className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
+            <li className="flex items-center gap-2"><Lock className="h-4 w-4 text-blue-800 dark:text-blue-400" aria-hidden="true" /> Dados sensíveis criptografados</li>
+            <li className="flex items-center gap-2"><Accessibility className="h-4 w-4 text-teal-700 dark:text-teal-400" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
           </ul>
         </div>
       </div>

@@ -4,41 +4,48 @@
 
 @layer base {
   /*
-   * Azul da saúde, tirado da logo (#1669C7 = 212 80% 43%).
+   * Paleta do manual de marca: teal #14B8A6, azul-marinho #0F3B82, verde-menta
+   * #A7E3C1 e branco quente #FAFAF8.
    *
-   * O azul da logo é o dos botões e links: com texto branco por cima dá 5,4:1,
-   * acima do mínimo do WCAG AA. Um azul mais claro nos botões ficaria ilegível,
-   * então o "azul clarinho" mora no ambiente — fundo e cinzas levemente
-   * azulados, realces com `primary/10` e o degradê da marca.
+   * O teal do manual dá só 2,5:1 sobre o branco: mora na logo, nos ícones e em
+   * superfícies sem texto. Botão, link e texto usam o teal 700 (#0F766E, 5,5:1
+   * com branco). Os pares de cada tema são conferidos em lib/theme-contrast.test.ts.
    */
   :root {
     color-scheme: light;
-    /* A cor da logo, igual em qualquer tema: a marca não muda no escuro. */
-    --brand: 212 80% 43%;
+    /* As cores exatas da logo, iguais em qualquer tema: a marca não muda no escuro. */
+    --brand: 173.4 80.4% 40%;
+    --brand-navy: 217.3 79.3% 28.4%;
+    --brand-mint: 145.7 51.4% 77.3%;
 
-    --background: 210 40% 98%;
-    --foreground: 222 35% 12%;
+    /* Branco quente do manual. */
+    --background: 60 14% 98%;
+    /* Um marinho quase preto, tirado do #0F3B82. */
+    --foreground: 217 55% 13%;
+    /* O marinho da marca, para títulos (10:1 sobre o fundo). */
+    --heading: 217 79% 28%;
 
     --surface: 0 0% 100%;
-    --surface-alt: 210 40% 96%;
+    --surface-alt: 60 9% 95.5%;
 
-    --border: 214 32% 91%;
-    --border-strong: 214 25% 82%;
-    --input: 214 32% 91%;
-    --ring: 212 80% 43%;
+    --border: 60 6% 89%;
+    --border-strong: 60 4% 80%;
+    --input: 60 6% 89%;
+    --ring: 175 77% 26%;
 
-    --primary: 212 80% 43%;
+    --primary: 175 77% 26%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 212 80% 37%;
+    --primary-hover: 176 69% 22%;
 
-    --accent: 32 95% 44%;
-    --accent-foreground: 0 0% 100%;
+    /* Menta, sempre com o marinho por cima (7,3:1). Nunca como texto no branco. */
+    --accent: 146 51% 77%;
+    --accent-foreground: 217 79% 28%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 35% 12%;
+    --secondary: 60 9% 95.5%;
+    --secondary-foreground: 217 55% 13%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 40%;
+    --muted: 60 9% 95.5%;
+    --muted-foreground: 217 12% 38%;
 
     /* Escurecido para passar de 4,5:1 também sobre o fundo cinza das telas. */
     --destructive: 0 72% 44%;
@@ -48,58 +55,54 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 222 35% 12%;
+    --warning-foreground: 217 55% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 35% 12%;
+    --popover-foreground: 217 55% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 35% 12%;
+    --card-foreground: 217 55% 13%;
 
-    /*
-     * CRM no jeito do Kommo: menu escuro estreito à esquerda e o quadro sobre
-     * um cinza-azulado, com os cards brancos por cima.
-     */
-    /* Fundo das telas do sistema: um cinza claro, para os cartões brancos se destacarem. */
-    --canvas: 216 22% 95.5%;
-    --rail: 214 45% 17%;
-    --rail-foreground: 214 30% 80%;
-    --rail-active: 214 40% 26%;
-    --board: 214 30% 94%;
-    --bubble-out: 207 90% 93%;
+    /* Fundo das telas do sistema: um cinza quente, para os cartões brancos se destacarem. */
+    --canvas: 60 8% 95%;
+    --rail: 217 70% 16%;
+    --rail-foreground: 217 30% 82%;
+    --rail-active: 217 60% 24%;
+    --board: 60 8% 94%;
+    --bubble-out: 168 55% 91%;
     /* Telefone e links dentro dos cards do CRM. */
-    --link: 212 80% 40%;
+    --link: 175 77% 26%;
 
     --radius: 0.5rem;
   }
 
   .dark {
     color-scheme: dark;
-    --background: 222 30% 7%;
+    --background: 220 45% 7%;
     --foreground: 210 30% 94%;
+    --heading: 210 30% 96%;
 
-    --surface: 222 25% 11%;
-    --surface-alt: 222 22% 14%;
+    --surface: 220 38% 11%;
+    --surface-alt: 220 32% 14%;
 
-    --border: 220 18% 20%;
-    --border-strong: 220 15% 28%;
-    --input: 220 18% 20%;
-    /* Um pouco mais claro que o da logo para os links aparecerem no escuro,
-       sem passar do ponto em que o texto branco do botão perde contraste. */
-    --ring: 212 80% 47%;
+    --border: 220 24% 20%;
+    --border-strong: 220 18% 28%;
+    --input: 220 24% 20%;
+    /* No escuro o teal clareia (teal 400) e o texto do botão fica escuro. */
+    --ring: 172 66% 50%;
 
-    --primary: 212 80% 47%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 212 80% 42%;
+    --primary: 172 66% 50%;
+    --primary-foreground: 174 78% 8%;
+    --primary-hover: 173 80% 40%;
 
-    --accent: 32 90% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 146 51% 77%;
+    --accent-foreground: 217 79% 20%;
 
-    --secondary: 222 22% 14%;
+    --secondary: 220 32% 14%;
     --secondary-foreground: 210 30% 94%;
 
-    --muted: 222 22% 14%;
-    --muted-foreground: 215 15% 62%;
+    --muted: 220 32% 14%;
+    --muted-foreground: 215 15% 66%;
 
     --destructive: 0 72% 57%;
     --destructive-foreground: 0 0% 100%;
@@ -108,26 +111,27 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 85% 55%;
-    --warning-foreground: 222 30% 7%;
+    --warning-foreground: 220 45% 7%;
 
-    --popover: 222 25% 11%;
+    --popover: 220 38% 11%;
     --popover-foreground: 210 30% 94%;
 
-    --card: 222 25% 11%;
+    --card: 220 38% 11%;
     --card-foreground: 210 30% 94%;
 
-    --canvas: 222 30% 7%;
-    --rail: 222 32% 6%;
-    --rail-foreground: 215 20% 72%;
-    --rail-active: 222 25% 14%;
-    --board: 222 28% 9%;
-    --bubble-out: 212 45% 22%;
-    --link: 207 90% 68%;
+    --canvas: 220 45% 7%;
+    --rail: 220 50% 6%;
+    --rail-foreground: 215 20% 74%;
+    --rail-active: 220 38% 14%;
+    --board: 220 42% 9%;
+    --bubble-out: 175 45% 19%;
+    --link: 171 77% 64%;
   }
 
   .high-contrast {
     --background: 0 0% 100%;
     --foreground: 0 0% 0%;
+    --heading: 0 0% 0%;
 
     --surface: 0 0% 100%;
     --surface-alt: 0 0% 96%;
@@ -135,14 +139,14 @@
     --border: 0 0% 0%;
     --border-strong: 0 0% 0%;
     --input: 0 0% 0%;
-    --ring: 212 100% 30%;
+    --ring: 176 100% 19%;
 
-    --primary: 212 100% 30%;
+    --primary: 176 100% 19%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 212 100% 24%;
+    --primary-hover: 176 100% 14%;
 
-    --accent: 32 100% 38%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 146 51% 77%;
+    --accent-foreground: 0 0% 0%;
 
     --muted: 0 0% 90%;
     --muted-foreground: 0 0% 20%;
@@ -156,15 +160,16 @@
     --canvas: 0 0% 100%;
     --rail: 0 0% 0%;
     --rail-foreground: 0 0% 100%;
-    --rail-active: 212 100% 30%;
+    --rail-active: 176 100% 19%;
     --board: 0 0% 100%;
     --bubble-out: 0 0% 92%;
-    --link: 212 100% 28%;
+    --link: 176 100% 17%;
   }
 
   .dark.high-contrast {
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
+    --heading: 0 0% 100%;
 
     --surface: 0 0% 5%;
     --surface-alt: 0 0% 10%;
@@ -172,13 +177,13 @@
     --border: 0 0% 100%;
     --border-strong: 0 0% 100%;
     --input: 0 0% 100%;
-    --ring: 205 100% 65%;
+    --ring: 171 77% 64%;
 
-    --primary: 205 100% 65%;
+    --primary: 171 77% 64%;
     --primary-foreground: 0 0% 0%;
-    --primary-hover: 205 100% 58%;
+    --primary-hover: 172 66% 55%;
 
-    --accent: 32 100% 55%;
+    --accent: 146 51% 77%;
     --accent-foreground: 0 0% 0%;
 
     --muted: 0 0% 15%;
@@ -196,51 +201,54 @@
     --rail-active: 0 0% 20%;
     --board: 0 0% 0%;
     --bubble-out: 0 0% 15%;
-    --link: 205 100% 70%;
+    --link: 171 77% 70%;
   }
 
   /*
-   * O CRM é escuro, azul-marinho, como o Kommo das clínicas: o espaço do CRM
-   * liga `dark crm-navy` na página (components/crm-theme.tsx). O alto
-   * contraste, se ligado, continua mandando.
+   * O CRM é escuro, no azul-marinho da marca (#0F3B82, matiz 217), como o Kommo
+   * das clínicas: o espaço do CRM liga `dark crm-navy` na página
+   * (components/crm-theme.tsx). O alto contraste, se ligado, continua mandando.
    */
   .dark.crm-navy:not(.high-contrast) {
-    --background: 206 52% 11%;
-    --foreground: 205 30% 95%;
+    --background: 219 60% 12%;
+    --foreground: 215 30% 95%;
+    --heading: 215 30% 97%;
 
-    --surface: 206 44% 16%;
-    --surface-alt: 206 38% 20%;
+    --surface: 219 55% 17%;
+    --surface-alt: 219 48% 21%;
 
-    --border: 205 32% 26%;
-    --border-strong: 205 28% 34%;
-    --input: 205 32% 28%;
+    --border: 218 40% 27%;
+    --border-strong: 218 34% 35%;
+    --input: 218 40% 29%;
 
-    --secondary: 206 38% 20%;
-    --secondary-foreground: 205 30% 95%;
-    --muted: 206 38% 20%;
-    --muted-foreground: 205 22% 72%;
+    --secondary: 219 48% 21%;
+    --secondary-foreground: 215 30% 95%;
+    --muted: 219 48% 21%;
+    --muted-foreground: 216 25% 74%;
 
-    --popover: 206 46% 15%;
-    --popover-foreground: 205 30% 95%;
-    --card: 206 44% 16%;
-    --card-foreground: 205 30% 95%;
+    --popover: 219 57% 16%;
+    --popover-foreground: 215 30% 95%;
+    --card: 219 55% 17%;
+    --card-foreground: 215 30% 95%;
 
-    --canvas: 206 52% 11%;
-    --rail: 206 62% 7%;
-    --rail-foreground: 205 25% 76%;
-    --rail-active: 206 46% 16%;
-    --board: 206 52% 11%;
-    --bubble-out: 206 55% 26%;
-    --link: 207 90% 68%;
+    --primary-foreground: 219 60% 12%;
+
+    --canvas: 219 60% 12%;
+    --rail: 220 70% 8%;
+    --rail-foreground: 216 25% 78%;
+    --rail-active: 219 55% 17%;
+    --board: 219 60% 12%;
+    --bubble-out: 176 50% 20%;
+    --link: 171 77% 64%;
 
     /* Vermelho mais claro para ler sobre o marinho; texto escuro nos botões vermelhos. */
     --destructive: 0 84% 70%;
-    --destructive-foreground: 206 52% 11%;
+    --destructive-foreground: 219 60% 12%;
   }
 
   /*
-   * No marinho, o azul dos botões (com texto branco) fica escuro demais como
-   * texto: link e texto azul usam o azul claro do CRM.
+   * No marinho, o teal dos botões fica escuro demais como texto: link e texto
+   * teal usam o teal claro do CRM.
    */
   .dark.crm-navy:not(.high-contrast) .text-primary {
     color: hsl(var(--link));
@@ -256,6 +264,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Títulos no marinho da marca (claro no tema escuro e no CRM). */
+  h1,
+  h2,
+  h3 {
+    color: hsl(var(--heading));
   }
 
   /* Focus visible — high-visibility ring for keyboard navigation */
@@ -345,15 +360,10 @@
     box-shadow: 0 2px 4px hsl(var(--foreground) / 0.06), 0 8px 24px hsl(var(--foreground) / 0.08);
   }
 
-  /* A cor exata da logo, para o símbolo. Não acompanha o tema. */
-  .bg-brand {
-    background-color: hsl(var(--brand));
-  }
-
-  /* Degradê da marca: do azul-claro da saúde ao azul fundo. O lado claro foi
-     escurecido até o texto branco por cima continuar legível (4,7:1). */
+  /* Degradê da marca: do teal 700 ao azul-marinho. O texto branco por cima
+     passa de 5,4:1 nas duas pontas. */
   .bg-brand-gradient {
-    background-image: linear-gradient(135deg, hsl(206 80% 42%), hsl(214 82% 34%));
+    background-image: linear-gradient(135deg, hsl(175 77% 26%), hsl(217 79% 28%));
   }
 
   /* Landing page: gentle vertical float for the hero mockup cards. */

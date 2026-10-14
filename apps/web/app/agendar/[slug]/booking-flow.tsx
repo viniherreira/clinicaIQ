@@ -144,7 +144,7 @@ export function BookingFlow({
               onClick={() => setProfessionalId(p.id)}
               className={opcao(professionalId === p.id)}
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" style={{ backgroundColor: p.color ?? '#1669C7' }} aria-hidden="true">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" style={{ backgroundColor: p.color ?? '#0F766E' }} aria-hidden="true">
                 {p.name.replace(/^(Dra?\.?\s+)/i, '').slice(0, 1).toUpperCase()}
               </span>
               <span className="min-w-0">

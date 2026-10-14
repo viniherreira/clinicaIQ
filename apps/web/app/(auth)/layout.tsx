@@ -1,5 +1,5 @@
 import { CalendarDays, FileText, ShieldCheck, Sparkles } from 'lucide-react';
-import { LogoMark } from '@/components/logo';
+import { Logo } from '@/components/logo';
 
 const FEATURES = [
   { icon: CalendarDays, title: 'Agenda inteligente', desc: 'Visual, por profissional, com confirmação via WhatsApp.' },
@@ -15,16 +15,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/5 blur-3xl" aria-hidden="true" />
 
-        <div className="relative flex items-center gap-3">
-          <LogoMark size="lg" variant="glass" />
-          <span className="text-lg font-semibold tracking-tight">DreamClin</span>
+        <div className="relative">
+          <Logo size="md" tone="white" />
         </div>
 
         <div className="relative max-w-md">
           <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Gestão clínica moderna
           </div>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight xl:text-4xl">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white xl:text-4xl">
             A sua clínica inteira, em um só lugar.
           </h1>
           <p className="mt-3 text-white/80">
