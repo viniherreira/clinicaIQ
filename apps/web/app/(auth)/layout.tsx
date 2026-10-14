@@ -24,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Gestão clínica moderna
           </div>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight xl:text-4xl">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white xl:text-4xl">
             A sua clínica inteira, em um só lugar.
           </h1>
           <p className="mt-3 text-white/80">

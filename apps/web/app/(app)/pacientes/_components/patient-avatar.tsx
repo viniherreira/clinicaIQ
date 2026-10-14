@@ -1,6 +1,6 @@
 const COLORS = [
   'bg-primary/20 text-primary',
-  'bg-accent/20 text-accent',
+  'bg-accent text-accent-foreground',
   'bg-success/20 text-success',
   'bg-warning/20 text-warning',
   'bg-destructive/20 text-destructive',
