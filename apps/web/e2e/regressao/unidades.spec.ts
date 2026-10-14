@@ -4,6 +4,15 @@ import { prisma } from '@clinicaiq/db';
 import { createPatient, tomorrowISO, uniqueName } from '../support/helpers';
 import { E2E_TENANT_SLUG } from '../support/seed';
 
+/** O seletor do topo: botão "Unidade" com menu; espera a agenda trocar. */
+async function escolherUnidade(page: import('@playwright/test').Page, nome: string) {
+  await page.getByRole('button', { name: /^Unidade/ }).click();
+  await page.getByRole('menuitemradio', { name: new RegExp(nome) }).click();
+  await page.getByRole('button', { name: /^Unidade/ }).click();
+  await expect(page.getByRole('menuitemradio', { name: new RegExp(nome) })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+}
+
 /**
  * Unidades (várias clínicas na mesma conta): cadastrar nas Configurações,
  * trocar no topo e cada unidade com a sua agenda. Os pacientes são os mesmos.
@@ -47,9 +56,7 @@ test('unidades: cadastrar, trocar no topo e a agenda de cada uma', async ({ page
     await createPatient(page, paciente);
     const date = tomorrowISO();
     await page.goto(`/agenda?date=${date}`);
-    const seletor = page.getByLabel('Unidade', { exact: true });
-    await seletor.selectOption({ label: nome });
-    await expect(seletor).toHaveValue(unit.id);
+    await escolherUnidade(page, nome);
 
     await page.getByRole('button', { name: 'Novo agendamento (N)' }).click();
     const modal = page.getByRole('dialog', { name: 'Novo agendamento' });
@@ -69,8 +76,7 @@ test('unidades: cadastrar, trocar no topo e a agenda de cada uma', async ({ page
 
     // Na principal, o horário da outra unidade não aparece.
     const principal = await prisma.clinicUnit.findFirstOrThrow({ where: { tenantId: tenant.id }, orderBy: { order: 'asc' } });
-    await seletor.selectOption(principal.id);
-    await expect(seletor).toHaveValue(principal.id);
+    await escolherUnidade(page, principal.name);
     await expect(bloco).toHaveCount(0);
   } finally {
     if (profId) {
@@ -130,5 +136,22 @@ test('agendamento online: com duas unidades, o paciente escolhe onde e só vê q
       await prisma.professional.deleteMany({ where: { id: profId } });
     }
     if (unitId) await prisma.clinicUnit.deleteMany({ where: { id: unitId } });
+  }
+});
+
+test('unidade nova sem ninguém marcado: a agenda mostra todos e avisa onde marcar', async ({ page }) => {
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  const nome = uniqueName('Unidade Vazia E2E');
+  const unit = await prisma.clinicUnit.create({ data: { tenantId: tenant.id, name: nome, order: 950 } });
+  try {
+    await page.goto('/agenda');
+    await escolherUnidade(page, nome);
+    await expect(page.getByRole('note')).toContainText('Ninguém tem dia de atendimento marcado');
+    await expect(page.getByRole('link', { name: 'Marcar horários' })).toHaveAttribute('href', '/configuracoes#profissionais');
+    // Os profissionais aparecem (dá para agendar) em vez da tela de "cadastre profissionais".
+    await expect(page.getByText('Sua agenda está pronta')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Novo agendamento (N)' })).toBeEnabled();
+  } finally {
+    await prisma.clinicUnit.deleteMany({ where: { id: unit.id } });
   }
 });

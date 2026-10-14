@@ -141,18 +141,24 @@ export async function getAgendaData(dateStr: string, view: 'day' | 'week' | 'mon
   // Com várias unidades, a agenda mostra quem atende nesta (algum dia do
   // expediente aqui) ou já tem horário marcado aqui no período.
   const comHorario = new Set(appointments.map((a) => a.professionalId));
-  const daUnidade = units.multi
+  const atendemAqui = units.multi
     ? professionalsWithColor.filter((p) => comHorario.has(p.id) || (workingHours[p.id] ?? []).some(Boolean))
     : professionalsWithColor;
+  // Unidade nova, ninguém com dia marcado nela ainda: mostra todos (dá para
+  // agendar) e a tela avisa onde dizer quem atende aqui.
+  const noneHere = units.multi && atendemAqui.length === 0 && professionalsWithColor.length > 0;
+  const daUnidade = noneHere ? professionalsWithColor : atendemAqui;
+  // Nesse caso vale o horário de sempre de cada um (senão a grade ficaria toda fechada).
+  const horarios = noneHere ? await buildWorkingHoursMap(tenantId, professionals.map((p) => p.id)) : workingHours;
 
   return {
     appointments,
     blockedSlots,
     professionals: daUnidade,
-    unit: { id: unit.id, name: unit.name, multi: units.multi },
+    unit: { id: unit.id, name: unit.name, multi: units.multi, noneHere },
     rules,
     procedures: serializedProcedures,
-    workingHours,
+    workingHours: horarios,
     whatsappHealth,
     labels,
   };
