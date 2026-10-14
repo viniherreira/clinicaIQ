@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     template: '%s | ClinicaIQ',
   },
   description: 'Gestão inteligente para clínicas odontológicas e estéticas',
+  // Prova à Meta que o domínio dreamclin.com é nosso (verificação da empresa).
+  // Não é segredo e precisa ficar: tirar desverifica o domínio.
+  other: { 'facebook-domain-verification': 'vr6uyznl2ojvq1aymv8st4ogtktq7w' },
 };
 
 function Providers({ children }: { children: React.ReactNode }) {
