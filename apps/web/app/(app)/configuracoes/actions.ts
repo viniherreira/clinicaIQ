@@ -935,7 +935,7 @@ const inviteSchema = z.object({
 export async function inviteTeamMember(input: {
   email: string;
   role: string;
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{ ok: boolean; message?: string; inviteUrl?: string }> {
   const { tenantId, userId } = await requireOwner();
 
   const bloqueio = await writeBlocked(tenantId);
@@ -979,6 +979,10 @@ export async function inviteTeamMember(input: {
   const appUrl = siteUrl();
 
   let clerkInvitationId: string | null = null;
+  // O e-mail do convite sai pelo Clerk, fora do nosso alcance: quando ele não
+  // chega (filtro do provedor, envio do Clerk), a clínica fica sem saída. O
+  // link volta para a tela, para quem convidou mandar por WhatsApp.
+  let inviteUrl: string | undefined;
   try {
     const clerk = await clerkClient();
 
@@ -1002,6 +1006,7 @@ export async function inviteTeamMember(input: {
       redirectUrl: `${appUrl}/sign-up`,
     });
     clerkInvitationId = invite.id;
+    inviteUrl = invite.url ?? undefined;
   } catch (error) {
     // Sem o e-mail do Clerk o convite não chega a lugar nenhum. Falhar aqui é
     // melhor do que gravar um convite que ninguém vai receber.
@@ -1030,7 +1035,7 @@ export async function inviteTeamMember(input: {
   });
 
   revalidatePath('/configuracoes');
-  return { ok: true };
+  return { ok: true, inviteUrl };
 }
 
 export async function revokeInvite(id: string): Promise<{ ok: boolean; message?: string }> {
