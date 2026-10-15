@@ -1,0 +1,7 @@
+node_modules/
+out/
+audio/work/
+audio/sfx/*.wav
+*.48k.wav
+package-lock.json
+__pycache__/

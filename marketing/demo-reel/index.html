@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>DreamClin — reel</title>
+    <style>
+      @font-face { font-family: 'Outfit'; src: url(fonts/outfit-latin-600-normal.woff2) format('woff2'); font-weight: 600; }
+      @font-face { font-family: 'Outfit'; src: url(fonts/outfit-latin-700-normal.woff2) format('woff2'); font-weight: 700; }
+      @font-face { font-family: 'Outfit'; src: url(fonts/outfit-latin-800-normal.woff2) format('woff2'); font-weight: 800; }
+      html, body { margin: 0; padding: 0; background: #000; }
+      #stage {
+        position: relative; width: 1080px; height: 1920px; overflow: hidden;
+        background: #FAFAF8; font-family: 'Inter', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+        font-feature-settings: "cv11" 1;
+      }
+      .scene, .overlay { position: absolute; inset: 0; overflow: hidden; display: none; }
+      .overlay { display: block; pointer-events: none; }
+      * { box-sizing: border-box; }
+    </style>
+    <script src="src/vendor/lucide.js"></script>
+    <script src="src/timeline.js"></script>
+    <script src="src/engine.js"></script>
+    <script src="src/brand.js"></script>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <!-- Cenas, na ordem do vídeo (a ordem também define quem fica por cima). -->
+    <script src="src/scenes/manifest.js"></script>
+    <script>
+      for (const f of window.SCENE_FILES) document.write(`<script src="src/scenes/${f}.js"><\/script>`);
+    </script>
+    <script src="src/overlays.js"></script>
+    <script>
+      R.init().then(() => R.render(Number(new URLSearchParams(location.search).get('t') || 0)));
+    </script>
+  </body>
+</html>
