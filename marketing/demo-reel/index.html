@@ -30,6 +30,7 @@
     <script>
       for (const f of window.SCENE_FILES) document.write(`<script src="src/scenes/${f}.js"><\/script>`);
     </script>
+    <script src="src/rail.js"></script>
     <script src="src/overlays.js"></script>
     <script>
       R.init().then(() => R.render(Number(new URLSearchParams(location.search).get('t') || 0)));

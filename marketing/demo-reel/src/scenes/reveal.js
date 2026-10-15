@@ -1,5 +1,5 @@
 /*
- * Cena "logo": a marca se monta peça por peça sobre o branco quente.
+ * Cena "reveal": a marca se monta peça por peça sobre o branco quente.
  * Corpo sobe, cabeça brota, o "D" abraça a pessoa, a estrela acende e o nome
  * entra letra por letra. Depois a frase de posicionamento.
  */
@@ -10,7 +10,7 @@
   const TAGLINE = ['Gestão inteligente', 'para sua clínica'];
 
   R.scene({
-    id: 'logo',
+    id: 'reveal',
     build(root, S) {
       const mesh = B.mesh({
         base: C.warm,

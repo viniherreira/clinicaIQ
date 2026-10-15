@@ -509,3 +509,107 @@
     root.style.clipPath = `inset(${top.toFixed(1)}px 0 0 0 round ${R.lerp(120, 0, k).toFixed(1)}px ${R.lerp(120, 0, k).toFixed(1)}px 0 0)`;
   };
 })();
+
+// ── Peças de passagem entre cenas (match cuts) ───────────────────────────────
+// Cada uma aparece IDÊNTICA no último quadro de uma cena e no primeiro da
+// seguinte, na posição fixa indicada. A cena que sai termina com a peça
+// exatamente ali (sem transform); a que entra começa com ela ali e a anima.
+(() => {
+  const { h } = R;
+  const C = B.C;
+
+  /** Ícone de dente (molar), desenhado à mão, traço como os ícones lucide. */
+  B.tooth = ({ size = 40, color = C.teal700, sw = 2, fill = 'none' } = {}) => {
+    const el = R.s('svg', {
+      viewBox: '0 0 24 24', width: size, height: size, fill, stroke: color, 'stroke-width': sw,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', style: { display: 'block', flex: 'none', overflow: 'visible' },
+    });
+    el.innerHTML =
+      '<path d="M7 3C4.8 3 3 4.8 3 7.3c0 2 .7 3.2 1.3 4.6.6 1.5.7 3 1 4.8.3 2.2.8 4.3 2.2 4.3 1.6 0 1.6-3.2 2.2-5 .3-.8.7-1.3 1.3-1.3s1 .5 1.3 1.3c.6 1.8.6 5 2.2 5 1.4 0 1.9-2.1 2.2-4.3.3-1.8.4-3.3 1-4.8.6-1.4 1.3-2.6 1.3-4.6C21 4.8 19.2 3 17 3c-1.9 0-2.9 1-5 1S8.9 3 7 3z"/>';
+    return el;
+  };
+
+  B.handoff = {};
+
+  /** Cartão da Mariana: agenda → WhatsApp (Agendado) e WhatsApp → atendimento (Confirmado). */
+  B.handoff.PATIENT_CARD = { x: 100, y: 850, w: 880, h: 220 };
+  B.handoff.patientCard = ({ status = 'scheduled' } = {}) => {
+    const g = B.handoff.PATIENT_CARD;
+    const st = { scheduled: ['Agendado', C.scheduled], confirmed: ['Confirmado', C.confirmed] };
+    const chipBox = h('div', { style: { position: 'relative', flex: 'none', width: '232px', display: 'flex', justifyContent: 'flex-end' } });
+    const chips = {};
+    for (const [k, [label, col]] of Object.entries(st)) {
+      const c = B.chip(label, { bg: col.bg, fg: col.fg, dot: col.dot, size: 28, pad: 20 });
+      if (k !== status) Object.assign(c.style, { position: 'absolute', right: '0', top: '0', opacity: '0' });
+      chips[k] = c;
+      chipBox.appendChild(c);
+    }
+    const el = B.card(
+      { w: g.w, h: g.h, r: 44, shadow: 'lg', style: { left: `${g.x}px`, top: `${g.y}px`, display: 'flex', alignItems: 'center', gap: '28px', padding: '0 40px' } },
+      B.avatar('MC', { size: 104, bg: C.mint, fg: C.navy }),
+      h(
+        'div',
+        { style: { flex: '1', minWidth: '0', whiteSpace: 'nowrap' } },
+        B.text('Mariana Costa', { size: 44, weight: 700, color: C.ink, ls: '-0.025em', style: { whiteSpace: 'nowrap' } }),
+        h(
+          'div',
+          { style: { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' } },
+          B.icon('clock', { size: 30, color: C.muted, sw: 2.2 }),
+          B.text('Ter · 14:30 · Avaliação', { size: 30, weight: 500, color: C.muted, ls: '-0.01em', style: { whiteSpace: 'nowrap' } }),
+        ),
+      ),
+      chipBox,
+    );
+    el.style.transformOrigin = '50% 50%';
+    return { el, chips, geom: g };
+  };
+
+  /** Dois dentes tratados: atendimento → orçamento. Pílulas empilhadas no centro. */
+  B.handoff.TOOTH_CHIPS = [
+    { x: 260, y: 852, w: 560, h: 104 },
+    { x: 260, y: 980, w: 560, h: 104 },
+  ];
+  B.handoff.toothChips = () =>
+    B.handoff.TOOTH_CHIPS.map((g, i) => {
+      const el = B.card(
+        { w: g.w, h: g.h, r: 52, shadow: 'md', style: { left: `${g.x}px`, top: `${g.y}px`, display: 'flex', alignItems: 'center', gap: '22px', padding: '0 28px 0 18px' } },
+        h('div', { style: { width: '72px', height: '72px', borderRadius: '50%', background: C.teal100, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' } }, B.tooth({ size: 40, color: C.teal700, sw: 2.2 })),
+        B.text(i === 0 ? '16 · Restauração' : '26 · Restauração', { size: 38, weight: 650, color: C.ink, ls: '-0.02em' }),
+      );
+      el.style.transformOrigin = '50% 50%';
+      return { el, geom: g };
+    });
+
+  /** Pílula "Orçamento aceito": orçamento → pagamento. */
+  B.handoff.ACCEPTED_PILL = { x: 230, y: 894, w: 620, h: 132 };
+  B.handoff.acceptedPill = () => {
+    const g = B.handoff.ACCEPTED_PILL;
+    const el = B.card(
+      { w: g.w, h: g.h, r: 66, bg: C.mint, shadow: 'md', style: { left: `${g.x}px`, top: `${g.y}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '18px' } },
+      B.icon('circle-check', { size: 52, color: C.navy, sw: 2.4 }),
+      B.text('Orçamento aceito', { size: 46, weight: 750, color: C.navy, ls: '-0.025em' }),
+    );
+    el.style.transformOrigin = '50% 50%';
+    return { el, geom: g };
+  };
+
+  /** Moeda da marca: pagamento → financeiro. Centro em (540, 960), 200 px. */
+  B.handoff.COIN = { cx: 540, cy: 960, size: 200 };
+  B.handoff.coin = () => {
+    const g = B.handoff.COIN;
+    const star = B.star({ size: 92, color: '#fff' });
+    const el = h(
+      'div',
+      {
+        style: {
+          position: 'absolute', left: `${g.cx - g.size / 2}px`, top: `${g.cy - g.size / 2}px`, width: `${g.size}px`, height: `${g.size}px`,
+          borderRadius: '50%', background: `radial-gradient(circle at 35% 30%, ${C.teal300} 0%, ${C.teal} 38%, ${C.teal700} 100%)`,
+          boxShadow: '0 30px 60px -20px rgba(15,118,110,.55), inset 0 0 0 8px rgba(255,255,255,.22), inset 0 -10px 20px rgba(6,24,51,.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: '50% 50%', willChange: 'transform',
+        },
+      },
+      star,
+    );
+    return { el, geom: g };
+  };
+})();

@@ -67,7 +67,22 @@ escalar ou desfocar o seu conteúdo nos últimos décimos.
 - Fontes: `B.DISPLAY` ("Inter Display") para títulos (800, letter-spacing -0.04em), `B.FONT` ("Inter") para interface. Números com `font-feature-settings: "tnum"`.
 - Situações da agenda (mesmas cores do app): `B.C.scheduled`, `confirmed`, `arrived`, `inProgress`, `attended` (cada uma tem `bg`, `fg`, `dot`). Rótulos: Agendado, Confirmado, Na sala de espera, Em atendimento, Atendido.
 - Botões da confirmação no WhatsApp: **"Confirmar"** e **"Reagendar"** (o paciente toca; nunca "responda 1 ou 2"). Verde de conversa `B.C.whatsapp`, balão `B.C.waBubble`, fundo `B.C.waBg`. Não desenhe a logo do WhatsApp.
-- Clínica fictícia: **Clínica Aurora**. Pacientes fictícios: Mariana Costa, Pedro Alves, Juliana Reis, Carlos Lima, Ana Souza. Profissionais: Dra. Helena Prado (dentista), Dr. Rafael Nunes (ortodontista), Dra. Camila Torres (estética).
+- Clínica fictícia: **Clínica Aurora**. Paciente principal: **Mariana Costa** (avatar "MC", menta). Outros pacientes: Carlos Lima, Pedro Alves, Juliana Reis, Ana Souza. Profissionais: **Dra. Paula**, **Dr. Rafael**, **Dra. Lia**. A consulta da Mariana é **terça, 14:30, Avaliação, com a Dra. Paula**.
+- **Nenhum valor em dinheiro na tela** (nada de "R$", preços, totais, parcelas com valor). Onde um valor apareceria, use barras/esqueleto, ícones ou só o rótulo. Parcelas podem aparecer como "até 12x", "6x" (sem valor).
+
+## Sincronia, trilho e passagens
+
+- `TIMELINE.vo` traz cada fala da narração (início/fim, tempo global) e `TIMELINE.events` os momentos-chave. Sincronize o visual com eles (tempo local = global − início da cena).
+- **Trilho do dia da paciente** (`src/rail.js`, camada global): de 6,5 s a 22,5 s ocupa o topo, **y 222–354**. Nessas cenas não ponha nada importante acima de y = 370; títulos cinéticos vão na faixa y 380–480 e o objeto principal de y 500 a 1560.
+- **Peças de passagem** (`B.handoff`, em `src/brand.js`): a cena que sai termina com a peça exatamente na geometria indicada (sem transform, sobre o fundo combinado) e a que entra começa igual. Assim o corte é contínuo:
+  - agenda → whatsapp (10,5 s): `B.handoff.patientCard({status: 'scheduled'})`, fundo branco quente `B.C.warm`.
+  - whatsapp → care (17,0 s): `B.handoff.patientCard({status: 'confirmed'})`, fundo branco quente.
+  - care → quote (22,5 s): `B.handoff.toothChips()`, fundo branco quente.
+  - quote → payments (27,0 s): `B.handoff.acceptedPill()`, fundo branco quente no último quadro do quote; o payments começa com a pílula sobre o branco e abre o degradê.
+  - payments → finance (35,0 s): `B.handoff.coin()` no centro, fundo branco quente.
+  - hook → reveal (3,0 s): estrela da marca teal, centro (540, 960), 160 px de largura, fundo ardósia; o reveal abre com `B.starWipe` a partir dela.
+  - reveal → agenda (6,5 s): tela branca quente com a grade de pontos `B.dots({gap: 28, color: 'rgba(15,59,130,.07)'})`.
+  - finance → endcard (39,7–40,0 s): o finance termina com uma estrela teal no centro; o endcard (pre = 0,3 s, por cima) abre com `B.starWipe` a partir dela.
 
 ## Regras de qualidade
 
