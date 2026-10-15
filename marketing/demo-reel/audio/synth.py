@@ -221,8 +221,8 @@ def sub_bass(midi, dur, glide_from=None):
         f = midi_hz(glide_from) + (f0 - midi_hz(glide_from)) * (1 - np.exp(-np.arange(n) / SR / 0.03))
     else:
         f = np.full(n, f0)
-    x = osc_sine(f, n) + 0.18 * osc_sine(f * 2, n) + 0.06 * osc_sine(f * 3, n)
-    x = np.tanh(x * 1.4)
+    x = osc_sine(f, n) + 0.32 * osc_sine(f * 2, n) + 0.14 * osc_sine(f * 3, n) + 0.05 * osc_sine(f * 4, n)
+    x = np.tanh(x * 1.6)
     e = env_adsr(n, a=0.004, d=0.08, s=0.85, r=0.06, hold=dur)
     return x * e * 0.6
 
