@@ -74,11 +74,12 @@ def main(cue_path, out_path, stems_dir=None):
 
     # ── Gancho: tensão ──────────────────────────────────────────────────────
     hook_end = logo
-    drone = S.sub_bass(m('B1'), hook_end + 0.2) * 0.4
+    drone = S.sub_bass(m('B1'), cue.get('hush', hook_end) + 0.05) * 0.4
     S.place(bass, drone, 0)
-    dark = S.pad_chord([m('B2'), m('F#3'), m('C#4'), m('D4')], hook_end, attack=0.6, release=0.4, cutoff=900, detune=0.12)
+    dark = S.pad_chord([m('B2'), m('F#3'), m('C#4'), m('D4')], cue.get('hush', hook_end), attack=0.6, release=0.25, cutoff=900, detune=0.12)
     S.place(pads, dark, 0, 0.9)
-    for i, t in enumerate(beats_between(0, hook_end - 0.01, beat / 2)):
+    hush = cue.get('hush', hook_end)
+    for i, t in enumerate(beats_between(0, hush - 0.01, beat / 2)):
         S.place(fx, S.tick(0.32 if i % 2 == 0 else 0.2), t)
     for t in cue.get('stabs', []):
         S.place(drums, S.kick(punch=0.8, length=0.35, tone=44), t, 0.75)
@@ -91,8 +92,12 @@ def main(cue_path, out_path, stems_dir=None):
     # ── Logo: impacto e abertura ────────────────────────────────────────────
     S.place(fx, S.impact(0.75), logo)
     S.place(drums, S.kick(punch=1.3, length=0.6, tone=40), logo, 0.9)
-    for i, nn in enumerate(STAR_MOTIF):
-        S.place(bells, S.bell(m(nn), 1.8), logo + 0.12 + i * beat / 2, 0.55)
+    for mo in cue.get('motifs', [{'t': logo + 0.12, 'n': 4}]):
+        notes = STAR_MOTIF[:mo.get('n', 4)]
+        step = beat / 4
+        t0 = mo['t'] - step * (len(notes) - 1)  # a última nota cai no tempo dado
+        for i, nn in enumerate(notes):
+            S.place(bells, S.bell(m(nn), 1.8), t0 + i * step, 0.5 if mo.get('n', 4) == 4 else 0.42)
 
     # ── Harmonia do resto ───────────────────────────────────────────────────
     bars = beats_between(logo, cta, bar)
@@ -152,10 +157,9 @@ def main(cue_path, out_path, stems_dir=None):
         S.place(drums, cl, t, 0.15 + 0.07 * i)
     S.place(fx, S.riser(bar, 400, 8000, 0.2), groove - bar)
 
-    # Brilhos da estrela ao longo do vídeo.
+    # Brilhos agudos soltos.
     for t in cue.get('glints', []):
-        for i, nn in enumerate(STAR_MOTIF):
-            S.place(bells, S.bell(m(nn) + 12, 1.2), t + i * beat / 4, 0.28)
+        S.place(bells, S.bell(m('D7'), 1.0), t, 0.22)
 
     # ── Respiro e final ─────────────────────────────────────────────────────
     S.place(fx, S.reverse_cymbal(1.0, 0.35), cta - 1.0)
@@ -166,7 +170,7 @@ def main(cue_path, out_path, stems_dir=None):
     S.place(pads, S.pad_chord([m(x) for x in FINAL[1]], tail - 1.2, attack=0.02, release=1.6, cutoff=3800), cta, 1.1)
     S.place(bass, S.sub_bass(m(FINAL[0]), tail - 1.5), cta, 0.8)
     for i, nn in enumerate(FINAL[2] + ['D6']):
-        S.place(bells, S.bell(m(nn), 2.2), cta + 0.1 + i * beat / 2, 0.42)
+        S.place(bells, S.bell(m(nn), 2.2), cta + 0.1 + i * beat / 2, 0.32)
     # No final ainda pulsa leve até o fim do vídeo.
     for t in beats_between(cta + bar / 2, total - 0.6, beat):
         S.place(drums, k, t, 0.55)
