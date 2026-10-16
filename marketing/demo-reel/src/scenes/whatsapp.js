@@ -31,8 +31,9 @@
   T.reminderOut = T.reminder + 0.82; // some ~13,4
   T.push = VO.p7.start - 0.1; // câmera se aproxima do botão
   T.pulse = T.knows + 0.02; // sinal viaja do celular até a agenda
-  T.flip = T.knows + 0.3; // 15,9 o cartão vira
-  T.title3 = T.knows + 0.4; // 16,0 "Recepção não digita nada"
+  T.cardIn = T.knows + 0.12; // o cartão entra depois que o celular começa a recuar
+  T.flip = T.knows + 0.34; // 15,94 o cartão vira
+  T.title3 = T.knows + 0.42; // 16,0 "Recepção não digita nada"
   // Saída: tudo parado na geometria da passagem antes do último quadro.
   const DUR = TL.whatsapp.end - TL.whatsapp.start;
   T.exit = DUR - 0.5; // 6,0
@@ -50,8 +51,18 @@
   const CAM_O = { x: 540, y: 1290 }; // a câmera se aproxima dos botões
   const PG = B.handoff.PATIENT_CARD; // {x:100, y:850, w:880, h:220}
   const CARD_C = { x: PG.x + PG.w / 2, y: PG.y + PG.h / 2 };
-  const PBACK = { cx: 300, cy: 948, s: 0.74 }; // celular depois do recuo
-  const CBACK = { cx: 580, cy: 1362, s: 0.86 }; // cartão da agenda ao lado
+  const PBACK = { cx: 285, cy: 930, s: 0.7 }; // celular depois do recuo
+  const CBACK = { cx: 582, cy: 1362, s: 0.86 }; // cartão da agenda ao lado
+  // Coluna da agenda (Dra. Paula) atrás do cartão: 14:30 cai no centro do cartão.
+  const AP = { x: 540, y: 548, w: 392, h: 860 };
+  const HOUR = 200;
+  const yAtHour = (hr) => CBACK.cy + (hr - 14.5) * HOUR - AP.y; // y local no painel
+  const APPTS = [
+    { hr: 11, name: 'Carlos Lima', what: 'Retorno', col: C.confirmed },
+    { hr: 12, name: 'Juliana Reis', what: 'Limpeza', col: C.confirmed },
+    { hr: 13, name: 'Pedro Alves', what: 'Clareamento', col: C.scheduled },
+  ];
+  const RECEDE = E.bezier(0.55, 0, 0.15, 1);
   const LG_SHADOW = [
     [0, 30, 60, -20, 0.28],
     [0, 10, 24, -10, 0.14],
@@ -116,7 +127,7 @@
     if (!on) return;
     R.reveal(hl.parts, lt, {
       start, stagger, dur: 0.75, y: 135, r: 4,
-      out: { start: outStart, stagger: outStagger, dur: outDur, y: -150, ease: E.inCubic },
+      out: { start: outStart, stagger: outStagger, dur: outDur, y: -150, ease: E.inCubic, fade: true },
     });
   }
   /** Transform do celular (em torno do centro) aplicado num ponto local. */
@@ -130,6 +141,49 @@
   }
   /** Câmera (escala em torno de CAM_O) aplicada num ponto. */
   const camPt = (cs, p) => ({ x: CAM_O.x + cs.s * (p.x - CAM_O.x), y: CAM_O.y + cs.s * (p.y - CAM_O.y) });
+
+  /** Coluna do dia da Dra. Paula: cabeçalho, horas e três atendimentos. */
+  function agendaPanel() {
+    const panel = h('div', {
+      style: {
+        position: 'absolute', left: `${AP.x}px`, top: `${AP.y}px`, width: `${AP.w}px`, height: `${AP.h}px`, borderRadius: '36px',
+        background: '#fff', overflow: 'hidden', opacity: 0, visibility: 'hidden', willChange: 'transform', transformOrigin: '50% 30%',
+        boxShadow: '0 30px 60px -26px rgba(11,31,63,.24), 0 8px 20px -12px rgba(11,31,63,.10), 0 0 0 1px rgba(11,31,63,.05)',
+      },
+    });
+    panel.appendChild(
+      h(
+        'div',
+        { style: { position: 'absolute', left: '26px', right: '26px', top: '28px', height: '44px', display: 'flex', alignItems: 'center', gap: '12px' } },
+        B.icon('calendar-days', { size: 32, color: C.teal700, sw: 2.2 }),
+        h('div', { style: { flex: '1', font: `700 30px/1 ${B.FONT}`, color: C.ink, letterSpacing: '-0.02em' }, text: 'Agenda' }),
+        h('div', { style: { font: `500 24px/1 ${B.FONT}`, color: C.muted, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, text: 'Dra. Paula' }),
+      ),
+    );
+    [11, 12, 13].forEach((hr) => {
+      const y = yAtHour(hr);
+      panel.appendChild(h('div', { style: { position: 'absolute', left: '92px', right: '0', top: `${y}px`, height: '2px', background: C.warm100 } }));
+      panel.appendChild(h('div', { style: { position: 'absolute', left: '22px', top: `${y - 12}px`, font: `500 24px/1 ${B.FONT}`, color: C.muted2, letterSpacing: '-0.01em', fontFeatureSettings: '"tnum" 1' }, text: `${hr}:00` }));
+    });
+    const blocks = APPTS.map((a) => {
+      const b = h(
+        'div',
+        {
+          style: {
+            position: 'absolute', left: '100px', right: '18px', top: `${yAtHour(a.hr) + 8}px`, height: `${HOUR / 2 - 4}px`, borderRadius: '20px',
+            background: a.col.bg, padding: '0 16px 0 28px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            gap: '8px', overflow: 'hidden', willChange: 'transform',
+          },
+        },
+        h('div', { style: { position: 'absolute', left: '0', top: '0', bottom: '0', width: '8px', background: a.col.dot } }),
+        h('div', { style: { font: `650 28px/1.05 ${B.FONT}`, color: a.col.fg, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }, text: a.name }),
+        h('div', { style: { font: `500 24px/1.05 ${B.FONT}`, color: a.col.fg, opacity: 0.72, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, text: a.what }),
+      );
+      panel.appendChild(b);
+      return b;
+    });
+    return { panel, blocks };
+  }
 
   R.scene({
     id: 'whatsapp',
@@ -284,7 +338,7 @@
       cam.appendChild(tap.el);
       const STAR_COLS = [C.teal, C.mint, C.teal300, C.teal, C.mint, C.teal300, C.teal, C.mint];
       const burst = STAR_COLS.map((col, i) => {
-        const size = 22 + R.hash(i * 4.1 + 3) * 14;
+        const size = 30 + R.hash(i * 4.1 + 3) * 18;
         const w = h('div', { style: { position: 'absolute', left: `${-size / 2}px`, top: `${(-size * 148) / 140 / 2}px`, opacity: 0 } }, B.star({ size, color: col }));
         cam.appendChild(w);
         return w;
@@ -305,17 +359,12 @@
       // ── Agenda (cartão que vira "Confirmado") ──
       const agenda = h('div', { style: { position: 'absolute', inset: 0 } });
       root.appendChild(agenda);
+      const ag = agendaPanel();
+      agenda.appendChild(ag.panel);
       const pulseSvg = R.s('svg', { width: 1080, height: 1920, viewBox: '0 0 1080 1920', style: { position: 'absolute', left: 0, top: 0, overflow: 'visible' } });
       const pulsePath = R.s('path', { d: 'M0 0', fill: 'none', stroke: C.teal, 'stroke-width': 5, 'stroke-linecap': 'round', opacity: 0 });
       pulseSvg.appendChild(pulsePath);
       agenda.appendChild(pulseSvg);
-      const agLabel = h(
-        'div',
-        { style: { position: 'absolute', left: 0, top: 0, display: 'flex', alignItems: 'center', gap: '10px', font: `600 28px/1 ${B.FONT}`, color: C.muted, letterSpacing: '-0.01em', whiteSpace: 'nowrap', opacity: 0 } },
-        B.icon('calendar-days', { size: 30, color: C.teal700, sw: 2.2 }),
-        h('span', { text: 'Agenda' }),
-      );
-      agenda.appendChild(agLabel);
       const cardB = B.handoff.patientCard({ status: 'confirmed' });
       cardB.el.style.visibility = 'hidden';
       agenda.appendChild(cardB.el);
@@ -341,7 +390,7 @@
 
       Object.assign(S, {
         glow, blobs, cam, waLabel, phone, statusText, dayChip, bubble, body, words, msgTime, dots, btnC, btnR, ripple, lab1, lab2, check,
-        reminder, bell, tap, burst, t1, t2, t3, underline, agenda, pulsePath, agLabel, cardB, badge, sparks, head, shell, shellDots, cardA,
+        reminder, bell, tap, burst, t1, t2, t3, underline, agenda, ag, pulsePath, cardB, badge, sparks, head, shell, shellDots, cardA,
         CT, SH, cardAStyle: { background: cardA.el.style.background, boxShadow: cardA.el.style.boxShadow },
       });
     },
@@ -363,10 +412,12 @@
       updateReminder(lt, S);
       updateTap(lt, S, ps);
 
-      runTitle(S.t1, lt, T.title1, T.confirmed - 0.02);
-      runTitle(S.t2, lt, T.confirmed + 0.1, T.knows + 0.02);
+      runTitle(S.t1, lt, T.title1, T.tap - 0.1, { outDur: 0.26 });
+      runTitle(S.t2, lt, T.confirmed + 0.06, T.knows + 0.02);
       runTitle(S.t3, lt, T.title3, T.exit + 0.06, { stagger: 0.05, outStagger: 0.03, outDur: 0.29 });
-      S.underline.style.transform = `scaleX(${R.p(lt, T.title3 + 0.38, 0.32, E.snappy).toFixed(4)})`;
+      const ulOut = R.p(lt, T.exit - 0.04, 0.2, E.inCubic);
+      S.underline.style.transformOrigin = ulOut > 0 ? '100% 50%' : '0% 50%';
+      S.underline.style.transform = `scaleX(${(R.p(lt, T.title3 + 0.38, 0.32, E.snappy) * (1 - ulOut)).toFixed(4)})`;
 
       updateAgenda(lt, S, cs, ps);
     },
@@ -409,7 +460,7 @@
     x += bump * 8;
     r += bump * 0.8;
     // Recuo: desliza para a esquerda e encolhe.
-    const kb = R.p(lt, T.knows, 0.5, E.swift);
+    const kb = R.p(lt, T.knows, 0.55, RECEDE);
     const nat = { cx: PX + PW / 2, cy: PY + ph / 2 };
     x = R.lerp(x, PBACK.cx - nat.cx, kb);
     y = R.lerp(y, PBACK.cy - nat.cy + Math.sin(lt * 1.8) * 4, kb);
@@ -426,8 +477,8 @@
   function updateMorph(lt, S, cs, ps) {
     const a = S.cardA.el;
     if (lt <= 0) {
-      // Primeiro quadro: a peça de passagem intacta.
-      a.style.display = '';
+      // Primeiro quadro: a peça de passagem intacta (o display flex dela não é tocado).
+      a.style.visibility = 'visible';
       a.style.transform = 'none';
       a.style.opacity = '';
       a.style.background = S.cardAStyle.background;
@@ -436,7 +487,7 @@
       return;
     }
     if (lt >= T.morphEnd) {
-      a.style.display = 'none';
+      a.style.visibility = 'hidden';
       S.shell.style.display = 'none';
       return;
     }
@@ -468,10 +519,11 @@
       Object.assign(d.style, { left: `${(ox - ds / 2).toFixed(2)}px`, top: `${(oy - ds / 2).toFixed(2)}px`, width: `${ds.toFixed(2)}px`, height: `${ds.toFixed(2)}px` });
     });
     // O conteúdo do cartão encolhe junto e some (crossfade com a casca).
-    a.style.display = '';
+    a.style.visibility = 'visible';
     a.style.background = 'transparent';
     a.style.boxShadow = 'none';
-    R.tf(a, { x: cx - CARD_C.x, y: cy - CARD_C.y, r: rot, s: hh / PG.h, o: 1 - R.p(lt, 0.02, 0.2, E.outQuad) });
+    const fit = Math.min(w / PG.w, hh / PG.h); // cabe inteiro dentro da casca
+    R.tf(a, { x: cx - CARD_C.x, y: cy - CARD_C.y, r: rot, s: fit, o: 1 - R.p(lt, 0.13, 0.17, E.inOutQuad) });
   }
   const dotBounce = (lt, i) => -9 * Math.max(0, Math.sin((lt * 2.4 - i * 0.16) * Math.PI * 2));
 
@@ -574,14 +626,30 @@
     });
   }
 
+  // ── Coluna da agenda: entra pela direita junto com o recuo, sai pela direita ──
+  function updatePanel(lt, S) {
+    const { panel, blocks } = S.ag;
+    const kp = R.sp(lt, T.knows + 0.1, { k: 200, c: 24 }); // espera o celular abrir espaço
+    const ke = R.p(lt, T.exit - 0.04, 0.4, E.inCubic);
+    const o = R.clamp(kp * 2) * (1 - R.p(lt, T.exit + 0.02, 0.3, E.inQuad));
+    const on = lt >= T.knows + 0.1 && o > 0.001;
+    panel.style.visibility = on ? 'visible' : 'hidden';
+    if (!on) return;
+    R.tf(panel, { x: (1 - kp) * 480 + 520 * ke, y: Math.sin(lt * 1.6) * 3, s: R.lerp(0.94, 1, kp), o });
+    blocks.forEach((b, i) => {
+      const kb = R.sp(lt, T.knows + 0.2 + i * 0.07, R.springs.snappy);
+      R.tf(b, { y: (1 - kb) * 34, o: R.clamp(kb * 2) });
+    });
+  }
+
   // ── 5,1 s em diante: a agenda já sabe ───────────────────────────────────────
   function updateAgenda(lt, S, cs, ps) {
     const c = S.cardB;
     const el = c.el;
-    const visible = lt >= T.knows;
+    updatePanel(lt, S);
+    const visible = lt >= T.cardIn;
     el.style.visibility = visible ? 'visible' : 'hidden';
     if (!visible) {
-      S.agLabel.style.opacity = '0';
       S.badge.style.opacity = '0';
       S.pulsePath.setAttribute('opacity', '0');
       S.head.style.opacity = '0';
@@ -589,9 +657,9 @@
       return;
     }
     // Entra pela direita, vira, depois vai para a geometria da passagem.
-    const kc = R.sp(lt, T.knows, { k: 190, c: 21 });
+    const kc = R.sp(lt, T.cardIn, { k: 190, c: 21 });
     const km = R.p(lt, T.exit, T.settle - T.exit, E.swift);
-    const cx = R.lerp(R.lerp(CBACK.cx + 780, CBACK.cx, kc), CARD_C.x, km);
+    const cx = R.lerp(R.lerp(CBACK.cx + 900, CBACK.cx, kc), CARD_C.x, km);
     const cy = R.lerp(CBACK.cy + (1 - kc) * 40, CARD_C.y, km);
     const fk = R.p(lt, T.flip, 0.34, E.inOutCubic);
     const ang = 180 * fk;
@@ -607,14 +675,8 @@
       R.tf(el, { persp: 1600, x: cx - CARD_C.x, y: cy - CARD_C.y, rx: flipped ? ang - 180 : ang, r: rz, s });
     }
 
-    // Rótulo "Agenda" acima do cartão, à direita.
-    const right = cx + (PG.w / 2) * s;
-    const top = cy - (PG.h / 2) * s;
-    const lw = S.agLabel.offsetWidth;
-    R.tf(S.agLabel, { x: right - lw - 8, y: top - 50, o: R.p(lt, T.knows + 0.15, 0.3) * (1 - R.p(lt, T.exit - 0.05, 0.22)) });
-
-    // Sinal: do botão "Confirmado" no celular até a situação no cartão.
-    const a = camPt(cs, phonePt(ps, BZ + 18 + BW / 2, BZ + S.C_TOP + BTN_H / 2));
+    // Sinal: da ponta do botão "Confirmado" (sem riscar o rótulo) até a situação no cartão.
+    const a = camPt(cs, phonePt(ps, BZ + 18 + BW - 14, BZ + S.C_TOP + BTN_H / 2));
     const chipLocal = { x: S.chipC.x + 30, y: S.chipC.y + S.chipC.h / 2 };
     const b = { x: cx + (chipLocal.x - PG.w / 2) * s, y: cy + (chipLocal.y - PG.h / 2) * s };
     const ctl = { x: (a.x + b.x) / 2 + 60, y: Math.min(a.y, b.y) - 150 };
@@ -632,16 +694,16 @@
     const headOn = lt >= T.pulse && lt < T.flip + 0.05;
     R.tf(S.head, { x: hx, y: hy, r: lt * 300, s: headOn ? 1 - 0.5 * R.p(lt, T.flip - 0.04, 0.08) : 0, o: headOn ? 1 : 0 });
 
-    // Selo de check com faíscas: estoura na situação e é absorvido pelo ponto verde.
-    const corner = { x: S.chipC.x + S.chipC.w - 8, y: S.chipC.y + 2 };
-    const dot = { x: S.chipC.x + 20 + 6, y: S.chipC.y + S.chipC.h / 2 };
+    // Selo de check com faíscas: estoura no canto do cartão (sem cobrir a situação)
+    // e no fim encolhe ali mesmo, girando.
+    const corner = { x: PG.w - 30, y: 26 };
     const pop = R.sp(lt, T.flip + 0.22, R.springs.bouncy);
-    const absorb = R.p(lt, T.exit - 0.02, 0.24, E.inCubic);
-    const bl = { x: R.lerp(corner.x, dot.x, absorb), y: R.lerp(corner.y, dot.y, absorb) };
+    const absorb = R.p(lt, T.exit - 0.04, 0.22, E.inBack);
+    const bl = corner;
     const bx = cx + (bl.x - PG.w / 2) * s;
     const by = cy + (bl.y - PG.h / 2) * s;
     const bOn = lt >= T.flip + 0.22 && absorb < 1;
-    R.tf(S.badge, { x: bx, y: by, s: bOn ? R.clamp(pop, 0, 1.4) * R.lerp(1, 0.2, absorb) * s : 0, r: (1 - R.clamp(pop)) * -40, o: bOn ? R.clamp(pop * 3) * (1 - absorb) : 0 });
+    R.tf(S.badge, { x: bx, y: by, s: bOn ? R.clamp(pop, 0, 1.4) * Math.max(0, 1 - absorb) * s : 0, r: (1 - R.clamp(pop)) * -40 + absorb * 90, o: bOn ? R.clamp(pop * 3) : 0 });
     const cc = { x: cx + (corner.x - PG.w / 2) * s, y: cy + (corner.y - PG.h / 2) * s };
     S.sparks.forEach((w, i) => {
       const k = R.p(lt, T.flip + 0.22 + R.hash(i * 3.3) * 0.06, 0.6, E.outCubic);
