@@ -121,14 +121,11 @@ export function LeadPanel({
         </div>
       ) : (
         <div>
-          <div className="flex gap-1" aria-hidden="true">
-            {stages.map((s, i) => (
-              <span key={s.id} className={`h-1.5 flex-1 rounded-full ${i <= indice ? colorClasses(s.color).dot : 'bg-border'}`} />
-            ))}
-          </div>
-          {pipelines.length > 1 && (
-            <>
-              <label htmlFor="lead-funil" className="mt-3 block text-xs font-medium text-muted-foreground">
+          {/* Como no Kommo: o funil pequeno em cima, a etapa em destaque e a barra do caminho embaixo. */}
+          {pipelines.length > 1 ? (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {/* "Funil principal" já diz que é funil: o rótulo fica só para o leitor de tela. */}
+              <label htmlFor="lead-funil" className={/^funil\b/i.test(funil?.name ?? '') ? 'sr-only' : ''}>
                 Funil
               </label>
               <select
@@ -139,29 +136,39 @@ export function LeadPanel({
                   const destino = pipelines.find((p) => p.id === e.target.value);
                   if (destino?.columns[0]) mover(destino.columns[0].id, undefined, `Movido para o funil ${destino.name}.`);
                 }}
-                className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="min-w-0 max-w-full cursor-pointer truncate rounded border-0 bg-transparent py-0 pl-0 pr-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 {pipelines.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-            </>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{/^funil\b/i.test(funil?.name ?? '') ? funil?.name : `Funil ${funil?.name ?? ''}`}</p>
           )}
-          <label htmlFor="lead-etapa" className="mt-3 block text-xs font-medium text-muted-foreground">
-            Etapa <span className="font-normal">· {timeAgo(new Date(lead.stageEnteredAt))}</span>
+          <label htmlFor="lead-etapa" className="sr-only">
+            Etapa
           </label>
-          <select
-            id="lead-etapa"
-            value={lead.stageId}
-            disabled={pending}
-            onChange={(e) => mover(e.target.value)}
-            className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+          <div className="mt-0.5 flex items-baseline gap-2">
+            <select
+              id="lead-etapa"
+              value={lead.stageId}
+              disabled={pending}
+              onChange={(e) => mover(e.target.value)}
+              className="min-w-0 flex-1 cursor-pointer truncate rounded border-0 bg-transparent py-0.5 pl-0 text-sm font-bold uppercase tracking-wide text-heading hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {stages.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(new Date(lead.stageEnteredAt))}</span>
+          </div>
+          <div className="mt-1.5 flex gap-0.5" aria-hidden="true">
+            {stages.map((s, i) => (
+              <span key={s.id} className={`h-1 flex-1 rounded-full ${i <= indice ? colorClasses(s.color).dot : 'bg-border'}`} />
             ))}
-          </select>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" disabled={pending} onClick={() => mover(closedStages.won, undefined, 'Negócio fechado.')} className="btn-outline btn-sm inline-flex items-center justify-center gap-1.5 text-green-700 dark:text-green-300">
               <Check className="h-3.5 w-3.5" aria-hidden="true" /> Ganho
             </button>
@@ -174,7 +181,7 @@ export function LeadPanel({
 
       {actions}
 
-      <dl className="divide-y divide-border/70 text-sm">
+      <dl className="text-sm">
         <Field label="Responsável">
           <InlineSelect
             label="Responsável"
@@ -329,7 +336,7 @@ function CustomFieldEditor({ def, value, onSave }: { def: FieldDef; value: LeadD
 /** Um dado da ficha, como no Kommo: o nome à esquerda, o valor à direita. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-3 py-2">
+    <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-3 py-1.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>

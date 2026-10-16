@@ -238,7 +238,8 @@
     --rail-foreground: 216 25% 78%;
     --rail-active: 219 55% 17%;
     --board: 219 60% 12%;
-    --bubble-out: 176 50% 20%;
+    /* Balão da clínica azul, como no Kommo. */
+    --bubble-out: 215 45% 28%;
     --link: 171 77% 64%;
 
     /* Vermelho mais claro para ler sobre o marinho; texto escuro nos botões vermelhos. */

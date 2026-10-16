@@ -137,7 +137,7 @@ export function Inbox({
       )}
 
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 ${thread ? 'lg:grid-cols-[280px_1fr_300px] xl:grid-cols-[320px_1fr_340px]' : 'lg:grid-cols-[minmax(300px,340px)_1fr]'}`}
+        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(290px,330px)_1fr] ${thread ? 'xl:grid-cols-[330px_350px_1fr]' : ''}`}
       >
         <aside aria-labelledby={`${id}-titulo`} className={`${selectedId ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col border-r border-border bg-surface`}>
           <div className="space-y-3 border-b border-border p-4">
@@ -204,6 +204,13 @@ export function Inbox({
           <ConversationList items={snap.list} selectedId={selectedId} onSelect={setSelectedId} tab={tab} q={q} filtered={Boolean(tagId)} />
         </aside>
 
+        {/* O lead da conversa no meio, como no Kommo: tags, funil, etapa e campos à mão enquanto se conversa. */}
+        {thread && (
+          <div className="hidden min-h-0 overflow-y-auto border-r border-border bg-surface xl:block">
+            <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />
+          </div>
+        )}
+
         <div className={`${selectedId ? 'flex' : 'hidden lg:flex'} min-h-0 flex-col`}>
           {thread ? (
             <ConversationPane
@@ -217,7 +224,7 @@ export function Inbox({
                 <button
                   type="button"
                   onClick={() => setGaveta(true)}
-                  className="btn-outline btn-sm inline-flex items-center gap-1.5 lg:hidden"
+                  className="btn-outline btn-sm inline-flex items-center gap-1.5 xl:hidden"
                   aria-haspopup="dialog"
                 >
                   <PanelRight className="h-3.5 w-3.5" aria-hidden="true" /> {thread.conversation.lead ? 'Lead' : 'Contato'}
@@ -232,18 +239,13 @@ export function Inbox({
           )}
         </div>
 
-        {thread && (
-          <div className="hidden min-h-0 overflow-y-auto border-l border-border bg-surface lg:block">
-            <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />
-          </div>
-        )}
       </div>
 
       {/* Tela pequena: o mesmo painel, por cima, pelo botão do cabeçalho da conversa. */}
       <Dialog.Root open={gaveta && Boolean(thread)} onOpenChange={setGaveta}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm lg:hidden" />
-          <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(380px,100vw)] flex-col border-l border-border bg-surface shadow-2xl focus:outline-none lg:hidden">
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm xl:hidden" />
+          <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(380px,100vw)] flex-col border-l border-border bg-surface shadow-2xl focus:outline-none xl:hidden">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <Dialog.Title className="text-sm font-semibold">{thread?.conversation.lead ? 'Lead da conversa' : 'Contato da conversa'}</Dialog.Title>
               <Dialog.Description className="sr-only">Dados de {thread?.conversation.name}</Dialog.Description>
@@ -332,8 +334,21 @@ function ConversationList({
                     {chatListTime(new Date(c.lastMessageAt))}
                   </span>
                 </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[13px]">
+                  {c.lead ? (
+                    <span className="truncate font-medium text-foreground/90">{c.lead.label}</span>
+                  ) : entrada ? (
+                    <span className="rounded-[3px] bg-amber-100 px-1.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Entrada · sem lead</span>
+                  ) : c.patient ? (
+                    <span className="text-[12px] text-muted-foreground">Paciente · sem negócio</span>
+                  ) : null}
+                  {c.lead && <span className="shrink-0 text-[11px] text-muted-foreground">· {c.lead.stage}</span>}
+                </span>
                 <span className="mt-0.5 flex items-center gap-2">
-                  <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>{c.preview || '—'}</span>
+                  <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {c.previewFrom && <span className="font-medium">{c.previewFrom}: </span>}
+                    {c.preview || '—'}
+                  </span>
                   {!lida && (
                     <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
                       {c.unread}
@@ -341,25 +356,22 @@ function ConversationList({
                     </span>
                   )}
                 </span>
-                <span className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-                  {entrada && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Entrada</span>
-                  )}
-                  {c.lead && <span className="truncate rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">{c.lead.stage}</span>}
-                  {!c.lead && c.patient && <span className="rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">Paciente</span>}
-                  {c.awaitingReply && !entrada && <span className="rounded-full px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
-                  {c.tags.slice(0, 2).map((t) => (
-                    <span key={t.id} className={`max-w-[110px] truncate rounded-[3px] px-1.5 py-0.5 font-medium ${colorClasses(t.color).chip}`}>
-                      {t.name}
-                    </span>
-                  ))}
-                  {c.tags.length > 2 && (
-                    <span className="rounded-[3px] bg-surface-alt px-1.5 py-0.5 text-muted-foreground">
-                      +{c.tags.length - 2}
-                      <span className="sr-only"> tags: {c.tags.slice(2).map((t) => t.name).join(', ')}</span>
-                    </span>
-                  )}
-                </span>
+                {(c.tags.length > 0 || (c.awaitingReply && !entrada)) && (
+                  <span className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
+                    {c.awaitingReply && !entrada && <span className="rounded-[3px] px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
+                    {c.tags.slice(0, 3).map((t) => (
+                      <span key={t.id} className={`max-w-[110px] truncate rounded-[3px] px-1.5 py-0.5 font-medium ${colorClasses(t.color).chip}`}>
+                        {t.name}
+                      </span>
+                    ))}
+                    {c.tags.length > 3 && (
+                      <span className="rounded-[3px] bg-surface-alt px-1.5 py-0.5 text-muted-foreground">
+                        +{c.tags.length - 3}
+                        <span className="sr-only"> tags: {c.tags.slice(3).map((t) => t.name).join(', ')}</span>
+                      </span>
+                    )}
+                  </span>
+                )}
               </span>
             </button>
           </li>
