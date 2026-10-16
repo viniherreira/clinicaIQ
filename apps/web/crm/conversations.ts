@@ -134,6 +134,8 @@ export interface ConversationSummary {
   contactName: string | null;
   phoneMasked: string;
   preview: string;
+  /** Quem mandou a última mensagem, se foi a clínica ("Ana", "Robô"); null se foi o contato. Só na lista. */
+  previewFrom: string | null;
   lastMessageAt: string;
   unread: number;
   awaitingReply: boolean;
@@ -173,6 +175,7 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
     contactName: r.contactName,
     phoneMasked: masked,
     preview: open(r.lastPreviewEncrypted, tenantId),
+    previewFrom: null,
     lastMessageAt: r.lastMessageAt.toISOString(),
     unread: r.unreadCount,
     awaitingReply: r.awaitingReply,
@@ -233,7 +236,27 @@ export async function listConversations(
     orderBy: { lastMessageAt: 'desc' },
     take,
   });
-  return rows.map((r) => toSummary(r, ctx.tenantId));
+  const lista = rows.map((r) => toSummary(r, ctx.tenantId));
+  if (lista.length === 0) return lista;
+  // Quem mandou a última de cada conversa ("Ana: Tenho às 15h", "Robô: Olá!"), como no Kommo.
+  const ultimas = await db.$queryRaw<{ conversationId: string; direction: string; origin: string; name: string | null }[]>`
+    SELECT DISTINCT ON (m."conversationId") m."conversationId", m."direction"::text AS direction, m."origin"::text AS origin, u."name"
+    FROM "chat_messages" m
+    LEFT JOIN "users" u ON u."id" = m."sentById"
+    WHERE m."tenantId" = ${ctx.tenantId} AND m."conversationId" = ANY(${lista.map((c) => c.id)})
+    ORDER BY m."conversationId", m."at" DESC, m."createdAt" DESC`;
+  const de = new Map(ultimas.map((u) => [u.conversationId, previewAuthor(u)]));
+  for (const c of lista) c.previewFrom = de.get(c.id) ?? null;
+  return lista;
+}
+
+function previewAuthor(m: { direction: string; origin: string; name: string | null }): string | null {
+  if (m.direction === 'INBOUND') return null;
+  if (m.origin === 'BOT') return 'Robô';
+  if (m.origin === 'AUTOMATION') return 'Automático';
+  if (m.origin === 'BROADCAST') return 'Transmissão';
+  if (m.origin === 'PHONE') return 'Celular da clínica';
+  return m.name?.split(' ')[0] ?? 'Equipe';
 }
 
 /** Os números das abas e do menu. */

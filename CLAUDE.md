@@ -108,6 +108,16 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - Banco de produção dos funis: `docs/producao/2026-10-13-funis.sql` (cria `pipelines`, põe as etapas no "Funil principal" e troca o índice de papel).
 - Spec e plano: `docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md` e `docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
 
+### Pacote A: dados e lista (no jeito do Kommo)
+
+- **Campos personalizados** (`LeadField`; valores em `Lead.fields` jsonb, `{ [fieldId]: valor }`): texto, número, data, lista, várias opções e sim/não, até 40 ativos. Regras puras em `crm/custom-fields.ts`; banco em `crm/lead-fields.ts` — `setLeadFields` grava com um único `jsonb ||` (não apaga o que outra pessoa escreveu) e registra `FIELD_CHANGED`. O tipo não muda depois de criado. Aparecem na ficha, no card (até 3 com `showOnCard`), no Novo lead, nos filtros (`campo_<id>=`), na lista, no público da transmissão e no robô (pergunta aberta guarda em `field:<id>`). Cadastro em Configurações do CRM › Campos. Produção: `docs/producao/2026-10-16-crm-campos.sql`.
+- **Lista de leads**: colunas escolhidas (cookie `crm-colunas`, `crm/list-columns.ts`), páginas de 100 (`pagina=`), marcar linhas ou "todos da busca".
+- **Ações em massa** (`crm/bulk.ts`, até 2000): mover (sem automação de etapa, a não ser que peça), responsável, tag, tarefa, campo, perder e excluir (só `crm_config`). A coluna é renumerada uma vez no fim (`renumberStage`). Auditoria `LEADS_BULK_*`.
+- **Exportar** (`/crm/leads/exportar`, só `crm_config`): CSV para o Excel brasileiro (`;`, BOM, proteção contra fórmula — `crm/csv.ts`), com os filtros da tela e os campos. Auditoria `LEADS_EXPORTED`.
+- **Importar** (`/crm/leads/importar`, só `crm_config`): o navegador lê .xlsx (`read-excel-file`) ou .csv, reconhece as colunas do Kommo em pt/en/es (`crm/import-map.ts`, puro e testado) e manda lotes de 200 (`crm/import.ts`). Cria funis, etapas, tags e campos que faltam; ganho/perdido, datas, notas e responsável vêm junto; duplicado (lead aberto com o mesmo telefone) pula, atualiza ou cria. Não dispara automação de etapa (`createLead`/`moveLead` com `automations: false`). Auditoria `LEADS_IMPORTED` por lote.
+- **Conversas no layout do Kommo**: lista | lead | conversa a partir de `xl` (`conversas/_components/inbox.tsx`); abaixo disso o lead abre numa gaveta pelo botão "Lead". Sem lead, o painel mostra o contato com "Criar lead" (nome, funil, etapa, tags — `acceptConversation` aceita essas opções) e "Recusar". A lista mostra o negócio, quem mandou a última mensagem (`previewFrom`) e as tags, com filtro por tag (`?tag=`). Balões com hora, autor e situação em cima e o avatar ao lado.
+- Spec e plano: `docs/superpowers/specs/2026-10-16-crm-pacote-a-dados-lista-design.md` e `docs/superpowers/plans/2026-10-16-crm-pacote-a-plan.md`.
+
 ## Accessibility
 
 WCAG 2.1 AA is a product differentiator. Every component must be keyboard-navigable, have proper ARIA attributes, and pass axe-core checks. Use `eslint-plugin-jsx-a11y` and `@axe-core/playwright`.

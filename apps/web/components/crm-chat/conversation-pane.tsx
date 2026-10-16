@@ -183,7 +183,7 @@ function PaneHeader({
             disabled={pending}
             onClick={() => run(() => acceptConversationAction(c.id), entrada ? 'Aceito. O lead foi criado em Novo.' : 'Negócio criado em Novo.')}
             // Na tela de Conversas larga, o "Criar lead" (com funil, etapa e tags) fica no painel ao lado.
-            className={`btn-primary btn-sm ${entrada && action ? 'lg:hidden' : ''}`}
+            className={`btn-primary btn-sm ${entrada && action ? 'xl:hidden' : ''}`}
           >
             {entrada ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
             {entrada ? 'Aceitar' : 'Criar negócio'}
@@ -197,7 +197,7 @@ function PaneHeader({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => declineConversationAction(c.id), 'Conversa recusada.')}
-                className={`btn-ghost btn-sm ${action ? 'lg:hidden' : ''}`}
+                className={`btn-ghost btn-sm ${action ? 'xl:hidden' : ''}`}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" /> Recusar
               </button>

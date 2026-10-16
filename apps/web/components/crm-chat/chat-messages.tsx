@@ -5,7 +5,7 @@ import {
   AlertCircle, Bot, Check, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw, Smartphone, Sticker, User, Video,
 } from 'lucide-react';
 import type { ChatLine } from '@/crm/conversations';
-import { chatDayLabel, chatTime, sameClinicDay } from '@/crm/format';
+import { chatDayLabel, chatTime, initials, sameClinicDay } from '@/crm/format';
 
 const MEDIA: Record<string, { icon: typeof ImageIcon; label: string }> = {
   IMAGE: { icon: ImageIcon, label: 'Foto' },
@@ -105,10 +105,17 @@ export function ChatMessages({
                     </span>
                   </li>
                 )}
-                <li className={`flex ${saida ? 'justify-end' : 'justify-start'}`}>
+                <li className={`flex items-end gap-2 ${saida ? 'flex-row-reverse' : ''}`}>
+                  {/* Como no Kommo: quem falou ao lado do balão. */}
+                  <span
+                    aria-hidden="true"
+                    className={`mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${saida ? 'bg-primary/15 text-primary' : 'bg-surface-alt text-muted-foreground'}`}
+                  >
+                    {quem.icon ? <quem.icon className="h-3.5 w-3.5" /> : initials(quem.label)}
+                  </span>
                   <div
                     className={[
-                      'max-w-[85%] rounded-lg px-3.5 py-2 text-sm shadow-[0_1px_2px_rgba(15,30,60,0.10)] sm:max-w-[70%]',
+                      'max-w-[80%] rounded-lg px-3.5 py-2 text-sm shadow-[0_1px_2px_rgba(15,30,60,0.10)] sm:max-w-[68%]',
                       saida
                         ? auto
                           ? 'rounded-br-sm border border-dashed border-border-strong bg-surface text-foreground'
@@ -118,6 +125,18 @@ export function ChatMessages({
                     ].join(' ')}
                   >
                     <span className="sr-only">{`${quem.label}, ${chatDayLabel(at)} às ${chatTime(at)}: `}</span>
+                    <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground" aria-hidden={status ? undefined : true}>
+                      <span aria-hidden="true">{chatTime(at)}</span>
+                      <span aria-hidden="true" className="inline-flex items-center gap-1 font-medium">
+                        {quem.label}
+                      </span>
+                      {status && (
+                        <span className={`inline-flex items-center gap-0.5 ${status.tone}`}>
+                          <status.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>{status.label}</span>
+                        </span>
+                      )}
+                    </p>
                     {media && m.hasMedia && <MediaView line={m} label={media.label} />}
                     {media && !m.hasMedia && (
                       <p className="flex items-center gap-1.5 text-muted-foreground">
@@ -129,21 +148,6 @@ export function ChatMessages({
                       </p>
                     )}
                     {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
-                    <p className={`mt-1 flex items-center justify-end gap-1.5 text-[11px] text-muted-foreground`} aria-hidden={status ? undefined : true}>
-                      {(saida || auto) && (
-                        <span className="inline-flex items-center gap-1" aria-hidden="true">
-                          {quem.icon && <quem.icon className="h-3 w-3" />}
-                          {quem.label} ·
-                        </span>
-                      )}
-                      <span aria-hidden="true">{chatTime(at)}</span>
-                      {status && (
-                        <span className={`inline-flex items-center gap-0.5 ${status.tone}`}>
-                          <status.icon className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span className={m.status === 'FAILED' ? '' : 'sr-only'}>{status.label}</span>
-                        </span>
-                      )}
-                    </p>
                     {m.status === 'FAILED' && (
                       <div className="mt-1 flex flex-wrap items-center justify-end gap-2 text-xs">
                         {m.error && <span className="text-destructive">{m.error}</span>}
