@@ -217,3 +217,56 @@ test('Conversas: Criar lead da Entrada com etapa e tag, tag na lista, filtro por
     await prisma.leadTag.deleteMany({ where: { id: tag.id } });
   }
 });
+
+test('robô por tag: "Para quem", lista separada por gatilho, filtro por tag e duplicar', async ({ page }) => {
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  const nomeTag = `robo${Date.now().toString(36)}`;
+  const tag = await prisma.leadTag.create({ data: { tenantId: tenant.id, name: nomeTag, color: 'green' } });
+  const nome = uniqueName('Robô Tag E2E');
+  try {
+    await page.goto('/crm/automacoes/bots');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Novo robô' }).click();
+    await page.getByRole('button', { name: /Em branco/ }).click();
+    await page.getByLabel('Nome do robô').fill(nome);
+    await page.getByRole('radio', { name: /Palavra-chave/ }).check();
+    await page.getByLabel(/^Palavras-chave/).fill(`e2e${Date.now()}`);
+    const para = page.getByRole('group', { name: 'Só para leads com alguma destas tags' });
+    await para.getByLabel('Só para leads com alguma destas tags').selectOption({ label: nomeTag });
+    await expect(para.getByRole('button', { name: `Tirar ${nomeTag} de “Só para leads com alguma destas tags”` })).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+    await page.getByRole('checkbox', { name: 'Ligado' }).uncheck();
+    await page.getByRole('button', { name: 'Salvar robô' }).click();
+
+    const grupo = page.getByRole('region', { name: /Quando escrevem uma palavra-chave/ });
+    const card = grupo.getByRole('listitem').filter({ hasText: nome });
+    await expect(card).toContainText('Só para leads com');
+    await expect(card.getByRole('list', { name: 'Tags pedidas' })).toContainText(nomeTag);
+    await page.getByLabel('Tag', { exact: true }).selectOption({ label: nomeTag });
+    await expect(page.getByRole('button', { name: `Editar ${nome}` })).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+
+    await page.getByRole('button', { name: `Duplicar ${nome}` }).click();
+    await expect(page.getByLabel('Nome do robô')).toHaveValue(`${nome} (cópia)`);
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+  } finally {
+    await prisma.chatbotFlow.deleteMany({ where: { tenantId: tenant.id, name: nome } });
+    await prisma.leadTag.deleteMany({ where: { id: tag.id } });
+  }
+});
+
+test('funil: o mapa do canto leva às etapas da direita', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  await page.goto('/crm');
+  await page.waitForLoadState('networkidle');
+  const mapa = page.getByRole('navigation', { name: 'Navegar pelas etapas do funil' });
+  await expect(mapa).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
+  const quadro = page.getByRole('list', { name: 'Etapas do funil' });
+  expect(await quadro.evaluate((el) => el.scrollLeft)).toBe(0);
+  await mapa.getByRole('button', { name: 'Ver as etapas à direita' }).click();
+  await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+  // A primeira coluna (Entrada, se houver, ou Novo) leva de volta ao começo.
+  await mapa.getByRole('button', { name: /^Ir para / }).first().click();
+  await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeLessThan(40);
+});

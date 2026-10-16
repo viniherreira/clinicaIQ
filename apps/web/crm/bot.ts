@@ -1,5 +1,5 @@
 import { decrypt, getTenantClient, prisma, type TenantPrismaClient } from '@clinicaiq/db';
-import { botExpired, continueBot, isKeyword, parseSteps, shouldStart, startBot, type BotAction, type BotDecision } from './bot-engine';
+import { botExpired, continueBot, parseSteps, pickBot, startBot, type BotAction, type BotDecision, type BotSteps } from './bot-engine';
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { createLead, moveLead, OPEN_LEAD } from './leads';
@@ -59,20 +59,22 @@ export async function runBotOnInbound(
   if (conv.botFlowId) await db.conversation.updateMany({ where: { id: conv.id }, data: CLEAR });
 
   // Começa um? Contato novo: primeira mensagem de um número da Entrada.
-  // Só os que podem começar agora (horário de atendimento de cada robô).
-  const flows = (await db.chatbotFlow.findMany({ where: { active: true }, orderBy: { createdAt: 'asc' } })).filter((f) =>
-    shouldStart(parseSteps(f.steps)?.hours, now),
-  );
+  // Cada robô tem horário e público (tags do lead); o que pede tag vem antes do geral.
+  const flows = (await db.chatbotFlow.findMany({ where: { active: true }, orderBy: { createdAt: 'asc' } })).flatMap((f) => {
+    const steps = parseSteps(f.steps);
+    return steps ? [{ id: f.id, trigger: f.trigger, keywords: f.keywords, steps }] : [];
+  });
   if (flows.length === 0) return 'none';
   const primeira =
     opts.newContact ??
     (conv.status === 'INBOX' && (await db.chatMessage.count({ where: { conversationId: conv.id, origin: 'CONTACT' } })) === 1);
-  const flow =
-    flows.find((f) => f.trigger === 'KEYWORD' && isKeyword(text, f.keywords)) ??
-    (primeira ? flows.find((f) => f.trigger === 'NEW_CONTACT') : undefined);
-  const steps = flow ? parseSteps(flow.steps) : null;
-  if (!flow || !steps) return 'none';
-  await apply(db, tenantId, conv, flow.id, startBot(steps), now);
+  // As tags do lead aberto desta conversa (a captação pode ter acabado de pôr).
+  const tagIds = conv.leadId
+    ? (await db.leadTagOnLead.findMany({ where: { leadId: conv.leadId, lead: { deletedAt: null } }, select: { tagId: true } })).map((t) => t.tagId)
+    : [];
+  const flow = pickBot(flows, { text, newContact: primeira, tagIds, now });
+  if (!flow) return 'none';
+  await apply(db, tenantId, conv, flow.id, startBot(flow.steps as BotSteps), now);
   return 'started';
 }
 

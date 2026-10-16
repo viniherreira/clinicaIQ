@@ -2,8 +2,9 @@
 
 import { useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, ChevronDown, Clock, MessageSquareText, Pencil, Plus, Sparkles, Trash2, X, Zap } from 'lucide-react';
-import { DEFAULT_HOURS, type BotHours } from '@/crm/bot-engine';
+import { Ban, Bot, ChevronDown, Clock, Copy, MessageSquareText, Pencil, Plus, Sparkles, Tag, Trash2, Users, X, Zap } from 'lucide-react';
+import { DEFAULT_HOURS, EMPTY_AUDIENCE, type BotAudience, type BotHours } from '@/crm/bot-engine';
+import { colorClasses } from '@/crm/colors';
 import {
   BOT_TEMPLATES, blankOption, blankQuestion, NEW_STAGE,
   type UiAfter, type UiMenu, type UiOption, type UiQuestion, type UiQuestionAfter,
@@ -19,9 +20,38 @@ export type BotRow = {
   active: boolean;
   menu: UiMenu;
   hours: BotHours;
+  audience: BotAudience;
 };
 type Option = { id: string; name: string };
-export type BotRefs = { stages: Option[]; tags: Option[]; team: Option[]; fields?: Option[] };
+type TagOption = Option & { color?: string };
+export type BotRefs = { stages: Option[]; tags: TagOption[]; team: Option[]; fields?: Option[] };
+
+/** As tags que os botões do robô põem no lead (menu e submenus). */
+function tagsPostas(menu: UiMenu): string[] {
+  const out = new Set<string>();
+  const ler = (m: UiMenu) => {
+    for (const o of m.options) {
+      o.tagIds.forEach((t) => out.add(t));
+      if (o.sub) ler(o.sub);
+    }
+  };
+  ler(menu);
+  return [...out];
+}
+
+function TagChips({ ids, tags, label }: { ids: string[]; tags: TagOption[]; label: string }) {
+  const lista = ids.map((id) => tags.find((t) => t.id === id)).filter((t): t is TagOption => Boolean(t));
+  if (lista.length === 0) return null;
+  return (
+    <ul className="inline-flex flex-wrap gap-1" aria-label={label}>
+      {lista.map((t) => (
+        <li key={t.id} className={`rounded-[4px] px-1.5 py-0.5 text-xs font-medium ${colorClasses(t.color ?? 'gray').chip}`}>
+          {t.name}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
@@ -73,7 +103,7 @@ export function BotsTab({ bots, stages, tags, team, fields = [], children }: { b
             <li key={t.key}>
               <button
                 type="button"
-                onClick={() => setEditando({ id: '', name: t.name, trigger: t.trigger, keywords: ['menu'], active: false, menu: t.menu(), hours: t.hours })}
+                onClick={() => setEditando({ id: '', name: t.name, trigger: t.trigger, keywords: ['menu'], active: false, menu: t.menu(), hours: t.hours, audience: EMPTY_AUDIENCE })}
                 className="flex h-full w-full flex-col items-start gap-1 rounded-xl border border-border bg-surface p-4 text-left hover:border-link focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <Sparkles className="h-5 w-5 text-link" aria-hidden="true" />
@@ -86,7 +116,7 @@ export function BotsTab({ bots, stages, tags, team, fields = [], children }: { b
             <button
               type="button"
               onClick={() =>
-                setEditando({ id: '', name: 'Meu robô', trigger: 'NEW_CONTACT', keywords: ['menu'], active: false, menu: { text: 'Oi! Como posso ajudar?', options: [blankOption('Opção 1')] }, hours: DEFAULT_HOURS })
+                setEditando({ id: '', name: 'Meu robô', trigger: 'NEW_CONTACT', keywords: ['menu'], active: false, menu: { text: 'Oi! Como posso ajudar?', options: [blankOption('Opção 1')] }, hours: DEFAULT_HOURS, audience: EMPTY_AUDIENCE })
               }
               className="flex h-full w-full flex-col items-start gap-1 rounded-xl border border-dashed border-border-strong bg-surface p-4 text-left hover:border-link focus-visible:outline-2 focus-visible:outline-ring"
             >
@@ -114,72 +144,151 @@ export function BotsTab({ bots, stages, tags, team, fields = [], children }: { b
   }
 
   return (
+    <BotList
+      bots={bots}
+      refs={refs}
+      pending={pending}
+      aviso={aviso}
+      onNew={() => setEditando('escolher')}
+      onEdit={(b) => setEditando(b)}
+      onDuplicate={(b) => setEditando({ ...b, id: '', name: `${b.name} (cópia)`.slice(0, 60), active: false })}
+      onToggle={(b, on) => agir(() => toggleBotAction(b.id, on), on ? `${b.name} ligado.` : `${b.name} desligado.`)}
+      onDelete={(b) => window.confirm(`Apagar o robô ${b.name}?`) && agir(() => deleteBotAction(b.id), 'Robô apagado.')}
+    >
+      {children}
+    </BotList>
+  );
+}
+
+type Situacao = 'todos' | 'ligados' | 'desligados';
+
+/**
+ * A lista dos robôs, organizada como no Kommo: separados pelo que faz cada um
+ * começar, com filtro por situação e por tag (a tag que o robô pede ou põe).
+ */
+function BotList({
+  bots,
+  refs,
+  pending,
+  aviso,
+  onNew,
+  onEdit,
+  onDuplicate,
+  onToggle,
+  onDelete,
+  children,
+}: {
+  bots: BotRow[];
+  refs: BotRefs;
+  pending: boolean;
+  aviso: string;
+  onNew: () => void;
+  onEdit: (b: BotRow) => void;
+  onDuplicate: (b: BotRow) => void;
+  onToggle: (b: BotRow, on: boolean) => void;
+  onDelete: (b: BotRow) => void;
+  children?: React.ReactNode;
+}) {
+  const id = useId();
+  const [situacao, setSituacao] = useState<Situacao>('todos');
+  const [tag, setTag] = useState('');
+  const usaTag = (b: BotRow, t: string) => b.audience.anyTags.includes(t) || b.audience.noneTags.includes(t) || tagsPostas(b.menu).includes(t);
+  const tagsUsadas = refs.tags.filter((t) => bots.some((b) => usaTag(b, t.id)));
+  const visiveis = bots.filter(
+    (b) => (situacao === 'todos' || (situacao === 'ligados') === b.active) && (!tag || usaTag(b, tag)),
+  );
+  const grupos: { key: BotRow['trigger']; titulo: string; dica: string }[] = [
+    { key: 'NEW_CONTACT', titulo: 'Quando chega um número novo', dica: 'Responde a primeira mensagem. O que pede tag responde antes do que vale para todos.' },
+    { key: 'KEYWORD', titulo: 'Quando escrevem uma palavra-chave', dica: 'Responde em qualquer momento da conversa, como “menu”.' },
+  ];
+  const ligados = bots.filter((b) => b.active).length;
+
+  return (
     <section aria-label="Robôs">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="max-w-xl text-sm text-muted-foreground">
-          O robô responde sozinho no WhatsApp com botões. Ele para quando alguém da equipe responde, quando a pessoa pede para falar com a
-          equipe, se não entender duas vezes ou depois de 24 horas parado.
-        </p>
-        <button type="button" onClick={() => setEditando('escolher')} className="btn-primary btn-md">
+        <div className="max-w-xl">
+          <p className="text-sm text-muted-foreground">
+            O robô responde sozinho no WhatsApp com botões. Ele para quando alguém da equipe responde, quando a pessoa pede para falar com a
+            equipe, se não entender duas vezes ou depois de 24 horas parado.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {bots.length} {bots.length === 1 ? 'robô' : 'robôs'} · {ligados} {ligados === 1 ? 'ligado' : 'ligados'}
+          </p>
+        </div>
+        <button type="button" onClick={onNew} className="btn-primary btn-md">
           <Plus className="h-4 w-4" aria-hidden="true" /> Novo robô
         </button>
       </div>
 
-      <ul className="mt-4 space-y-3">
-        {bots.map((b) => (
-          <li key={b.id} className="rounded-xl border border-border bg-surface p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-link" aria-hidden="true">
-                <Bot className="h-5 w-5" />
-              </span>
-              <h3 className="min-w-0 flex-1 font-semibold">{b.name}</h3>
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  checked={b.active}
-                  disabled={pending}
-                  onChange={(e) => agir(() => toggleBotAction(b.id, e.target.checked), e.target.checked ? `${b.name} ligado.` : `${b.name} desligado.`)}
-                  className="peer sr-only"
-                />
-                <span
-                  aria-hidden="true"
-                  className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-green-600 peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ring"
-                />
-                {b.active ? 'Ligado' : 'Desligado'}
-                <span className="sr-only">: {b.name}</span>
+      {bots.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div role="group" aria-label="Situação dos robôs" className="segmented">
+            {(
+              [
+                ['todos', 'Todos'],
+                ['ligados', 'Ligados'],
+                ['desligados', 'Desligados'],
+              ] as const
+            ).map(([v, l]) => (
+              <button key={v} type="button" aria-pressed={situacao === v} onClick={() => setSituacao(v)} className="segmented-item px-3">
+                {l}
+              </button>
+            ))}
+          </div>
+          {tagsUsadas.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label htmlFor={`${id}-tag`} className="text-xs text-muted-foreground">
+                Tag
               </label>
-              <button type="button" onClick={() => setEditando(b)} className="btn-outline btn-sm">
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar<span className="sr-only"> {b.name}</span>
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => window.confirm(`Apagar o robô ${b.name}?`) && agir(() => deleteBotAction(b.id), 'Robô apagado.')}
-                aria-label={`Apagar ${b.name}`}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-destructive focus-visible:outline-2 focus-visible:outline-ring"
+              <select
+                id={`${id}-tag`}
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+                className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
+                <option value="">Todas</option>
+                {tagsUsadas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
             </div>
-            <ul className="mt-3 space-y-1 pl-12 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <Zap className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Começa {b.trigger === 'NEW_CONTACT' ? 'quando um número novo manda a primeira mensagem' : `quando escrevem ${b.keywords.map((k) => `“${k}”`).join(' ou ')}`},{' '}
-                  {hoursText(b.hours)}.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Mostra {b.menu.options.length} {b.menu.options.length === 1 ? 'botão' : 'botões'}: {b.menu.options.map((o) => o.label).join(' · ')}.
-                </span>
-              </li>
+          )}
+        </div>
+      )}
+
+      {grupos.map((g) => {
+        const doGrupo = visiveis.filter((b) => b.trigger === g.key);
+        if (doGrupo.length === 0) return null;
+        return (
+          <section key={g.key} aria-labelledby={`${id}-${g.key}`} className="mt-5">
+            <h3 id={`${id}-${g.key}`} className="flex items-center gap-2 text-sm font-semibold">
+              <Zap className="h-4 w-4 text-link" aria-hidden="true" /> {g.titulo}
+              <span className="font-normal text-muted-foreground">({doGrupo.length})</span>
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{g.dica}</p>
+            <ul className="mt-2 space-y-2">
+              {doGrupo.map((b) => (
+                <BotCard
+                  key={b.id}
+                  bot={b}
+                  refs={refs}
+                  pending={pending}
+                  onEdit={() => onEdit(b)}
+                  onDuplicate={() => onDuplicate(b)}
+                  onToggle={(on) => onToggle(b, on)}
+                  onDelete={() => onDelete(b)}
+                />
+              ))}
             </ul>
-          </li>
-        ))}
-      </ul>
+          </section>
+        );
+      })}
+
+      {bots.length > 0 && visiveis.length === 0 && (
+        <p className="mt-4 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Nenhum robô com esse filtro.</p>
+      )}
       {bots.length === 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           Nenhum robô ainda. Clique em <strong className="font-medium text-foreground">Novo robô</strong> e escolha um modelo pronto.
@@ -193,7 +302,119 @@ export function BotsTab({ bots, stages, tags, team, fields = [], children }: { b
   );
 }
 
-type SaveInput = { id?: string; name: string; trigger: 'NEW_CONTACT' | 'KEYWORD'; keywords: string; menu: UiMenu; hours: BotHours; active: boolean };
+function BotCard({
+  bot: b,
+  refs,
+  pending,
+  onEdit,
+  onDuplicate,
+  onToggle,
+  onDelete,
+}: {
+  bot: BotRow;
+  refs: BotRefs;
+  pending: boolean;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onToggle: (on: boolean) => void;
+  onDelete: () => void;
+}) {
+  const postas = tagsPostas(b.menu);
+  return (
+    <li className={`rounded-xl border bg-surface p-4 ${b.active ? 'border-border-strong' : 'border-border opacity-90'}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-full ${b.active ? 'bg-green-600/20 text-green-400' : 'bg-surface-alt text-muted-foreground'}`}
+          aria-hidden="true"
+        >
+          <Bot className="h-5 w-5" />
+        </span>
+        <h4 className="min-w-0 flex-1 truncate font-semibold">{b.name}</h4>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" role="switch" checked={b.active} disabled={pending} onChange={(e) => onToggle(e.target.checked)} className="peer sr-only" />
+          <span
+            aria-hidden="true"
+            className="relative h-5 w-9 rounded-full bg-border transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-green-600 peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ring"
+          />
+          {b.active ? 'Ligado' : 'Desligado'}
+          <span className="sr-only">: {b.name}</span>
+        </label>
+        <button type="button" onClick={onEdit} className="btn-outline btn-sm">
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar<span className="sr-only"> {b.name}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onDuplicate}
+          aria-label={`Duplicar ${b.name}`}
+          title="Duplicar"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <Copy className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onDelete}
+          aria-label={`Apagar ${b.name}`}
+          title="Apagar"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-destructive focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      <ul className="mt-3 space-y-1.5 pl-12 text-sm text-muted-foreground">
+        <li className="flex items-start gap-2">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {b.trigger === 'NEW_CONTACT' ? 'Na primeira mensagem de um número novo' : `Quando escrevem ${b.keywords.map((k) => `“${k}”`).join(' ou ')}`},{' '}
+            {hoursText(b.hours)}.
+          </span>
+        </li>
+        <li className="flex flex-wrap items-center gap-2">
+          <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {b.audience.anyTags.length === 0 && b.audience.noneTags.length === 0 ? (
+            <span>Para todos.</span>
+          ) : (
+            <>
+              {b.audience.anyTags.length > 0 && (
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  Só para leads com <TagChips ids={b.audience.anyTags} tags={refs.tags} label="Tags pedidas" />
+                </span>
+              )}
+              {b.audience.noneTags.length > 0 && (
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  <Ban className="h-3.5 w-3.5" aria-hidden="true" /> nunca com <TagChips ids={b.audience.noneTags} tags={refs.tags} label="Tags que bloqueiam" />
+                </span>
+              )}
+            </>
+          )}
+        </li>
+        <li className="flex items-start gap-2">
+          <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {b.menu.options.length} {b.menu.options.length === 1 ? 'botão' : 'botões'}: {b.menu.options.map((o) => o.label).join(' · ')}.
+          </span>
+        </li>
+        {postas.length > 0 && (
+          <li className="flex flex-wrap items-center gap-2">
+            <Tag className="h-4 w-4 shrink-0" aria-hidden="true" /> Põe as tags <TagChips ids={postas} tags={refs.tags} label="Tags que o robô põe" />
+          </li>
+        )}
+      </ul>
+    </li>
+  );
+}
+
+type SaveInput = {
+  id?: string;
+  name: string;
+  trigger: 'NEW_CONTACT' | 'KEYWORD';
+  keywords: string;
+  menu: UiMenu;
+  hours: BotHours;
+  audience: BotAudience;
+  active: boolean;
+};
 
 function Passo({ n, titulo, children, id }: { n: number; titulo: string; children: React.ReactNode; id: string }) {
   return (
@@ -230,6 +451,7 @@ function BotEditor({
   const [keywords, setKeywords] = useState(bot.keywords.join(', '));
   const [menu, setMenu] = useState<UiMenu>(bot.menu);
   const [hours, setHours] = useState<BotHours>(bot.hours);
+  const [audience, setAudience] = useState<BotAudience>(bot.audience);
   const [ativo, setAtivo] = useState(bot.active);
 
   return (
@@ -240,7 +462,7 @@ function BotEditor({
         className="min-w-0 space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          onSave({ id: bot.id || undefined, name: nome, trigger, keywords, menu, hours, active: ativo });
+          onSave({ id: bot.id || undefined, name: nome, trigger, keywords, menu, hours, audience, active: ativo });
         }}
       >
         <div className="flex flex-wrap items-end gap-3">
@@ -281,13 +503,17 @@ function BotEditor({
           <HoursEditor hours={hours} onChange={setHours} />
         </Passo>
 
-        <Passo n={2} titulo="A primeira mensagem" id={`${id}-p2`}>
-          <label htmlFor={`${id}-texto`} className="sr-only">Primeira mensagem do robô</label>
-          <textarea id={`${id}-texto`} value={menu.text} onChange={(e) => setMenu({ ...menu, text: e.target.value })} rows={3} maxLength={1000} className={areaCls} />
-          <p className="text-xs text-muted-foreground">Os botões do passo 3 aparecem embaixo desta mensagem.</p>
+        <Passo n={2} titulo="Para quem" id={`${id}-pq`}>
+          <AudienceEditor audience={audience} tags={refs.tags} onChange={setAudience} />
         </Passo>
 
-        <Passo n={3} titulo="Os botões e o que cada um faz" id={`${id}-p3`}>
+        <Passo n={3} titulo="A primeira mensagem" id={`${id}-p2`}>
+          <label htmlFor={`${id}-texto`} className="sr-only">Primeira mensagem do robô</label>
+          <textarea id={`${id}-texto`} value={menu.text} onChange={(e) => setMenu({ ...menu, text: e.target.value })} rows={3} maxLength={1000} className={areaCls} />
+          <p className="text-xs text-muted-foreground">Os botões do passo 4 aparecem embaixo desta mensagem.</p>
+        </Passo>
+
+        <Passo n={4} titulo="Os botões e o que cada um faz" id={`${id}-p3`}>
           <OptionsEditor menu={menu} onChange={setMenu} refs={refs} level={0} />
         </Passo>
 
@@ -307,6 +533,69 @@ function BotEditor({
       <aside aria-label="Testar o robô" className="lg:sticky lg:top-4 lg:self-start">
         <BotSimulator menu={menu} hours={hours} refs={refs} />
       </aside>
+    </div>
+  );
+}
+
+/** As tags do lead decidem se o robô começa: só com estas / nunca com aquelas. */
+function AudienceEditor({ audience, tags, onChange }: { audience: BotAudience; tags: TagOption[]; onChange: (a: BotAudience) => void }) {
+  const idBase = useId();
+  if (tags.length === 0) {
+    return <p className="text-sm text-muted-foreground">Para todos. Crie tags nas Configurações do CRM para separar os robôs por assunto.</p>;
+  }
+  const grupo = (campo: keyof BotAudience, titulo: string, dica: string) => {
+    const outro: keyof BotAudience = campo === 'anyTags' ? 'noneTags' : 'anyTags';
+    const escolhidas = audience[campo].map((tid) => tags.find((t) => t.id === tid)).filter((t): t is TagOption => Boolean(t));
+    // A mesma tag não pode pedir e bloquear ao mesmo tempo: some da outra lista.
+    const livres = tags.filter((t) => !audience[campo].includes(t.id) && !audience[outro].includes(t.id));
+    const selectId = `${idBase}-${campo}`;
+    return (
+      <div role="group" aria-label={titulo}>
+        <label htmlFor={selectId} className="text-xs font-medium text-muted-foreground">
+          {titulo}
+        </label>
+        <p className="text-xs text-muted-foreground/80">{dica}</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {escolhidas.map((t) => (
+            <span key={t.id} className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium ${colorClasses(t.color ?? 'gray').chip}`}>
+              {t.name}
+              <button
+                type="button"
+                onClick={() => onChange({ ...audience, [campo]: audience[campo].filter((x) => x !== t.id) })}
+                aria-label={`Tirar ${t.name} de “${titulo}”`}
+                className="rounded opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+          {livres.length > 0 && (
+            <select
+              id={selectId}
+              value=""
+              onChange={(e) => e.target.value && onChange({ ...audience, [campo]: [...audience[campo], e.target.value] })}
+              className="h-7 rounded-md border border-dashed border-border-strong bg-background px-2 text-xs text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <option value="">+ escolher tag</option>
+              {livres.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+    );
+  };
+  const nada = audience.anyTags.length === 0 && audience.noneTags.length === 0;
+  return (
+    <div className="space-y-3">
+      {grupo('anyTags', 'Só para leads com alguma destas tags', 'Ex.: “implante” — combine com a Captação, que põe a tag pela primeira mensagem.')}
+      {grupo('noneTags', 'Nunca para leads com estas tags', 'Ex.: “paciente” ou “não perturbe”.')}
+      <p className="text-xs text-muted-foreground">
+        {nada ? 'Sem tag escolhida, o robô vale para todos.' : 'Quem não tem lead ainda não tem tags: só entra se nenhuma tag for pedida.'}
+      </p>
     </div>
   );
 }

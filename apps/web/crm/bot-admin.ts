@@ -1,5 +1,5 @@
 import type { ChatbotTrigger, Prisma, TenantPrismaClient } from '@clinicaiq/db';
-import { normalize, parseSteps, stepsProblem, type BotSteps } from './bot-engine';
+import { isTargeted, normalize, parseSteps, stepsProblem, type BotSteps } from './bot-engine';
 
 /** Cadastro dos robôs. Quem chama já passou por `guardCrmAction('crm_config')`. */
 
@@ -47,10 +47,11 @@ export async function saveBot(db: TenantPrismaClient, tenantId: string, input: B
   }
   if (fields !== refs.fields.length) return { ok: false, message: 'Uma pergunta guarda a resposta num campo que não existe mais.' };
 
-  // Só um robô de "contato novo" ligado por vez: dois responderiam juntos.
-  if (input.active && input.trigger === 'NEW_CONTACT') {
-    const outro = await db.chatbotFlow.findFirst({ where: { active: true, trigger: 'NEW_CONTACT', ...(input.id ? { id: { not: input.id } } : {}) } });
-    if (outro) return { ok: false, message: `Já existe um robô de contato novo ligado (${outro.name}). Desligue aquele primeiro.` };
+  // Só um robô geral de "contato novo" ligado por vez: dois responderiam juntos.
+  // Os que pedem tag podem ser vários (cada um para o seu público).
+  if (input.active && input.trigger === 'NEW_CONTACT' && !isTargeted(steps)) {
+    const outro = await outroGeral(db, input.id);
+    if (outro) return { ok: false, message: `Já existe um robô de contato novo para todos ligado (${outro}). Desligue aquele ou escolha tags no passo "Para quem".` };
   }
 
   const data = { name, trigger: input.trigger, keywords, steps: steps as unknown as Prisma.InputJsonValue, active: input.active };
@@ -63,7 +64,7 @@ export async function saveBot(db: TenantPrismaClient, tenantId: string, input: B
 }
 
 function refsOf(steps: BotSteps) {
-  const tags = new Set<string>();
+  const tags = new Set<string>([...(steps.audience?.anyTags ?? []), ...(steps.audience?.noneTags ?? [])]);
   const stages = new Set<string>();
   const users = new Set<string>();
   const fields = new Set<string>();
@@ -83,14 +84,28 @@ function refsOf(steps: BotSteps) {
 export async function toggleBot(db: TenantPrismaClient, id: string, active: boolean): Promise<Result> {
   const bot = await db.chatbotFlow.findFirst({ where: { id } });
   if (!bot) return { ok: false, message: 'Robô não encontrado.' };
-  if (active && bot.trigger === 'NEW_CONTACT') {
-    const outro = await db.chatbotFlow.findFirst({ where: { active: true, trigger: 'NEW_CONTACT', id: { not: id } } });
-    if (outro) return { ok: false, message: `Já existe um robô de contato novo ligado (${outro.name}). Desligue aquele primeiro.` };
+  const steps = parseSteps(bot.steps);
+  if (active && bot.trigger === 'NEW_CONTACT' && !(steps && isTargeted(steps))) {
+    const outro = await outroGeral(db, id);
+    if (outro) return { ok: false, message: `Já existe um robô de contato novo para todos ligado (${outro}). Desligue aquele primeiro.` };
   }
   await db.chatbotFlow.updateMany({ where: { id }, data: { active } });
   // Desligou: as conversas em que ele estava seguem com a equipe.
   if (!active) await db.conversation.updateMany({ where: { botFlowId: id }, data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 } });
   return { ok: true };
+}
+
+/** Nome de outro robô de contato novo ligado que vale para todos (sem tag pedida), se houver. */
+async function outroGeral(db: TenantPrismaClient, exceto?: string): Promise<string | null> {
+  const ligados = await db.chatbotFlow.findMany({
+    where: { active: true, trigger: 'NEW_CONTACT', ...(exceto ? { id: { not: exceto } } : {}) },
+    select: { name: true, steps: true },
+  });
+  const geral = ligados.find((b) => {
+    const s = parseSteps(b.steps);
+    return !s || !isTargeted(s);
+  });
+  return geral?.name ?? null;
 }
 
 export async function deleteBot(db: TenantPrismaClient, id: string): Promise<Result> {

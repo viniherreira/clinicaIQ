@@ -259,6 +259,20 @@
     border-color: hsl(var(--border));
   }
 
+  /*
+   * A lista que abre do <select> não herda o fundo quando o campo é
+   * transparente: sem isto, no tema escuro ela abria branca com o texto claro
+   * (quase invisível). As opções voltam à caixa normal mesmo em campo maiúsculo.
+   */
+  .dark select option,
+  .dark select optgroup {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    text-transform: none;
+    font-weight: 400;
+    letter-spacing: normal;
+  }
+
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));

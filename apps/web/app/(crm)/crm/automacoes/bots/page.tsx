@@ -1,6 +1,6 @@
 import { requireCrm } from '@/crm/guard';
 import { loadCrmBasics, stageOptions } from '@/crm/page-data';
-import { DEFAULT_HOURS, parseSteps } from '@/crm/bot-engine';
+import { DEFAULT_HOURS, EMPTY_AUDIENCE, parseSteps } from '@/crm/bot-engine';
 import { fromSteps } from '@/crm/bot-form';
 import { BotsTab } from '../../configuracoes/_components/bots-tab';
 import { CaptureRules } from '../../configuracoes/_components/capture-rules';
@@ -18,7 +18,7 @@ export default async function BotsPage() {
     ctx.db.chatbotFlow.findMany({ orderBy: { createdAt: 'asc' } }),
     ctx.db.captureRule.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
   ]);
-  const tags = basics.tags.map((t) => ({ id: t.id, name: t.name }));
+  const tags = basics.tags.map((t) => ({ id: t.id, name: t.name, color: t.color }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -27,7 +27,7 @@ export default async function BotsPage() {
           bots={bots.flatMap((b) => {
             const steps = parseSteps(b.steps);
             return steps
-              ? [{ id: b.id, name: b.name, trigger: b.trigger, keywords: b.keywords, active: b.active, menu: fromSteps(steps), hours: steps.hours ?? DEFAULT_HOURS }]
+              ? [{ id: b.id, name: b.name, trigger: b.trigger, keywords: b.keywords, active: b.active, menu: fromSteps(steps), hours: steps.hours ?? DEFAULT_HOURS, audience: steps.audience ?? EMPTY_AUDIENCE }]
               : [];
           })}
           stages={stageOptions(basics.pipelines)}
