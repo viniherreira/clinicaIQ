@@ -18,7 +18,7 @@
     { label: 'Atendido', at: EV.attended, col: C.attended },
   ];
   const SHOW = TL.agenda.start + 0.15;
-  const HIDE = TL.care.end;
+  const HIDE = TL.care.end - 0.02; // some antes do corte: o 1º quadro do orçamento já vem sem trilho
   const X0 = 140;
   const X1 = 940;
   const Y = 262;

@@ -529,6 +529,8 @@
     return el;
   };
 
+  // Peças de passagem. Mostre/esconda com visibility (nunca zere style.display:
+  // o cartão usa display:flex inline e o layout desmonta).
   B.handoff = {};
 
   /** Cartão da Mariana: agenda → WhatsApp (Agendado) e WhatsApp → atendimento (Confirmado). */

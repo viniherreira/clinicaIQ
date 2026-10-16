@@ -52,11 +52,13 @@ SFX = [
     ('whoosh_c', 3.95, -16, 'peak'),   # traço do D
     ('pop_b', 4.50, -12, 'peak'),      # cabeça
     ('whoosh_b', 6.25, -9, 'peak'),    # mergulho no D
-    ('pop_c', 7.70, -11, 'peak'),      # bloco da Mariana
+    ('pop_b', 7.50, -13, 'peak'),      # bloco da Mariana aparece
+    ('pop_c', 7.70, -11, 'peak'),      # cursor pega o bloco
     ('pop_a', 8.50, -8, 'peak'),       # conflito
     ('pop_b', 9.60, -10, 'peak'),      # encaixa
     ('notif_b', 9.65, -14, 'start'),
-    ('whoosh_c', 10.25, -12, 'peak'),  # cartão voa para o celular
+    ('whoosh_c', 10.00, -15, 'peak'),  # bloco vira o cartão
+    ('whoosh_a', 10.62, -13, 'peak'),  # cartão voa para o celular
     ('notif_c', 11.20, -9, 'start'),   # mensagem chega
     ('pop_b', 11.60, -13, 'peak'),     # botões
     ('pop_b', 11.72, -14, 'peak'),
@@ -64,13 +66,16 @@ SFX = [
     ('pop_a', 14.40, -6, 'peak'),      # toque em Confirmar
     ('pop_c', 14.52, -10, 'peak'),
     ('whoosh_c', 15.60, -13, 'peak'),  # câmera recua
-    ('pop_b', 15.90, -11, 'peak'),     # flip
+    ('pop_b', 15.94, -11, 'peak'),     # flip
+    ('pop_c', 16.16, -14, 'peak'),     # selo de check
+    ('pop_b', 17.12, -15, 'peak'),     # cartão encaixa na sala de espera
     ('pop_b', 17.40, -12, 'peak'),     # chegou
     ('whoosh_a', 19.20, -12, 'peak'),  # círculo menta abre a ficha
+    ('whoosh_c', 20.40, -17, 'peak'),  # dentes se desenham
     ('pop_a', 20.90, -10, 'peak'),     # dente 16
     ('pop_a', 21.30, -10, 'peak'),     # dente 26
     ('notif_b', 21.90, -14, 'start'),  # atendido
-    ('whoosh_c', 22.25, -12, 'peak'),  # dentes voam
+    ('whoosh_c', 22.05, -12, 'peak'),  # dentes voam
     ('whoosh_a', 22.70, -15, 'peak'),  # documento
     ('pop_b', 24.50, -11, 'peak'),     # link
     ('pop_b', 24.62, -12, 'peak'),     # pdf
@@ -88,17 +93,18 @@ SFX = [
     ('pop_c', 31.20, -10, 'peak'),     # dinheiro
     ('pop_c', 31.95, -10, 'peak'),     # transferência
     ('whoosh_c', 32.40, -13, 'peak'),  # cards compactam
-    ('pop_a', 33.80, -9, 'peak'),      # alternador
+    ('pop_b', 33.10, -14, 'peak'),     # alternador aparece
+    ('pop_a', 33.80, -9, 'peak'),      # toque em Parcelado
     ('notif_b', 34.30, -11, 'start'),  # entrada paga
-    ('whoosh_a', 34.80, -12, 'peak'),  # painel sobe
+    ('whoosh_a', 34.62, -12, 'peak'),  # moeda sai e o painel sobe
     ('pop_a', 35.50, -8, 'peak'),      # moeda cai no card
-    ('whoosh_a', 36.45, -11, 'peak'),  # risca a planilha
-    ('pop_c', 36.60, -12, 'peak'),
+    ('whoosh_a', 36.58, -11, 'peak'),  # risca a planilha
+    ('pop_c', 36.86, -11, 'peak'),     # planilha estilhaça
     ('pop_a', 37.50, -10, 'peak'),     # modo escuro
     ('pop_c', 38.60, -9, 'peak'),      # cadeado fecha
-    ('pop_b', 38.90, -13, 'peak'),     # selos
-    ('pop_b', 39.20, -13, 'peak'),
-    ('pop_b', 39.50, -13, 'peak'),
+    ('pop_b', 38.85, -13, 'peak'),     # selos
+    ('pop_b', 39.10, -13, 'peak'),
+    ('pop_b', 39.35, -13, 'peak'),
     ('whoosh_b', 39.75, -9, 'peak'),   # íris do final
     ('pop_c', 41.70, -12, 'peak'),     # botão
     ('pop_a', 42.38, -10, 'peak'),     # toque no botão

@@ -17,6 +17,9 @@
       .scene, .overlay { position: absolute; inset: 0; overflow: hidden; display: none; }
       .overlay { display: block; pointer-events: none; }
       * { box-sizing: border-box; }
+      /* Sem camadas em cache: o Chrome rasteriza de novo a cada quadro e o texto
+         que cresce fica nítido (e o quadro não depende da ordem de renderização). */
+      #stage * { will-change: auto !important; }
     </style>
     <script src="src/vendor/lucide.js"></script>
     <script src="src/timeline.js"></script>

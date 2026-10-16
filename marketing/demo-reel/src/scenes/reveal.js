@@ -136,7 +136,7 @@
       cam.style.transformOrigin = `${DIVE_AT[0]}px ${DIVE_AT[1]}px`;
       R.tf(cam, { s: (drift + breathe) * zoom, y: R.lerp(0, -20, R.p(lt, 0, ev.dive, E.inOutSine)) });
       // As manchas somem no mergulho: a agenda começa no branco liso com a grade.
-      mesh.el.style.opacity = String(1 - dive);
+      mesh.el.style.opacity = String(1 - R.p(lt, ev.dive, S.dur - 0.1 - ev.dive, E.inOutCubic));
       dots.style.opacity = String(R.lerp(0.75, 1, R.p(lt, 0, 1.0)));
 
       // 3) "Respira." por letra, depois vira estrelinhas.

@@ -16,7 +16,7 @@ const sub = Number(a.sub || 1);
 const rfps = fps * sub;
 const workers = Number(a.workers || 3);
 const outFile = path.resolve(ROOT, a.out || 'out/video.mp4');
-const framesDir = path.resolve(ROOT, a.frames || 'out/frames');
+const framesDir = path.resolve(ROOT, a.frames || (a.scene ? `out/frames-${a.scene}` : 'out/frames'));
 const query = a.scene ? `?scene=${a.scene}` : '';
 
 const { server, port } = await serve();
