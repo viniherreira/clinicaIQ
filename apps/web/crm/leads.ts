@@ -211,6 +211,8 @@ export interface NewLeadInput {
   /** Etapa inicial; padrão: a de papel NEW do funil (`pipelineId` ou o principal). */
   stageId?: string | null;
   pipelineId?: string | null;
+  /** `false`: não agenda as automações da etapa (importação). */
+  automations?: boolean;
 }
 
 export async function createLead(
@@ -257,7 +259,7 @@ export async function createLead(
         updatedById: actor.userId,
       },
     });
-    await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
+    if (input.automations !== false) await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
 
     await tx.leadActivity.create({
       data: {

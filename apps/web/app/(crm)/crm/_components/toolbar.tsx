@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Download, KanbanSquare, List, Megaphone, MoreHorizontal, Pencil, Plus, Tags, Zap } from 'lucide-react';
+import { Download, KanbanSquare, List, Megaphone, MoreHorizontal, Pencil, Plus, Tags, Upload, Zap } from 'lucide-react';
 import type { BoardFilters, BoardPerson, BoardPipeline } from '@/crm/types';
 import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
@@ -200,6 +200,13 @@ export function CrmToolbar({
                 <a href={`/crm/leads/exportar${transmissaoQs}`} download>
                   <Download className="h-4 w-4" aria-hidden="true" /> Exportar planilha
                 </a>
+              </DropdownMenu.Item>
+            )}
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                <Link href="/crm/leads/importar">
+                  <Upload className="h-4 w-4" aria-hidden="true" /> Importar planilha (Kommo)
+                </Link>
               </DropdownMenu.Item>
             )}
             {canConfig && (

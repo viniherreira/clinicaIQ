@@ -95,3 +95,69 @@ test('exportar planilha: o menu baixa um CSV com os filtros da busca e fica na a
   expect(linhas[1]).toContain('Aberto');
   expect(await prisma.auditLog.count({ where: { tenantId: tenant.id, action: 'LEADS_EXPORTED' } })).toBe(antes + 1);
 });
+
+test('importar planilha do Kommo: colunas reconhecidas, prévia, importação e auditoria', async ({ page }) => {
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  const sufixo = Date.now().toString(36);
+  const campo = uniqueName('Como conheceu');
+  const tag = `kommo${sufixo}`;
+  const fone = () => `(11) 9${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+  const titulos = [`Implante ${sufixo}`, `Clareamento ${sufixo}`];
+  // O jeito que o Kommo exporta em português: ";" e datas com ponto.
+  const csv = [
+    `Título do lead;Contato principal;Telefone comercial;Venda;Etapa do lead;Tags;Criado em;Nota;${campo}`,
+    `${titulos[0]};Ana Kommo;${fone()};2.500,00;Em conversa;${tag}, ${tag}b;15.10.2026 10:00:00;Quer começar em novembro;Instagram`,
+    `${titulos[1]};Bia Kommo;${fone()};900;Venda ganha;${tag};01.09.2026 09:30:00;;Instagram`,
+    `Sem telefone ${sufixo};Caio;;;;;;;Google`,
+  ].join('\r\n');
+  const antes = await prisma.auditLog.count({ where: { tenantId: tenant.id, action: 'LEADS_IMPORTED' } });
+
+  try {
+    await page.goto('/crm/leads/importar');
+    await page.waitForLoadState('networkidle');
+    expect((await axe(page)).violations).toEqual([]);
+    await page.getByLabel('Planilha de leads').setInputFiles({ name: 'kommo.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf-8') });
+
+    await expect(page.getByRole('heading', { name: 'O que é cada coluna' })).toBeVisible();
+    await expect(page.getByLabel('Coluna Contato principal vai para')).toHaveValue('name');
+    await expect(page.getByLabel('Coluna Etapa do lead vai para')).toHaveValue('stage');
+    await expect(page.getByLabel(`Coluna ${campo} vai para`)).toHaveValue('newField');
+    expect((await axe(page)).violations).toEqual([]);
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Conferir antes de importar' })).toBeVisible();
+    await expect(page.getByText('telefones já têm lead aberto')).toBeVisible();
+    await expect(page.getByText(`Campos novos: ${campo} (lista)`)).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+    await page.getByRole('button', { name: 'Importar 2 leads' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Importação concluída' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('status')).toContainText('2 criados');
+    await page.getByText('1 aviso por linha').click();
+    await expect(page.getByText('Linha 4: sem telefone')).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+
+    const ana = await prisma.lead.findFirst({
+      where: { tenantId: tenant.id, title: titulos[0] },
+      include: { stage: true, tags: { include: { tag: true } } },
+    });
+    expect(ana).toMatchObject({ name: 'Ana Kommo', estimatedValueCents: 250000 });
+    expect(ana!.stage.name).toBe('Em conversa');
+    expect(ana!.createdAt.toISOString()).toBe('2026-10-15T13:00:00.000Z');
+    expect(ana!.tags.map((t) => t.tag.name).sort()).toEqual([tag, `${tag}b`]);
+    const bia = await prisma.lead.findFirst({ where: { tenantId: tenant.id, title: titulos[1] }, include: { stage: true } });
+    expect(bia!.stage.role).toBe('WON');
+    const def = await prisma.leadField.findFirst({ where: { tenantId: tenant.id, name: campo } });
+    expect(def).toMatchObject({ type: 'SELECT' });
+    expect(ana!.fields).toEqual({ [def!.id]: 'Instagram' });
+    expect(await prisma.auditLog.count({ where: { tenantId: tenant.id, action: 'LEADS_IMPORTED' } })).toBe(antes + 1);
+  } finally {
+    const leads = await prisma.lead.findMany({ where: { tenantId: tenant.id, title: { in: titulos } }, select: { id: true } });
+    const ids = leads.map((l) => l.id);
+    await prisma.leadActivity.deleteMany({ where: { leadId: { in: ids } } });
+    await prisma.leadTagOnLead.deleteMany({ where: { leadId: { in: ids } } });
+    await prisma.lead.deleteMany({ where: { id: { in: ids } } });
+    await prisma.leadTag.deleteMany({ where: { tenantId: tenant.id, name: { in: [tag, `${tag}b`] } } });
+    await prisma.leadField.deleteMany({ where: { tenantId: tenant.id, name: campo } });
+  }
+});
