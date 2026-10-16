@@ -3,7 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { prisma } from '@clinicaiq/db';
 import { uniqueName } from '../support/helpers';
 import { E2E_TENANT_SLUG } from '../support/seed';
-import { createLeadViaModal } from './helpers';
+import { incomingMessage } from './chat';
+import { createLeadViaModal, uniquePhone } from './helpers';
 
 /**
  * Pacote A do CRM (no jeito do Kommo): campos personalizados, lista com
@@ -159,5 +160,60 @@ test('importar planilha do Kommo: colunas reconhecidas, prévia, importação e 
     await prisma.lead.deleteMany({ where: { id: { in: ids } } });
     await prisma.leadTag.deleteMany({ where: { tenantId: tenant.id, name: { in: [tag, `${tag}b`] } } });
     await prisma.leadField.deleteMany({ where: { tenantId: tenant.id, name: campo } });
+  }
+});
+
+test('Conversas: Criar lead da Entrada com etapa e tag, tag na lista, filtro por tag e gaveta em tela pequena', async ({ page }) => {
+  test.setTimeout(120_000);
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  const nome = uniqueName('Contato Kommo');
+  const nomeTag = `conv${Date.now().toString(36)}`;
+  const tag = await prisma.leadTag.create({ data: { tenantId: tenant.id, name: nomeTag, color: 'violet' } });
+  try {
+    await incomingMessage(uniquePhone(), nome, 'Vi o anúncio do implante');
+    await page.goto('/crm/conversas?aba=inbox');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('list', { name: 'Lista de conversas' }).getByRole('button', { name: new RegExp(nome) }).click();
+
+    const contato = page.getByRole('complementary', { name: 'Contato da conversa' });
+    const form = contato.getByRole('form', { name: 'Criar lead' });
+    await form.getByLabel('Etapa').selectOption({ label: 'Em conversa' });
+    await form.getByRole('button', { name: nomeTag }).click();
+    await expect(form.getByRole('button', { name: nomeTag })).toHaveAttribute('aria-pressed', 'true');
+    expect((await axe(page)).violations).toEqual([]);
+    await form.getByRole('button', { name: 'Criar lead' }).click();
+
+    // O painel vira o do lead, já na etapa escolhida e com a tag.
+    const lado = page.getByRole('complementary', { name: 'Dados do lead' });
+    await expect(lado).toBeVisible({ timeout: 20_000 });
+    await expect(lado.getByRole('list', { name: 'Tags' })).toContainText(nomeTag);
+    await expect.poll(async () => {
+      const l = await prisma.lead.findFirst({ where: { tenantId: tenant.id, name: nome }, include: { stage: true, tags: true } });
+      return l ? `${l.stage.name}|${l.tags.map((t) => t.tagId).join(',')}` : '';
+    }, { timeout: 20_000 }).toBe(`Em conversa|${tag.id}`);
+
+    // Lista: a tag aparece no item; o filtro por tag deixa só quem tem a tag.
+    await page.goto('/crm/conversas');
+    await page.waitForLoadState('networkidle');
+    const lista = page.getByRole('list', { name: 'Lista de conversas' });
+    await page.getByLabel('Filtrar por tag').selectOption({ label: `Tag: ${nomeTag}` });
+    await expect(lista.getByRole('button')).toHaveCount(1);
+    await expect(lista.getByRole('button', { name: new RegExp(nome) })).toContainText(nomeTag);
+    await expect(page).toHaveURL(new RegExp(`tag=${tag.id}`));
+    expect((await axe(page)).violations).toEqual([]);
+
+    // Tela pequena: o lead abre por cima pelo botão "Lead".
+    await page.setViewportSize({ width: 820, height: 900 });
+    await lista.getByRole('button', { name: new RegExp(nome) }).click();
+    await page.getByRole('button', { name: 'Lead', exact: true }).click();
+    const gaveta = page.getByRole('dialog', { name: 'Lead da conversa' });
+    await expect(gaveta.getByRole('complementary', { name: 'Dados do lead' })).toBeVisible();
+    expect((await axe(page)).violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(gaveta).toBeHidden();
+  } finally {
+    await prisma.leadTagOnLead.deleteMany({ where: { tagId: tag.id } });
+    await prisma.leadActivity.deleteMany({ where: { tenantId: tenant.id, type: 'TAG_ADDED', data: { path: ['tagId'], equals: tag.id } } });
+    await prisma.leadTag.deleteMany({ where: { id: tag.id } });
   }
 });

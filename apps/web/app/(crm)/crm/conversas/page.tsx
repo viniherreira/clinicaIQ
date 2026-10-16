@@ -22,12 +22,13 @@ export default async function ConversasPage({
   const tab: InboxTab = (INBOX_TABS as readonly string[]).includes(one('aba')) ? (one('aba') as InboxTab) : 'all';
   const q = one('q').slice(0, 80);
   const selectedId = one('c') || null;
+  const tagId = one('tag') || null;
 
   // As que o aviso do gateway não alcançou.
   await classifyPending(ctx.db, ctx.tenantId);
 
   const [list, counts, thread, quickReplies, line, cloud, basics] = await Promise.all([
-    listConversations(ctx.db, ctx, tab, q),
+    listConversations(ctx.db, ctx, tab, q, 60, tagId),
     inboxCounts(ctx.db),
     selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
@@ -47,6 +48,7 @@ export default async function ConversasPage({
       initial={{ list, counts, thread }}
       initialTab={tab}
       initialQ={q}
+      initialTagId={tagId}
       initialSelectedId={thread ? selectedId : null}
       quickReplies={quickReplies}
       // Na API oficial não há linha de QR para cair.
