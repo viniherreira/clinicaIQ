@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { KanbanSquare, List, MoreHorizontal, Pencil, Plus, Tags, Megaphone, Zap } from 'lucide-react';
+import { Download, KanbanSquare, List, Megaphone, MoreHorizontal, Pencil, Plus, Tags, Zap } from 'lucide-react';
 import type { BoardFilters, BoardPerson, BoardPipeline } from '@/crm/types';
 import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
@@ -192,6 +192,14 @@ export function CrmToolbar({
                 <Link href={`/crm/automacoes/transmissoes/nova${transmissaoQs}`}>
                   <Megaphone className="h-4 w-4" aria-hidden="true" /> Enviar transmissão para estes leads
                 </Link>
+              </DropdownMenu.Item>
+            )}
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                {/* A planilha leva os filtros desta busca; baixa direto (é uma rota, não uma página). */}
+                <a href={`/crm/leads/exportar${transmissaoQs}`} download>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Exportar planilha
+                </a>
               </DropdownMenu.Item>
             )}
             {canConfig && (

@@ -74,3 +74,24 @@ test('ações em massa: marcar dois leads e pôr uma tag nos dois', async ({ pag
     await prisma.leadTag.deleteMany({ where: { id: tag.id } });
   }
 });
+
+test('exportar planilha: o menu baixa um CSV com os filtros da busca e fica na auditoria', async ({ page }) => {
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
+  const lead = await createLeadViaModal(page);
+  const antes = await prisma.auditLog.count({ where: { tenantId: tenant.id, action: 'LEADS_EXPORTED' } });
+
+  await page.goto(`/crm/leads?q=${encodeURIComponent(lead.title)}`);
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Mais opções' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'Exportar planilha' }).click();
+  const arquivo = await download;
+  expect(arquivo.suggestedFilename()).toMatch(/^leads-dreamclin-\d{4}-\d{2}-\d{2}\.csv$/);
+  const texto = (await (await arquivo.createReadStream()).toArray()).map((b) => b.toString('utf-8')).join('');
+  const linhas = texto.replace(/^﻿/, '').trim().split('\r\n');
+  expect(linhas[0]).toMatch(/^Negócio;Pessoa;Telefone;E-mail;Funil;Etapa;Situação/);
+  expect(linhas).toHaveLength(2);
+  expect(linhas[1]).toContain(lead.title);
+  expect(linhas[1]).toContain('Aberto');
+  expect(await prisma.auditLog.count({ where: { tenantId: tenant.id, action: 'LEADS_EXPORTED' } })).toBe(antes + 1);
+});
