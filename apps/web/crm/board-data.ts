@@ -10,6 +10,7 @@ import type { BoardFilters, BoardLead, BoardTaskStatus } from './types';
 import { clinicDay, hasPeriod, periodWhere } from './period';
 
 export { parseFilters } from './filters';
+import { anyFieldWhere, formatFieldValue, readFieldValues } from './custom-fields';
 
 /**
  * O filtro inteiro, resolvido no banco. `now` decide "hoje" (para os atalhos
@@ -34,6 +35,7 @@ export function leadWhere(
   // As mesmas regras de `taskStatus`: sem tarefa aberta; ou alguma aberta já vencida.
   if (f.tarefa === 'none') and.push({ tasks: { none: { completedAt: null } } });
   if (f.tarefa === 'overdue') and.push({ tasks: { some: { completedAt: null, dueAt: { lt: now } } } });
+  for (const c of f.campos) and.push(anyFieldWhere(c));
   if (f.valorMin != null || f.valorMax != null) {
     where.estimatedValueCents = {
       ...(f.valorMin != null ? { gte: Math.round(f.valorMin * 100) } : {}),
@@ -71,9 +73,13 @@ function toTaskStatus(row: LeadRow, now: Date): BoardTaskStatus {
 }
 
 export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date = new Date()): Promise<BoardLead[]> {
-  const live = await liveInfoForLeads(ctx.db, rows, now);
+  const [live, noCard] = await Promise.all([
+    liveInfoForLeads(ctx.db, rows, now),
+    ctx.db.leadField.findMany({ where: { active: true, showOnCard: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }], take: 3 }),
+  ]);
   return rows.map((r) => {
     const info = live.get(r.id);
+    const fields = readFieldValues(r.fields);
     return {
       id: r.id,
       stageId: r.stageId,
@@ -94,13 +100,19 @@ export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date =
       openQuote: info?.openQuote ? { number: info.openQuote.number, totalCents: info.openQuote.totalCents } : null,
       wonAt: r.wonAt?.toISOString() ?? null,
       lostAt: r.lostAt?.toISOString() ?? null,
+      fields,
+      cardFields: noCard.flatMap((d) => {
+        const value = formatFieldValue(d, fields[d.id]);
+        return value ? [{ name: d.name, value }] : [];
+      }),
     };
   });
 }
 
 /** Quantos o quadro carrega de uma vez; a lista, 500. A contagem é sempre a de verdade. */
 export const BOARD_LIMIT = 1000;
-export const LIST_LIMIT = 500;
+/** A lista mostra de 100 em 100 (`pagina=`). */
+export const LIST_PAGE_SIZE = 100;
 
 /** Os leads abertos do quadro, com os filtros aplicados. */
 export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, now: Date = new Date()) {
@@ -158,6 +170,7 @@ export async function loadLeadList(
   status: ListStatus,
   order: ListOrder,
   now: Date = new Date(),
+  page = 1,
 ) {
   const situacao = statusWhere(status);
   const orderBy: Prisma.LeadOrderByWithRelationInput[] =
@@ -171,18 +184,22 @@ export async function loadLeadList(
 
   const rows = await ctx.db.lead.findMany({
     where: { ...leadWhere(ctx, f, now), ...situacao },
-    include: { ...leadInclude, stage: { select: { name: true } } },
-    orderBy,
-    take: LIST_LIMIT,
+    include: { ...leadInclude, stage: { select: { name: true, pipelineId: true } } },
+    // Desempate pela id: a mesma ordem em todas as páginas.
+    orderBy: [...orderBy, { id: 'asc' }],
+    skip: (Math.max(1, page) - 1) * LIST_PAGE_SIZE,
+    take: LIST_PAGE_SIZE,
   });
   const leads = await toBoardLeads(ctx, rows, now);
-  const stageName = new Map(rows.map((r) => [r.id, r.stage.name]));
-  return leads.map((l) => ({ ...l, stageName: stageName.get(l.id) ?? '' }));
+  const etapa = new Map(rows.map((r) => [r.id, r.stage]));
+  return leads.map((l) => ({ ...l, stageName: etapa.get(l.id)?.name ?? '', pipelineId: etapa.get(l.id)?.pipelineId ?? '' }));
 }
 
 export function parseListParams(sp: Record<string, string | string[] | undefined>) {
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
   const status = (['abertos', 'ganhos', 'perdidos', 'todos'] as const).find((s) => s === one('situacao')) ?? 'abertos';
   const order = (['recentes', 'nome', 'valor', 'etapa'] as const).find((s) => s === one('ordem')) ?? 'recentes';
-  return { status, order };
+  const n = Number(one('pagina'));
+  const page = Number.isInteger(n) && n >= 1 && n <= 10_000 ? n : 1;
+  return { status, order, page };
 }

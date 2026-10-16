@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SOURCE_LABEL } from '@/crm/format';
 import type { BoardPerson, BoardStage } from '@/crm/types';
 import { createLeadAction, type NewLeadForm } from '../actions';
+import type { FieldDef } from '@/crm/custom-fields';
 
 const NENHUM = '__nenhum__';
 const inputCls =
@@ -22,8 +23,11 @@ export function NewLeadModal({
   procedures,
   meId,
   stages,
+  fields = [],
 }: {
   open: boolean;
+  /** Campos personalizados ativos (opcionais no cadastro). */
+  fields?: FieldDef[];
   onClose: () => void;
   onCreated: (message: string) => void;
   team: BoardPerson[];
@@ -43,6 +47,7 @@ export function NewLeadModal({
     assignedToId: meId,
   });
   const [erros, setErros] = useState<Record<string, string>>({});
+  const [campos, setCampos] = useState<Record<string, unknown>>({});
   const [mensagem, setMensagem] = useState('');
   const [duplicado, setDuplicado] = useState<{ leadId: string; name: string } | null>(null);
   const [pending, start] = useTransition();
@@ -50,6 +55,7 @@ export function NewLeadModal({
   useEffect(() => {
     if (!open) return;
     setForm({ name: '', phone: '', title: '', source: 'MANUAL', interestProcedureId: NENHUM, estimatedValue: '', assignedToId: meId });
+    setCampos({});
     setErros({});
     setMensagem('');
     setDuplicado(null);
@@ -73,6 +79,7 @@ export function NewLeadModal({
       assignedToId: form.assignedToId === NENHUM ? null : form.assignedToId,
       stageId: entrada?.id ?? null,
       force,
+      fields: campos,
     };
     start(async () => {
       const r = await createLeadAction(input);
@@ -234,6 +241,15 @@ export function NewLeadModal({
                   </Select>
                 </div>
               </div>
+
+              {fields.length > 0 && (
+                <fieldset className="grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
+                  <legend className="sr-only">Campos personalizados</legend>
+                  {fields.map((d) => (
+                    <NewLeadField key={d.id} def={d} value={campos[d.id]} onChange={(v) => setCampos((c) => ({ ...c, [d.id]: v }))} />
+                  ))}
+                </fieldset>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border bg-surface-alt/50 px-5 py-4">
@@ -248,5 +264,58 @@ export function NewLeadModal({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** Um campo personalizado no cadastro, com o controle nativo de cada tipo. */
+function NewLeadField({ def, value, onChange }: { def: FieldDef; value: unknown; onChange: (v: unknown) => void }) {
+  const id = `novo-lead-campo-${def.id}`;
+  const cls = 'h-10 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+  if (def.type === 'MULTISELECT') {
+    const marcadas = Array.isArray(value) ? (value as string[]) : [];
+    return (
+      <div role="group" aria-labelledby={`${id}-r`} className="space-y-1.5 sm:col-span-2">
+        <span id={`${id}-r`} className="block text-xs font-medium text-foreground">{def.name}</span>
+        <div className="flex flex-wrap gap-1.5">
+          {def.options.map((o) => {
+            const on = marcadas.includes(o);
+            return (
+              <button
+                key={o}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onChange(on ? marcadas.filter((x) => x !== o) : [...marcadas, o])}
+                className={`h-8 rounded-md border px-2.5 text-xs focus-visible:outline-2 focus-visible:outline-ring ${on ? 'border-link bg-primary/15 text-link' : 'border-border text-muted-foreground'}`}
+              >
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  const texto = typeof value === 'string' ? value : '';
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-xs font-medium text-foreground">{def.name}</label>
+      {def.type === 'SELECT' || def.type === 'BOOLEAN' ? (
+        <select id={id} value={texto} onChange={(e) => onChange(e.target.value)} className={cls}>
+          <option value="">Não informado</option>
+          {(def.type === 'BOOLEAN' ? ['Sim', 'Não'] : def.options).map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={id}
+          type={def.type === 'DATE' ? 'date' : 'text'}
+          inputMode={def.type === 'NUMBER' ? 'decimal' : undefined}
+          value={texto}
+          onChange={(e) => onChange(e.target.value)}
+          className={cls}
+        />
+      )}
+    </div>
   );
 }

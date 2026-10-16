@@ -8,7 +8,8 @@
  */
 
 /** Onde a resposta de uma pergunta é guardada. */
-export type BotSaveField = 'name' | 'email' | 'note';
+/** Onde a resposta da pergunta é guardada: nome, e-mail, anotação ou um campo personalizado (`field:<id>`). */
+export type BotSaveField = 'name' | 'email' | 'note' | `field:${string}`;
 
 export type BotAction =
   | { type: 'createLead'; stageId?: string }

@@ -11,7 +11,8 @@ import { pipelineOfStage } from '@/crm/pipeline-options';
 import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { moveLeadAction } from '../../../actions';
 import { LostReasonModal } from '../../../_components/lost-reason-modal';
-import { createTagAction, revealPhoneAction, setLeadTagsAction, updateLeadAction } from '../actions';
+import { createTagAction, revealPhoneAction, setLeadFieldsAction, setLeadTagsAction, updateLeadAction } from '../actions';
+import { formatFieldValue, type FieldDef } from '@/crm/custom-fields';
 
 /**
  * A metade esquerda da ficha: quem é, em que etapa está e o que fazer.
@@ -25,10 +26,13 @@ export function LeadPanel({
   team,
   procedures,
   lostReasons,
+  fields = [],
   actions,
   onSaved,
 }: {
   lead: LeadDetail;
+  /** Campos personalizados ativos da clínica, na ordem. */
+  fields?: FieldDef[];
   /** Todos os funis: a ficha mostra o do lead e deixa trocar de funil. */
   pipelines: BoardPipeline[];
   allTags: BoardTag[];
@@ -54,6 +58,17 @@ export function LeadPanel({
     start(async () => {
       const r = await updateLeadAction(lead.id, patch);
       setAviso(r.ok ? msg : r.message);
+      if (r.ok) {
+        router.refresh();
+        onSaved?.();
+      }
+    });
+  }
+
+  function salvarCampo(def: FieldDef, valor: unknown) {
+    start(async () => {
+      const r = await setLeadFieldsAction(lead.id, { [def.id]: valor });
+      setAviso(r.ok ? `${def.name} salvo.` : r.message);
       if (r.ok) {
         router.refresh();
         onSaved?.();
@@ -216,6 +231,11 @@ export function LeadPanel({
             onSave={(v) => salvar({ source: v as 'MANUAL' }, 'Origem salva.')}
           />
         </Field>
+        {fields.map((d) => (
+          <Field key={d.id} label={d.name}>
+            <CustomFieldEditor def={d} value={lead.fields[d.id]} onSave={(v) => salvarCampo(d, v)} />
+          </Field>
+        ))}
         <Field label="Paciente">
           {lead.patient ? (
             <Link href={`/pacientes/${lead.patient.id}`} className="text-primary underline-offset-2 hover:underline">
@@ -256,6 +276,53 @@ export function LeadPanel({
       />
       <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
     </aside>
+  );
+}
+
+/** O editor de cada campo personalizado, conforme o tipo. Salva na hora (lista, sim/não) ou ao sair do campo (texto). */
+function CustomFieldEditor({ def, value, onSave }: { def: FieldDef; value: LeadDetail['fields'][string] | undefined; onSave: (v: unknown) => void }) {
+  if (def.type === 'SELECT' || def.type === 'BOOLEAN') {
+    const opcoes = def.type === 'BOOLEAN' ? ['Sim', 'Não'] : def.options;
+    const atual = def.type === 'BOOLEAN' ? (value === true ? 'Sim' : value === false ? 'Não' : '') : typeof value === 'string' ? value : '';
+    return (
+      <InlineSelect
+        label={def.name}
+        value={atual}
+        options={[{ value: '', label: 'Não informado' }, ...opcoes.map((o) => ({ value: o, label: o }))]}
+        onSave={(v) => onSave(v)}
+      />
+    );
+  }
+  if (def.type === 'MULTISELECT') {
+    const marcadas = Array.isArray(value) ? value : [];
+    return (
+      <div role="group" aria-label={def.name} className="flex flex-wrap gap-1">
+        {def.options.map((o) => {
+          const on = marcadas.includes(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onSave(on ? marcadas.filter((x) => x !== o) : [...marcadas, o])}
+              className={`h-7 rounded-md border px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring ${on ? 'border-link bg-primary/15 text-link' : 'border-border text-muted-foreground hover:text-foreground'}`}
+            >
+              {o}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  const texto = formatFieldValue(def, value ?? null);
+  return (
+    <InlineText
+      label={def.name}
+      value={texto}
+      placeholder={def.type === 'DATE' ? 'dd/mm/aaaa' : 'Informar'}
+      inputMode={def.type === 'NUMBER' ? 'decimal' : 'text'}
+      onSave={(v) => onSave(v)}
+    />
   );
 }
 

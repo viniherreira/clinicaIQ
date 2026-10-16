@@ -49,6 +49,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             team={basics.team}
             procedures={basics.procedures}
             lostReasons={basics.lostReasons}
+            fields={basics.fields}
             actions={<ConvertActions key="converter" leadId={lead.id} patient={lead.patient} />}
           />
           {can(ctx.role, 'crm_config') && <EraseLeadData leadId={lead.id} leadName={lead.name} />}

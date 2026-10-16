@@ -3,6 +3,7 @@
  * mostrar: telefone já mascarado, datas como texto ISO, nada cifrado.
  */
 
+import type { FieldFilter, FieldValues } from './custom-fields';
 import type { Period } from './period';
 
 export interface BoardStage {
@@ -56,6 +57,10 @@ export interface BoardLead {
   openQuote: { number: number; totalCents: number } | null;
   wonAt: string | null;
   lostAt: string | null;
+  /** Campos personalizados: { [fieldId]: valor } (lista e exportação). */
+  fields: FieldValues;
+  /** Os campos marcados "mostrar no card", já escritos para a tela. */
+  cardFields: { name: string; value: string }[];
 }
 
 export interface BoardFilters {
@@ -74,6 +79,8 @@ export interface BoardFilters {
   /** Valor de venda em reais, mínimo e máximo. */
   valorMin: number | null;
   valorMax: number | null;
+  /** Campos personalizados de lista e sim/não (`campo_<id>=valor`). */
+  campos: FieldFilter[];
 }
 
 export interface LostReasonOption {

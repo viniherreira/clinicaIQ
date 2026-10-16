@@ -113,6 +113,11 @@ export function LeadCard({
           {lead.valueCents != null && lead.valueCents > 0 && (
             <p className="text-xs tabular-nums text-foreground/90">{formatCents(lead.valueCents)}</p>
           )}
+          {lead.cardFields.map((c) => (
+            <p key={c.name} className="truncate text-xs text-muted-foreground">
+              {c.name}: <span className="text-foreground/90">{c.value}</span>
+            </p>
+          ))}
         </div>
       </div>
 

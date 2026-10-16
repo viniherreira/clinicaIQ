@@ -3,6 +3,7 @@ import { botExpired, continueBot, isKeyword, parseSteps, shouldStart, startBot, 
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { createLead, moveLead, OPEN_LEAD } from './leads';
+import { setLeadFields } from './lead-fields';
 import { decryptPhone } from './phone';
 
 /**
@@ -137,6 +138,8 @@ async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: BotA
       await db.conversation.updateMany({ where: { id: conv.id }, data: { contactName: nome } });
     }
     if (a.field === 'email') await db.lead.updateMany({ where: { id: leadId }, data: { email: valor.slice(0, 200) } });
+    // Campo personalizado (como o Salesbot): resposta que não serve para o campo fica só na anotação.
+    if (a.field.startsWith('field:')) await setLeadFields(db, { tenantId, userId: null }, leadId, { [a.field.slice(6)]: valor });
     await db.leadActivity.create({
       data: { tenantId, leadId, type: 'NOTE', actorId: null, data: { text: `Robô — ${a.question.slice(0, 200)}\nResposta: ${valor}` } },
     });

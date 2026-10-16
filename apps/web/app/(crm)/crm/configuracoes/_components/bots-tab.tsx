@@ -21,7 +21,7 @@ export type BotRow = {
   hours: BotHours;
 };
 type Option = { id: string; name: string };
-export type BotRefs = { stages: Option[]; tags: Option[]; team: Option[] };
+export type BotRefs = { stages: Option[]; tags: Option[]; team: Option[]; fields?: Option[] };
 
 const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
@@ -41,12 +41,12 @@ export function hoursText(h: BotHours) {
  * robô é contado em frases ("quando… responde… e faz…"), começa de um modelo
  * pronto e pode ser testado no simulador ao lado antes de ligar.
  */
-export function BotsTab({ bots, stages, tags, team, children }: { bots: BotRow[]; children?: React.ReactNode } & BotRefs) {
+export function BotsTab({ bots, stages, tags, team, fields = [], children }: { bots: BotRow[]; children?: React.ReactNode } & BotRefs) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [aviso, setAviso] = useState('');
   const [editando, setEditando] = useState<BotRow | 'escolher' | null>(null);
-  const refs = { stages, tags, team };
+  const refs = { stages, tags, team, fields };
 
   const agir = (fn: () => Promise<{ ok: boolean; message?: string }>, ok: string, fechar = false) =>
     start(async () => {
@@ -559,14 +559,14 @@ function OptionCard({
             </div>
           )}
 
-          {o.after === 'question' && o.question && <QuestionEditor q={o.question} onChange={(question) => onChange({ question })} />}
+          {o.after === 'question' && o.question && <QuestionEditor q={o.question} fields={refs.fields ?? []} onChange={(question) => onChange({ question })} />}
         </div>
       )}
     </li>
   );
 }
 
-function QuestionEditor({ q, onChange }: { q: UiQuestion; onChange: (q: UiQuestion) => void }) {
+function QuestionEditor({ q, fields, onChange }: { q: UiQuestion; fields: Option[]; onChange: (q: UiQuestion) => void }) {
   const id = useId();
   return (
     <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-2">
@@ -580,6 +580,9 @@ function QuestionEditor({ q, onChange }: { q: UiQuestion; onChange: (q: UiQuesti
           <option value="name">Nome do lead</option>
           <option value="email">E-mail do lead</option>
           <option value="note">Anotação no histórico</option>
+          {fields.map((f) => (
+            <option key={f.id} value={`field:${f.id}`}>Campo: {f.name}</option>
+          ))}
         </select>
       </div>
       <div>

@@ -33,6 +33,7 @@ export default async function BotsPage() {
           stages={stageOptions(basics.pipelines)}
           tags={tags}
           team={basics.team.map((u) => ({ id: u.id, name: u.name ?? 'Sem nome' }))}
+          fields={basics.fields.map((f) => ({ id: f.id, name: f.name }))}
         >
           <CaptureRules
             rules={regras.map((r) => ({

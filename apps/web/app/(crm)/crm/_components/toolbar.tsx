@@ -4,12 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { KanbanSquare, List, MoreHorizontal, Pencil, Plus, Tags, Megaphone, Zap } from 'lucide-react';
+import { Download, KanbanSquare, List, Megaphone, MoreHorizontal, Pencil, Plus, Tags, Upload, Zap } from 'lucide-react';
 import type { BoardFilters, BoardPerson, BoardPipeline } from '@/crm/types';
 import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
 import { PipelineMenu } from './pipeline-menu';
 import { FilterSearch, type TagWithCount } from './filter-panel';
+import { isFilterable, type FieldDef } from '@/crm/custom-fields';
 
 /**
  * A barra do topo do funil e da lista, como a do Kommo: o nome do funil (que
@@ -31,8 +32,11 @@ export function CrmToolbar({
   currentPipeline,
   canConfig,
   today,
+  fields = [],
 }: {
   view: 'quadro' | 'lista';
+  /** Campos personalizados ativos: viram filtro (lista e sim/não) e entram no Novo lead. */
+  fields?: FieldDef[];
   filters: BoardFilters;
   tags: TagWithCount[];
   team: BoardPerson[];
@@ -117,6 +121,7 @@ export function CrmToolbar({
         team={team}
         stages={currentPipeline ? currentPipeline.columns : pipelines.flatMap((p) => p.columns.map((s) => ({ ...s, name: pipelines.length > 1 ? `${p.name} · ${s.name}` : s.name })))}
         pipelines={view === 'lista' ? pipelines : []}
+        fields={fields.filter((f) => isFilterable(f.type))}
         canConfig={canConfig}
         today={today}
         onApply={(next) => {
@@ -191,6 +196,21 @@ export function CrmToolbar({
             )}
             {canConfig && (
               <DropdownMenu.Item asChild className={item}>
+                {/* A planilha leva os filtros desta busca; baixa direto (é uma rota, não uma página). */}
+                <a href={`/crm/leads/exportar${transmissaoQs}`} download>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Exportar planilha
+                </a>
+              </DropdownMenu.Item>
+            )}
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
+                <Link href="/crm/leads/importar">
+                  <Upload className="h-4 w-4" aria-hidden="true" /> Importar planilha (Kommo)
+                </Link>
+              </DropdownMenu.Item>
+            )}
+            {canConfig && (
+              <DropdownMenu.Item asChild className={item}>
                 <Link href="/crm/automacoes">
                   <Zap className="h-4 w-4" aria-hidden="true" /> Automações
                 </Link>
@@ -219,6 +239,7 @@ export function CrmToolbar({
         procedures={procedures}
         meId={meId}
         stages={currentPipeline?.columns}
+        fields={fields}
       />
       <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
     </div>

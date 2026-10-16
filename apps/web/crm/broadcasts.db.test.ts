@@ -37,6 +37,7 @@ describe('transmissões: regras puras', async () => {
       valueMin: null,
       valueMax: null,
       search: '',
+      fields: [],
     });
   });
 
