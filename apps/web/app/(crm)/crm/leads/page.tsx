@@ -108,7 +108,8 @@ export default async function LeadsPage({
         pageSize={LIST_PAGE_SIZE}
         initialColumns={colunas}
         fields={basics.fields}
-        pipelines={basics.pipelines.map((p) => ({ id: p.id, name: p.name }))}
+        pipelines={basics.pipelines}
+        bulk={{ team: basics.team, tags: basics.tags, lostReasons: basics.lostReasons, canDelete: can(ctx.role, 'crm_config') }}
         showClosed={mostraFechado}
         order={order}
         sortHrefs={{

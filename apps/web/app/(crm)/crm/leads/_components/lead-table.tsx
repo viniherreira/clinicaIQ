@@ -2,13 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Columns3 } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import { formatFieldValue, type FieldDef } from '@/crm/custom-fields';
 import { formatCents, formatDue, SOURCE_LABEL } from '@/crm/format';
 import { BASE_COLUMNS, COLUMNS_COOKIE, fieldColumn, serializeColumns } from '@/crm/list-columns';
-import type { BoardLead } from '@/crm/types';
+import { MAX_BULK } from '@/crm/bulk-limits';
+import type { BoardLead, BoardPipeline } from '@/crm/types';
 import { instantDateBR } from '@/lib/tz';
+import { BulkBar, type BulkData } from './bulk-bar';
 
 export type ListRow = BoardLead & { stageName: string; pipelineId: string };
 type SortKey = 'nome' | 'etapa' | 'valor' | 'recentes';
@@ -31,6 +34,7 @@ export function LeadTable({
   sortHrefs,
   pageHrefs,
   caption,
+  bulk,
 }: {
   rows: ListRow[];
   total: number;
@@ -38,14 +42,54 @@ export function LeadTable({
   pageSize: number;
   initialColumns: string[];
   fields: FieldDef[];
-  pipelines: { id: string; name: string }[];
+  pipelines: BoardPipeline[];
   showClosed: boolean;
   order: SortKey;
   sortHrefs: Record<SortKey, string>;
   pageHrefs: { prev: string | null; next: string | null };
   caption: string;
+  /** Dados das ações em massa (equipe, tags, motivos) e se pode excluir. */
+  bulk: Omit<BulkData, 'pipelines' | 'fields'>;
 }) {
+  const router = useRouter();
+  const params = useSearchParams();
   const [colunas, setColunas] = useState(initialColumns);
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [todos, setTodos] = useState(false);
+  const [aviso, setAviso] = useState('');
+  const geral = useRef<HTMLInputElement>(null);
+  const paginaToda = rows.length > 0 && rows.every((r) => marcados.has(r.id));
+  const algum = rows.some((r) => marcados.has(r.id));
+  const quantos = todos ? Math.min(total, MAX_BULK) : marcados.size;
+
+  // Mudou a página ou o filtro: a seleção de antes não vale mais.
+  const chaveDasLinhas = rows.map((r) => r.id).join(',');
+  useEffect(() => {
+    setMarcados(new Set());
+    setTodos(false);
+  }, [chaveDasLinhas]);
+  useEffect(() => {
+    if (geral.current) geral.current.indeterminate = algum && !paginaToda;
+  }, [algum, paginaToda]);
+
+  const marcar = (id: string, on: boolean) => {
+    setTodos(false);
+    setMarcados((m) => {
+      const n = new Set(m);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  };
+  const marcarPagina = (on: boolean) => {
+    setTodos(false);
+    setMarcados(on ? new Set(rows.map((r) => r.id)) : new Set());
+  };
+  const limpar = () => {
+    setMarcados(new Set());
+    setTodos(false);
+  };
+  const busca = Object.fromEntries([...params.entries()].filter(([k]) => k !== 'pagina'));
   const visivel = (k: string) => colunas.includes(k);
   const nomeFunil = new Map(pipelines.map((p) => [p.id, p.name]));
   const camposVisiveis = fields.filter((f) => visivel(fieldColumn(f.id)));
@@ -78,16 +122,53 @@ export function LeadTable({
   return (
     <div className="mx-4 rounded-xl border border-border bg-surface sm:mx-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <p className="text-xs text-muted-foreground" aria-live="polite">
+        <p className="text-xs text-muted-foreground">
           {total === 0 ? 'Nenhum lead' : `${primeira.toLocaleString('pt-BR')}–${ultima.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
+        </p>
+        <p role="status" aria-live="polite" className="text-xs font-medium text-foreground empty:hidden">
+          {aviso}
         </p>
         <ColumnPicker colunas={colunas} fields={fields} onChange={escolher} />
       </div>
+      {paginaToda && total > rows.length && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary/10 px-3 py-2 text-sm">
+          {todos ? (
+            <>
+              <span>
+                {total > MAX_BULK
+                  ? `Os ${MAX_BULK.toLocaleString('pt-BR')} primeiros da busca estão marcados (até ${MAX_BULK.toLocaleString('pt-BR')} por vez).`
+                  : `Todos os ${total.toLocaleString('pt-BR')} leads da busca estão marcados.`}
+              </span>
+              <button type="button" onClick={limpar} className="font-medium text-link underline-offset-2 hover:underline">
+                Desmarcar
+              </button>
+            </>
+          ) : (
+            <>
+              <span>Os {rows.length} desta página estão marcados.</span>
+              <button type="button" onClick={() => setTodos(true)} className="font-medium text-link underline-offset-2 hover:underline">
+                Marcar todos os {total.toLocaleString('pt-BR')} da busca
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead className="border-b border-border bg-surface-alt/50">
             <tr>
+              <th scope="col" className="w-10 px-3 py-2.5">
+                <input
+                  ref={geral}
+                  type="checkbox"
+                  checked={paginaToda}
+                  onChange={(e) => marcarPagina(e.target.checked)}
+                  aria-label="Marcar todos desta página"
+                  className="h-4 w-4 accent-primary"
+                  disabled={rows.length === 0}
+                />
+              </th>
               <Th label="Negócio" by="nome" />
               {visivel('etapa') && <Th label="Etapa" by="etapa" />}
               {visivel('funil') && <Th label="Funil" />}
@@ -105,7 +186,16 @@ export function LeadTable({
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((l) => (
-              <tr key={l.id} className="hover:bg-surface-alt/40">
+              <tr key={l.id} className={marcados.has(l.id) || todos ? 'bg-primary/5' : 'hover:bg-surface-alt/40'}>
+                <td className="w-10 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={todos || marcados.has(l.id)}
+                    onChange={(e) => marcar(l.id, e.target.checked)}
+                    aria-label={`Marcar ${l.title || l.name}`}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </td>
                 <td className="px-3 py-2.5">
                   <Link href={`/crm/leads/${l.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
                     {l.title || l.name}
@@ -163,6 +253,19 @@ export function LeadTable({
         </table>
       </div>
       {rows.length === 0 && <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhum lead com esses filtros.</p>}
+      {quantos > 0 && (
+        <BulkBar
+          count={quantos}
+          target={todos ? { search: busca } : { ids: [...marcados] }}
+          data={{ ...bulk, pipelines, fields }}
+          onClear={limpar}
+          onDone={(msg) => {
+            setAviso(msg);
+            limpar();
+            router.refresh();
+          }}
+        />
+      )}
       {paginas > 1 && (
         <nav aria-label="Páginas da lista" className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-sm">
           {pageHrefs.prev ? (
