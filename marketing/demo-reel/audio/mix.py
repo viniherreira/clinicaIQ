@@ -44,6 +44,7 @@ VO = [
 
 # Efeitos: (arquivo, tempo, ganho dB, alinhar pelo 'start' ou pelo 'peak').
 SFX = [
+    ('pop_b', 0.20, -13, 'peak'),      # cartão trava sobre a cadeira
     ('pop_a', 0.55, -4, 'peak'),       # carimbo "Faltou"
     ('whoosh_a', 1.20, -8, 'peak'),    # chicote para a planilha
     ('whoosh_b', 2.45, -6, 'peak'),    # a estrela corta o caos
@@ -77,12 +78,13 @@ SFX = [
     ('notif_b', 21.90, -14, 'start'),  # atendido
     ('whoosh_c', 22.05, -12, 'peak'),  # dentes voam
     ('whoosh_a', 22.70, -15, 'peak'),  # documento
+    ('pop_b', 23.30, -16, 'peak'),     # checks das linhas
     ('pop_b', 24.50, -11, 'peak'),     # link
     ('pop_b', 24.62, -12, 'peak'),     # pdf
     ('pop_c', 25.10, -12, 'peak'),     # visualizado
     ('pop_a', 26.00, -4, 'peak'),      # carimbo "Aceito"
     ('impact_b', 26.00, -15, 'peak'),
-    ('whoosh_c', 26.70, -12, 'peak'),  # documento vira pílula
+    ('whoosh_c', 26.50, -12, 'peak'),  # documento vira pílula
     ('whoosh_b', 27.10, -11, 'peak'),  # íris do degradê
     ('pop_c', 28.55, -10, 'peak'),     # pix
     ('pop_c', 28.95, -10, 'peak'),     # crédito

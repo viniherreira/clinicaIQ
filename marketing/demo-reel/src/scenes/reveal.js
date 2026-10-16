@@ -111,13 +111,16 @@
       // Borda da íris (contorno teal que acompanha o recorte em estrela).
       const irisSvg = s('svg', { width: 1080, height: 1920, viewBox: '0 0 1080 1920', style: { position: 'absolute', inset: 0, overflow: 'visible' } });
       const irisEdge = s('path', { d: '', fill: 'none', stroke: C.teal, 'stroke-width': 10, 'stroke-linejoin': 'round' });
+      // Recheio teal que some logo no começo: continua a estrela cheia do último quadro do gancho.
+      const irisFill = s('path', { d: '', fill: C.teal, stroke: 'none' });
+      irisSvg.appendChild(irisFill);
       irisSvg.appendChild(irisEdge);
       root.appendChild(irisSvg);
 
-      Object.assign(S, { mesh, dots, cam, respira, chars, sym, dStroke, minis, glint, glintRing, word, tagParts, sparkles, shadow, irisEdge });
+      Object.assign(S, { mesh, dots, cam, respira, chars, sym, dStroke, minis, glint, glintRing, word, tagParts, sparkles, shadow, irisEdge, irisFill });
     },
     update(lt, t, S) {
-      const { ev, mesh, dots, cam, chars, sym, dStroke, minis, glint, glintRing, word, tagParts, sparkles, shadow, irisEdge } = S;
+      const { ev, mesh, dots, cam, chars, sym, dStroke, minis, glint, glintRing, word, tagParts, sparkles, shadow, irisEdge, irisFill } = S;
       mesh.update(t);
 
       // 1) Íris em estrela a partir da estrela do gancho (r ≈ 69 px no centro).
@@ -126,7 +129,12 @@
       if (k < 1) {
         irisEdge.setAttribute('d', R.starPath(540, 960, R.lerp(0, 2600, k), R.lerp(0.18, 0.7, k), 0));
         irisEdge.style.opacity = String(1 - R.p(lt, 0.15, 0.3));
-      } else irisEdge.style.opacity = '0';
+        irisFill.setAttribute('d', irisEdge.getAttribute('d'));
+        irisFill.style.opacity = String(1 - R.p(lt, 0.02, 0.14, E.outQuad));
+      } else {
+        irisEdge.style.opacity = '0';
+        irisFill.style.opacity = '0';
+      }
 
       // 2) Mergulho pelo miolo do D: a câmera aproxima até o branco tomar a tela.
       const dive = R.p(lt, ev.dive, S.dur - ev.dive, E.inExpo);
