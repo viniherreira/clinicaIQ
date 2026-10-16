@@ -111,7 +111,8 @@ export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date =
 
 /** Quantos o quadro carrega de uma vez; a lista, 500. A contagem é sempre a de verdade. */
 export const BOARD_LIMIT = 1000;
-export const LIST_LIMIT = 500;
+/** A lista mostra de 100 em 100 (`pagina=`). */
+export const LIST_PAGE_SIZE = 100;
 
 /** Os leads abertos do quadro, com os filtros aplicados. */
 export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, now: Date = new Date()) {
@@ -169,6 +170,7 @@ export async function loadLeadList(
   status: ListStatus,
   order: ListOrder,
   now: Date = new Date(),
+  page = 1,
 ) {
   const situacao = statusWhere(status);
   const orderBy: Prisma.LeadOrderByWithRelationInput[] =
@@ -182,18 +184,22 @@ export async function loadLeadList(
 
   const rows = await ctx.db.lead.findMany({
     where: { ...leadWhere(ctx, f, now), ...situacao },
-    include: { ...leadInclude, stage: { select: { name: true } } },
-    orderBy,
-    take: LIST_LIMIT,
+    include: { ...leadInclude, stage: { select: { name: true, pipelineId: true } } },
+    // Desempate pela id: a mesma ordem em todas as páginas.
+    orderBy: [...orderBy, { id: 'asc' }],
+    skip: (Math.max(1, page) - 1) * LIST_PAGE_SIZE,
+    take: LIST_PAGE_SIZE,
   });
   const leads = await toBoardLeads(ctx, rows, now);
-  const stageName = new Map(rows.map((r) => [r.id, r.stage.name]));
-  return leads.map((l) => ({ ...l, stageName: stageName.get(l.id) ?? '' }));
+  const etapa = new Map(rows.map((r) => [r.id, r.stage]));
+  return leads.map((l) => ({ ...l, stageName: etapa.get(l.id)?.name ?? '', pipelineId: etapa.get(l.id)?.pipelineId ?? '' }));
 }
 
 export function parseListParams(sp: Record<string, string | string[] | undefined>) {
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
   const status = (['abertos', 'ganhos', 'perdidos', 'todos'] as const).find((s) => s === one('situacao')) ?? 'abertos';
   const order = (['recentes', 'nome', 'valor', 'etapa'] as const).find((s) => s === one('ordem')) ?? 'recentes';
-  return { status, order };
+  const n = Number(one('pagina'));
+  const page = Number.isInteger(n) && n >= 1 && n <= 10_000 ? n : 1;
+  return { status, order, page };
 }
