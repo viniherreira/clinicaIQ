@@ -9,6 +9,7 @@ import { hasPeriod, NO_PERIOD, periodLabel, periodParams } from '@/crm/period';
 import type { BoardFilters, BoardPerson, BoardPipeline, BoardStage } from '@/crm/types';
 import { PeriodPicker } from '@/components/crm-period-picker';
 import { countLeadsAction } from '../actions';
+import { fieldFilterParams, type FieldDef } from '@/crm/custom-fields';
 
 export type TagWithCount = { id: string; name: string; color: string; count: number };
 
@@ -27,13 +28,14 @@ function toParams(f: BoardFilters, extra: FilterParams = {}): FilterParams {
     ...periodParams(f.periodo),
     vmin: f.valorMin != null ? String(f.valorMin) : '',
     vmax: f.valorMax != null ? String(f.valorMax) : '',
+    ...fieldFilterParams(f.campos),
     ...extra,
   };
 }
 
 /** O nome do atalho ativo, que aparece no começo da busca como no Kommo. */
 function presetLabel(f: BoardFilters): string {
-  const outros = f.q || f.tags.length || f.origem || f.etapa || hasPeriod(f.periodo) || f.valorMin != null || f.valorMax != null ||
+  const outros = f.q || f.tags.length || f.campos.length || f.origem || f.etapa || hasPeriod(f.periodo) || f.valorMin != null || f.valorMax != null ||
     (f.resp !== 'all' && f.resp !== 'me');
   if (outros) return 'Filtro';
   if (f.resp === 'me' && !f.tarefa) return 'Meus leads';
@@ -48,7 +50,7 @@ const reaisCurto = (v: number) => formatCents(Math.round(v * 100)).replace(/,00$
 /** Cada filtro ligado vira uma etiqueta na busca, com o seu "x". */
 function chipsFor(
   f: BoardFilters,
-  ctx: { tags: TagWithCount[]; team: BoardPerson[]; stages: BoardStage[]; pipelines: BoardPipeline[] },
+  ctx: { tags: TagWithCount[]; team: BoardPerson[]; stages: BoardStage[]; pipelines: BoardPipeline[]; fields: FieldDef[] },
 ): { key: string; label: string; clear: Partial<BoardFilters> }[] {
   const out: { key: string; label: string; clear: Partial<BoardFilters> }[] = [];
   const atalho = presetLabel(f) !== 'Filtro';
@@ -62,6 +64,10 @@ function chipsFor(
     out.push({ key: 'tags', label: nome ? `Tag: ${nome}` : `Tags: ${f.tags.length}`, clear: { tags: [] } });
   }
   if (f.origem) out.push({ key: 'origem', label: `Origem: ${SOURCE_LABEL[f.origem] ?? f.origem}`, clear: { origem: '' } });
+  for (const c of f.campos) {
+    const nome = ctx.fields.find((d) => d.id === c.id)?.name ?? 'Campo';
+    out.push({ key: `campo_${c.id}`, label: `${nome}: ${c.value}`, clear: { campos: f.campos.filter((x) => x.id !== c.id) } });
+  }
   if (!atalho && f.resp === 'me') out.push({ key: 'resp', label: 'Responsável: eu', clear: { resp: 'all' } });
   if (f.resp !== 'all' && f.resp !== 'me') {
     out.push({ key: 'resp', label: `Responsável: ${ctx.team.find((p) => p.id === f.resp)?.name ?? '—'}`, clear: { resp: 'all' } });
@@ -97,6 +103,7 @@ export function FilterSearch({
   team,
   stages,
   pipelines,
+  fields = [],
   canConfig,
   today,
   onApply,
@@ -105,6 +112,8 @@ export function FilterSearch({
   view: 'quadro' | 'lista';
   filters: BoardFilters;
   tags: TagWithCount[];
+  /** Campos personalizados de lista e sim/não (viram filtro). */
+  fields?: FieldDef[];
   team: BoardPerson[];
   stages: BoardStage[];
   /** Só na lista: escolher o funil. */
@@ -190,9 +199,10 @@ export function FilterSearch({
     periodo: { ...NO_PERIOD },
     valorMin: null,
     valorMax: null,
+    campos: [],
   };
   const label = presetLabel(filters);
-  const chips = chipsFor(filters, { tags, team, stages, pipelines });
+  const chips = chipsFor(filters, { tags, team, stages, pipelines, fields });
   const rascunhoComBusca = { ...rascunho, q: busca.trim() };
 
   const presetCls = (ativo: boolean) =>
@@ -364,6 +374,24 @@ export function FilterSearch({
                   <option value="none">Sem tarefa</option>
                   <option value="overdue">Atrasadas</option>
                 </Select>
+                {fields.map((d) => {
+                  const atual = rascunho.campos.find((c) => c.id === d.id)?.value ?? '';
+                  const outros = rascunho.campos.filter((c) => c.id !== d.id);
+                  return (
+                    <Select
+                      key={d.id}
+                      label={d.name}
+                      id={`${id}-campo-${d.id}`}
+                      value={atual}
+                      onChange={(v) => setRascunho({ ...rascunho, campos: v ? [...outros, { id: d.id, value: v }] : outros })}
+                    >
+                      <option value="">Todos</option>
+                      {(d.type === 'BOOLEAN' ? ['Sim', 'Não'] : d.options).map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </Select>
+                  );
+                })}
               </div>
               <fieldset>
                 <legend className={rotulo}>Valor de venda (R$)</legend>

@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import type { LeadDetail } from '@/crm/lead-detail';
 import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { LeadPanel } from '../../leads/[id]/_components/lead-panel';
+import type { FieldDef } from '@/crm/custom-fields';
 import { leadDetailAction } from '../actions';
 
 export interface LeadSideBasics {
@@ -14,6 +15,7 @@ export interface LeadSideBasics {
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
   lostReasons: LostReasonOption[];
+  fields?: FieldDef[];
 }
 
 /**
@@ -46,6 +48,7 @@ export function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics
           team={basics.team}
           procedures={basics.procedures}
           lostReasons={basics.lostReasons}
+          fields={basics.fields}
           onSaved={() => {
             void carregar();
             onChanged();

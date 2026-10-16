@@ -16,7 +16,7 @@ type Linha =
  * tela. Toque nos botões (ou escreva) e veja o que ele responde e o que faria
  * no CRM. Nada é gravado.
  */
-export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHours; refs: { stages: Option[]; tags: Option[]; team: Option[] } }) {
+export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHours; refs: { stages: Option[]; tags: Option[]; team: Option[]; fields?: Option[] } }) {
   const id = useId();
   const flow = useMemo(() => toSteps(menu, hours), [menu, hours]);
   const [linhas, setLinhas] = useState<Linha[]>([]);
@@ -36,6 +36,7 @@ export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHo
       case 'assign':
         return `Responsável: ${nome(refs.team, a.userId)}`;
       case 'save':
+        if (a.field.startsWith('field:')) return `${nome(refs.fields ?? [], a.field.slice(6))}: ${a.value}`;
         return a.field === 'name' ? `Nome do lead: ${a.value}` : a.field === 'email' ? `E-mail do lead: ${a.value}` : `Anotado no histórico: ${a.value}`;
       case 'handoff':
         return 'Robô para — a equipe assume a conversa';

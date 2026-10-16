@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  anyFieldWhere,
   cleanOptions,
+  fieldFilterParams,
+  parseFieldFilters,
   fieldFilterWhere,
   formatFieldValue,
   parseDate,
@@ -94,5 +97,23 @@ describe('filtro do Prisma', () => {
     expect(fieldFilterWhere(INTERESSES, 'Implante')).toEqual({ fields: { path: ['f1'], array_contains: ['Implante'] } });
     expect(fieldFilterWhere(def('BOOLEAN'), 'sim')).toEqual({ fields: { path: ['f1'], equals: true } });
     expect(fieldFilterWhere(CONVENIO, 'Outro')).toBeNull();
+  });
+});
+
+describe('filtros de campo na URL', () => {
+  it('lê só campo_<id> válidos, com valor', () => {
+    const f = parseFieldFilters({ campo_abcdefgh12: 'Amil', campo_x: 'y', campo_zzzzzzzz99: '', outro: 'a' });
+    expect(f).toEqual([{ id: 'abcdefgh12', value: 'Amil' }]);
+  });
+
+  it('volta para a URL e vira filtro do Prisma sem saber o tipo', () => {
+    expect(fieldFilterParams([{ id: 'abcdefgh12', value: 'Amil' }])).toEqual({ campo_abcdefgh12: 'Amil' });
+    expect(anyFieldWhere({ id: 'f1', value: 'Sim' })).toEqual({
+      OR: [
+        { fields: { path: ['f1'], equals: 'Sim' } },
+        { fields: { path: ['f1'], array_contains: ['Sim'] } },
+        { fields: { path: ['f1'], equals: true } },
+      ],
+    });
   });
 });

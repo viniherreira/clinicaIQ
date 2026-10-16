@@ -1,5 +1,6 @@
 import type { LeadSource } from '@clinicaiq/db';
 import { parsePeriod } from './period';
+import { parseFieldFilters } from './custom-fields';
 import type { BoardFilters } from './types';
 
 const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
@@ -29,5 +30,6 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
     periodo: parsePeriod(sp),
     valorMin: reais('vmin'),
     valorMax: reais('vmax'),
+    campos: parseFieldFilters(sp),
   };
 }

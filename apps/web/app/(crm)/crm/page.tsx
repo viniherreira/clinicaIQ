@@ -74,6 +74,7 @@ export default async function FunilPage({
         filters={filters}
         tags={basics.tags.map((t) => ({ ...t, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
+        fields={basics.fields}
         procedures={basics.procedures}
         meId={ctx.userId}
         summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}

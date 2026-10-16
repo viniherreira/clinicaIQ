@@ -180,3 +180,40 @@ export function fieldFilterWhere(def: Pick<FieldDef, 'id' | 'type' | 'options'>,
   if (def.type === 'MULTISELECT') return { fields: { path: [def.id], array_contains: [o] } };
   return null;
 }
+
+// ─── Filtros na URL (`campo_<id>=valor`) ────────────────────────────────────────
+
+export interface FieldFilter {
+  id: string;
+  value: string;
+}
+
+/** Os filtros de campo da URL. Até 10; id no formato das nossas ids, valor curto. */
+export function parseFieldFilters(sp: Record<string, string | string[] | undefined>): FieldFilter[] {
+  const out: FieldFilter[] = [];
+  for (const [k, v] of Object.entries(sp)) {
+    const m = /^campo_([a-z0-9]{8,40})$/i.exec(k);
+    if (!m || typeof v !== 'string' || !v.trim()) continue;
+    out.push({ id: m[1], value: v.trim().slice(0, 60) });
+  }
+  return out.slice(0, 10);
+}
+
+export const fieldFilterParams = (filters: FieldFilter[]): Record<string, string> =>
+  Object.fromEntries(filters.map((f) => [`campo_${f.id}`, f.value]));
+
+/**
+ * O filtro do Prisma sem precisar saber o tipo do campo: a opção escolhida
+ * (lista), contida na lista (várias opções) ou sim/não. O painel só oferece
+ * as opções do próprio campo, então o valor bate com o que foi guardado.
+ */
+export function anyFieldWhere(f: FieldFilter) {
+  const b = parseBoolean(f.value);
+  return {
+    OR: [
+      { fields: { path: [f.id], equals: f.value } },
+      { fields: { path: [f.id], array_contains: [f.value] } },
+      ...(b === null ? [] : [{ fields: { path: [f.id], equals: b } }]),
+    ],
+  };
+}

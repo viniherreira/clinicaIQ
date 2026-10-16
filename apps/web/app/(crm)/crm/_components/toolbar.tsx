@@ -10,6 +10,7 @@ import { formatCents } from '@/crm/format';
 import { NewLeadModal } from './new-lead-modal';
 import { PipelineMenu } from './pipeline-menu';
 import { FilterSearch, type TagWithCount } from './filter-panel';
+import { isFilterable, type FieldDef } from '@/crm/custom-fields';
 
 /**
  * A barra do topo do funil e da lista, como a do Kommo: o nome do funil (que
@@ -31,8 +32,11 @@ export function CrmToolbar({
   currentPipeline,
   canConfig,
   today,
+  fields = [],
 }: {
   view: 'quadro' | 'lista';
+  /** Campos personalizados ativos: viram filtro (lista e sim/não) e entram no Novo lead. */
+  fields?: FieldDef[];
   filters: BoardFilters;
   tags: TagWithCount[];
   team: BoardPerson[];
@@ -117,6 +121,7 @@ export function CrmToolbar({
         team={team}
         stages={currentPipeline ? currentPipeline.columns : pipelines.flatMap((p) => p.columns.map((s) => ({ ...s, name: pipelines.length > 1 ? `${p.name} · ${s.name}` : s.name })))}
         pipelines={view === 'lista' ? pipelines : []}
+        fields={fields.filter((f) => isFilterable(f.type))}
         canConfig={canConfig}
         today={today}
         onApply={(next) => {
@@ -219,6 +224,7 @@ export function CrmToolbar({
         procedures={procedures}
         meId={meId}
         stages={currentPipeline?.columns}
+        fields={fields}
       />
       <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
     </div>

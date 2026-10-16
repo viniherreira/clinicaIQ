@@ -3,6 +3,8 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { parseFieldInput } from '@/crm/custom-fields';
+import { setLeadFields } from '@/crm/lead-fields';
 import { guardCrmAction } from '@/crm/guard';
 import { createLead, moveLead, OPEN_LEAD, softDeleteLead } from '@/crm/leads';
 import { countLeads, effectiveStatus, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
@@ -32,6 +34,8 @@ const newLeadSchema = z.object({
   stageId: z.string().optional().nullable(),
   /** Criar mesmo havendo um lead aberto com o mesmo telefone. */
   force: z.boolean().optional(),
+  /** Campos personalizados: { [fieldId]: valor }. */
+  fields: z.record(z.unknown()).optional(),
 });
 
 export type NewLeadForm = z.input<typeof newLeadSchema>;
@@ -57,6 +61,21 @@ export async function createLeadAction(input: NewLeadForm): Promise<CreateLeadRe
   if (d.interestProcedureId && !procedimento) return { ok: false, message: 'Procedimento não encontrado.' };
   if (d.assignedToId && !responsavel) return { ok: false, message: 'Responsável não encontrado.' };
 
+  // Campos personalizados conferidos antes de criar: um valor errado não deixa lead pela metade.
+  const campos = Object.fromEntries(Object.entries(d.fields ?? {}).slice(0, 50));
+  if (Object.keys(campos).length) {
+    const defs = await g.db.leadField.findMany({
+      where: { id: { in: Object.keys(campos) }, active: true },
+      select: { id: true, name: true, type: true, options: true, showOnCard: true, active: true },
+    });
+    for (const [id, valor] of Object.entries(campos)) {
+      const def = defs.find((x) => x.id === id);
+      if (!def) return { ok: false, message: 'Um dos campos não existe mais.' };
+      const p = parseFieldInput(def, valor);
+      if (!p.ok) return { ok: false, message: p.message };
+    }
+  }
+
   if (!d.force) {
     const dup = await findOpenLeadByPhone(g.db, g.tenantId, d.phone);
     if (dup) return { ok: false, duplicate: { leadId: dup.id, name: dup.name } };
@@ -78,6 +97,8 @@ export async function createLeadAction(input: NewLeadForm): Promise<CreateLeadRe
     stageId: d.stageId || null,
   });
   if (!r.ok) return r;
+  // Já conferidos acima; nascem com o lead, sem entrar no histórico como mudança.
+  if (Object.keys(campos).length) await setLeadFields(g.db, g, r.leadId, campos, { history: false });
 
   revalidatePath('/crm');
   after(() => runDueAutomations(new Date(), { tenantId: g.tenantId }));

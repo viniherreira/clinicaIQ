@@ -1,5 +1,6 @@
 import type { LeadSource, Prisma } from '@clinicaiq/db';
 import { isDay, parsePeriod, rangeWhere, resolvePeriod, type PeriodField } from './period';
+import { anyFieldWhere, parseFieldFilters, type FieldFilter } from './custom-fields';
 
 /**
  * Quem recebe uma transmissão: os mesmos filtros da busca de leads (funil,
@@ -35,6 +36,8 @@ export interface Audience {
   valueMax: number | null;
   /** Nome ou título do negócio contém. */
   search: string;
+  /** Campos personalizados (lista e sim/não), vindos da busca de leads. */
+  fields: FieldFilter[];
 }
 
 export const EMPTY_AUDIENCE: Audience = {
@@ -53,6 +56,7 @@ export const EMPTY_AUDIENCE: Audience = {
   valueMin: null,
   valueMax: null,
   search: '',
+  fields: [],
 };
 
 const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
@@ -83,6 +87,12 @@ export function parseAudience(raw: unknown): Audience {
     valueMin: reais(a.valueMin),
     valueMax: reais(a.valueMax),
     search: typeof a.search === 'string' ? a.search.trim().slice(0, 80) : '',
+    fields: Array.isArray(a.fields)
+      ? a.fields
+          .filter((f): f is FieldFilter => !!f && typeof f === 'object' && typeof (f as FieldFilter).id === 'string' && typeof (f as FieldFilter).value === 'string')
+          .slice(0, 10)
+          .map((f) => ({ id: f.id.slice(0, 40), value: f.value.slice(0, 60) }))
+      : [],
   };
 }
 
@@ -116,6 +126,7 @@ export function audienceWhere(a: Audience, now: Date = new Date()): Prisma.LeadW
     });
   }
   if (a.search) and.push({ OR: [{ name: { contains: a.search, mode: 'insensitive' } }, { title: { contains: a.search, mode: 'insensitive' } }] });
+  for (const f of a.fields) and.push(anyFieldWhere(f));
   return { deletedAt: null, ...(and.length ? { AND: and } : {}) };
 }
 
@@ -161,5 +172,6 @@ export function audienceFromSearch(
     valueMin: reais('vmin'),
     valueMax: reais('vmax'),
     search: q.replace(/\D/g, '').length >= 10 ? '' : q,
+    fields: parseFieldFilters(sp),
   });
 }

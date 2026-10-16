@@ -5,8 +5,12 @@ import { NO_PERIOD } from './period';
 describe('parseFilters', () => {
   it('sem nada: leads ativos de todos', () => {
     expect(parseFilters({})).toEqual({
-      q: '', resp: 'all', tarefa: '', tags: [], origem: '', funil: '', etapa: '', periodo: NO_PERIOD, valorMin: null, valorMax: null,
+      q: '', resp: 'all', tarefa: '', tags: [], origem: '', funil: '', etapa: '', periodo: NO_PERIOD, valorMin: null, valorMax: null, campos: [],
     });
+  });
+
+  it('campos personalizados: campo_<id>=valor', () => {
+    expect(parseFilters({ campo_clx1abc2def3: 'Amil', campo_x: 'y' }).campos).toEqual([{ id: 'clx1abc2def3', value: 'Amil' }]);
   });
 
   it('várias tags separadas por vírgula; o que não parece id sai', () => {

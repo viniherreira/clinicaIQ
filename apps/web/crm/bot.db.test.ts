@@ -73,6 +73,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await prisma.conversation.deleteMany({ where: t });
     await prisma.chatbotFlow.deleteMany({ where: t });
     await prisma.captureRule.deleteMany({ where: t });
+    await prisma.leadField.deleteMany({ where: t });
     await prisma.automationRun.deleteMany({ where: t });
     await prisma.leadTagOnLead.deleteMany({ where: t });
     await prisma.leadTag.deleteMany({ where: t });
@@ -143,6 +144,25 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(conv?.contactName).toBe('Beatriz Lima');
     expect(conv?.lead?.activities.some((a) => a.type === 'NOTE' && JSON.stringify(a.data).includes('Beatriz Lima'))).toBe(true);
     await db.chatbotFlow.deleteMany({ where: { name: 'Nome' } });
+  });
+
+  it('pergunta: guarda a resposta num campo personalizado, como o Salesbot', async () => {
+    const campo = await db.leadField.create({ data: { tenantId: tenant.id, name: 'Convênio', type: 'SELECT', options: ['Amil', 'Unimed'] } });
+    const pergunta = {
+      start: 'inicio',
+      steps: {
+        inicio: { id: 'inicio', text: 'Oi!', options: [{ id: 'conv', label: 'Tenho convênio', next: 'q_conv', actions: [{ type: 'createLead' }] }] },
+        q_conv: { id: 'q_conv', kind: 'question', text: 'Qual convênio?', options: [], saveTo: `field:${campo.id}`, answer: { reply: 'Anotado!' } },
+      },
+    };
+    expect(await saveBot(db, tenant.id, { name: 'Convênio', trigger: 'KEYWORD', keywords: ['convenio'], steps: pergunta, active: true })).toEqual({ ok: true });
+    const id = await escreve('11 96666-0012', 'convenio');
+    await escreve('11 96666-0012', '1');
+    await escreve('11 96666-0012', 'unimed');
+    const conv = await db.conversation.findFirst({ where: { id }, include: { lead: true } });
+    expect(conv?.lead?.fields).toEqual({ [campo.id]: 'Unimed' });
+    await db.chatbotFlow.deleteMany({ where: { name: 'Convênio' } });
+    await db.leadField.deleteMany({ where: { id: campo.id } });
   });
 
   it('não entendeu duas vezes: chama a equipe', async () => {

@@ -59,6 +59,7 @@ export default async function ConversasPage({
         team: basics.team,
         procedures: basics.procedures,
         lostReasons: basics.lostReasons,
+        fields: basics.fields,
       }}
     />
   );

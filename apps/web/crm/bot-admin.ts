@@ -36,14 +36,16 @@ export async function saveBot(db: TenantPrismaClient, tenantId: string, input: B
 
   // O que as ações apontam precisa ser desta clínica.
   const refs = refsOf(steps);
-  const [tags, stages, users] = await Promise.all([
+  const [tags, stages, users, fields] = await Promise.all([
     refs.tags.length ? db.leadTag.count({ where: { id: { in: refs.tags } } }) : 0,
     refs.stages.length ? db.pipelineStage.count({ where: { id: { in: refs.stages } } }) : 0,
     refs.users.length ? db.user.count({ where: { id: { in: refs.users }, active: true } }) : 0,
+    refs.fields.length ? db.leadField.count({ where: { id: { in: refs.fields }, active: true } }) : 0,
   ]);
   if (tags !== refs.tags.length || stages !== refs.stages.length || users !== refs.users.length) {
     return { ok: false, message: 'Uma ação aponta para tag, etapa ou pessoa que não existe mais.' };
   }
+  if (fields !== refs.fields.length) return { ok: false, message: 'Uma pergunta guarda a resposta num campo que não existe mais.' };
 
   // Só um robô de "contato novo" ligado por vez: dois responderiam juntos.
   if (input.active && input.trigger === 'NEW_CONTACT') {
@@ -64,7 +66,9 @@ function refsOf(steps: BotSteps) {
   const tags = new Set<string>();
   const stages = new Set<string>();
   const users = new Set<string>();
+  const fields = new Set<string>();
   for (const s of Object.values(steps.steps)) {
+    if (s.saveTo?.startsWith('field:')) fields.add(s.saveTo.slice(6));
     for (const o of [...s.options, ...(s.answer ? [s.answer] : [])]) {
       for (const a of o.actions ?? []) {
         if (a.type === 'tag') tags.add(a.tagId);
@@ -73,7 +77,7 @@ function refsOf(steps: BotSteps) {
       }
     }
   }
-  return { tags: [...tags], stages: [...stages], users: [...users] };
+  return { tags: [...tags], stages: [...stages], users: [...users], fields: [...fields] };
 }
 
 export async function toggleBot(db: TenantPrismaClient, id: string, active: boolean): Promise<Result> {
