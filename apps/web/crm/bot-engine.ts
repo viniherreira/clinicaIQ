@@ -51,10 +51,61 @@ export interface BotHours {
 
 export const DEFAULT_HOURS: BotHours = { mode: 'always', days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' };
 
+/**
+ * Para quem o robô começa, pelas tags do lead da conversa (a captação põe a
+ * tag na primeira mensagem, então o robô certo já responde). Vazio = todos.
+ */
+export interface BotAudience {
+  /** Só para leads com pelo menos uma destas tags. */
+  anyTags: string[];
+  /** Nunca para leads com alguma destas (ex.: paciente, não perturbe). */
+  noneTags: string[];
+}
+
+export const EMPTY_AUDIENCE: BotAudience = { anyTags: [], noneTags: [] };
+
 export interface BotSteps {
   start: string;
   steps: Record<string, BotStep>;
   hours?: BotHours;
+  audience?: BotAudience;
+}
+
+/** O público como veio do banco ou da tela, limpo. */
+export function readAudience(raw: unknown): BotAudience {
+  const r = (raw ?? {}) as Partial<BotAudience>;
+  const lista = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.length > 0))].slice(0, 30) : []);
+  return { anyTags: lista(r.anyTags), noneTags: lista(r.noneTags) };
+}
+
+/** O robô pode começar para um lead com estas tags? (sem lead: lista vazia) */
+export function fitsAudience(audience: BotAudience | undefined, leadTagIds: readonly string[]): boolean {
+  if (!audience) return true;
+  const tem = new Set(leadTagIds);
+  if (audience.noneTags.some((t) => tem.has(t))) return false;
+  if (audience.anyTags.length > 0 && !audience.anyTags.some((t) => tem.has(t))) return false;
+  return true;
+}
+
+/** Robô que pede tag: mais específico, passa na frente do geral. */
+export const isTargeted = (steps: Pick<BotSteps, 'audience'>) => (steps.audience?.anyTags.length ?? 0) > 0;
+
+/**
+ * Qual robô começa agora (ou nenhum). Palavra-chave vale em qualquer
+ * mensagem; contato novo, só na primeira. Em cada caso, o que pede tag vem
+ * antes do geral, e depois a ordem dada (o mais antigo primeiro).
+ * Fora do horário do robô ou do público dele, ele não conta.
+ */
+export function pickBot<T extends { trigger: 'NEW_CONTACT' | 'KEYWORD'; keywords: string[]; steps: BotSteps }>(
+  flows: readonly T[],
+  ctx: { text: string; newContact: boolean; tagIds: readonly string[]; now: Date },
+): T | null {
+  const aptos = flows.filter((f) => shouldStart(f.steps.hours, ctx.now) && fitsAudience(f.steps.audience, ctx.tagIds));
+  const ordem = (lista: T[]) => [...lista.filter((f) => isTargeted(f.steps)), ...lista.filter((f) => !isTargeted(f.steps))];
+  const porPalavra = ordem(aptos.filter((f) => f.trigger === 'KEYWORD' && isKeyword(ctx.text, f.keywords)))[0];
+  if (porPalavra) return porPalavra;
+  if (!ctx.newContact) return null;
+  return ordem(aptos.filter((f) => f.trigger === 'NEW_CONTACT'))[0] ?? null;
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -100,7 +151,7 @@ export function normalize(s: string): string {
 export function parseSteps(raw: unknown): BotSteps | null {
   const r = raw as BotSteps | null;
   if (!r || typeof r.start !== 'string' || typeof r.steps !== 'object' || !r.steps[r.start]) return null;
-  return r;
+  return r.audience ? { ...r, audience: readAudience(r.audience) } : r;
 }
 
 /** O texto do menu com as opções numeradas (funciona até onde os botões não aparecem) e os botões. */

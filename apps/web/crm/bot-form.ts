@@ -1,4 +1,4 @@
-import { DEFAULT_HOURS, type BotAction, type BotHours, type BotOption, type BotSaveField, type BotStep, type BotSteps } from './bot-engine';
+import { DEFAULT_HOURS, readAudience, type BotAction, type BotAudience, type BotHours, type BotOption, type BotSaveField, type BotStep, type BotSteps } from './bot-engine';
 
 /**
  * O robô como a tela edita, em linguagem de gente: um menu de botões e, em
@@ -157,7 +157,7 @@ function readActions(acts: BotAction[]) {
   };
 }
 
-export function toSteps(menu: UiMenu, hours?: BotHours): BotSteps {
+export function toSteps(menu: UiMenu, hours?: BotHours, audience?: BotAudience): BotSteps {
   const steps: BotSteps['steps'] = {};
   const build = (m: UiMenu, id: string, parent: string | null) => {
     const options: BotOption[] = m.options.map((o) => {
@@ -186,7 +186,13 @@ export function toSteps(menu: UiMenu, hours?: BotHours): BotSteps {
     steps[id] = { id, text: m.text.trim(), options };
   };
   build(menu, 'inicio', null);
-  return { start: 'inicio', steps, ...(hours ? { hours } : {}) };
+  const publico = audience ? readAudience(audience) : null;
+  return {
+    start: 'inicio',
+    steps,
+    ...(hours ? { hours } : {}),
+    ...(publico && (publico.anyTags.length || publico.noneTags.length) ? { audience: publico } : {}),
+  };
 }
 
 export function fromSteps(flow: BotSteps): UiMenu {

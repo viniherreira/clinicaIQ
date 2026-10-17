@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_HOURS,
   EMAIL_RETRY_TEXT,
+  fitsAudience,
+  pickBot,
+  readAudience,
   HANDOFF_TEXT,
   isOpenAt,
   shouldStart,
@@ -169,5 +172,33 @@ describe('pergunta aberta e horário', () => {
 
   it('horário invertido não salva', () => {
     expect(stepsProblem({ ...flow, hours: { ...DEFAULT_HOURS, mode: 'outside', start: '18:00', end: '08:00' } })).toMatch(/horário/);
+  });
+});
+
+describe('público por tag', () => {
+  it.each([
+    [{ anyTags: [], noneTags: [] }, [], true],
+    [{ anyTags: ['implante'], noneTags: [] }, [], false],
+    [{ anyTags: ['implante', 'protese'], noneTags: [] }, ['protese'], true],
+    [{ anyTags: [], noneTags: ['paciente'] }, ['paciente', 'vip'], false],
+    [{ anyTags: ['vip'], noneTags: ['paciente'] }, ['vip', 'paciente'], false],
+  ])('%o com as tags %o → %s', (aud, tags, esperado) => expect(fitsAudience(aud, tags)).toBe(esperado));
+
+  it('lê o que veio do banco sem confiar', () => {
+    expect(readAudience({ anyTags: ['a', 'a', 3, ''], noneTags: 'x' })).toEqual({ anyTags: ['a'], noneTags: [] });
+    expect(readAudience(null)).toEqual({ anyTags: [], noneTags: [] });
+  });
+
+  it('escolhe o robô: palavra-chave primeiro; o que pede tag antes do geral; fora do público não conta', () => {
+    const menu = FLOW;
+    const geral = { id: 'geral', trigger: 'NEW_CONTACT' as const, keywords: [], steps: menu };
+    const implante = { id: 'implante', trigger: 'NEW_CONTACT' as const, keywords: [], steps: { ...menu, audience: { anyTags: ['t-impl'], noneTags: [] } } };
+    const palavra = { id: 'menu', trigger: 'KEYWORD' as const, keywords: ['menu'], steps: menu };
+    const flows = [geral, implante, palavra];
+    const now = new Date('2026-10-14T15:00:00Z');
+    expect(pickBot(flows, { text: 'oi', newContact: true, tagIds: ['t-impl'], now })?.id).toBe('implante');
+    expect(pickBot(flows, { text: 'oi', newContact: true, tagIds: [], now })?.id).toBe('geral');
+    expect(pickBot(flows, { text: 'Menu', newContact: true, tagIds: ['t-impl'], now })?.id).toBe('menu');
+    expect(pickBot(flows, { text: 'oi', newContact: false, tagIds: [], now })).toBeNull();
   });
 });

@@ -214,6 +214,30 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect((await db.conversation.findFirst({ where: { id: id2 }, include: { lead: { include: { tags: true } } } }))?.lead?.tags ?? []).toEqual([]);
   });
 
+  it('robô por tag: quem chega com a tag da captação recebe o robô dela; os outros, o geral', async () => {
+    const implante = (await db.leadTag.findFirst({ where: { name: 'implante' } }))!;
+    const proprio = {
+      start: 'inicio',
+      steps: { inicio: { id: 'inicio', text: 'Oi! Sobre implantes:', options: [{ id: 'v', label: 'Valores' }] } },
+      audience: { anyTags: [implante.id], noneTags: [] },
+    };
+    // Pede tag: pode ficar ligado junto com o de contato novo para todos.
+    expect(await saveBot(db, tenant.id, { name: 'Implantes', trigger: 'NEW_CONTACT', keywords: [], steps: proprio, active: true })).toEqual({ ok: true });
+    const comTag = await escreve('11 96666-0020', 'Quero colocar implante');
+    expect(await saidas(comTag)).toEqual([expect.stringContaining('Sobre implantes')]);
+    const semTag = await escreve('11 96666-0021', 'Oi');
+    expect(await saidas(semTag)).toEqual([expect.stringContaining('Como posso ajudar?')]);
+
+    // "Nunca com": o geral deixa de responder a quem tem a tag bloqueada.
+    const geral = (await db.chatbotFlow.findFirst({ where: { name: 'Boas-vindas' } }))!;
+    await toggleBot(db, (await db.chatbotFlow.findFirst({ where: { name: 'Implantes' } }))!.id, false);
+    expect(
+      await saveBot(db, tenant.id, { id: geral.id, name: 'Boas-vindas', trigger: 'NEW_CONTACT', keywords: [], steps: { ...steps, audience: { anyTags: [], noneTags: [implante.id] } }, active: true }),
+    ).toEqual({ ok: true });
+    const bloqueado = await escreve('11 96666-0022', 'implante, por favor');
+    expect(await saidas(bloqueado)).toEqual([]);
+  });
+
   it('robô desligado não responde', async () => {
     for (const f of await db.chatbotFlow.findMany()) await toggleBot(db, f.id, false);
     const id = await escreve('11 96666-0004', 'Oi');

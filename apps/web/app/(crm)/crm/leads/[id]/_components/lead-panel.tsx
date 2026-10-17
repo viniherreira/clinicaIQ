@@ -149,13 +149,13 @@ export function LeadPanel({
           <label htmlFor="lead-etapa" className="sr-only">
             Etapa
           </label>
-          <div className="mt-0.5 flex items-baseline gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <select
               id="lead-etapa"
               value={lead.stageId}
               disabled={pending}
               onChange={(e) => mover(e.target.value)}
-              className="min-w-0 flex-1 cursor-pointer truncate rounded border-0 bg-transparent py-0.5 pl-0 text-sm font-bold uppercase tracking-wide text-heading hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="h-9 min-w-0 flex-1 cursor-pointer truncate rounded-md border border-border bg-surface-alt px-2.5 text-sm font-bold uppercase tracking-wide text-heading hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
