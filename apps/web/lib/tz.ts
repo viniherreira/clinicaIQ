@@ -12,6 +12,11 @@ export function clinicToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TZ }).format(new Date());
 }
 
+/** O dia da clínica (AAAA-MM-DD) de um instante real (ex.: quando o orçamento foi aprovado). */
+export function clinicDayOf(d: Date | string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TZ }).format(new Date(d));
+}
+
 /** Wall-clock HH:mm of a stored datetime (read from UTC components). */
 export function wallClockTime(d: Date | string): string {
   const date = typeof d === 'string' ? new Date(d) : d;
