@@ -270,3 +270,32 @@ test('funil: o mapa do canto leva às etapas da direita', async ({ page }) => {
   await mapa.getByRole('button', { name: /^Ir para / }).first().click();
   await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeLessThan(40);
 });
+
+test('robô no jeito do Salesbot: respostas personalizadas por palavra e o nome da pessoa', async ({ page }) => {
+  await page.goto('/crm/automacoes/bots');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Novo robô' }).click();
+  await page.getByRole('button', { name: /Boas-vindas com menu/ }).click();
+  const log = page.getByRole('log', { name: 'Conversa de teste' });
+  // O modelo já chama a pessoa pelo nome (no teste, Ana).
+  await expect(log).toContainText('Oi, Ana!');
+  const responder = async (t: string) => {
+    await page.getByLabel('Responder como a pessoa').fill(t);
+    await page.getByLabel('Responder como a pessoa').press('Enter');
+  };
+  await responder('quanto custa um clareamento?');
+  await expect(log).toContainText('Os valores dependem da avaliação, Ana');
+
+  // Uma resposta nova, feita na tela.
+  const regras = page.getByRole('button', { name: 'Adicionar resposta personalizada' }).first();
+  await regras.click();
+  await page.getByLabel(/^Se a pessoa escrever/).last().fill('estacionamento');
+  await page.getByLabel('O robô responde').last().fill('Temos estacionamento conveniado,');
+  await page.getByRole('button', { name: '+ Primeiro nome' }).last().click();
+  await expect(page.getByLabel('O robô responde').last()).toHaveValue('Temos estacionamento conveniado, {primeiro_nome}');
+  await page.getByRole('button', { name: 'Recomeçar' }).click();
+  await responder('Vocês tem estacionamento?');
+  await expect(log).toContainText('Temos estacionamento conveniado, Ana');
+  expect((await axe(page)).violations).toEqual([]);
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+});

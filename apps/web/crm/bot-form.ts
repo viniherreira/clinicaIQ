@@ -1,4 +1,4 @@
-import { DEFAULT_HOURS, readAudience, type BotAction, type BotAudience, type BotHours, type BotOption, type BotSaveField, type BotStep, type BotSteps } from './bot-engine';
+import { DEFAULT_HOURS, readAudience, type BotAction, type BotAudience, type BotHours, type BotOption, type BotRule, type BotRuleThen, type BotSaveField, type BotStep, type BotSteps } from './bot-engine';
 
 /**
  * O robô como a tela edita, em linguagem de gente: um menu de botões e, em
@@ -15,11 +15,23 @@ export type UiQuestionAfter = 'end' | 'menu' | 'handoff';
 /** '' = não mexe no funil; NEW_STAGE = cria o lead na entrada; id = cria/move para a etapa. */
 export const NEW_STAGE = '__entrada__';
 
+/** Resposta personalizada como a tela edita: palavras separadas por vírgula. */
+export interface UiRule {
+  id: string;
+  keywords: string;
+  reply: string;
+  then: BotRuleThen;
+  stage: string;
+  tagIds: string[];
+  assignTo: string;
+}
+
 export interface UiQuestion {
   text: string;
   saveTo: BotSaveField;
   reply: string;
   after: UiQuestionAfter;
+  rules?: UiRule[];
 }
 
 export interface UiOption {
@@ -37,6 +49,8 @@ export interface UiOption {
 export interface UiMenu {
   text: string;
   options: UiOption[];
+  /** Quando a pessoa escreve em vez de tocar num botão. */
+  rules?: UiRule[];
 }
 
 let n = 0;
@@ -52,16 +66,51 @@ export const blankOption = (label = ''): UiOption => ({
   after: 'end',
 });
 
+export const blankRule = (): UiRule => ({ id: `r${newOptionId()}`, keywords: '', reply: '', then: 'stay', stage: '', tagIds: [], assignTo: '' });
+
+function rulesToSteps(rules: UiRule[] | undefined): BotRule[] | undefined {
+  const out = (rules ?? [])
+    .map((r): BotRule => {
+      const keywords = [...new Set(r.keywords.split(',').map((k) => k.trim()).filter(Boolean))].slice(0, 20);
+      const rule: BotRule = { id: r.id, keywords, then: r.then };
+      if (r.reply.trim()) rule.reply = r.reply.trim();
+      const actions = actionsOf(r, false);
+      if (actions.length) rule.actions = actions;
+      return rule;
+    })
+    // Regra em branco (nem palavra nem texto) é só um rascunho na tela: não vai.
+    .filter((r) => r.keywords.length || r.reply);
+  return out.length ? out : undefined;
+}
+
+function rulesFromSteps(rules: BotRule[] | undefined): UiRule[] {
+  return (rules ?? []).map((r) => {
+    const { stage, tagIds, assignTo } = readActions(r.actions ?? []);
+    return { id: r.id, keywords: r.keywords.join(', '), reply: r.reply ?? '', then: r.then, stage, tagIds, assignTo };
+  });
+}
+
 export const blankQuestion = (): UiQuestion => ({ text: 'Qual é o seu nome?', saveTo: 'name', reply: 'Obrigado! 😊', after: 'handoff' });
 
 /** Um robô de exemplo para começar (a clínica edita). */
 export function exampleMenu(): UiMenu {
   return {
-    text: 'Oi! Aqui é da clínica. 😊 Como posso te ajudar?',
+    text: 'Oi, {primeiro_nome}! Aqui é da {clinica}. 😊 Como posso te ajudar?',
     options: [
       { ...blankOption('Agendar avaliação'), reply: 'Ótimo! Já vou te passar para a recepção marcar o melhor horário.', stage: NEW_STAGE, after: 'handoff' },
       { ...blankOption('Valores'), reply: 'Os valores dependem da avaliação, que é sem custo. Quer agendar?', after: 'menu' },
       { ...blankOption('Endereço e horário'), reply: 'Atendemos de segunda a sexta, das 8h às 18h, e sábado até 12h.', after: 'menu' },
+    ],
+    // Quem escreve em vez de tocar nos botões, como no Salesbot do Kommo.
+    rules: [
+      {
+        ...blankRule(),
+        keywords: 'preço, valor, quanto custa, orçamento',
+        reply: 'Os valores dependem da avaliação, {primeiro_nome}, que é sem custo. Toque em “Agendar avaliação” que a recepção marca para você.',
+        then: 'stay',
+      },
+      { ...blankRule(), keywords: 'convênio, plano, reembolso', reply: 'Vou chamar a recepção para confirmar o seu convênio. 😊', then: 'handoff' },
+      { ...blankRule(), keywords: 'dor, urgente, urgência, emergência', reply: 'Sinto muito, {primeiro_nome}! Já vou chamar alguém da equipe agora.', then: 'handoff' },
     ],
   };
 }
@@ -175,6 +224,8 @@ export function toSteps(menu: UiMenu, hours?: BotHours, audience?: BotAudience):
         const q = o.question;
         const qId = `q_${o.id}`;
         const step: BotStep = { id: qId, kind: 'question', text: q.text.trim(), options: [], saveTo: q.saveTo, answer: {} };
+        const qRules = rulesToSteps(q.rules);
+        if (qRules) step.rules = qRules;
         if (q.reply.trim()) step.answer!.reply = q.reply.trim();
         if (q.after === 'menu') step.answer!.next = 'inicio';
         if (q.after === 'handoff') step.answer!.actions = [{ type: 'handoff' }];
@@ -183,7 +234,8 @@ export function toSteps(menu: UiMenu, hours?: BotHours, audience?: BotAudience):
       }
       return opt;
     });
-    steps[id] = { id, text: m.text.trim(), options };
+    const regras = rulesToSteps(m.rules);
+    steps[id] = { id, text: m.text.trim(), options, ...(regras ? { rules: regras } : {}) };
   };
   build(menu, 'inicio', null);
   const publico = audience ? readAudience(audience) : null;
@@ -200,6 +252,7 @@ export function fromSteps(flow: BotSteps): UiMenu {
     const s = flow.steps[stepId];
     return {
       text: s?.text ?? '',
+      ...(s?.rules?.length ? { rules: rulesFromSteps(s.rules) } : {}),
       options: (s?.options ?? []).map((o) => {
         const { stage, tagIds, assignTo, handoff } = readActions(o.actions ?? []);
         let after: UiAfter = 'end';
@@ -214,6 +267,7 @@ export function fromSteps(flow: BotSteps): UiMenu {
             saveTo: alvo.saveTo ?? 'note',
             reply: alvo.answer?.reply ?? '',
             after: (alvo.answer?.actions ?? []).some((a) => a.type === 'handoff') ? 'handoff' : alvo.answer?.next ? 'menu' : 'end',
+            ...(alvo.rules?.length ? { rules: rulesFromSteps(alvo.rules) } : {}),
           };
         } else if (o.next && o.next === (parent ?? stepId)) after = 'menu';
         else if (o.next && !parent) {

@@ -6,6 +6,9 @@ import { continueBot, isOpenAt, startBot, type BotAction, type BotDecision, type
 import { toSteps, type UiMenu } from '@/crm/bot-form';
 
 type Option = { id: string; name: string };
+
+/** No teste, a pessoa se chama Ana Souza: dá para ver o {primeiro_nome} funcionando. */
+const TESTE = { name: 'Ana Souza', clinic: 'sua clínica' };
 type Linha =
   | { de: 'robo'; texto: string; botoes?: { id: string; title: string }[] }
   | { de: 'pessoa'; texto: string }
@@ -57,7 +60,7 @@ export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHo
 
   const recomecar = () => {
     try {
-      aplica(startBot(flow), [{ de: 'pessoa', texto: 'Oi, boa tarde!' }]);
+      aplica(startBot(flow, TESTE), [{ de: 'pessoa', texto: 'Oi, boa tarde!' }]);
     } catch {
       setLinhas([]);
       setEstado(null);
@@ -77,7 +80,7 @@ export function BotSimulator({ menu, hours, refs }: { menu: UiMenu; hours: BotHo
   const responder = (t: string, buttonId?: string) => {
     if (!estado || !t.trim()) return;
     const antes: Linha[] = [...linhas, { de: 'pessoa', texto: t }];
-    aplica(continueBot(flow, estado, { text: t, buttonId }), antes);
+    aplica(continueBot(flow, estado, { text: t, buttonId }, TESTE), antes);
   };
 
   const ultimoRobo = [...linhas].reverse().find((l): l is Extract<Linha, { de: 'robo' }> => l.de === 'robo');

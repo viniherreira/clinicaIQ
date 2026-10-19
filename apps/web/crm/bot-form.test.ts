@@ -87,3 +87,24 @@ describe('robô na tela ⇄ formato do motor', () => {
     expect(d2.next).toBeNull();
   });
 });
+
+describe('respostas personalizadas na tela', () => {
+  it('ida e volta: palavras, texto, depois e ações; rascunho em branco não vai', async () => {
+    const { toSteps, fromSteps, blankOption, blankRule } = await import('./bot-form');
+    const menu = {
+      text: 'Oi, {primeiro_nome}!',
+      options: [blankOption('Agendar')],
+      rules: [
+        { ...blankRule(), id: 'r1', keywords: 'preço, valor , preço', reply: 'Depende da avaliação.', then: 'menu' as const, tagIds: ['t1'] },
+        { ...blankRule(), id: 'r2' },
+      ],
+    };
+    const steps = toSteps(menu);
+    expect(steps.steps.inicio.rules).toEqual([
+      { id: 'r1', keywords: ['preço', 'valor'], reply: 'Depende da avaliação.', then: 'menu', actions: [{ type: 'tag', tagId: 't1' }] },
+    ]);
+    expect(fromSteps(steps).rules).toEqual([
+      { id: 'r1', keywords: 'preço, valor', reply: 'Depende da avaliação.', then: 'menu', stage: '', tagIds: ['t1'], assignTo: '' },
+    ]);
+  });
+});
