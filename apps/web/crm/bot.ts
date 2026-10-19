@@ -1,5 +1,5 @@
 import { decrypt, getTenantClient, prisma, type TenantPrismaClient } from '@clinicaiq/db';
-import { botExpired, continueBot, parseSteps, pickBot, startBot, type BotAction, type BotDecision, type BotSteps } from './bot-engine';
+import { botExpired, continueBot, parseSteps, pickBot, startBot, type BotAction, type BotDecision, type BotSteps, type BotVars } from './bot-engine';
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { createLead, moveLead, OPEN_LEAD } from './leads';
@@ -46,12 +46,22 @@ export async function runBotOnInbound(
     text = '';
   }
 
+  // Para personalizar as mensagens: {primeiro_nome}, {nome} e {clinica}.
+  const varsDe = async (): Promise<BotVars> => {
+    const [lead, patient, tenant] = await Promise.all([
+      conv.leadId ? db.lead.findFirst({ where: { id: conv.leadId }, select: { name: true } }) : null,
+      conv.patientId ? db.patient.findFirst({ where: { id: conv.patientId }, select: { name: true } }) : null,
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
+    ]);
+    return { name: patient?.name ?? lead?.name ?? conv.contactName, clinic: tenant?.name };
+  };
+
   // Já há robô nesta conversa?
   if (conv.botFlowId && conv.botStepId && !botExpired(conv.botStartedAt, now)) {
     const flow = await db.chatbotFlow.findFirst({ where: { id: conv.botFlowId, active: true } });
     const steps = flow ? parseSteps(flow.steps) : null;
     if (steps) {
-      const d = continueBot(steps, { stepId: conv.botStepId, misses: conv.botMisses }, { text });
+      const d = continueBot(steps, { stepId: conv.botStepId, misses: conv.botMisses }, { text }, await varsDe());
       await apply(db, tenantId, conv, flow!.id, d, now);
       return 'continued';
     }
@@ -74,7 +84,7 @@ export async function runBotOnInbound(
     : [];
   const flow = pickBot(flows, { text, newContact: primeira, tagIds, now });
   if (!flow) return 'none';
-  await apply(db, tenantId, conv, flow.id, startBot(flow.steps as BotSteps), now);
+  await apply(db, tenantId, conv, flow.id, startBot(flow.steps as BotSteps, await varsDe()), now);
   return 'started';
 }
 

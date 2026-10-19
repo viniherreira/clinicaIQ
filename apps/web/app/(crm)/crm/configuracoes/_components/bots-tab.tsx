@@ -11,6 +11,7 @@ import {
 } from '@/crm/bot-form';
 import { deleteBotAction, saveBotAction, toggleBotAction } from '../actions';
 import { BotSimulator } from './bot-simulator';
+import { juntar, RulesEditor, VarChips } from './bot-rules';
 
 export type BotRow = {
   id: string;
@@ -510,11 +511,15 @@ function BotEditor({
         <Passo n={3} titulo="A primeira mensagem" id={`${id}-p2`}>
           <label htmlFor={`${id}-texto`} className="sr-only">Primeira mensagem do robô</label>
           <textarea id={`${id}-texto`} value={menu.text} onChange={(e) => setMenu({ ...menu, text: e.target.value })} rows={3} maxLength={1000} className={areaCls} />
-          <p className="text-xs text-muted-foreground">Os botões do passo 4 aparecem embaixo desta mensagem.</p>
+          <VarChips onInsert={(t) => setMenu({ ...menu, text: juntar(menu.text, t) })} />
+          <p className="text-xs text-muted-foreground">
+            Os botões do passo 4 aparecem embaixo desta mensagem. {'{primeiro_nome}'} vira o nome da pessoa (ou some, se ainda não souber).
+          </p>
         </Passo>
 
         <Passo n={4} titulo="Os botões e o que cada um faz" id={`${id}-p3`}>
           <OptionsEditor menu={menu} onChange={setMenu} refs={refs} level={0} />
+          <RulesEditor rules={menu.rules ?? []} onChange={(rules) => setMenu({ ...menu, rules })} refs={refs} context="menu" />
         </Passo>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -767,6 +772,9 @@ function OptionCard({
           <div>
             <label htmlFor={`${id}-reply`} className="block text-xs font-medium text-muted-foreground">Quando a pessoa toca, o robô responde (opcional)</label>
             <textarea id={`${id}-reply`} value={o.reply} onChange={(e) => onChange({ reply: e.target.value })} rows={2} maxLength={1000} className={`${areaCls} mt-1`} />
+            <div className="mt-1">
+              <VarChips onInsert={(t) => onChange({ reply: juntar(o.reply, t) })} />
+            </div>
           </div>
 
           <fieldset className="space-y-2">
@@ -845,18 +853,20 @@ function OptionCard({
               <label htmlFor={`${id}-sub`} className="block text-xs font-medium text-muted-foreground">Mensagem dos outros botões</label>
               <textarea id={`${id}-sub`} value={o.sub.text} onChange={(e) => onChange({ sub: { ...o.sub!, text: e.target.value } })} rows={2} maxLength={1000} className={areaCls} />
               <OptionsEditor menu={o.sub} onChange={(sub) => onChange({ sub })} refs={refs} level={1} />
+              <RulesEditor rules={o.sub.rules ?? []} onChange={(rules) => onChange({ sub: { ...o.sub!, rules } })} refs={refs} context="menu" />
             </div>
           )}
 
-          {o.after === 'question' && o.question && <QuestionEditor q={o.question} fields={refs.fields ?? []} onChange={(question) => onChange({ question })} />}
+          {o.after === 'question' && o.question && <QuestionEditor q={o.question} refs={refs} onChange={(question) => onChange({ question })} />}
         </div>
       )}
     </li>
   );
 }
 
-function QuestionEditor({ q, fields, onChange }: { q: UiQuestion; fields: Option[]; onChange: (q: UiQuestion) => void }) {
+function QuestionEditor({ q, refs, onChange }: { q: UiQuestion; refs: BotRefs; onChange: (q: UiQuestion) => void }) {
   const id = useId();
+  const fields = refs.fields ?? [];
   return (
     <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -885,6 +895,12 @@ function QuestionEditor({ q, fields, onChange }: { q: UiQuestion; fields: Option
       <div className="sm:col-span-2">
         <label htmlFor={`${id}-reply`} className="block text-xs font-medium text-muted-foreground">Depois que a pessoa responde, o robô diz (opcional)</label>
         <input id={`${id}-reply`} value={q.reply} onChange={(e) => onChange({ ...q, reply: e.target.value })} maxLength={500} className={`${inputCls} mt-1`} />
+        <div className="mt-1">
+          <VarChips onInsert={(t) => onChange({ ...q, reply: juntar(q.reply, t) })} />
+        </div>
+      </div>
+      <div className="sm:col-span-2">
+        <RulesEditor rules={q.rules ?? []} onChange={(rules) => onChange({ ...q, rules })} refs={refs} context="question" />
       </div>
     </div>
   );

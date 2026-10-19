@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_HOURS,
   EMAIL_RETRY_TEXT,
+  fillVars,
   fitsAudience,
+  hasWord,
   pickBot,
   readAudience,
   HANDOFF_TEXT,
@@ -200,5 +202,86 @@ describe('público por tag', () => {
     expect(pickBot(flows, { text: 'oi', newContact: true, tagIds: [], now })?.id).toBe('geral');
     expect(pickBot(flows, { text: 'Menu', newContact: true, tagIds: ['t-impl'], now })?.id).toBe('menu');
     expect(pickBot(flows, { text: 'oi', newContact: false, tagIds: [], now })).toBeNull();
+  });
+});
+
+describe('respostas personalizadas (como a Condição do Salesbot)', () => {
+  const comRegras: BotSteps = {
+    start: 'inicio',
+    steps: {
+      ...FLOW.steps,
+      inicio: {
+        ...FLOW.steps.inicio,
+        text: 'Oi, {primeiro_nome}! Como posso ajudar?',
+        rules: [
+          { id: 'r1', keywords: ['preço', 'valor', 'quanto custa'], reply: 'Os valores dependem da avaliação, {primeiro_nome}.', then: 'menu', actions: [{ type: 'tag', tagId: 'preco' }] },
+          { id: 'r2', keywords: ['urgente', 'dor'], reply: 'Vou chamar a recepção agora.', then: 'handoff' },
+          { id: 'r3', keywords: ['convênio'], reply: 'Atendemos Amil e Unimed.', then: 'stay' },
+        ],
+      },
+      q: {
+        id: 'q',
+        kind: 'question',
+        text: 'Qual tratamento você procura?',
+        options: [],
+        saveTo: 'note',
+        answer: { reply: 'Anotado! A equipe já te responde.' },
+        rules: [{ id: 'q1', keywords: ['implante'], reply: 'Implante é com a Dra. Flávia. Quer agendar?', then: 'end', actions: [{ type: 'tag', tagId: 'implante' }] }],
+      },
+    },
+  };
+  const vars = { name: 'Ana Souza', clinic: 'Sorriso' };
+
+  it('variáveis: nome, primeiro nome e clínica; sem nome não sobra vírgula', () => {
+    expect(fillVars('Oi, {primeiro_nome}! Aqui é da {clinica}.', vars)).toBe('Oi, Ana! Aqui é da Sorriso.');
+    expect(fillVars('Oi, {primeiro_nome}!', { name: '' })).toBe('Oi!');
+    expect(fillVars('Oi {primeiro_nome}, tudo bem?', { name: '(11) •••••-1234' })).toBe('Oi, tudo bem?');
+    expect(fillVars('{nome}', { name: 'Contato do WhatsApp' })).toBe('');
+    expect(startBot(comRegras, vars).messages[0].text).toMatch(/^Oi, Ana! Como posso ajudar\?/);
+  });
+
+  it('palavra inteira, sem acento, plural vale', () => {
+    expect(hasWord('Qual o PRECO?', 'preço')).toBe(true);
+    expect(hasWord('quanto custam os valores', 'valor')).toBe(true);
+    expect(hasWord('quanto custa o clareamento', 'quanto custa')).toBe(true);
+    expect(hasWord('dorme bem', 'dor')).toBe(false);
+  });
+
+  it('no menu, quem escreve em vez de tocar recebe a resposta certa', () => {
+    const d = continueBot(comRegras, { stepId: 'inicio', misses: 0 }, { text: 'quanto custa um clareamento?' }, vars);
+    expect(d.messages[0].text).toBe('Os valores dependem da avaliação, Ana.');
+    expect(d.messages[1].text).toMatch(/^Oi, Ana! Como posso ajudar/);
+    expect(d.actions).toEqual([{ type: 'tag', tagId: 'preco' }]);
+    expect(d.next).toEqual({ stepId: 'inicio', misses: 0 });
+
+    const urg = continueBot(comRegras, { stepId: 'inicio', misses: 0 }, { text: 'estou com muita dor' });
+    expect(urg.actions).toEqual([{ type: 'handoff' }]);
+    expect(urg.next).toBeNull();
+
+    const fica = continueBot(comRegras, { stepId: 'inicio', misses: 1 }, { text: 'aceita convenio?' });
+    expect(fica.messages.map((m) => m.text)).toEqual(['Atendemos Amil e Unimed.']);
+    expect(fica.next).toEqual({ stepId: 'inicio', misses: 0 });
+  });
+
+  it('botão tocado vale mais que a palavra; sem regra, segue o "não entendi"', () => {
+    expect(continueBot(comRegras, { stepId: 'inicio', misses: 0 }, { text: 'Valores', buttonId: 'bot:inicio:valores' }).next?.stepId).toBe('valores');
+    expect(continueBot(comRegras, { stepId: 'inicio', misses: 0 }, { text: 'hein?' }).messages[0].text).toMatch(/^Não entendi/);
+  });
+
+  it('na pergunta: guarda a resposta e responde do jeito combinado; sem palavra, o padrão', () => {
+    const d = continueBot(comRegras, { stepId: 'q', misses: 0 }, { text: 'Quero fazer implantes' });
+    expect(d.messages.map((m) => m.text)).toEqual(['Implante é com a Dra. Flávia. Quer agendar?']);
+    expect(d.actions).toEqual([
+      { type: 'save', field: 'note', question: 'Qual tratamento você procura?', value: 'Quero fazer implantes' },
+      { type: 'tag', tagId: 'implante' },
+    ]);
+    expect(continueBot(comRegras, { stepId: 'q', misses: 0 }, { text: 'lente' }).messages[0].text).toBe('Anotado! A equipe já te responde.');
+  });
+
+  it('validação: regra sem palavra ou sem resposta não salva', () => {
+    const sem = (r: object) => ({ ...comRegras, steps: { ...comRegras.steps, inicio: { ...comRegras.steps.inicio, rules: [r as never] } } });
+    expect(stepsProblem(sem({ id: 'x', keywords: [' '], reply: 'oi', then: 'end' }))).toMatch(/pelo menos uma palavra/);
+    expect(stepsProblem(sem({ id: 'x', keywords: ['oi'], reply: '', then: 'end' }))).toMatch(/texto ou de uma ação/);
+    expect(stepsProblem(comRegras)).toBeNull();
   });
 });

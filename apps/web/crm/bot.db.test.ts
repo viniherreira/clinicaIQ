@@ -238,6 +238,29 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(await saidas(bloqueado)).toEqual([]);
   });
 
+  it('resposta personalizada e o nome da pessoa nas conversas de verdade', async () => {
+    const regras = {
+      start: 'inicio',
+      steps: {
+        inicio: {
+          id: 'inicio',
+          text: 'Oi, {primeiro_nome}! Em que posso ajudar?',
+          options: [{ id: 'a', label: 'Agendar' }],
+          rules: [{ id: 'r1', keywords: ['valor', 'preço'], reply: 'Depende da avaliação, {primeiro_nome}.', then: 'stay', actions: [{ type: 'tag', tagId: tag.id }] }],
+        },
+      },
+    };
+    expect(await saveBot(db, tenant.id, { name: 'Regras', trigger: 'KEYWORD', keywords: ['ajuda'], steps: regras, active: true })).toEqual({ ok: true });
+    const id = await escreve('11 96666-0030', 'ajuda');
+    expect(await saidas(id)).toEqual(['Oi, Ana! Em que posso ajudar?\n\n1 - Agendar']);
+    await escreve('11 96666-0030', 'qual o preço?');
+    expect((await saidas(id)).at(-1)).toBe('Depende da avaliação, Ana.');
+    const conv = await db.conversation.findFirst({ where: { id }, include: { lead: { include: { tags: true } } } });
+    expect(conv?.botStepId).toBe('inicio');
+    expect(conv?.lead?.tags.map((t) => t.tagId)).toEqual([tag.id]);
+    await db.chatbotFlow.deleteMany({ where: { name: 'Regras' } });
+  });
+
   it('robô desligado não responde', async () => {
     for (const f of await db.chatbotFlow.findMany()) await toggleBot(db, f.id, false);
     const id = await escreve('11 96666-0004', 'Oi');

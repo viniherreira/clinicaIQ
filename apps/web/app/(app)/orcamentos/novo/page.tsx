@@ -1,3 +1,4 @@
+import { clinicToday } from '@/lib/tz';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient } from '../actions';
@@ -39,6 +40,7 @@ export default async function NovoOrcamentoPage({
         procedures={procedures}
         professionals={professionals}
         defaultValidUntil={validUntil}
+        today={clinicToday()}
         initialPatient={patient ?? undefined}
       />
     </div>
