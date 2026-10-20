@@ -44,7 +44,7 @@ export function FunilView({ data }: { data: FunilData }) {
         <h1 className="text-2xl font-semibold tracking-tight">Quem chamar de volta</h1>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
           A fila é ordenada por quem tem mais chance de virar consulta agora. Cada linha explica o
-          motivo — nada aqui é adivinhação, e nenhuma mensagem sai desta tela.
+          motivo. Nada aqui é adivinhação, e nenhuma mensagem sai desta tela.
         </p>
       </header>
 
@@ -89,7 +89,7 @@ export function FunilView({ data }: { data: FunilData }) {
       {estagio === 'SEM_HISTORICO' && (
         <p className="rounded-xl border border-border bg-surface-alt/50 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
           <strong className="font-medium text-foreground">Estes não sumiram.</strong> São pacientes
-          do cadastro que nunca tiveram consulta marcada aqui — quase sempre vieram de uma
+          do cadastro que nunca tiveram consulta marcada aqui. Quase sempre vieram de uma
           importação, com a história antiga fora do sistema. É uma lista de primeira consulta, não
           de retorno, e por isso fica separada.
         </p>
@@ -300,7 +300,7 @@ function AvisoBaixa({ quantos }: { quantos: number }) {
         </p>
         <p className="mt-0.5 text-sm leading-relaxed text-amber-900/80 dark:text-amber-100/80">
           A data já passou e ninguém marcou se o paciente compareceu ou faltou. Enquanto isso, esta
-          tela assume que quem tinha horário marcado veio — o que é quase sempre verdade, mas é
+          tela assume que quem tinha horário marcado veio. Isso é quase sempre verdade, mas é
           estimativa. Dar baixa na agenda deixa o cálculo exato e ainda corrige o número de faltas.
         </p>
         <Link
@@ -367,7 +367,7 @@ function Vazio({
             <strong className="font-medium">
               Mas {nuncaAgendaram} pacientes do cadastro nunca agendaram aqui.
             </strong>{' '}
-            É a maior oportunidade parada na sua base hoje — gente que já confiou o telefone à
+            É a maior oportunidade parada na sua base hoje: gente que já confiou o telefone à
             clínica e nunca marcou nada.
           </p>
           <button type="button" onClick={onVerNuncaAgendaram} className="btn-primary btn-md mt-3">

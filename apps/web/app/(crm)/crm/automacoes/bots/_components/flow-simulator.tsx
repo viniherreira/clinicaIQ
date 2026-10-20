@@ -44,7 +44,7 @@ export function FlowSimulator({ doc, refs, onActive, onClose }: { doc: FlowDoc; 
       case 'notify':
         return `Aviso para a equipe: ${e.text}`;
       case 'handoff':
-        return 'Robô para — a equipe assume a conversa';
+        return 'O robô para e a equipe assume a conversa';
       case 'startBot':
         return `Passa para o robô ${nome(refs.bots, e.botId)}`;
     }
@@ -134,7 +134,7 @@ export function FlowSimulator({ doc, refs, onActive, onClose }: { doc: FlowDoc; 
         {linhas.map((l, i) =>
           l.de === 'crm' ? (
             <p key={i} className="text-center text-[11px] text-muted-foreground">
-              — {l.texto} —
+              {l.texto}
             </p>
           ) : (
             <div key={i} className={`flex ${l.de === 'pessoa' ? 'justify-end' : 'justify-start'}`}>
@@ -178,7 +178,7 @@ export function FlowSimulator({ doc, refs, onActive, onClose }: { doc: FlowDoc; 
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           disabled={!estado}
-          placeholder={estado ? 'Responda como a pessoa…' : 'Conversa encerrada — clique em Recomeçar'}
+          placeholder={estado ? 'Responda como a pessoa…' : 'Conversa encerrada. Clique em Recomeçar'}
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
         />
         <button type="submit" disabled={!estado || !texto.trim()} className="btn-primary btn-sm" aria-label="Enviar resposta de teste">

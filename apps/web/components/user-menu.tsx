@@ -132,7 +132,7 @@ export function UserMenu({
         // Sem isto o leitor de tela lê iniciais, nome e perfil soltos, um atrás
         // do outro. O nome visível continua dentro do rótulo, como pede o
         // critério "Label in Name".
-        aria-label={`Sua conta — ${userName}, ${roleLabel}`}
+        aria-label={`Sua conta: ${userName}, ${roleLabel}`}
         onClick={() => (aberto ? setAberto(false) : abrir(null))}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

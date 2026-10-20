@@ -13,7 +13,7 @@ describe('composeAddress', () => {
         state: 'SP',
         zipCode: '01310-100',
       }),
-    ).toBe('Rua das Flores, 123 — Sala 4 · Centro · São Paulo/SP · CEP 01310-100');
+    ).toBe('Rua das Flores, 123, Sala 4 · Centro · São Paulo/SP · CEP 01310-100');
   });
 
   it('não deixa pontuação órfã quando falta pedaço', () => {

@@ -48,7 +48,7 @@ describe('toTimeline', () => {
 
   it('fechamento pela automação diz de onde veio', () => {
     const [e] = toTimeline([a('STAGE_CHANGED', { from: 's2', to: 's9', event: 'quote.accepted' }, null)], names);
-    expect(e).toMatchObject({ kind: 'won', text: 'Negócio fechado — orçamento aprovado' });
+    expect(e).toMatchObject({ kind: 'won', text: 'Negócio fechado: orçamento aprovado' });
   });
 
   it('etapa apagada não quebra a frase', () => {

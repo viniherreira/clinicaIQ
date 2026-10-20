@@ -102,7 +102,7 @@ export function QuotePayments({ quoteId, quoteLabel, total, payments, methods = 
           { k: 'Falta receber', v: formatBRL(remaining), cls: remaining > 0 ? 'text-foreground' : 'text-muted-foreground' },
           {
             k: 'Próximo vencimento',
-            v: proxima ? `${dia(proxima.dueDate)} · ${formatBRL(proxima.due)}` : '—',
+            v: proxima ? `${dia(proxima.dueDate)} · ${formatBRL(proxima.due)}` : '-',
             cls: proxima?.status === 'overdue' ? 'text-destructive' : '',
           },
         ].map((c) => (

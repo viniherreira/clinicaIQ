@@ -60,7 +60,7 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
       case 'CREATED':
         return { ...base, kind: 'event', text: `Lead criado${d.source ? ` (${SOURCE[d.source] ?? d.source})` : ''}` };
       case 'STAGE_CHANGED': {
-        const motivo = d.event && CLINIC_TEXT[d.event] ? ` — ${CLINIC_TEXT[d.event].toLowerCase()}` : '';
+        const motivo = d.event && CLINIC_TEXT[d.event] ? `: ${CLINIC_TEXT[d.event].toLowerCase()}` : '';
         if (d.to && names.wonStageIds.has(d.to)) {
           return { ...base, kind: 'won', text: `Negócio fechado${motivo}` };
         }

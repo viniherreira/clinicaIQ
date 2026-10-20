@@ -18,7 +18,7 @@ const QUADRANTES = ['', 'superior direito', 'superior esquerdo', 'inferior esque
 
 /** "11 — incisivo central superior direito", para leitor de tela e dica. */
 export function toothName(n: number): string {
-  return `${n} — ${NOMES[n % 10]} ${QUADRANTES[Math.floor(n / 10)]}`;
+  return `${n} · ${NOMES[n % 10]} ${QUADRANTES[Math.floor(n / 10)]}`;
 }
 
 /** Em ordem de quadrante e dente: "Dente 11", "Dentes 11, 21 e 36". */

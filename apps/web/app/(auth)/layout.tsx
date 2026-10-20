@@ -27,7 +27,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             A sua clínica inteira, em um só lugar.
           </h1>
           <p className="mt-3 text-white/80">
-            Agenda, pacientes, procedimentos e orçamentos — com acessibilidade e segurança de verdade.
+            Agenda, pacientes, procedimentos e orçamentos, com acessibilidade e segurança de verdade.
           </p>
 
           <ul className="mt-8 space-y-4">

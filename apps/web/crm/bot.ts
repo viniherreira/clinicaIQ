@@ -289,7 +289,7 @@ async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: Flow
       if (a.field === 'email') await db.lead.updateMany({ where: { id: leadId }, data: { email: valor.slice(0, 200) } });
       // Campo personalizado (como o Salesbot): valor que não serve para o campo fica só na anotação.
       if (a.field.startsWith('field:')) await setLeadFields(db, { tenantId, userId: null }, leadId, { [a.field.slice(6)]: valor });
-      if (a.question) await nota(`Robô — ${a.question.slice(0, 200)}\nResposta: ${valor}`);
+      if (a.question) await nota(`Robô: ${a.question.slice(0, 200)}\nResposta: ${valor}`);
       else if (a.field === 'note') await nota(`Robô: ${valor}`);
       return;
     }

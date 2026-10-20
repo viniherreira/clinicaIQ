@@ -48,7 +48,7 @@ export const PERMANENT = new Set(['numero-sem-whatsapp', 'invalid-number', 'empt
  */
 export const REASON: Record<string, string> = {
   'numero-sem-whatsapp':
-    'WhatsApp não encontrado neste número — confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
+    'WhatsApp não encontrado neste número. Confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
   'invalid-number': 'Número de telefone inválido',
   'empty-body': 'Mensagem vazia',
 };
@@ -135,7 +135,7 @@ async function runPass(): Promise<number> {
   let delivered = 0;
   for (const msg of due) {
     if (Date.now() - msg.createdAt.getTime() > GIVE_UP_AFTER_MS) {
-      await settle(msg.id, 'Não foi possível enviar a tempo — ligue para o paciente.');
+      await settle(msg.id, 'Não foi possível enviar a tempo. Ligue para o paciente.');
       continue;
     }
 
@@ -145,7 +145,7 @@ async function runPass(): Promise<number> {
         decrypt(msg.patient.phoneEncrypted, env.ENCRYPTION_MASTER_KEY, msg.tenantId),
       );
     } catch {
-      await settle(msg.id, 'Telefone do paciente ilegível — confira o cadastro.');
+      await settle(msg.id, 'Telefone do paciente ilegível. Confira o cadastro.');
       continue;
     }
     if (!phone) {
@@ -179,7 +179,7 @@ async function runPass(): Promise<number> {
     if (attempts >= MAX_ATTEMPTS) {
       await settle(
         msg.id,
-        'Não foi possível entregar após várias tentativas — ligue para o paciente.',
+        'Não foi possível entregar após várias tentativas. Ligue para o paciente.',
       );
       continue;
     }
@@ -227,7 +227,7 @@ export async function sweepStuckMessages(): Promise<number> {
     data: {
       status: 'FAILED',
       nextAttemptAt: null,
-      errorMessage: 'Sem confirmação de entrega do WhatsApp — trate como não recebida.',
+      errorMessage: 'Sem confirmação de entrega do WhatsApp. Trate como não recebida.',
     },
   });
   if (count > 0) console.log(`[gateway] ${count} mensagem(ns) sem ack marcada(s) como nao entregue`);

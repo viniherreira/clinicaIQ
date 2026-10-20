@@ -185,7 +185,7 @@ export function BroadcastForm({
     const r = (v: number) => formatCents(Math.round(v * 100));
     criterios.push({
       label: 'Valor',
-      valor: aud.valueMin != null && aud.valueMax != null ? `${r(aud.valueMin)} – ${r(aud.valueMax)}` : aud.valueMin != null ? `a partir de ${r(aud.valueMin)}` : `até ${r(aud.valueMax!)}`,
+      valor: aud.valueMin != null && aud.valueMax != null ? `${r(aud.valueMin)} a ${r(aud.valueMax)}` : aud.valueMin != null ? `a partir de ${r(aud.valueMin)}` : `até ${r(aud.valueMax!)}`,
     });
   }
   if (aud.search) criterios.push({ label: 'Nome contém', valor: `"${aud.search}"` });
@@ -212,7 +212,7 @@ export function BroadcastForm({
       <div className="min-w-0 space-y-6">
         <div>
           <label htmlFor={`${id}-nome`} className="block text-xs font-medium text-muted-foreground">Nome (só para a equipe)</label>
-          <input id={`${id}-nome`} value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Promoção de clareamento — outubro" className={`${inputCls} mt-1`} />
+          <input id={`${id}-nome`} value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Promoção de clareamento de outubro" className={`${inputCls} mt-1`} />
         </div>
 
         <section aria-labelledby={`${id}-publico`} className="space-y-5 rounded-xl border border-border bg-surface p-4 sm:p-5">
@@ -398,7 +398,7 @@ export function BroadcastForm({
                   }}
                   className={inputCls}
                 />
-                <span aria-hidden="true" className="text-muted-foreground">–</span>
+                <span aria-hidden="true" className="text-muted-foreground">a</span>
                 <label htmlFor={`${id}-vmax`} className="sr-only">Valor máximo (R$)</label>
                 <input
                   id={`${id}-vmax`}
@@ -474,7 +474,7 @@ export function BroadcastForm({
               />
               <p className="text-xs text-muted-foreground">
                 Pelo QR code, as mensagens saem devagar, como uma pessoa mandando, para o número não ser bloqueado
-                {n > 0 && ` — cerca de ${minutosQr(n)} min para ${n} pessoas`}.
+                {n > 0 && `, cerca de ${minutosQr(n)} min para ${n} pessoas`}.
               </p>
             </>
           )}

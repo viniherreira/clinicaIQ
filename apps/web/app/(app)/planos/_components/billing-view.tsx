@@ -120,7 +120,7 @@ function ResumoAssinatura({ data }: { data: BillingData }) {
         <span className="text-muted-foreground"> · cobrança gerada sozinha todo mês</span>
       </>
     ) : (
-      <span className="text-muted-foreground">Manual — escolha um plano para ativar</span>
+      <span className="text-muted-foreground">Manual. Escolha um plano para ativar</span>
     ),
   });
 
@@ -729,7 +729,7 @@ export function BillingView({
                         </span>
                       </td>
                       <td className="py-3 tabular-nums text-muted-foreground">
-                        {c.paidAt ? date(c.paidAt) : '—'}
+                        {c.paidAt ? date(c.paidAt) : '-'}
                       </td>
                       <td className="py-3 text-right">
                         {c.invoiceUrl ? (
@@ -743,7 +743,7 @@ export function BillingView({
                             <ExternalLink className="h-3 w-3" aria-hidden="true" />
                           </a>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                     </tr>
@@ -793,8 +793,8 @@ function CancelarAssinatura({ data }: { data: BillingData }) {
           {data.currentPeriodEnd && new Date(data.currentPeriodEnd) > new Date() ? (
             <>
               Não haverá nova cobrança. Você continua com acesso completo até{' '}
-              <strong className="text-foreground">{date(data.currentPeriodEnd)}</strong> — depois
-              disso a clínica fica em modo consulta, e nada é apagado.
+              <strong className="text-foreground">{date(data.currentPeriodEnd)}</strong>. Depois
+              disso, a clínica fica em modo consulta, e nada é apagado.
             </>
           ) : (
             <>

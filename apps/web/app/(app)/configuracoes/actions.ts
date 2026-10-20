@@ -739,7 +739,7 @@ export async function removeTeamMember(input: {
     console.error('[equipe] Clerk falhou ao remover', error);
     return {
       ok: false,
-      message: 'Não foi possível encerrar o acesso agora. Tente de novo — nada foi alterado.',
+      message: 'Não foi possível encerrar o acesso agora. Tente de novo. Nada foi alterado.',
     };
   }
 
@@ -871,7 +871,7 @@ export interface PendingInvite {
 
 /** O motivo, escrito uma vez só, porque aparece ao convidar e ao listar. */
 const CONTA_EM_OUTRA_CLINICA =
-  'Este e-mail já tem uma conta DreamClin em outra clínica. Cada conta pertence a uma clínica só — convide a pessoa por outro e-mail.';
+  'Este e-mail já tem uma conta DreamClin em outra clínica. Cada conta pertence a uma clínica só. Convide a pessoa por outro e-mail.';
 
 /**
  * E-mails desta lista que já têm conta em outra clínica.
@@ -1535,7 +1535,7 @@ export async function getSampleDocument(kind: string): Promise<SampleDocument | 
           method: 'PIX',
           paidAt: instantDateBR(now),
           paidAtLong: instantDateLongBR(now),
-          reference: `${/\bCRO\b/i.test(clinic.technicalRegistration ?? '') ? 'tratamento odontológico' : 'serviços prestados'} — Orçamento ORC-EXEMPLO`,
+          reference: `${/\bCRO\b/i.test(clinic.technicalRegistration ?? '') ? 'tratamento odontológico' : 'serviços prestados'} (Orçamento ORC-EXEMPLO)`,
           services: items.map((it) => (it.description ? `${it.name} (${it.description})` : it.name)),
           generatedAt: instantDateTimeBR(now),
         },

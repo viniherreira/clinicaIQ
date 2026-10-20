@@ -49,7 +49,7 @@ export function ReceiptDocument({ clinic, signer, receipt }: ReceiptDocumentProp
     : undefined);
 
   return (
-    <Document title={`Recibo ${receipt.number} — ${receipt.payer.name}`} author={clinic.name} language="pt-BR">
+    <Document title={`Recibo ${receipt.number} · ${receipt.payer.name}`} author={clinic.name} language="pt-BR">
       <Page size="A4" style={s.page}>
         <DocHeader
           clinic={clinic}

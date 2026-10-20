@@ -17,7 +17,7 @@ export type StepNodeData = {
   numberOf: (id: string) => number | null;
 };
 
-const nome = (l: { id: string; name: string }[], id?: string) => l.find((x) => x.id === id)?.name ?? '—';
+const nome = (l: { id: string; name: string }[], id?: string) => l.find((x) => x.id === id)?.name ?? '-';
 const tempo = (min: number) => (min % 1440 === 0 ? `${min / 1440} dia(s)` : min % 60 === 0 ? `${min / 60} h` : `${min} min`);
 
 /** O resumo dentro da caixa: o que o passo faz, em uma ou duas linhas. */

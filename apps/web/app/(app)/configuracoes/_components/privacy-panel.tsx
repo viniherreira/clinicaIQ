@@ -144,7 +144,7 @@ export function PrivacyPanel({
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Atender o paciente e guardar o prontuário tem base legal própria. Mandar promoção
-            precisa de autorização específica — são coisas diferentes.
+            precisa de autorização específica. São coisas diferentes.
           </p>
         </div>
 
@@ -170,8 +170,8 @@ export function PrivacyPanel({
           <div className="mx-5 mb-5 rounded-lg border border-border bg-background p-4">
             <h3 className="text-sm font-medium">Todos os pacientes já autorizaram?</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Se a sua clínica já tem o aceite dessas pessoas — no papel, no balcão ou na ficha
-              antiga — registre aqui de uma vez. Fica gravado no registro de atividades com o seu
+              Se a sua clínica já tem o aceite dessas pessoas (no papel, no balcão ou na ficha
+              antiga), registre aqui de uma vez. Fica gravado no registro de atividades com o seu
               nome e a data, e quem já respondeu <strong>SAIR</strong> continua de fora.
             </p>
 
@@ -228,7 +228,7 @@ export function PrivacyPanel({
         {summary.excluidosMasNoBanco > 0 && (
           <div className="mx-5 mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
             <strong>{summary.excluidosMasNoBanco} paciente(s) excluídos</strong> continuam
-            guardados. Hoje “excluir” apenas tira da lista — o prontuário tem prazo de guarda
+            guardados. Hoje “excluir” apenas tira da lista: o prontuário tem prazo de guarda
             obrigatório pelo conselho, então apagar de vez ainda não é automático.
           </div>
         )}
@@ -275,7 +275,7 @@ export function PrivacyPanel({
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="px-5 py-2.5">{e.userName ?? '—'}</td>
+                    <td className="px-5 py-2.5">{e.userName ?? '-'}</td>
                     <td className="px-5 py-2.5">
                       {descreve(e)}{' '}
                       <span className="text-muted-foreground">
