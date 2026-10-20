@@ -1,4 +1,5 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
+import { queueTriggeredBot } from './bot-queue';
 
 type Tx = Parameters<Parameters<TenantPrismaClient['$transaction']>[0]>[0];
 
@@ -19,6 +20,8 @@ export async function queueStageAutomations(
     where: { tenantId, leadId, status: 'PENDING', doneAt: null, automation: { stageId: { not: stageId } } },
     data: { status: 'SKIPPED', error: 'O lead saiu da etapa antes da hora.', doneAt: enteredAt },
   });
+  // Robô com gatilho "lead entra nesta etapa" (Salesbot do Kommo).
+  await queueTriggeredBot(tx, tenantId, leadId, { stageId }, enteredAt);
   const autos = await tx.stageAutomation.findMany({ where: { tenantId, stageId, active: true }, select: { id: true, delayMinutes: true } });
   if (autos.length === 0) return 0;
   await tx.automationRun.createMany({

@@ -116,7 +116,7 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
     // Respondido pelo celular da clínica: alguém leu, e o robô sai da conversa.
     data.unreadCount = 0;
     data.awaitingReply = false;
-    Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 });
+    Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null });
   }
   await db.conversation.update({ where: { id: conv.id, tenantId }, data });
 

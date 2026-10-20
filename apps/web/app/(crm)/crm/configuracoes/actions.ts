@@ -5,9 +5,7 @@ import { guardCrmAction } from '@/crm/guard';
 import * as s from '@/crm/settings';
 import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
 import type { AutomationAction } from '@clinicaiq/db';
-import { deleteBot, saveBot, toggleBot } from '@/crm/bot-admin';
-import { toSteps, type UiMenu } from '@/crm/bot-form';
-import type { BotAudience, BotHours } from '@/crm/bot-engine';
+import { deleteBot, toggleBot } from '@/crm/bot-admin';
 import { moveField, saveField, type FieldInput } from '@/crm/lead-fields';
 import { deleteCaptureRule, saveCaptureRule, toggleCaptureRule, type CaptureRuleInput } from '@/crm/capture';
 
@@ -53,26 +51,7 @@ export const saveAutomationAction = async (input: {
 export const toggleAutomationAction = async (id: string, active: boolean) => run((g) => toggleAutomation(g.db, id, active));
 export const deleteAutomationAction = async (id: string) => run((g) => deleteAutomation(g.db, id));
 
-export const saveBotAction = async (input: {
-  id?: string;
-  name: string;
-  trigger: 'NEW_CONTACT' | 'KEYWORD';
-  keywords: string;
-  menu: UiMenu;
-  hours?: BotHours;
-  audience?: BotAudience;
-  active: boolean;
-}) =>
-  run((g) =>
-    saveBot(g.db, g.tenantId, {
-      id: input.id,
-      name: input.name,
-      trigger: input.trigger === 'KEYWORD' ? 'KEYWORD' : 'NEW_CONTACT',
-      keywords: input.keywords.split(','),
-      steps: toSteps(input.menu, input.hours, input.audience),
-      active: input.active,
-    }),
-  );
+// Salvar robô: `saveFlowAction` (automacoes/bots/actions.ts), no editor em quadro.
 export const toggleBotAction = async (id: string, active: boolean) => run((g) => toggleBot(g.db, id, active));
 export const deleteBotAction = async (id: string) => run((g) => deleteBot(g.db, id));
 

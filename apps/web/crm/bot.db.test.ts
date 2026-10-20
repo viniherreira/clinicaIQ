@@ -77,6 +77,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await prisma.automationRun.deleteMany({ where: t });
     await prisma.leadTagOnLead.deleteMany({ where: t });
     await prisma.leadTag.deleteMany({ where: t });
+    await prisma.leadTask.deleteMany({ where: t });
     await prisma.leadActivity.deleteMany({ where: t });
     await prisma.lead.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
@@ -89,9 +90,9 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
 
   it('cadastro: palavra-chave limpa e um só robô de contato novo ligado', async () => {
     expect(cleanKeywords([' Menu ', 'menu', '1', 'Olá!'])).toEqual(['menu', 'ola']);
-    expect(await saveBot(db, tenant.id, { name: 'Boas-vindas', trigger: 'NEW_CONTACT', keywords: [], steps, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Boas-vindas', trigger: 'NEW_CONTACT', keywords: [], steps, active: true })).toMatchObject({ ok: true });
     expect((await saveBot(db, tenant.id, { name: 'Outro', trigger: 'NEW_CONTACT', keywords: [], steps, active: true })).ok).toBe(false);
-    expect(await saveBot(db, tenant.id, { name: 'Menu', trigger: 'KEYWORD', keywords: ['menu'], steps, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Menu', trigger: 'KEYWORD', keywords: ['menu'], steps, active: true })).toMatchObject({ ok: true });
   });
 
   it('número novo: o robô cumprimenta com o menu; submenu; opção final responde e põe a tag', async () => {
@@ -133,7 +134,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
         q_nome: { id: 'q_nome', kind: 'question', text: 'Qual é o seu nome?', options: [], saveTo: 'name', answer: { reply: 'Obrigado!' } },
       },
     };
-    expect(await saveBot(db, tenant.id, { name: 'Nome', trigger: 'KEYWORD', keywords: ['nome'], steps: pergunta, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Nome', trigger: 'KEYWORD', keywords: ['nome'], steps: pergunta, active: true })).toMatchObject({ ok: true });
     const id = await escreve('11 96666-0009', 'nome');
     await escreve('11 96666-0009', '1');
     expect((await saidas(id)).at(-1)).toBe('Qual é o seu nome?');
@@ -155,7 +156,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
         q_conv: { id: 'q_conv', kind: 'question', text: 'Qual convênio?', options: [], saveTo: `field:${campo.id}`, answer: { reply: 'Anotado!' } },
       },
     };
-    expect(await saveBot(db, tenant.id, { name: 'Convênio', trigger: 'KEYWORD', keywords: ['convenio'], steps: pergunta, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Convênio', trigger: 'KEYWORD', keywords: ['convenio'], steps: pergunta, active: true })).toMatchObject({ ok: true });
     const id = await escreve('11 96666-0012', 'convenio');
     await escreve('11 96666-0012', '1');
     await escreve('11 96666-0012', 'unimed');
@@ -222,7 +223,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
       audience: { anyTags: [implante.id], noneTags: [] },
     };
     // Pede tag: pode ficar ligado junto com o de contato novo para todos.
-    expect(await saveBot(db, tenant.id, { name: 'Implantes', trigger: 'NEW_CONTACT', keywords: [], steps: proprio, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Implantes', trigger: 'NEW_CONTACT', keywords: [], steps: proprio, active: true })).toMatchObject({ ok: true });
     const comTag = await escreve('11 96666-0020', 'Quero colocar implante');
     expect(await saidas(comTag)).toEqual([expect.stringContaining('Sobre implantes')]);
     const semTag = await escreve('11 96666-0021', 'Oi');
@@ -233,7 +234,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await toggleBot(db, (await db.chatbotFlow.findFirst({ where: { name: 'Implantes' } }))!.id, false);
     expect(
       await saveBot(db, tenant.id, { id: geral.id, name: 'Boas-vindas', trigger: 'NEW_CONTACT', keywords: [], steps: { ...steps, audience: { anyTags: [], noneTags: [implante.id] } }, active: true }),
-    ).toEqual({ ok: true });
+    ).toMatchObject({ ok: true });
     const bloqueado = await escreve('11 96666-0022', 'implante, por favor');
     expect(await saidas(bloqueado)).toEqual([]);
   });
@@ -250,7 +251,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
         },
       },
     };
-    expect(await saveBot(db, tenant.id, { name: 'Regras', trigger: 'KEYWORD', keywords: ['ajuda'], steps: regras, active: true })).toEqual({ ok: true });
+    expect(await saveBot(db, tenant.id, { name: 'Regras', trigger: 'KEYWORD', keywords: ['ajuda'], steps: regras, active: true })).toMatchObject({ ok: true });
     const id = await escreve('11 96666-0030', 'ajuda');
     expect(await saidas(id)).toEqual(['Oi, Ana! Em que posso ajudar?\n\n1 - Agendar']);
     await escreve('11 96666-0030', 'qual o preço?');
@@ -259,6 +260,96 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(conv?.botStepId).toBe('inicio');
     expect(conv?.lead?.tags.map((t) => t.tagId)).toEqual([tag.id]);
     await db.chatbotFlow.deleteMany({ where: { name: 'Regras' } });
+  });
+
+  it('formato novo: sem resposta acorda pelo relógio, rodízio alterna e a ação cria tarefa', async () => {
+    const { wakeBots } = await import('./bot');
+    const fluxo = {
+      version: 2,
+      start: 'oi',
+      steps: {
+        oi: { id: 'oi', type: 'message', text: 'Oi, {{primeiro_nome}}! Posso ajudar?', buttons: [{ id: 's', label: 'Sim', synonyms: ['quero'] }], waitReply: true, timeoutMinutes: 30, out: { 'b:s': 'rr', timeout: 'lembra' } },
+        lembra: { id: 'lembra', type: 'message', text: 'Ainda está por aí?', buttons: [], waitReply: false, timeoutMinutes: null, out: { next: 'tarefa' } },
+        tarefa: { id: 'tarefa', type: 'action', actions: [{ type: 'task', text: 'Ligar para quem sumiu', dueMinutes: 60 }], out: {} },
+        rr: { id: 'rr', type: 'roundRobin', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], out: { 'r:a': 'msgA', 'r:b': 'msgB' } },
+        msgA: { id: 'msgA', type: 'message', text: 'Opção A', buttons: [], waitReply: false, timeoutMinutes: null, out: {} },
+        msgB: { id: 'msgB', type: 'message', text: 'Opção B', buttons: [], waitReply: false, timeoutMinutes: null, out: {} },
+      },
+    };
+    expect(await saveBot(db, tenant.id, { name: 'Novo', trigger: 'KEYWORD', keywords: ['novo'], steps: fluxo, active: true })).toMatchObject({ ok: true });
+
+    const a = await escreve('11 96666-0040', 'novo');
+    expect(await saidas(a)).toEqual(['Oi, Ana! Posso ajudar?\n\n1 - Sim']);
+    const esperando = await db.conversation.findFirst({ where: { id: a } });
+    expect(esperando?.botWakeAt).toBeInstanceOf(Date);
+
+    // Passou meia hora sem resposta: o relógio acorda, manda o lembrete e cria a tarefa.
+    expect(await wakeBots(new Date(Date.now() + 31 * 60_000))).toBeGreaterThanOrEqual(1);
+    expect((await saidas(a)).at(-1)).toBe('Ainda está por aí?');
+    const conv = await db.conversation.findFirst({ where: { id: a }, include: { lead: { include: { tasks: true } } } });
+    expect(conv?.botFlowId).toBeNull();
+    expect(conv?.lead?.tasks.map((t) => t.text)).toEqual(['Ligar para quem sumiu']);
+
+    // Rodízio: dois que dizem "quero" vão para opções diferentes.
+    const b = await escreve('11 96666-0041', 'novo');
+    await escreve('11 96666-0041', 'quero');
+    const c = await escreve('11 96666-0042', 'novo');
+    await escreve('11 96666-0042', 'quero');
+    expect([(await saidas(b)).at(-1), (await saidas(c)).at(-1)].sort()).toEqual(['Opção A', 'Opção B']);
+    await db.chatbotFlow.deleteMany({ where: { name: 'Novo' } });
+  });
+
+  it('gatilhos do Kommo: lead entra na etapa, tag posta e sem resposta', async () => {
+    const { wakeBots, startNoReplyBots } = await import('./bot');
+    const { createLead, moveLead, setTags } = await import('./leads');
+    const actor = { tenantId: tenant.id, userId: user.id };
+    const avisa = (texto: string) => ({
+      version: 2,
+      start: 'm',
+      steps: { m: { id: 'm', type: 'message', text: texto, buttons: [], waitReply: false, timeoutMinutes: null, out: {} } },
+    });
+    const vip = await db.leadTag.create({ data: { tenantId: tenant.id, name: 'vip-gatilho', color: 'blue' } });
+    expect(
+      await saveBot(db, tenant.id, { name: 'Etapa', trigger: 'STAGE', keywords: [], steps: { ...avisa('Que bom que vamos conversar, {{primeiro_nome}}!'), trigger: { stageIds: [conversa.id] } }, active: true }),
+    ).toEqual(expect.objectContaining({ ok: true }));
+    expect(await saveBot(db, tenant.id, { name: 'Tag', trigger: 'TAG', keywords: [], steps: { ...avisa('Você agora é VIP!'), trigger: { tagIds: [vip.id] } }, active: true })).toEqual(
+      expect.objectContaining({ ok: true }),
+    );
+    expect(await saveBot(db, tenant.id, { name: 'Sumiu', trigger: 'NO_REPLY', keywords: [], steps: { ...avisa('Ainda tem interesse?'), trigger: { hours: 24 } }, active: true })).toEqual(
+      expect.objectContaining({ ok: true }),
+    );
+    // Sem dizer quando, não salva.
+    expect((await saveBot(db, tenant.id, { name: 'Ruim', trigger: 'STAGE', keywords: [], steps: avisa('x'), active: false })).ok).toBe(false);
+
+    // Etapa: a pessoa já conversou; o lead vai para "Em conversa" e o relógio começa o robô.
+    const c1 = await escreve('11 96666-0050', 'Oi');
+    for (const f of await db.chatbotFlow.findMany({ where: { trigger: { in: ['NEW_CONTACT', 'KEYWORD'] } } })) await toggleBot(db, f.id, false);
+    const l1 = await createLead(db, actor, { name: 'Ana Souza', phone: '11 96666-0050', automations: false });
+    if (!l1.ok) throw new Error(l1.message);
+    await db.conversation.updateMany({ where: { id: c1 }, data: { botFlowId: null, botStepId: null, botWakeAt: null } });
+    await moveLead(db, actor, l1.leadId, { stageId: conversa.id });
+    expect((await db.conversation.findFirst({ where: { id: c1 } }))?.botStepId).toBe('__start__');
+    await wakeBots(new Date(Date.now() + 1000));
+    expect((await saidas(c1)).at(-1)).toBe('Que bom que vamos conversar, Ana!');
+
+    // Tag posta por alguém da equipe.
+    await setTags(db, actor, l1.leadId, [vip.id]);
+    await wakeBots(new Date(Date.now() + 1000));
+    expect((await saidas(c1)).at(-1)).toBe('Você agora é VIP!');
+
+    // Sem resposta: a equipe falou por último há 25 horas.
+    const c2 = await escreve('11 96666-0051', 'Quanto custa?');
+    await db.conversation.updateMany({ where: { id: c2 }, data: { status: 'ACTIVE', botFlowId: null, botStepId: null, botWakeAt: null } });
+    // A pergunta da pessoa veio antes (26 h), a resposta da equipe depois (25 h).
+    await db.chatMessage.updateMany({ where: { conversationId: c2, direction: 'INBOUND' }, data: { at: new Date(Date.now() - 26 * 3_600_000) } });
+    await writeChatMessage(db, actor, c2, 'Custa R$ 900. Quer agendar?', new Date(Date.now() - 25 * 3_600_000));
+    expect(await startNoReplyBots(new Date())).toBeGreaterThanOrEqual(1);
+    expect((await saidas(c2)).at(-1)).toBe('Ainda tem interesse?');
+    // A última agora é do robô: não começa de novo.
+    await db.conversation.updateMany({ where: { id: c2 }, data: { lastMessageAt: new Date(Date.now() - 25 * 3_600_000) } });
+    expect(await startNoReplyBots(new Date())).toBe(0);
+
+    await db.chatbotFlow.deleteMany({ where: { name: { in: ['Etapa', 'Tag', 'Sumiu'] } } });
   });
 
   it('robô desligado não responde', async () => {

@@ -479,7 +479,7 @@ export async function writeChatMessage(
           lastPreviewEncrypted: seal(previewText(opts.media?.kind ?? 'TEXT', text || null), tenantId),
           // Quem responde é a equipe: leu, respondeu e o robô sai da conversa.
           ...(origin === 'CRM'
-            ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 }
+            ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null }
             : {}),
         },
       });

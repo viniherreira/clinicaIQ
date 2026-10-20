@@ -218,43 +218,6 @@ test('Conversas: Criar lead da Entrada com etapa e tag, tag na lista, filtro por
   }
 });
 
-test('robô por tag: "Para quem", lista separada por gatilho, filtro por tag e duplicar', async ({ page }) => {
-  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
-  const nomeTag = `robo${Date.now().toString(36)}`;
-  const tag = await prisma.leadTag.create({ data: { tenantId: tenant.id, name: nomeTag, color: 'green' } });
-  const nome = uniqueName('Robô Tag E2E');
-  try {
-    await page.goto('/crm/automacoes/bots');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Novo robô' }).click();
-    await page.getByRole('button', { name: /Em branco/ }).click();
-    await page.getByLabel('Nome do robô').fill(nome);
-    await page.getByRole('radio', { name: /Palavra-chave/ }).check();
-    await page.getByLabel(/^Palavras-chave/).fill(`e2e${Date.now()}`);
-    const para = page.getByRole('group', { name: 'Só para leads com alguma destas tags' });
-    await para.getByLabel('Só para leads com alguma destas tags').selectOption({ label: nomeTag });
-    await expect(para.getByRole('button', { name: `Tirar ${nomeTag} de “Só para leads com alguma destas tags”` })).toBeVisible();
-    expect((await axe(page)).violations).toEqual([]);
-    await page.getByRole('checkbox', { name: 'Ligado' }).uncheck();
-    await page.getByRole('button', { name: 'Salvar robô' }).click();
-
-    const grupo = page.getByRole('region', { name: /Quando escrevem uma palavra-chave/ });
-    const card = grupo.getByRole('listitem').filter({ hasText: nome });
-    await expect(card).toContainText('Só para leads com');
-    await expect(card.getByRole('list', { name: 'Tags pedidas' })).toContainText(nomeTag);
-    await page.getByLabel('Tag', { exact: true }).selectOption({ label: nomeTag });
-    await expect(page.getByRole('button', { name: `Editar ${nome}` })).toBeVisible();
-    expect((await axe(page)).violations).toEqual([]);
-
-    await page.getByRole('button', { name: `Duplicar ${nome}` }).click();
-    await expect(page.getByLabel('Nome do robô')).toHaveValue(`${nome} (cópia)`);
-    await page.getByRole('button', { name: 'Cancelar' }).click();
-  } finally {
-    await prisma.chatbotFlow.deleteMany({ where: { tenantId: tenant.id, name: nome } });
-    await prisma.leadTag.deleteMany({ where: { id: tag.id } });
-  }
-});
-
 test('funil: o mapa do canto leva às etapas da direita', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 });
   await page.goto('/crm');
@@ -269,33 +232,4 @@ test('funil: o mapa do canto leva às etapas da direita', async ({ page }) => {
   // A primeira coluna (Entrada, se houver, ou Novo) leva de volta ao começo.
   await mapa.getByRole('button', { name: /^Ir para / }).first().click();
   await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeLessThan(40);
-});
-
-test('robô no jeito do Salesbot: respostas personalizadas por palavra e o nome da pessoa', async ({ page }) => {
-  await page.goto('/crm/automacoes/bots');
-  await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: 'Novo robô' }).click();
-  await page.getByRole('button', { name: /Boas-vindas com menu/ }).click();
-  const log = page.getByRole('log', { name: 'Conversa de teste' });
-  // O modelo já chama a pessoa pelo nome (no teste, Ana).
-  await expect(log).toContainText('Oi, Ana!');
-  const responder = async (t: string) => {
-    await page.getByLabel('Responder como a pessoa').fill(t);
-    await page.getByLabel('Responder como a pessoa').press('Enter');
-  };
-  await responder('quanto custa um clareamento?');
-  await expect(log).toContainText('Os valores dependem da avaliação, Ana');
-
-  // Uma resposta nova, feita na tela.
-  const regras = page.getByRole('button', { name: 'Adicionar resposta personalizada' }).first();
-  await regras.click();
-  await page.getByLabel(/^Se a pessoa escrever/).last().fill('estacionamento');
-  await page.getByLabel('O robô responde').last().fill('Temos estacionamento conveniado,');
-  await page.getByRole('button', { name: '+ Primeiro nome' }).last().click();
-  await expect(page.getByLabel('O robô responde').last()).toHaveValue('Temos estacionamento conveniado, {primeiro_nome}');
-  await page.getByRole('button', { name: 'Recomeçar' }).click();
-  await responder('Vocês tem estacionamento?');
-  await expect(log).toContainText('Temos estacionamento conveniado, Ana');
-  expect((await axe(page)).violations).toEqual([]);
-  await page.getByRole('button', { name: 'Cancelar' }).click();
 });

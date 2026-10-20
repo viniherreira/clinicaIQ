@@ -20,13 +20,14 @@ test('robô, conversas e ficha com scrollIntoView que devolve Promise', async ({
     await page.goto('/crm/automacoes/bots');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Novo robô' }).click();
-    await page.getByRole('button', { name: modelo }).click();
+    await page.getByRole('link', { name: modelo }).click();
+    await page.waitForURL(/\/crm\/automacoes\/bots\/novo/);
+    await page.getByRole('button', { name: 'Testar' }).click();
     const log = page.getByRole('log', { name: 'Conversa de teste' });
     await expect(log).toBeVisible();
-    await log.getByRole('button').first().click();
+    if (await log.getByRole('button').count()) await log.getByRole('button').first().click();
     await page.getByRole('button', { name: 'Recomeçar' }).click();
-    await page.getByLabel('Primeira mensagem do robô').fill('Oi, tudo bem?');
-    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.getByRole('link', { name: 'Robôs' }).click();
     await expect(page.getByRole('button', { name: 'Novo robô' })).toBeVisible();
   }
 
