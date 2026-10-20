@@ -8,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/orcamento/(.*)',
   '/privacidade',
   '/termos',
+  '/sitemap.xml', // Google Search Console
+  '/robots.txt',
   '/agendar/(.*)', // agendamento online: público, sem login
   '/api/webhooks/(.*)',
   '/api/cron/(.*)', // Vercel Cron authenticates via CRON_SECRET, not Clerk
