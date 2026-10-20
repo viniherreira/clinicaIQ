@@ -183,7 +183,7 @@ export function PairingModal({ open, onClose }: Props) {
 
             <div className="mt-5 rounded-lg border border-border bg-surface-alt p-3 text-xs leading-relaxed text-muted-foreground">
               <strong className="font-medium text-foreground">Use o número da clínica</strong>, não o
-              pessoal. O celular precisa ficar com internet — se ele ficar dias offline, o WhatsApp
+              pessoal. O celular precisa ficar com internet. Se ele ficar dias offline, o WhatsApp
               derruba a conexão e você terá que ler o código de novo.
             </div>
           </div>

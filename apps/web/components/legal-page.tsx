@@ -9,7 +9,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`${COMPANY.brand} — página inicial`}>
+          <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`${COMPANY.brand}, página inicial`}>
             <Logo size="md" />
           </Link>
           <Link href="/" className="inline-flex items-center gap-1 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
@@ -36,7 +36,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:px-6">
-          <p>© {new Date().getFullYear()} {COMPANY.brand}{companyLine() ? ` — ${companyLine()}` : ''}</p>
+          <p>© {new Date().getFullYear()} {COMPANY.brand}{companyLine() ? ` · ${companyLine()}` : ''}</p>
           <nav aria-label="Páginas legais" className="flex gap-4">
             <Link href="/privacidade" className="hover:text-foreground">Privacidade</Link>
             <Link href="/termos" className="hover:text-foreground">Termos de uso</Link>

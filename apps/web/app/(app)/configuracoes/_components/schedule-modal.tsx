@@ -125,15 +125,15 @@ export function ScheduleModal({ open, professionalId, professionalName, onClose,
                           checked={d.work}
                           onChange={(e) => update(dow, { work: e.target.checked })}
                           className="h-4 w-4 rounded accent-primary"
-                          aria-label={`${DAY_LABELS[dow]} — atende`}
+                          aria-label={`${DAY_LABELS[dow]}, atende`}
                         />
                         <span className="text-sm font-medium">{DAY_LABELS[dow]}</span>
                       </label>
                       {d.work ? (
                         <div className="flex items-center gap-1.5">
-                          <input type="time" value={d.start} onChange={(e) => update(dow, { start: e.target.value })} aria-label={`${DAY_LABELS[dow]} — início`} className={timeCls} />
+                          <input type="time" value={d.start} onChange={(e) => update(dow, { start: e.target.value })} aria-label={`${DAY_LABELS[dow]}, início`} className={timeCls} />
                           <span className="text-xs text-muted-foreground">às</span>
-                          <input type="time" value={d.end} onChange={(e) => update(dow, { end: e.target.value })} aria-label={`${DAY_LABELS[dow]} — fim`} className={timeCls} />
+                          <input type="time" value={d.end} onChange={(e) => update(dow, { end: e.target.value })} aria-label={`${DAY_LABELS[dow]}, fim`} className={timeCls} />
                         </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">Não atende</span>
@@ -145,7 +145,7 @@ export function ScheduleModal({ open, professionalId, professionalName, onClose,
                         <select
                           value={d.unitId || units[0].id}
                           onChange={(e) => update(dow, { unitId: e.target.value === units[0].id ? '' : e.target.value })}
-                          aria-label={`${DAY_LABELS[dow]} — unidade`}
+                          aria-label={`${DAY_LABELS[dow]}, unidade`}
                           className={timeCls}
                         >
                           {units.map((u) => (
@@ -157,9 +157,9 @@ export function ScheduleModal({ open, professionalId, professionalName, onClose,
                     {d.work && (
                       <div className="mt-2 flex items-center gap-1.5 pl-[calc(7rem+0.75rem)] max-sm:pl-0">
                         <span className="text-xs text-muted-foreground">Almoço</span>
-                        <input type="time" value={d.lunchStart} onChange={(e) => update(dow, { lunchStart: e.target.value })} aria-label={`${DAY_LABELS[dow]} — início do almoço`} className={timeCls} />
+                        <input type="time" value={d.lunchStart} onChange={(e) => update(dow, { lunchStart: e.target.value })} aria-label={`${DAY_LABELS[dow]}, início do almoço`} className={timeCls} />
                         <span className="text-xs text-muted-foreground">às</span>
-                        <input type="time" value={d.lunchEnd} onChange={(e) => update(dow, { lunchEnd: e.target.value })} aria-label={`${DAY_LABELS[dow]} — fim do almoço`} className={timeCls} />
+                        <input type="time" value={d.lunchEnd} onChange={(e) => update(dow, { lunchEnd: e.target.value })} aria-label={`${DAY_LABELS[dow]}, fim do almoço`} className={timeCls} />
                       </div>
                     )}
                   </div>

@@ -21,7 +21,7 @@ function periodLabel(from: string, to: string) {
   const f = new Date(`${from}T12:00:00.000Z`);
   const t = new Date(`${to}T12:00:00.000Z`);
   if (from === to) return format(f, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
-  return `${format(f, 'd MMM', { locale: ptBR })} — ${format(t, "d MMM yyyy", { locale: ptBR })}`;
+  return `${format(f, 'd MMM', { locale: ptBR })} a ${format(t, "d MMM yyyy", { locale: ptBR })}`;
 }
 
 interface PageProps {
@@ -218,10 +218,10 @@ function CommissionsCard({
                   <td className="py-2 text-right tabular-nums">{r.count}</td>
                   <td className="py-2 text-right tabular-nums">{brl(r.value)}</td>
                   <td className="py-2 text-right tabular-nums">
-                    {r.commissionPercent != null ? `${r.commissionPercent.toLocaleString('pt-BR')}%` : '—'}
+                    {r.commissionPercent != null ? `${r.commissionPercent.toLocaleString('pt-BR')}%` : '-'}
                   </td>
                   <td className="py-2 text-right font-semibold tabular-nums">
-                    {r.commissionPercent != null ? brl((r.value * r.commissionPercent) / 100) : '—'}
+                    {r.commissionPercent != null ? brl((r.value * r.commissionPercent) / 100) : '-'}
                   </td>
                 </tr>
               ))}

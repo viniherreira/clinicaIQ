@@ -18,12 +18,12 @@ type Patient = {
 };
 
 function calcAge(birthDate: Date | null) {
-  if (!birthDate) return '—';
+  if (!birthDate) return '-';
   const today = new Date();
   const birth = new Date(birthDate);
   let age = today.getFullYear() - birth.getFullYear();
   if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
-  return age >= 0 ? `${age} anos` : '—';
+  return age >= 0 ? `${age} anos` : '-';
 }
 
 function formatPhone(phone: string) {
@@ -234,7 +234,7 @@ export function PatientTable({
           {/* Desktop: full table */}
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
-              <caption className="sr-only">Lista de pacientes — {total} no total</caption>
+              <caption className="sr-only">Lista de pacientes, {total} no total</caption>
               <thead>
                 <tr className="border-b border-border bg-surface-alt text-left text-xs text-muted-foreground">
                   <th scope="col" className="px-4 py-3 font-medium">Paciente</th>
@@ -259,7 +259,7 @@ export function PatientTable({
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{calcAge(patient.birthDate)}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">{formatPhone(patient.phone)}</td>
-                    <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell truncate max-w-[180px]">{patient.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell truncate max-w-[180px]">{patient.email ?? '-'}</td>
                     <td className="px-4 py-3"><PatientStatusBadge active={patient.active} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">

@@ -90,7 +90,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
               ))}
             </ul>
             <p className="mt-1.5 text-xs opacity-80">
-              Dá para gerar mesmo assim — o que faltar sai como linha em branco para completar à caneta.
+              Dá para gerar mesmo assim. O que faltar sai como linha em branco para completar à caneta.
             </p>
           </div>
         </aside>
@@ -118,7 +118,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
                 </td>
                 <td className="px-4 py-3 text-center tabular-nums">{it.quantity}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatBRL(it.unitPrice)}</td>
-                <td className="px-4 py-3 text-center tabular-nums hidden sm:table-cell">{it.discountPercent > 0 ? `${it.discountPercent}%` : '—'}</td>
+                <td className="px-4 py-3 text-center tabular-nums hidden sm:table-cell">{it.discountPercent > 0 ? `${it.discountPercent}%` : '-'}</td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums">{formatBRL(it.total)}</td>
               </tr>
             ))}

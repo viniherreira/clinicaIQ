@@ -368,7 +368,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             A pessoa recebe um e-mail com um link, cria o acesso dela e{' '}
-            <strong>define a própria senha</strong> — você nunca vê essa senha. Ela entra direto
+            <strong>define a própria senha</strong>, e você nunca vê essa senha. Ela entra direto
             nesta clínica, com o perfil que você escolher aqui.
           </p>
         </div>

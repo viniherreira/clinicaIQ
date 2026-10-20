@@ -126,7 +126,7 @@ export function Odontogram({ patientId, teeth }: Props) {
         type="button"
         onClick={() => pick(n)}
         aria-pressed={isSel}
-        aria-label={`Dente ${n}${meta ? ` — ${meta.label}` : ''}${data?.note ? ` — ${data.note}` : ''}`}
+        aria-label={`Dente ${n}${meta ? `, ${meta.label}` : ''}${data?.note ? `, ${data.note}` : ''}`}
         title={meta ? `${n} · ${meta.label}` : `Dente ${n}`}
         className={[
           'flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 transition-all',
@@ -279,7 +279,7 @@ export function Odontogram({ patientId, teeth }: Props) {
               </button>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">Escolha uma situação acima — a nota é salva junto.</p>
+          <p className="text-xs text-muted-foreground">Escolha uma situação acima. A nota é salva junto.</p>
         </div>
       ) : (
         <p className="text-center text-sm text-muted-foreground">

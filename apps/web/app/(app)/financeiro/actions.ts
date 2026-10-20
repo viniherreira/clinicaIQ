@@ -267,7 +267,7 @@ export async function getReceiptData(paymentId: string): Promise<ReceiptDocument
       paidAt: instantDateBR(payment.paidAt),
       paidAtLong: instantDateLongBR(payment.paidAt),
       reference: payment.quote?.number
-        ? `${servico} — Orçamento ORC-${String(payment.quote.number).padStart(4, '0')}`
+        ? `${servico} (Orçamento ORC-${String(payment.quote.number).padStart(4, '0')})`
         : servico,
       services: payment.quote?.items.map((it) => (it.description ? `${it.name} (${it.description})` : it.name)),
       generatedAt: instantDateTimeBR(new Date()),

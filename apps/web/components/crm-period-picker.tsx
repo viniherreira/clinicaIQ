@@ -337,7 +337,7 @@ export function PeriodPicker({
                 }
               }}
             />
-            <span aria-hidden="true" className="pb-2 text-muted-foreground">–</span>
+            <span aria-hidden="true" className="pb-2 text-muted-foreground">a</span>
             <DayInput
               id={`${id}-ate`}
               label="Até"

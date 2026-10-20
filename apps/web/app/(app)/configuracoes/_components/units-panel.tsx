@@ -243,9 +243,9 @@ function UnitForm({
                   </label>
                   {d.open ? (
                     <span className="flex items-center gap-1.5">
-                      <input type="time" value={d.start} onChange={(e) => muda({ start: e.target.value })} aria-label={`${DIAS[dow]} — abre`} className={timeCls} />
+                      <input type="time" value={d.start} onChange={(e) => muda({ start: e.target.value })} aria-label={`${DIAS[dow]}, abre`} className={timeCls} />
                       <span className="text-xs text-muted-foreground">às</span>
-                      <input type="time" value={d.end} onChange={(e) => muda({ end: e.target.value })} aria-label={`${DIAS[dow]} — fecha`} className={timeCls} />
+                      <input type="time" value={d.end} onChange={(e) => muda({ end: e.target.value })} aria-label={`${DIAS[dow]}, fecha`} className={timeCls} />
                     </span>
                   ) : (
                     <span className="text-sm text-muted-foreground">Fechado</span>

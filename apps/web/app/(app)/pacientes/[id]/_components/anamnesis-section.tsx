@@ -60,7 +60,7 @@ export function AnamnesisSection({ patientId, initial }: Props) {
             {criticalYes.map((q) => (
               <li key={q.key} className="text-sm text-red-700 dark:text-red-300">
                 • {q.label.replace(/\?$/, '')}
-                {items[q.key]?.detail && <strong> — {items[q.key].detail}</strong>}
+                {items[q.key]?.detail && <strong>: {items[q.key].detail}</strong>}
               </li>
             ))}
           </ul>
@@ -122,7 +122,7 @@ export function AnamnesisSection({ patientId, initial }: Props) {
                     onChange={(e) => setDetail(q.key, e.target.value)}
                     maxLength={300}
                     placeholder={q.detail}
-                    aria-label={`${q.label} — detalhe`}
+                    aria-label={`${q.label}, detalhe`}
                     className="mt-2 h-9 w-full rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   />
                 )}
