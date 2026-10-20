@@ -354,7 +354,7 @@ export function runFlow(doc: FlowDoc, state: FlowState | null, event: FlowEvent,
   const messages: FlowOutMessage[] = [];
   const effects: FlowEffect[] = [];
   const visited: string[] = [];
-  let lastMessage = event.kind === 'timer' ? '' : (event.text ?? '').trim().slice(0, 1000);
+  const lastMessage = event.kind === 'timer' ? '' : (event.text ?? '').trim().slice(0, 1000);
   let misses = state?.misses ?? 0;
 
   const fim = (): FlowResult => ({ messages, effects, state: null, visited });
