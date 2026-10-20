@@ -7,6 +7,8 @@
  * orçamento que a clínica manda ao paciente sairia com a propaganda do
  * DreamClin. Só a página inicial aponta para cá (`app/page.tsx`).
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 import {
   BRAND,
@@ -28,30 +30,23 @@ const SIZE = { width: 1200, height: 630 };
 const MODULES = ['Agenda', 'WhatsApp', 'Orçamentos', 'Prontuário', 'Financeiro'];
 
 /**
- * Inter, a fonte da marca, no peso pedido. O gerador da imagem só traz uma
- * fonte comum, sem negrito. Sem rede, a imagem sai assim mesmo, com a comum.
+ * Inter, a fonte da marca (licença OFL), em TTF ao lado desta rota: o gerador
+ * da imagem só traz uma fonte comum, sem negrito, e não lê woff2. Os arquivos
+ * ficam no projeto porque baixar do Google Fonts durante o build da Vercel
+ * não funcionou. A imagem é gerada no build (`force-static`), quando o
+ * diretório de trabalho é `apps/web`.
  */
-async function inter(weight: number): Promise<ArrayBuffer | null> {
-  try {
-    // Sem user-agent de navegador, o Google Fonts responde com TTF, que é o
-    // formato que o gerador lê (woff2 ele não lê).
-    const css = await (await fetch(`https://fonts.googleapis.com/css2?family=Inter:wght@${weight}`)).text();
-    const url = css.match(/src: url\((.+?)\) format\('(?:opentype|truetype)'\)/)?.[1];
-    return url ? await (await fetch(url)).arrayBuffer() : null;
-  } catch {
-    return null;
-  }
-}
+const FONT_DIR = join(process.cwd(), 'app', 'og.png', 'fonts');
 
 export async function GET() {
-  const fonts = (
-    await Promise.all(
-      ([500, 700, 800] as const).map(async (weight) => {
-        const data = await inter(weight);
-        return data ? { name: 'Inter', data, weight, style: 'normal' as const } : null;
-      }),
-    )
-  ).filter((f) => f !== null);
+  const [medium, extraBold] = await Promise.all([
+    readFile(join(FONT_DIR, 'Inter-Medium.ttf')),
+    readFile(join(FONT_DIR, 'Inter-ExtraBold.ttf')),
+  ]);
+  const fonts = [
+    { name: 'Inter', data: medium, weight: 500 as const, style: 'normal' as const },
+    { name: 'Inter', data: extraBold, weight: 800 as const, style: 'normal' as const },
+  ];
 
   return new ImageResponse(
     (
@@ -106,15 +101,15 @@ export async function GET() {
               background: 'white',
               color: BRAND.navy,
               fontSize: 30,
-              fontWeight: 700,
+              fontWeight: 800,
             }}
           >
             {TRIAL_DAYS} dias grátis, sem cartão
           </div>
-          <div style={{ fontSize: 30, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>dreamclin.com</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>dreamclin.com</div>
         </div>
       </div>
     ),
-    { ...SIZE, fonts: fonts.length ? fonts : undefined },
+    { ...SIZE, fonts },
   );
 }
