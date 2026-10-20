@@ -5,7 +5,7 @@ import { readFlow } from './flow-legacy';
 
 /** Cadastro dos robôs. Quem chama já passou por `guardCrmAction('crm_config')`. */
 
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true; id?: string } | { ok: false; message: string };
 
 export interface BotInput {
   id?: string;
@@ -37,6 +37,21 @@ export async function saveBot(db: TenantPrismaClient, tenantId: string, input: B
   if (problem) return { ok: false, message: problem };
   const keywords = input.trigger === 'KEYWORD' ? cleanKeywords(input.keywords) : [];
   if (input.trigger === 'KEYWORD' && keywords.length === 0) return { ok: false, message: 'Escreva pelo menos uma palavra-chave (ex.: menu).' };
+  // Gatilhos do Kommo: etapa, tag e sem resposta precisam saber quando.
+  const cfg = novo?.trigger ?? {};
+  if (input.trigger === 'STAGE' && !cfg.stageIds?.length) return { ok: false, message: 'Escolha em quais etapas o robô começa.' };
+  if (input.trigger === 'TAG' && !cfg.tagIds?.length) return { ok: false, message: 'Escolha qual tag faz o robô começar.' };
+  if (input.trigger === 'NO_REPLY' && !(cfg.hours && cfg.hours >= 1 && cfg.hours <= 24 * 30)) {
+    return { ok: false, message: 'Diga depois de quantas horas sem resposta o robô começa (de 1 hora a 30 dias).' };
+  }
+  if (cfg.stageIds?.length) {
+    const n = await db.pipelineStage.count({ where: { id: { in: cfg.stageIds } } });
+    if (n !== cfg.stageIds.length) return { ok: false, message: 'O gatilho aponta para uma etapa que não existe mais.' };
+  }
+  if (cfg.tagIds?.length) {
+    const n = await db.leadTag.count({ where: { id: { in: cfg.tagIds } } });
+    if (n !== cfg.tagIds.length) return { ok: false, message: 'O gatilho aponta para uma tag que não existe mais.' };
+  }
 
   // O que as ações apontam precisa ser desta clínica.
   const refs = novo ? refsOfFlow(novo) : refsOf(steps as BotSteps);
@@ -65,10 +80,10 @@ export async function saveBot(db: TenantPrismaClient, tenantId: string, input: B
   const data = { name, trigger: input.trigger, keywords, steps: steps as unknown as Prisma.InputJsonValue, active: input.active };
   if (input.id) {
     const r = await db.chatbotFlow.updateMany({ where: { id: input.id }, data });
-    return r.count ? { ok: true } : { ok: false, message: 'Robô não encontrado.' };
+    return r.count ? { ok: true, id: input.id } : { ok: false, message: 'Robô não encontrado.' };
   }
-  await db.chatbotFlow.create({ data: { tenantId, ...data } });
-  return { ok: true };
+  const criado = await db.chatbotFlow.create({ data: { tenantId, ...data } });
+  return { ok: true, id: criado.id };
 }
 
 function refsOf(steps: BotSteps) {

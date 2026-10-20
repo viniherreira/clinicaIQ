@@ -1,5 +1,6 @@
 import { decrypt, getTenantClient, prisma, type TenantPrismaClient } from '@clinicaiq/db';
-import { BOT_IDLE_MS, DEFAULT_HOURS, isOpenAt, pickBot } from './bot-engine';
+import { BOT_IDLE_MS, DEFAULT_HOURS, fitsAudience, isOpenAt, pickBot, shouldStart } from './bot-engine';
+import { START_PENDING } from './bot-queue';
 import { dispatchChat } from './chat-dispatch';
 import { writeChatMessage } from './conversations';
 import { runFlow, type FlowContext, type FlowDoc, type FlowEffect, type FlowEvent, type FlowResult, type FlowState } from './flow-engine';
@@ -85,6 +86,11 @@ export async function runBotOnInbound(
     const flow = await db.chatbotFlow.findFirst({ where: { id: conv.botFlowId, active: true } });
     const doc = flow ? readFlow(flow.steps) : null;
     if (flow && doc) {
+      // Gatilho de etapa/tag esperando o relógio e a pessoa escreveu antes: começa agora, com a mensagem dela.
+      if (conv.botStepId === START_PENDING) {
+        await step(db, tenantId, conv, flow, doc, null, { kind: 'start', text }, now);
+        return 'started';
+      }
       await step(db, tenantId, conv, flow, doc, { stepId: conv.botStepId, misses: conv.botMisses, wakeAt: conv.botWakeAt }, { kind: 'message', text }, now);
       return 'continued';
     }
@@ -342,10 +348,57 @@ export async function wakeBots(now: Date = new Date(), limit = 100): Promise<num
       continue;
     }
     try {
-      await step(db, v.tenantId, conv, flow, doc, { stepId: conv.botStepId, misses: conv.botMisses, wakeAt: null }, { kind: 'timer' }, now);
+      if (conv.botStepId === START_PENDING) {
+        // Gatilho de etapa ou tag: confere o horário e o público do robô antes de começar.
+        const tags = conv.leadId ? (await db.leadTagOnLead.findMany({ where: { leadId: conv.leadId }, select: { tagId: true } })).map((t) => t.tagId) : [];
+        if (!shouldStart(doc.hours, now) || !fitsAudience(doc.audience, tags)) {
+          await db.conversation.updateMany({ where: { id: conv.id }, data: CLEAR });
+          continue;
+        }
+        await step(db, v.tenantId, conv, flow, doc, null, { kind: 'start' }, now);
+      } else {
+        await step(db, v.tenantId, conv, flow, doc, { stepId: conv.botStepId, misses: conv.botMisses, wakeAt: null }, { kind: 'timer' }, now);
+      }
       n++;
     } catch (e) {
       console.error('[robô] acordar falhou', e instanceof Error ? e.message : e);
+    }
+  }
+  return n;
+}
+
+/**
+ * Gatilho "sem resposta" (Kommo: X horas depois da última mensagem): a última
+ * mensagem foi da equipe (não de robô, para não virar laço) e a pessoa não
+ * responde há as horas do robô. Só olha as conversas que passaram da hora nas
+ * últimas 6 horas: ligar o robô não dispara para todo o histórico.
+ */
+export async function startNoReplyBots(now: Date = new Date(), limit = 50): Promise<number> {
+  const flows = await prisma.chatbotFlow.findMany({ where: { active: true, trigger: 'NO_REPLY' }, select: { id: true, tenantId: true, steps: true } });
+  let n = 0;
+  for (const f of flows) {
+    const doc = readFlow(f.steps);
+    const horas = doc?.trigger?.hours;
+    if (!doc || !horas || !shouldStart(doc.hours, now)) continue;
+    const limite = new Date(now.getTime() - horas * 3_600_000);
+    const db = getTenantClient(f.tenantId);
+    const candidatas = await db.conversation.findMany({
+      where: { status: 'ACTIVE', botFlowId: null, lastMessageAt: { lte: limite, gt: new Date(limite.getTime() - 6 * 3_600_000) } },
+      select: { ...CONV_SELECT, messages: { orderBy: [{ at: 'desc' }, { createdAt: 'desc' }], take: 1, select: { direction: true, origin: true } } },
+      take: limit,
+    });
+    for (const c of candidatas) {
+      const ultima = c.messages[0];
+      if (!ultima || ultima.direction !== 'OUTBOUND' || ultima.origin === 'BOT' || ultima.origin === 'BROADCAST') continue;
+      const tags = c.leadId ? (await db.leadTagOnLead.findMany({ where: { leadId: c.leadId }, select: { tagId: true } })).map((t) => t.tagId) : [];
+      if (!fitsAudience(doc.audience, tags)) continue;
+      // Reserva a conversa: duas voltas do relógio juntas não começam duas vezes.
+      const { count } = await db.conversation.updateMany({ where: { id: c.id, botFlowId: null }, data: { botFlowId: f.id, botStepId: START_PENDING, botStartedAt: now } });
+      if (!count) continue;
+      await step(db, f.tenantId, { ...c, botFlowId: f.id, botStepId: START_PENDING }, { id: f.id, state: {} }, doc, null, { kind: 'start' }, now).catch((e) =>
+        console.error('[robô] sem resposta falhou', e instanceof Error ? e.message : e),
+      );
+      n++;
     }
   }
   return n;

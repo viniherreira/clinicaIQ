@@ -1,4 +1,4 @@
-import { expireBots, wakeBots } from './bot';
+import { expireBots, startNoReplyBots, wakeBots } from './bot';
 import { finishBroadcasts, startDueBroadcasts } from './broadcasts';
 import { processCloudQueue } from './cloud-send';
 import { simulateDueLocal } from './dev-clock';
@@ -19,6 +19,7 @@ export async function runTick(now: Date = new Date()) {
   const broadcastsDone = await finishBroadcasts(now);
   // Robôs com hora marcada ("sem resposta", pausa) antes de expirar os parados.
   const botsWoken = await wakeBots(now);
+  const botsNoReply = await startNoReplyBots(now);
   const botsExpired = await expireBots(now);
-  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsExpired };
+  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsNoReply, botsExpired };
 }

@@ -167,6 +167,17 @@ export interface FlowDoc {
   layout?: Record<string, { x: number; y: number }>;
   hours?: BotHours;
   audience?: BotAudience;
+  /** Configuração dos gatilhos novos (etapa, tag, sem resposta). */
+  trigger?: FlowTriggerConfig;
+}
+
+export interface FlowTriggerConfig {
+  /** STAGE: começa quando o lead é criado ou movido para uma destas etapas. */
+  stageIds?: string[];
+  /** TAG: começa quando uma destas tags é posta no lead. */
+  tagIds?: string[];
+  /** NO_REPLY: começa quando a clínica falou por último e a pessoa não responde há tantas horas. */
+  hours?: number;
 }
 
 // ─── Execução ─────────────────────────────────────────────────────────────────
@@ -557,7 +568,24 @@ export function flowProblem(doc: FlowDoc): string | null {
     if (s.type === 'goto' && !doc.steps[s.target]) return `${n}: escolha para qual passo ir.`;
     if (s.type === 'roundRobin' && (s.options.length < 2 || s.options.length > 10)) return `${n}: o rodízio tem de 2 a 10 opções.`;
     if (s.type === 'pause' && s.minutes != null && (s.minutes < 1 || s.minutes > 60 * 24 * 30)) return `${n}: a pausa vai de 1 minuto a 30 dias.`;
-    if (s.type === 'action' && s.actions.length === 0) return `${n}: escolha pelo menos uma ação.`;
+    if (s.type === 'action') {
+      if (s.actions.length === 0) return `${n}: escolha pelo menos uma ação.`;
+      for (const a of s.actions) {
+        if ((a.type === 'tag' || a.type === 'untag') && !a.tagId) return `${n}: escolha a tag.`;
+        if (a.type === 'stage' && !a.stageId) return `${n}: escolha a etapa.`;
+        if (a.type === 'assign' && !a.userId) return `${n}: escolha o responsável.`;
+        if ((a.type === 'task' || a.type === 'note' || a.type === 'notify') && !a.text.trim()) return `${n}: escreva o texto da ${a.type === 'task' ? 'tarefa' : a.type === 'note' ? 'anotação' : 'mensagem para a equipe'}.`;
+        if (a.type === 'setField' && a.from === 'value' && !(a.value ?? '').trim()) return `${n}: escreva o valor do campo.`;
+      }
+    }
+    if (s.type === 'condition') {
+      for (const c of s.cases) {
+        for (const r of c.rules) {
+          if ((r.subject === 'tag' || r.subject === 'stage' || r.subject === 'field') && !r.ref) return `${n}: complete a condição (escolha a tag, etapa ou campo).`;
+          if (r.subject === 'message' && (r.op === 'contains' || r.op === 'equals' || r.op === 'starts') && !(r.value ?? '').trim()) return `${n}: escreva as palavras da condição.`;
+        }
+      }
+    }
     if (s.type === 'startBot' && !s.botId) return `${n}: escolha qual robô iniciar.`;
   }
   return null;

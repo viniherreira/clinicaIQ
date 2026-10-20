@@ -91,7 +91,11 @@ test('automações por etapa e bots (com o editor aberto) sem violações', asyn
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Novo robô' }).click();
   expect((await axe(page)).violations).toEqual([]);
-  await page.getByRole('button', { name: /Fora do horário/ }).click();
+  await page.getByRole('link', { name: /Fora do horário/ }).click();
+  await page.waitForURL(/\/crm\/automacoes\/bots\/novo/);
+  await expect(page.getByRole('heading', { name: 'Gatilho e público' })).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
+  await page.getByRole('button', { name: 'Testar' }).click();
   await expect(page.getByRole('log', { name: 'Conversa de teste' })).toBeVisible();
   expect((await axe(page)).violations).toEqual([]);
   await page.goto('/crm/automacoes/bots');

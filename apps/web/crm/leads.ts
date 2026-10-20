@@ -1,6 +1,7 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipeline';
 import { conversationHash, encryptPhone, phoneHash } from './phone';
+import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
 
 /**
@@ -385,6 +386,8 @@ export async function setTags(db: TenantPrismaClient, actor: Actor, leadId: stri
     if (saem.length) await tx.leadTagOnLead.deleteMany({ where: { tenantId, leadId, tagId: { in: saem } } });
     if (entram.length) {
       await tx.leadTagOnLead.createMany({ data: entram.map((tagId) => ({ tenantId, leadId, tagId })) });
+      // Robô com gatilho "tag posta no lead" (Salesbot do Kommo).
+      await queueTriggeredBot(tx, tenantId, leadId, { tagIds: entram });
     }
     const historico = [
       ...entram.map((tagId) => ({ type: 'TAG_ADDED' as const, tagId })),
