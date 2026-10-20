@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   GRACE_DAYS,
   NO_SUBSCRIPTION,
+  TRIAL_DAYS,
   canWrite,
   resolveAccess,
+  trialEndFrom,
   type SubscriptionSnapshot,
 } from './subscription';
 
@@ -161,5 +163,30 @@ describe('resolveAccess', () => {
       expect(access.complimentary).toBe(false);
       expect(access.level).toBe('readonly');
     });
+  });
+});
+
+describe('teste grátis de clínica nova', () => {
+  const novo = (now: Date) => {
+    const fim = trialEndFrom(now);
+    return snapshot({ status: 'TRIALING', trialEndsAt: fim, currentPeriodEnd: fim });
+  };
+
+  it('entra liberada, com {TRIAL_DAYS} dias e sem aviso', () => {
+    const access = resolveAccess(novo(NOW), NOW);
+    expect(TRIAL_DAYS).toBe(14);
+    expect(access.level).toBe('full');
+    expect(access.status).toBe('TRIALING');
+    expect(access.daysLeft).toBe(TRIAL_DAYS);
+    expect(access.warning).toBeNull();
+  });
+
+  it('depois do teste ganha a tolerância e então fica só leitura', () => {
+    const tolerancia = resolveAccess(novo(NOW), at(TRIAL_DAYS + 1));
+    expect(tolerancia.level).toBe('full');
+    expect(tolerancia.inGrace).toBe(true);
+
+    const fim = resolveAccess(novo(NOW), at(TRIAL_DAYS + GRACE_DAYS + 1));
+    expect(fim.level).toBe('readonly');
   });
 });
