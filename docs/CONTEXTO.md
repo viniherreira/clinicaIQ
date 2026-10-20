@@ -6,8 +6,8 @@ Atualizado em 2026-10-11. Leia isto antes de continuar o CRM.
 
 - Branch: `feat/crm-etapa1` (no GitHub). A `main` e o site em produção **não** têm nada do CRM.
 - **Etapa 1 do CRM pronta e testada** (leads, funil, tags, tarefas, conversão em paciente, integração automática com agenda e orçamentos). Spec e plano:
-  - `docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md`
-  - `docs/superpowers/plans/2026-10-07-crm-etapa1-plan.md` (todas as tarefas ✅)
+  - `docs/specs/2026-10-07-crm-etapa1-leads-funil-design.md`
+  - `docs/planos/2026-10-07-crm-etapa1-plan.md` (todas as tarefas ✅)
 - Verificação: 289 testes unitários, 17 E2E (regressão da agenda e orçamentos + CRM), axe-core sem violações nas telas do CRM, `next build` ok.
 - **Ainda não publicado em produção.** Ver "Publicar a etapa 1" abaixo.
 
@@ -15,7 +15,7 @@ Atualizado em 2026-10-11. Leia isto antes de continuar o CRM.
 
 - CRM **só para clínicas**, funcionalidades e organização de tela **inspiradas no Kommo**, identidade visual do ClinicaIQ (nada de marca do Kommo).
 - Dois espaços no mesmo app com seletor `Clínica | CRM`.
-- **Mudança de estratégia (2026-10-09): o produto é o sistema de agenda; o CRM é um adicional pago** por cima de qualquer plano — R$ 39 por usuário/mês, a clínica escolhe quem tem acesso, 14 dias grátis, uma cobrança só no Asaas, cortesia inclui o CRM. Não existe plano "só CRM". Spec: `docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md`; plano: `docs/superpowers/plans/2026-10-09-crm-adicional-pago-plan.md`. Vem **antes** da etapa 2.
+- **Mudança de estratégia (2026-10-09): o produto é o sistema de agenda; o CRM é um adicional pago** por cima de qualquer plano — R$ 39 por usuário/mês, a clínica escolhe quem tem acesso, 14 dias grátis, uma cobrança só no Asaas, cortesia inclui o CRM. Não existe plano "só CRM". Spec: `docs/specs/2026-10-09-crm-adicional-pago-design.md`; plano: `docs/planos/2026-10-09-crm-adicional-pago-plan.md`. Vem **antes** da etapa 2.
 - Lead = negócio (várias por pessoa). Tarefas com aviso "sem tarefa". Um funil editável por clínica.
 - **A agenda nunca depende do CRM**: só `after(() => notifyCrm(...))` depois de salvar.
 - Banco de desenvolvimento **separado da produção** (Postgres local). Nunca testar contra o banco das clínicas.
@@ -23,15 +23,15 @@ Atualizado em 2026-10-11. Leia isto antes de continuar o CRM.
 
 ## CRM adicional pago — pronto
 
-Feito no plano `docs/superpowers/plans/2026-10-09-crm-adicional-pago-plan.md`: colunas novas,
+Feito no plano `docs/planos/2026-10-09-crm-adicional-pago-plan.md`: colunas novas,
 regras de cobrança, ligar/desligar com teste de 14 dias, acesso por pessoa (Equipe),
 cartão no Plano, tela de venda em `/crm-indisponivel`, aviso de fim de teste, troca de
 plano e rotina diária cobrando plano + CRM. 19 testes E2E verdes.
 
 ## Etapa 2 — Conversas do WhatsApp — pronta
 
-Aprovada (opção A) e feita no plano `docs/superpowers/plans/2026-10-10-crm-etapa2-plan.md`
-(spec `docs/superpowers/specs/2026-10-10-crm-etapa2-conversas-design.md`):
+Aprovada (opção A) e feita no plano `docs/planos/2026-10-10-crm-etapa2-plan.md`
+(spec `docs/specs/2026-10-10-crm-etapa2-conversas-design.md`):
 
 - **Gateway** grava toda mensagem 1:1 (entrando, pelo celular, do sistema) para clínica com CRM, texto cifrado, sem duplicar; envia as respostas do CRM com reserva e reenvio (`chat-log.ts`, `chat-send.ts`).
 - **App**: tela Conversas (Todas/Minhas/Sem resposta/Entrada), aba Conversa na ficha do lead, coluna Entrada no funil, respostas rápidas com `/`, não lidas no menu.
@@ -42,8 +42,8 @@ Aprovada (opção A) e feita no plano `docs/superpowers/plans/2026-10-10-crm-eta
 ## API oficial, transmissões, robô e automações — prontas
 
 O dono pediu para fazer as etapas seguidas, sem aprovar cada uma (2026-10-11). Spec e plano:
-`docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md`,
-`docs/superpowers/plans/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
+`docs/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md`,
+`docs/planos/2026-10-11-crm-api-oficial-transmissoes-robo-plan.md`.
 
 - **API oficial pronta para ligar**: CRM → WhatsApp (cadastro incorporado com coexistência, conexão de teste com o número de teste da Meta, modelos), webhook `/api/webhooks/meta`, janela de 24 h, mídia aberta no CRM. Só funciona de verdade quando a Meta aprovar o ClinicaIQ como Tech Provider e as variáveis `META_*` estiverem na Vercel (lista em `apps/web/.env.example`). No `.env.local` há valores só de desenvolvimento para os testes do webhook.
 - **Transmissões** (`/crm/transmissoes`), **Automações por etapa** e **Robô** (abas em Configurações do CRM).

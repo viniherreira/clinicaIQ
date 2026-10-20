@@ -94,4 +94,4 @@ mudam o contexto na hora (uma tag posta vale para a condição seguinte).
 1. Motor novo + conversão dos antigos + execução + banco (testes de unidade e de banco).
 2. Quadro + painel + vista em lista + simulador destacando o passo.
 3. Gatilhos novos (etapa, tag, sem resposta) e modelos prontos.
-4. E2E + axe, SQL de produção, CLAUDE.md, fotos.
+4. E2E + axe, SQL de produção, GUIA-DO-PROJETO.md, fotos.

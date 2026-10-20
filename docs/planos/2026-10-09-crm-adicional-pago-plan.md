@@ -1,6 +1,6 @@
 # Plano — CRM como adicional pago
 
-Spec: [`docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md`](../specs/2026-10-09-crm-adicional-pago-design.md)
+Spec: [`docs/specs/2026-10-09-crm-adicional-pago-design.md`](../specs/2026-10-09-crm-adicional-pago-design.md)
 Branch: `feat/crm-etapa1`
 
 Mesmas regras do plano da etapa 1: um commit por tarefa, lint/typecheck/unit

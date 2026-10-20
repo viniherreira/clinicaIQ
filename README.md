@@ -58,7 +58,8 @@ packages/
   ui/                componentes compartilhados
 docs/
   producao/          SQL para rodar no banco de produção
-  superpowers/       especificações e planos das funcionalidades
+  specs/             especificações das funcionalidades
+  planos/            planos de implementação
 ```
 
 Dentro de `apps/web`, a gestão fica em `app/(app)`, as telas do CRM em `app/(crm)` e as regras do CRM em `crm/`.
@@ -132,6 +133,6 @@ Os deploys de Preview usam um banco separado (Neon) e o Clerk de desenvolvimento
 
 ## Para saber mais
 
-- [`CLAUDE.md`](CLAUDE.md) tem as regras do projeto em detalhe: multi-tenant, CRM, LGPD e acessibilidade.
+- [`docs/GUIA-DO-PROJETO.md`](docs/GUIA-DO-PROJETO.md) tem as regras do projeto em detalhe: multi-tenant, CRM, LGPD e acessibilidade.
 - [`ROADMAP.md`](ROADMAP.md) mostra o que vem por aí.
 - [`docs/`](docs) reúne as especificações, o SQL de produção e a configuração do WhatsApp.

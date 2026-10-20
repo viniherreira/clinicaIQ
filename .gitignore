@@ -22,3 +22,7 @@ apps/web/e2e/.auth/
 
 # Arquivos do CRM no desenvolvimento (apps/web/crm/media-store.ts)
 .crm-media/
+
+# Arquivos locais de ferramentas de editor e assistentes; ficam só na máquina.
+.claude/
+CLAUDE.md
