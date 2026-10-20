@@ -10,8 +10,8 @@
  * Font: Inter, the brand typeface. Features use an editorial numbered list
  * with hairline dividers instead of cards. Motion: staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
  *
- * Copy is intentionally honest: the product is in early access, so there are no
- * invented testimonials or user counts.
+ * Copy is intentionally honest: no invented testimonials or user counts. The
+ * trial length comes from TRIAL_DAYS, the same number the signup grants.
  */
 import Link from 'next/link';
 import { Pricing } from './pricing-section';
@@ -22,7 +22,8 @@ import {
   Users, Heart, PlusCircle, TrendingUp,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
-import { companyLine } from '@/lib/company';
+import { companyLine, salesWhatsAppUrl } from '@/lib/company';
+import { TRIAL_DAYS } from '@/lib/subscription';
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ function Hero() {
         <div>
           <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            Grátis durante o acesso antecipado
+            {TRIAL_DAYS} dias grátis, sem cartão
           </p>
 
           <h1
@@ -276,7 +277,7 @@ function Hero() {
           </div>
 
           <p className="animate-fade-in-up mt-4 text-xs text-muted-foreground" style={{ animationDelay: '400ms' }}>
-            Sem cartão de crédito · Pronto para usar em 5 minutos
+            {TRIAL_DAYS} dias grátis · Sem cartão de crédito · Pronto em 5 minutos
           </p>
         </div>
 
@@ -478,7 +479,11 @@ function FAQ() {
   const faqs = [
     {
       q: 'Quanto custa o DreamClin?',
-      a: 'Durante o acesso antecipado, o DreamClin é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais. Você será avisado com antecedência, sem surpresa na fatura.',
+      a: `Os primeiros ${TRIAL_DAYS} dias são grátis e sem cartão. Depois, você escolhe um dos planos acima e paga por PIX, boleto ou cartão. Sem fidelidade e sem taxa de instalação.`,
+    },
+    {
+      q: 'O que acontece quando o teste acaba?',
+      a: 'Você escolhe um plano e segue usando, sem perder nada do que cadastrou. Se não escolher, seus dados continuam guardados e disponíveis para consulta; só fica bloqueado criar e alterar até assinar.',
     },
     {
       q: 'Preciso instalar alguma coisa?',
@@ -498,7 +503,7 @@ function FAQ() {
     },
     {
       q: 'Consigo trazer meus pacientes de outro sistema?',
-      a: 'Sim. O cadastro de pacientes é rápido e, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração durante o acesso antecipado.',
+      a: 'Sim. O cadastro de pacientes é rápido e, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
     },
   ];
   return (
@@ -534,7 +539,7 @@ function FAQ() {
 
 // ─── Final CTA ───────────────────────────────────────────────────────────────
 
-function FinalCTA() {
+function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
   return (
     <section aria-labelledby="cta-final" className="px-4 pb-16 sm:px-6 lg:pb-24">
       <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-brand-gradient px-6 py-14 text-center shadow-xl sm:px-12 lg:py-20">
@@ -547,8 +552,8 @@ function FinalCTA() {
           Pronto para simplificar a rotina da sua clínica?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
-          Crie sua conta gratuita, cadastre a equipe e faça o primeiro agendamento
-          em menos de 5 minutos. Sem cartão, sem fidelidade.
+          Crie sua conta, cadastre a equipe e faça o primeiro agendamento em menos
+          de 5 minutos. {TRIAL_DAYS} dias grátis, sem cartão e sem fidelidade.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {/* O degradê não muda com o tema, então o teal do botão também não. */}
@@ -559,21 +564,56 @@ function FinalCTA() {
             Começar agora, é grátis
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-          <Link
-            href="/sign-in"
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-base font-medium text-white/90 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            Já tenho conta
-          </Link>
+          {whatsapp ? (
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              Tirar dúvidas no WhatsApp
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-base font-medium text-white/90 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              Já tenho conta
+            </Link>
+          )}
         </div>
       </div>
     </section>
   );
 }
 
+// ─── Fale com a gente (WhatsApp de vendas) ───────────────────────────────────
+
+/**
+ * Botão fixo no canto para conversar com a equipe. Dono de clínica raramente
+ * assina sistema sem falar com alguém antes. Sem número configurado
+ * (`NEXT_PUBLIC_COMPANY_WHATSAPP`), não aparece.
+ */
+function WhatsAppFloat({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-4 right-4 z-50 inline-flex h-14 items-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition-transform hover:scale-[1.04] hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:bottom-6 sm:right-6 sm:px-5"
+    >
+      <MessageCircle className="h-6 w-6 shrink-0" aria-hidden="true" />
+      <span className="max-sm:sr-only">Fale com a gente</span>
+      <span className="sr-only"> pelo WhatsApp (abre em nova aba)</span>
+    </a>
+  );
+}
+
 // ─── Footer ──────────────────────────────────────────────────────────────────
 
-function Footer() {
+function Footer({ whatsapp }: { whatsapp: string | null }) {
   return (
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
@@ -596,6 +636,13 @@ function Footer() {
             <li><a href="#perguntas" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Perguntas frequentes</a></li>
             <li><Link href="/sign-up" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Criar conta</Link></li>
             <li><Link href="/sign-in" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Entrar</Link></li>
+            {whatsapp && (
+              <li>
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                  Fale com a gente no WhatsApp<span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              </li>
+            )}
           </ul>
         </nav>
 
@@ -628,6 +675,7 @@ function Footer() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function LandingPage() {
+  const whatsapp = salesWhatsAppUrl();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
@@ -638,9 +686,10 @@ export function LandingPage() {
         <Differentiators />
         <Pricing />
         <FAQ />
-        <FinalCTA />
+        <FinalCTA whatsapp={whatsapp} />
       </main>
-      <Footer />
+      <Footer whatsapp={whatsapp} />
+      {whatsapp && <WhatsAppFloat href={whatsapp} />}
     </div>
   );
 }

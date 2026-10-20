@@ -3,6 +3,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
+import { trialEndFrom } from '@/lib/subscription';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -282,17 +283,17 @@ export async function completeOnboarding(
     },
   });
 
-  // Starts without access. The clinic picks a plan and pays before using the
-  // system, so the subscription begins already past due rather than as a trial
-  // that would have to be revoked later. `currentPeriodEnd` in the past is what
-  // resolveAccess reads, so this holds even if no job ever runs.
+  // Começa no teste grátis: TRIAL_DAYS com tudo liberado, sem cartão. Depois
+  // vem a mesma tolerância de uma fatura atrasada e então só leitura — tudo
+  // lido das datas por resolveAccess, mesmo que nenhuma rotina rode.
+  const trialEndsAt = trialEndFrom(new Date());
   await prisma.subscription.create({
     data: {
       tenantId: tenant.id,
       tier: 'ESSENCIAL',
-      status: 'SUSPENDED',
-      currentPeriodEnd: new Date(),
-      graceEndsAt: new Date(),
+      status: 'TRIALING',
+      trialEndsAt,
+      currentPeriodEnd: trialEndsAt,
     },
   });
 
