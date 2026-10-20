@@ -878,7 +878,7 @@ model Plan {
   assistantEnabled  Boolean  @default(false)
   advancedReports   Boolean  @default(false)
   /// Preço do CRM por usuário com acesso, por mês. O CRM é um adicional pago
-  /// por cima de qualquer plano (docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md).
+  /// por cima de qualquer plano (docs/specs/2026-10-09-crm-adicional-pago-design.md).
   crmSeatPriceCents Int      @default(3900)
   /// Ordem de exibição na tela de planos.
   sortOrder         Int      @default(0)
@@ -1000,7 +1000,7 @@ model Invitation {
 //
 // Toda tabela daqui tem `tenantId`, inclusive as de ligação: `getTenantClient`
 // filtra todo modelo por ele, e uma tabela sem a coluna quebraria as consultas.
-// Ver docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md.
+// Ver docs/specs/2026-10-07-crm-etapa1-leads-funil-design.md.
 
 /// Papel de uma etapa para a automação. A automação procura a etapa pelo
 /// papel, nunca pelo nome — assim a clínica renomeia à vontade.

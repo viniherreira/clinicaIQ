@@ -10,7 +10,7 @@ import { DEFAULT_HOURS, fillVars, hasWord, normalize, type BotAudience, type Bot
  * devolve as mensagens a mandar, as ações a fazer no CRM e onde ficou
  * esperando. `crm/bot.ts` executa; o simulador da tela roda este mesmo motor.
  *
- * Spec: docs/superpowers/specs/2026-10-20-crm-robo-salesbot-design.md
+ * Spec: docs/specs/2026-10-20-crm-robo-salesbot-design.md
  */
 
 // ─── Passos ───────────────────────────────────────────────────────────────────

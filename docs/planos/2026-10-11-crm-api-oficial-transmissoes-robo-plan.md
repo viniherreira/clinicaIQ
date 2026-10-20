@@ -1,6 +1,6 @@
 # Plano — API oficial, Transmissões, Robô e automações
 
-Spec: [`docs/superpowers/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md`](../specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md)
+Spec: [`docs/specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md`](../specs/2026-10-11-crm-api-oficial-transmissoes-robo-design.md)
 Branch: `feat/crm-etapa1`. Mesmas regras: um commit por tarefa, testes verdes, banco só o local.
 
 ### 1. Schema ✅

@@ -1,6 +1,6 @@
 # Plano — CRM etapa 2: Conversas do WhatsApp
 
-Spec: [`docs/superpowers/specs/2026-10-10-crm-etapa2-conversas-design.md`](../specs/2026-10-10-crm-etapa2-conversas-design.md)
+Spec: [`docs/specs/2026-10-10-crm-etapa2-conversas-design.md`](../specs/2026-10-10-crm-etapa2-conversas-design.md)
 Branch: `feat/crm-etapa1` (a etapa 1 ainda não foi publicada; segue na mesma branch)
 
 Mesmas regras das etapas anteriores: um commit por tarefa; lint, typecheck e unitários verdes;
@@ -34,4 +34,4 @@ Abas Histórico | Conversa. Coluna Entrada no funil, com aceitar e recusar.
 CRUD em Configurações do CRM e `/` na caixa de texto.
 
 ### 8. E2E, a11y e documentação ✅
-Specs E2E com conversas semeadas, axe nas telas novas, `CONTEXTO.md`, `ROADMAP.md` e `CLAUDE.md`.
+Specs E2E com conversas semeadas, axe nas telas novas, `CONTEXTO.md`, `ROADMAP.md` e `docs/GUIA-DO-PROJETO.md`.

@@ -1,4 +1,4 @@
--- Robô no jeito do Salesbot do Kommo (docs/superpowers/specs/2026-10-20-crm-robo-salesbot-design.md).
+-- Robô no jeito do Salesbot do Kommo (docs/specs/2026-10-20-crm-robo-salesbot-design.md).
 -- Só acréscimos: novos gatilhos, quando o robô acorda e o contador do rodízio.
 -- Os robôs que já existem continuam funcionando: o app converte o formato antigo na leitura.
 
