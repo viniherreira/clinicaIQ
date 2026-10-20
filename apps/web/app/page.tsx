@@ -21,6 +21,12 @@ export const metadata: Metadata = {
       'Agenda, WhatsApp automático, orçamentos, odontograma e financeiro em um só lugar. Teste grátis por 14 dias.',
     locale: 'pt_BR',
     type: 'website',
+    siteName: 'DreamClin',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DreamClin — gestão inteligente para clínicas' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og.png'],
   },
 };
 

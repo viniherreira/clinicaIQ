@@ -3,12 +3,16 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { ptBR } from '@clerk/localizations';
 import { Inter } from 'next/font/google';
 import { GeistMono } from 'geist/font/mono';
+import { siteUrl } from '@/lib/company';
 import './globals.css';
 
 // A fonte do manual de marca.
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
 
 export const metadata: Metadata = {
+  // Base dos endereços da imagem de compartilhamento: o WhatsApp só mostra a
+  // prévia com URL completa.
+  metadataBase: new URL(siteUrl()),
   title: {
     default: 'DreamClin',
     template: '%s | DreamClin',
