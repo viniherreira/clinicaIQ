@@ -23,6 +23,9 @@ export type SubscriptionStatus =
  */
 export const GRACE_DAYS = 7;
 
+/** Dias de teste grátis de uma clínica nova, sem cartão. O site promete isso. */
+export const TRIAL_DAYS = 14;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type AccessLevel =
@@ -65,6 +68,11 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
  *  parede — formatar no fuso local volta um dia no Brasil. */
 const diaBR = (d: Date) =>
   `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+
+/** Fim do teste grátis de uma clínica criada agora. */
+export function trialEndFrom(now: Date): Date {
+  return new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
+}
 
 export function graceEnd(snapshot: SubscriptionSnapshot): Date {
   if (snapshot.graceEndsAt) return snapshot.graceEndsAt;

@@ -19,8 +19,8 @@ export function CreateClinicForm() {
       try {
         const result = await completeOnboarding(null, formData);
         if (result.success) {
-          // Straight to the plans: the clinic chooses and pays before it can work.
-          window.location.href = '/configuracoes#plano';
+          // Direto para o sistema: a clínica começa no teste grátis.
+          window.location.href = '/dashboard';
         } else {
           setFieldErrors(result.errors);
         }
