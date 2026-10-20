@@ -15,7 +15,8 @@ export default async function BotsPage() {
   const ctx = await requireCrm('crm_config');
   const [basics, bots, regras] = await Promise.all([
     loadCrmBasics(ctx),
-    ctx.db.chatbotFlow.findMany({ orderBy: { createdAt: 'asc' } }),
+    // Por enquanto a tela antiga só mostra os gatilhos que ela conhece (a nova tela do quadro vem a seguir).
+    ctx.db.chatbotFlow.findMany({ where: { trigger: { in: ['NEW_CONTACT', 'KEYWORD'] } }, orderBy: { createdAt: 'asc' } }),
     ctx.db.captureRule.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
   ]);
   const tags = basics.tags.map((t) => ({ id: t.id, name: t.name, color: t.color }));
@@ -27,7 +28,7 @@ export default async function BotsPage() {
           bots={bots.flatMap((b) => {
             const steps = parseSteps(b.steps);
             return steps
-              ? [{ id: b.id, name: b.name, trigger: b.trigger, keywords: b.keywords, active: b.active, menu: fromSteps(steps), hours: steps.hours ?? DEFAULT_HOURS, audience: steps.audience ?? EMPTY_AUDIENCE }]
+              ? [{ id: b.id, name: b.name, trigger: b.trigger as 'NEW_CONTACT' | 'KEYWORD', keywords: b.keywords, active: b.active, menu: fromSteps(steps), hours: steps.hours ?? DEFAULT_HOURS, audience: steps.audience ?? EMPTY_AUDIENCE }]
               : [];
           })}
           stages={stageOptions(basics.pipelines)}

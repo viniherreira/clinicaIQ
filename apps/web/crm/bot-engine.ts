@@ -163,7 +163,7 @@ export const isTargeted = (steps: Pick<BotSteps, 'audience'>) => (steps.audience
  * antes do geral, e depois a ordem dada (o mais antigo primeiro).
  * Fora do horário do robô ou do público dele, ele não conta.
  */
-export function pickBot<T extends { trigger: 'NEW_CONTACT' | 'KEYWORD'; keywords: string[]; steps: BotSteps }>(
+export function pickBot<T extends { trigger: 'NEW_CONTACT' | 'KEYWORD'; keywords: string[]; steps: Pick<BotSteps, 'hours' | 'audience'> }>(
   flows: readonly T[],
   ctx: { text: string; newContact: boolean; tagIds: readonly string[]; now: Date },
 ): T | null {

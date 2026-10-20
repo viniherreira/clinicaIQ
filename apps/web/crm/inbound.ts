@@ -43,7 +43,7 @@ export async function afterInbound(tenantId: string, conversationId: string, mes
     if (conv?.patientId) await db.patient.updateMany({ where: { id: conv.patientId }, data: { whatsappOptOut: true } });
     await db.conversation.updateMany({
       where: { id: conversationId },
-      data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 },
+      data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null },
     });
     return;
   }

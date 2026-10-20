@@ -77,6 +77,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     await prisma.automationRun.deleteMany({ where: t });
     await prisma.leadTagOnLead.deleteMany({ where: t });
     await prisma.leadTag.deleteMany({ where: t });
+    await prisma.leadTask.deleteMany({ where: t });
     await prisma.leadActivity.deleteMany({ where: t });
     await prisma.lead.deleteMany({ where: t });
     await prisma.lostReason.deleteMany({ where: t });
@@ -259,6 +260,43 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(conv?.botStepId).toBe('inicio');
     expect(conv?.lead?.tags.map((t) => t.tagId)).toEqual([tag.id]);
     await db.chatbotFlow.deleteMany({ where: { name: 'Regras' } });
+  });
+
+  it('formato novo: sem resposta acorda pelo relógio, rodízio alterna e a ação cria tarefa', async () => {
+    const { wakeBots } = await import('./bot');
+    const fluxo = {
+      version: 2,
+      start: 'oi',
+      steps: {
+        oi: { id: 'oi', type: 'message', text: 'Oi, {{primeiro_nome}}! Posso ajudar?', buttons: [{ id: 's', label: 'Sim', synonyms: ['quero'] }], waitReply: true, timeoutMinutes: 30, out: { 'b:s': 'rr', timeout: 'lembra' } },
+        lembra: { id: 'lembra', type: 'message', text: 'Ainda está por aí?', buttons: [], waitReply: false, timeoutMinutes: null, out: { next: 'tarefa' } },
+        tarefa: { id: 'tarefa', type: 'action', actions: [{ type: 'task', text: 'Ligar para quem sumiu', dueMinutes: 60 }], out: {} },
+        rr: { id: 'rr', type: 'roundRobin', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], out: { 'r:a': 'msgA', 'r:b': 'msgB' } },
+        msgA: { id: 'msgA', type: 'message', text: 'Opção A', buttons: [], waitReply: false, timeoutMinutes: null, out: {} },
+        msgB: { id: 'msgB', type: 'message', text: 'Opção B', buttons: [], waitReply: false, timeoutMinutes: null, out: {} },
+      },
+    };
+    expect(await saveBot(db, tenant.id, { name: 'Novo', trigger: 'KEYWORD', keywords: ['novo'], steps: fluxo, active: true })).toEqual({ ok: true });
+
+    const a = await escreve('11 96666-0040', 'novo');
+    expect(await saidas(a)).toEqual(['Oi, Ana! Posso ajudar?\n\n1 - Sim']);
+    const esperando = await db.conversation.findFirst({ where: { id: a } });
+    expect(esperando?.botWakeAt).toBeInstanceOf(Date);
+
+    // Passou meia hora sem resposta: o relógio acorda, manda o lembrete e cria a tarefa.
+    expect(await wakeBots(new Date(Date.now() + 31 * 60_000))).toBeGreaterThanOrEqual(1);
+    expect((await saidas(a)).at(-1)).toBe('Ainda está por aí?');
+    const conv = await db.conversation.findFirst({ where: { id: a }, include: { lead: { include: { tasks: true } } } });
+    expect(conv?.botFlowId).toBeNull();
+    expect(conv?.lead?.tasks.map((t) => t.text)).toEqual(['Ligar para quem sumiu']);
+
+    // Rodízio: dois que dizem "quero" vão para opções diferentes.
+    const b = await escreve('11 96666-0041', 'novo');
+    await escreve('11 96666-0041', 'quero');
+    const c = await escreve('11 96666-0042', 'novo');
+    await escreve('11 96666-0042', 'quero');
+    expect([(await saidas(b)).at(-1), (await saidas(c)).at(-1)].sort()).toEqual(['Opção A', 'Opção B']);
+    await db.chatbotFlow.deleteMany({ where: { name: 'Novo' } });
   });
 
   it('robô desligado não responde', async () => {

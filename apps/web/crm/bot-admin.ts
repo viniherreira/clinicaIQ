@@ -1,5 +1,7 @@
 import type { ChatbotTrigger, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isTargeted, normalize, parseSteps, stepsProblem, type BotSteps } from './bot-engine';
+import { flowProblem, isFlowDoc, type FlowDoc } from './flow-engine';
+import { readFlow } from './flow-legacy';
 
 /** Cadastro dos robôs. Quem chama já passou por `guardCrmAction('crm_config')`. */
 
@@ -27,15 +29,21 @@ export function cleanKeywords(raw: string[]): string[] {
 export async function saveBot(db: TenantPrismaClient, tenantId: string, input: BotInput): Promise<Result> {
   const name = input.name.trim().slice(0, 60);
   if (!name) return { ok: false, message: 'Dê um nome ao robô.' };
-  const steps = parseSteps(input.steps);
-  if (!steps) return { ok: false, message: 'O robô precisa de um menu inicial.' };
-  const problem = stepsProblem(steps);
+  // Formato novo (passos ligados, como o Salesbot) ou o antigo (menu de botões).
+  const novo = isFlowDoc(input.steps) ? (input.steps as FlowDoc) : null;
+  const steps = novo ?? parseSteps(input.steps);
+  if (!steps) return { ok: false, message: 'O robô precisa de um primeiro passo.' };
+  const problem = novo ? flowProblem(novo) : stepsProblem(steps as BotSteps);
   if (problem) return { ok: false, message: problem };
   const keywords = input.trigger === 'KEYWORD' ? cleanKeywords(input.keywords) : [];
   if (input.trigger === 'KEYWORD' && keywords.length === 0) return { ok: false, message: 'Escreva pelo menos uma palavra-chave (ex.: menu).' };
 
   // O que as ações apontam precisa ser desta clínica.
-  const refs = refsOf(steps);
+  const refs = novo ? refsOfFlow(novo) : refsOf(steps as BotSteps);
+  if (refs.bots.length) {
+    const bots = await db.chatbotFlow.count({ where: { id: { in: refs.bots } } });
+    if (bots !== refs.bots.length) return { ok: false, message: 'O passo "Iniciar outro robô" aponta para um robô que não existe mais.' };
+  }
   const [tags, stages, users, fields] = await Promise.all([
     refs.tags.length ? db.leadTag.count({ where: { id: { in: refs.tags } } }) : 0,
     refs.stages.length ? db.pipelineStage.count({ where: { id: { in: refs.stages } } }) : 0,
@@ -78,20 +86,51 @@ function refsOf(steps: BotSteps) {
       }
     }
   }
-  return { tags: [...tags], stages: [...stages], users: [...users], fields: [...fields] };
+  return { tags: [...tags], stages: [...stages], users: [...users], fields: [...fields], bots: [] as string[] };
+}
+
+/** Tudo que um robô do formato novo cita: tags, etapas, pessoas, campos e outros robôs. */
+function refsOfFlow(doc: FlowDoc) {
+  const tags = new Set<string>([...(doc.audience?.anyTags ?? []), ...(doc.audience?.noneTags ?? [])]);
+  const stages = new Set<string>();
+  const users = new Set<string>();
+  const fields = new Set<string>();
+  const bots = new Set<string>();
+  for (const s of Object.values(doc.steps)) {
+    if (s.type === 'action') {
+      for (const a of s.actions) {
+        if (a.type === 'tag' || a.type === 'untag') tags.add(a.tagId);
+        if (a.type === 'stage') stages.add(a.stageId);
+        if (a.type === 'createLead' && a.stageId) stages.add(a.stageId);
+        if (a.type === 'assign') users.add(a.userId);
+        if (a.type === 'setField' && a.field.startsWith('field:')) fields.add(a.field.slice(6));
+      }
+    }
+    if (s.type === 'condition') {
+      for (const c of s.cases) {
+        for (const r of c.rules) {
+          if (r.subject === 'tag' && r.ref) tags.add(r.ref);
+          if (r.subject === 'stage' && r.ref) stages.add(r.ref);
+          if (r.subject === 'field' && r.ref) fields.add(r.ref);
+        }
+      }
+    }
+    if (s.type === 'startBot' && s.botId) bots.add(s.botId);
+  }
+  return { tags: [...tags], stages: [...stages], users: [...users], fields: [...fields], bots: [...bots] };
 }
 
 export async function toggleBot(db: TenantPrismaClient, id: string, active: boolean): Promise<Result> {
   const bot = await db.chatbotFlow.findFirst({ where: { id } });
   if (!bot) return { ok: false, message: 'Robô não encontrado.' };
-  const steps = parseSteps(bot.steps);
+  const steps = readFlow(bot.steps);
   if (active && bot.trigger === 'NEW_CONTACT' && !(steps && isTargeted(steps))) {
     const outro = await outroGeral(db, id);
     if (outro) return { ok: false, message: `Já existe um robô de contato novo para todos ligado (${outro}). Desligue aquele primeiro.` };
   }
   await db.chatbotFlow.updateMany({ where: { id }, data: { active } });
   // Desligou: as conversas em que ele estava seguem com a equipe.
-  if (!active) await db.conversation.updateMany({ where: { botFlowId: id }, data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 } });
+  if (!active) await db.conversation.updateMany({ where: { botFlowId: id }, data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null } });
   return { ok: true };
 }
 
@@ -102,14 +141,14 @@ async function outroGeral(db: TenantPrismaClient, exceto?: string): Promise<stri
     select: { name: true, steps: true },
   });
   const geral = ligados.find((b) => {
-    const s = parseSteps(b.steps);
+    const s = readFlow(b.steps);
     return !s || !isTargeted(s);
   });
   return geral?.name ?? null;
 }
 
 export async function deleteBot(db: TenantPrismaClient, id: string): Promise<Result> {
-  await db.conversation.updateMany({ where: { botFlowId: id }, data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 } });
+  await db.conversation.updateMany({ where: { botFlowId: id }, data: { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null } });
   const r = await db.chatbotFlow.deleteMany({ where: { id } });
   return r.count ? { ok: true } : { ok: false, message: 'Robô não encontrado.' };
 }

@@ -1354,6 +1354,8 @@ model Conversation {
   botStartedAt DateTime?
   /// Respostas que o robô não entendeu seguidas; na segunda, passa para a equipe.
   botMisses    Int       @default(0)
+  /// Quando o robô acorda sozinho ("sem resposta" na mensagem, ou a pausa). O relógio do CRM acorda.
+  botWakeAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1369,6 +1371,7 @@ model Conversation {
   @@index([tenantId, lastMessageAt(sort: Desc)])
   @@index([tenantId, status, lastMessageAt(sort: Desc)])
   @@index([tenantId, leadId])
+  @@index([botWakeAt])
   @@map("conversations")
 }
 
@@ -1666,6 +1669,12 @@ enum ChatbotTrigger {
   NEW_CONTACT
   /// A mensagem é uma das palavras-chave.
   KEYWORD
+  /// O lead foi criado ou movido para uma das etapas (`steps.trigger.stageIds`).
+  STAGE
+  /// Uma das tags foi posta no lead (`steps.trigger.tagIds`).
+  TAG
+  /// A clínica falou por último e a pessoa não responde há X horas (`steps.trigger.hours`).
+  NO_REPLY
 }
 
 /// Robô por botões: um menu, com submenus, respostas e ações.
@@ -1676,8 +1685,11 @@ model ChatbotFlow {
   active   Boolean        @default(false)
   trigger  ChatbotTrigger
   keywords String[]       @default([])
-  /// { start, steps: { [id]: { text, options: [{ id, label, reply?, next?, actions? }] } } }
+  /// Formato 2 (`crm/flow-engine.ts`): { version: 2, start, steps, layout, trigger, hours, audience }.
+  /// Robôs antigos (menu de botões) são convertidos na leitura (`crm/flow-legacy.ts`).
   steps    Json
+  /// Contadores do rodízio ({ [stepId]: n }).
+  state    Json           @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
