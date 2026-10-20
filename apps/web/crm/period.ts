@@ -174,7 +174,7 @@ export function rangeText(from: string, to: string): string {
   if (from && to) {
     if (from === to) return dayBR(from);
     const mesmoAno = from.slice(0, 4) === to.slice(0, 4);
-    return `${mesmoAno ? dayBR(from).slice(0, 5) : dayBR(from)} – ${dayBR(to)}`;
+    return `${mesmoAno ? dayBR(from).slice(0, 5) : dayBR(from)} a ${dayBR(to)}`;
   }
   if (from) return `desde ${dayBR(from)}`;
   if (to) return `até ${dayBR(to)}`;

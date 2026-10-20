@@ -85,7 +85,7 @@ export function consequenciasDaRemocao(input: {
   ];
 
   if (ehAdministrador) {
-    frases.push('Esta pessoa é administradora — deixa de poder convidar, cobrar e configurar.');
+    frases.push('Esta pessoa é administradora e deixa de poder convidar, cobrar e configurar.');
   }
 
   if (convitesPendentes > 0) {

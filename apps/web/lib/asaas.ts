@@ -173,7 +173,7 @@ export async function createSubscription(input: {
       value: input.priceCents / 100,
       nextDueDate: due.toISOString().slice(0, 10),
       cycle: 'MONTHLY',
-      description: `DreamClin — plano ${input.planName}`,
+      description: `DreamClin: plano ${input.planName}`,
       externalReference: input.tenantId,
     }),
   });
@@ -188,7 +188,7 @@ export async function updateSubscriptionValue(
   priceCents: number,
   planName: string,
   /** Texto da fatura. Padrão: só o plano; com o CRM, "plano X + CRM (n usuários)". */
-  description: string = `DreamClin — plano ${planName}`,
+  description: string = `DreamClin: plano ${planName}`,
 ): Promise<void> {
   await request(`/subscriptions/${subscriptionId}`, {
     method: 'PUT',

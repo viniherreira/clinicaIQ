@@ -78,19 +78,19 @@ const PERMANENT_ERRORS = new Set([
 function friendlyError(code: string): string {
   const map: Record<string, string> = {
     'numero-sem-whatsapp':
-      'WhatsApp não encontrado neste número — confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
-    'lookup-failed': 'Não foi possível verificar o número agora — reenviando automaticamente',
+      'WhatsApp não encontrado neste número. Confira o cadastro (DDD + 9 dígitos, ex: 11 99999-9999)',
+    'lookup-failed': 'Não foi possível verificar o número agora. Reenviando automaticamente',
     'patient-without-phone': 'Paciente sem telefone cadastrado',
-    'not-connected': 'WhatsApp da clínica desconectado — será enviada quando reconectar',
+    'not-connected': 'WhatsApp da clínica desconectado. Será enviada quando reconectar',
     'automation-disabled': 'Envio desligado nas configurações',
     'invalid-number': 'Número de telefone inválido',
-    'gateway-unreachable': 'Serviço de WhatsApp fora do ar — reenviando automaticamente',
-    'gateway-timeout': 'O WhatsApp demorou para responder — reenviando automaticamente',
+    'gateway-unreachable': 'Serviço de WhatsApp fora do ar. Reenviando automaticamente',
+    'gateway-timeout': 'O WhatsApp demorou para responder. Reenviando automaticamente',
     'empty-body': 'Mensagem vazia',
   };
   if (map[code]) return map[code];
   if (code.startsWith('gateway-http-')) {
-    return 'Serviço de WhatsApp respondeu com erro — reenviando automaticamente';
+    return 'Serviço de WhatsApp respondeu com erro. Reenviando automaticamente';
   }
   return code;
 }
@@ -200,7 +200,7 @@ export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealt
       connected: false,
       problem:
         session.lastError ??
-        'O WhatsApp da clínica está desconectado — as confirmações não estão sendo enviadas.',
+        'O WhatsApp da clínica está desconectado e as confirmações não estão sendo enviadas.',
     };
   }
 
@@ -389,7 +389,7 @@ export async function prepareAppointmentMessage(
   // Com mais de uma unidade, o paciente precisa saber qual: "Clínica Sorriso – Centro".
   const unidades = appt.unit ? await prisma.clinicUnit.count({ where: { tenantId: appt.tenantId, active: true } }) : 0;
   const clinicName =
-    appt.unit && unidades > 1 && appt.unit.name !== appt.tenant.name ? `${appt.tenant.name} – ${appt.unit.name}` : appt.tenant.name;
+    appt.unit && unidades > 1 && appt.unit.name !== appt.tenant.name ? `${appt.tenant.name} (${appt.unit.name})` : appt.tenant.name;
 
   const phone = safeDecrypt(appt.patient.phoneEncrypted, appt.tenantId);
   if (!phone) return { kind: 'done', result: { success: false, error: 'patient-without-phone' } };
