@@ -10,8 +10,8 @@
  * Font: Inter, the brand typeface. Features use an editorial numbered list
  * with hairline dividers instead of cards. Motion: staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
  *
- * Copy is intentionally honest: the product is in early access, so there are no
- * invented testimonials or user counts.
+ * Copy is intentionally honest: no invented testimonials or user counts. The
+ * trial length comes from TRIAL_DAYS, the same number the signup grants.
  */
 import Link from 'next/link';
 import { Pricing } from './pricing-section';
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { companyLine } from '@/lib/company';
+import { TRIAL_DAYS } from '@/lib/subscription';
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ function Hero() {
         <div>
           <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            Grátis durante o acesso antecipado
+            {TRIAL_DAYS} dias grátis, sem cartão
           </p>
 
           <h1
@@ -276,7 +277,7 @@ function Hero() {
           </div>
 
           <p className="animate-fade-in-up mt-4 text-xs text-muted-foreground" style={{ animationDelay: '400ms' }}>
-            Sem cartão de crédito · Pronto para usar em 5 minutos
+            {TRIAL_DAYS} dias grátis · Sem cartão de crédito · Pronto em 5 minutos
           </p>
         </div>
 
@@ -478,7 +479,11 @@ function FAQ() {
   const faqs = [
     {
       q: 'Quanto custa o DreamClin?',
-      a: 'Durante o acesso antecipado, o DreamClin é gratuito. Quando os planos pagos chegarem, quem entrou cedo terá condições especiais. Você será avisado com antecedência, sem surpresa na fatura.',
+      a: `Os primeiros ${TRIAL_DAYS} dias são grátis e sem cartão. Depois, você escolhe um dos planos acima e paga por PIX, boleto ou cartão. Sem fidelidade e sem taxa de instalação.`,
+    },
+    {
+      q: 'O que acontece quando o teste acaba?',
+      a: 'Você escolhe um plano e segue usando, sem perder nada do que cadastrou. Se não escolher, seus dados continuam guardados e disponíveis para consulta; só fica bloqueado criar e alterar até assinar.',
     },
     {
       q: 'Preciso instalar alguma coisa?',
@@ -498,7 +503,7 @@ function FAQ() {
     },
     {
       q: 'Consigo trazer meus pacientes de outro sistema?',
-      a: 'Sim. O cadastro de pacientes é rápido e, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração durante o acesso antecipado.',
+      a: 'Sim. O cadastro de pacientes é rápido e, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
     },
   ];
   return (
@@ -547,8 +552,8 @@ function FinalCTA() {
           Pronto para simplificar a rotina da sua clínica?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
-          Crie sua conta gratuita, cadastre a equipe e faça o primeiro agendamento
-          em menos de 5 minutos. Sem cartão, sem fidelidade.
+          Crie sua conta, cadastre a equipe e faça o primeiro agendamento em menos
+          de 5 minutos. {TRIAL_DAYS} dias grátis, sem cartão e sem fidelidade.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {/* O degradê não muda com o tema, então o teal do botão também não. */}
