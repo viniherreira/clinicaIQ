@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, WifiOff } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { MessageCircle, PanelRight, Search, WifiOff, X } from 'lucide-react';
+import { colorClasses } from '@/crm/colors';
 import type { ConversationSummary, InboxTab } from '@/crm/conversations';
 import { chatListTime, initials } from '@/crm/format';
 import { ConversationPane } from '@/components/crm-chat/conversation-pane';
 import { announceUnread } from '@/components/crm-chat/unread';
 import type { QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { refreshInboxAction, type InboxSnapshot } from '../actions';
-import { LeadSide, type LeadSideBasics } from './lead-side';
+import { ThreadSide, type LeadSideBasics } from './lead-side';
 
 const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
@@ -25,6 +27,7 @@ export function Inbox({
   initial,
   initialTab,
   initialQ,
+  initialTagId,
   initialSelectedId,
   quickReplies,
   lineDown,
@@ -35,6 +38,7 @@ export function Inbox({
   initial: InboxSnapshot;
   initialTab: InboxTab;
   initialQ: string;
+  initialTagId: string | null;
   initialSelectedId: string | null;
   quickReplies: QuickReplyOption[];
   lineDown: boolean;
@@ -47,11 +51,13 @@ export function Inbox({
   const [tab, setTab] = useState(initialTab);
   const [busca, setBusca] = useState(initialQ);
   const [q, setQ] = useState(initialQ);
+  const [tagId, setTagId] = useState(initialTagId);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [aviso, setAviso] = useState('');
+  const [gaveta, setGaveta] = useState(false);
   const emVoo = useRef(false);
-  const estado = useRef({ tab, q, selectedId });
-  estado.current = { tab, q, selectedId };
+  const estado = useRef({ tab, q, selectedId, tagId });
+  estado.current = { tab, q, selectedId, tagId };
   const snapRef = useRef(snap);
   snapRef.current = snap;
 
@@ -63,7 +69,7 @@ export function Inbox({
       const r = await refreshInboxAction(pedido);
       // Se a pessoa trocou de aba ou de conversa no meio, esta resposta já é velha.
       const agora = estado.current;
-      if (!r.ok || pedido.tab !== agora.tab || pedido.q !== agora.q || pedido.selectedId !== agora.selectedId) return;
+      if (!r.ok || pedido.tab !== agora.tab || pedido.q !== agora.q || pedido.selectedId !== agora.selectedId || pedido.tagId !== agora.tagId) return;
       const novas = novasRecebidas(snapRef.current, r.snapshot);
       if (novas) setAviso(novas);
       // O número do menu acompanha sem recarregar a página: um router.refresh()
@@ -80,10 +86,11 @@ export function Inbox({
     const sp = new URLSearchParams();
     if (tab !== 'all') sp.set('aba', tab);
     if (q) sp.set('q', q);
+    if (tagId) sp.set('tag', tagId);
     if (selectedId) sp.set('c', selectedId);
     const qs = sp.toString();
     window.history.replaceState(null, '', qs ? `/crm/conversas?${qs}` : '/crm/conversas');
-  }, [tab, q, selectedId]);
+  }, [tab, q, selectedId, tagId]);
 
   // A primeira leitura já veio do servidor; daí em diante, a cada mudança.
   const primeira = useRef(true);
@@ -93,7 +100,7 @@ export function Inbox({
       return;
     }
     void refresh();
-  }, [tab, q, selectedId, refresh]);
+  }, [tab, q, selectedId, tagId, refresh]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -130,7 +137,7 @@ export function Inbox({
       )}
 
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(300px,340px)_1fr] ${thread?.conversation.lead ? 'xl:grid-cols-[320px_1fr_340px]' : ''}`}
+        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(290px,330px)_1fr] ${thread ? 'xl:grid-cols-[330px_350px_1fr]' : ''}`}
       >
         <aside aria-labelledby={`${id}-titulo`} className={`${selectedId ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col border-r border-border bg-surface`}>
           <div className="space-y-3 border-b border-border p-4">
@@ -172,10 +179,37 @@ export function Inbox({
                 </button>
               ))}
             </div>
+            {basics.tags.length > 0 && (
+              <div>
+                <label htmlFor={`${id}-tag`} className="sr-only">
+                  Filtrar por tag
+                </label>
+                <select
+                  id={`${id}-tag`}
+                  value={tagId ?? ''}
+                  onChange={(e) => setTagId(e.target.value || null)}
+                  className="h-8 w-full rounded-md border border-border bg-surface-alt px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <option value="">Todas as tags</option>
+                  {basics.tags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      Tag: {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <ConversationList items={snap.list} selectedId={selectedId} onSelect={setSelectedId} tab={tab} q={q} />
+          <ConversationList items={snap.list} selectedId={selectedId} onSelect={setSelectedId} tab={tab} q={q} filtered={Boolean(tagId)} />
         </aside>
+
+        {/* O lead da conversa no meio, como no Kommo: tags, funil, etapa e campos à mão enquanto se conversa. */}
+        {thread && (
+          <div className="hidden min-h-0 overflow-y-auto border-r border-border bg-surface xl:block">
+            <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />
+          </div>
+        )}
 
         <div className={`${selectedId ? 'flex' : 'hidden lg:flex'} min-h-0 flex-col`}>
           {thread ? (
@@ -186,6 +220,16 @@ export function Inbox({
               onChanged={() => void refresh()}
               onBack={() => setSelectedId(null)}
               canManage={canManage}
+              headerAction={
+                <button
+                  type="button"
+                  onClick={() => setGaveta(true)}
+                  className="btn-outline btn-sm inline-flex items-center gap-1.5 xl:hidden"
+                  aria-haspopup="dialog"
+                >
+                  <PanelRight className="h-3.5 w-3.5" aria-hidden="true" /> {thread.conversation.lead ? 'Lead' : 'Contato'}
+                </button>
+              }
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-board p-8 text-center text-muted-foreground">
@@ -195,10 +239,25 @@ export function Inbox({
           )}
         </div>
 
-        {thread?.conversation.lead && (
-          <LeadSide key={thread.conversation.lead.id} leadId={thread.conversation.lead.id} basics={basics} onChanged={() => void refresh()} />
-        )}
       </div>
+
+      {/* Tela pequena: o mesmo painel, por cima, pelo botão do cabeçalho da conversa. */}
+      <Dialog.Root open={gaveta && Boolean(thread)} onOpenChange={setGaveta}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm xl:hidden" />
+          <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(380px,100vw)] flex-col border-l border-border bg-surface shadow-2xl focus:outline-none xl:hidden">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <Dialog.Title className="text-sm font-semibold">{thread?.conversation.lead ? 'Lead da conversa' : 'Contato da conversa'}</Dialog.Title>
+              <Dialog.Description className="sr-only">Dados de {thread?.conversation.name}</Dialog.Description>
+              <Dialog.Close className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <X className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Fechar</span>
+              </Dialog.Close>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{thread && <ThreadSide thread={thread} basics={basics} onChanged={() => void refresh()} />}</div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <p role="status" aria-live="polite" className="sr-only">
         {aviso}
       </p>
@@ -224,17 +283,19 @@ function ConversationList({
   onSelect,
   tab,
   q,
+  filtered,
 }: {
   items: ConversationSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   tab: InboxTab;
   q: string;
+  filtered: boolean;
 }) {
   if (items.length === 0) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
-        {q
+        {q || filtered
           ? 'Nenhuma conversa encontrada.'
           : tab === 'inbox'
             ? 'Ninguém novo na Entrada.'
@@ -273,8 +334,21 @@ function ConversationList({
                     {chatListTime(new Date(c.lastMessageAt))}
                   </span>
                 </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[13px]">
+                  {c.lead ? (
+                    <span className="truncate font-medium text-foreground/90">{c.lead.label}</span>
+                  ) : entrada ? (
+                    <span className="rounded-[3px] bg-amber-100 px-1.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Entrada · sem lead</span>
+                  ) : c.patient ? (
+                    <span className="text-[12px] text-muted-foreground">Paciente · sem negócio</span>
+                  ) : null}
+                  {c.lead && <span className="shrink-0 text-[11px] text-muted-foreground">· {c.lead.stage}</span>}
+                </span>
                 <span className="mt-0.5 flex items-center gap-2">
-                  <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>{c.preview || '—'}</span>
+                  <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {c.previewFrom && <span className="font-medium">{c.previewFrom}: </span>}
+                    {c.preview || '-'}
+                  </span>
                   {!lida && (
                     <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
                       {c.unread}
@@ -282,14 +356,22 @@ function ConversationList({
                     </span>
                   )}
                 </span>
-                <span className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-                  {entrada && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Entrada</span>
-                  )}
-                  {c.lead && <span className="truncate rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">{c.lead.stage}</span>}
-                  {!c.lead && c.patient && <span className="rounded-full bg-surface-alt px-2 py-0.5 text-muted-foreground">Paciente</span>}
-                  {c.awaitingReply && !entrada && <span className="rounded-full px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
-                </span>
+                {(c.tags.length > 0 || (c.awaitingReply && !entrada)) && (
+                  <span className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
+                    {c.awaitingReply && !entrada && <span className="rounded-[3px] px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
+                    {c.tags.slice(0, 3).map((t) => (
+                      <span key={t.id} className={`max-w-[110px] truncate rounded-[3px] px-1.5 py-0.5 font-medium ${colorClasses(t.color).chip}`}>
+                        {t.name}
+                      </span>
+                    ))}
+                    {c.tags.length > 3 && (
+                      <span className="rounded-[3px] bg-surface-alt px-1.5 py-0.5 text-muted-foreground">
+                        +{c.tags.length - 3}
+                        <span className="sr-only"> tags: {c.tags.slice(3).map((t) => t.name).join(', ')}</span>
+                      </span>
+                    )}
+                  </span>
+                )}
               </span>
             </button>
           </li>

@@ -22,7 +22,7 @@ function DataField({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-sm text-foreground">{value || '—'}</dd>
+      <dd className="mt-0.5 text-sm text-foreground">{value || '-'}</dd>
     </div>
   );
 }
@@ -283,7 +283,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 <span className="text-muted-foreground"> · {wallClockTime(record.stats.nextAppointment)}</span>
               </>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground">-</span>
             )}
           </p>
         </div>

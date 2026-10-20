@@ -31,7 +31,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin — página inicial">
+        <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin, página inicial">
           <Logo size="md" />
         </Link>
 
@@ -659,7 +659,7 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
           <p>
-            © {new Date().getFullYear()} DreamClin{companyLine() ? ` — ${companyLine()}` : ''}. Todos os direitos reservados.
+            © {new Date().getFullYear()} DreamClin{companyLine() ? ` · ${companyLine()}` : ''}. Todos os direitos reservados.
           </p>
           <nav aria-label="Páginas legais" className="flex items-center gap-4">
             <Link href="/privacidade" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Privacidade</Link>

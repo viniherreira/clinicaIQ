@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@clinicaiq/db';
 import { guardCrmAction } from '@/crm/guard';
 import { addNote, linkPatient, setTags, updateLead } from '@/crm/leads';
+import { setLeadFields } from '@/crm/lead-fields';
 import { findPatientByPhone } from '@/crm/duplicates';
 import { completeTask, createTask } from '@/crm/tasks';
 import { clinicLocalToInstant } from '@/crm/clock';
@@ -31,6 +32,16 @@ const patchSchema = z.object({
   estimatedValue: z.number().nonnegative().max(10_000_000).nullable().optional(),
   assignedToId: z.string().nullable().optional(),
 });
+
+/** Campos personalizados da ficha: { [fieldId]: valor } (vazio apaga). Vai para o histórico. */
+export async function setLeadFieldsAction(leadId: string, values: Record<string, unknown>): Promise<Result> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  if (!values || typeof values !== 'object' || Object.keys(values).length > 50) return { ok: false, message: 'Dados inválidos.' };
+  const r = await setLeadFields(g.db, g, leadId, values);
+  if (r.ok) refresh(leadId);
+  return r;
+}
 
 export async function updateLeadAction(leadId: string, input: z.input<typeof patchSchema>): Promise<Result> {
   const g = await guardCrmAction('crm');

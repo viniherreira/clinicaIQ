@@ -53,7 +53,7 @@ export async function applyCapture(
   }
   const achou = m.hits.map((h) => `“${h.keyword}” (${h.name})`).join(', ');
   await db.leadActivity.create({
-    data: { tenantId, leadId, type: 'NOTE', actorId: null, data: { text: `Captação — a primeira mensagem tinha ${achou}.` } },
+    data: { tenantId, leadId, type: 'NOTE', actorId: null, data: { text: `Captação: a primeira mensagem tinha ${achou}.` } },
   });
   return { leadId, tagIds: tags.map((t) => t.id) };
 }

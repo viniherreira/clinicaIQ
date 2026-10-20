@@ -138,7 +138,7 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
           wallClockTime(a.startTime),
           a.patient.name,
           a.professional.name,
-          a.procedure?.name ?? '—',
+          a.procedure?.name ?? '-',
           APPT_STATUS_PT[a.status] ?? a.status,
           fmtNum(a.procedure ? Number(a.procedure.basePrice) : 0),
         ],
@@ -183,7 +183,7 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
     const summary = [
       { label: 'Orçamentos', value: String(quotes.length) },
       { label: 'Aceitos', value: String(aceitos) },
-      { label: 'Conversão', value: enviados > 0 ? `${Math.round((aceitos / enviados) * 100)}%` : '—' },
+      { label: 'Conversão', value: enviados > 0 ? `${Math.round((aceitos / enviados) * 100)}%` : '-' },
       { label: 'Valor total', value: fmtBRL(total) },
       { label: 'Recebido', value: fmtBRL(pago) },
     ];
@@ -242,7 +242,7 @@ export async function getReportData(params: ReportParams): Promise<ReportResult>
         clockDate(p.paidAt),
         p.patient.name,
         p.method || 'Não informado',
-        p.quote?.number ? `ORC-${String(p.quote.number).padStart(4, '0')}` : '—',
+        p.quote?.number ? `ORC-${String(p.quote.number).padStart(4, '0')}` : '-',
         fmtNum(Number(p.amount)),
       ],
       href: p.quote?.id ? `/orcamentos/${p.quote.id}` : `/pacientes/${p.patient.id}`,

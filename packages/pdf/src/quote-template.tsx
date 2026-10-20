@@ -55,7 +55,7 @@ export function QuoteDocument({ clinic, patient, professional, quote }: QuoteDoc
   const signer = clinicSigner(clinic, professional);
 
   return (
-    <Document title={`Orçamento ${quote.code} — ${patient.name}`} author={clinic.name} language="pt-BR">
+    <Document title={`Orçamento ${quote.code} · ${patient.name}`} author={clinic.name} language="pt-BR">
       <Page size="A4" style={s.page}>
         <DocHeader
           clinic={clinic}
@@ -80,7 +80,7 @@ export function QuoteDocument({ clinic, patient, professional, quote }: QuoteDoc
             <View style={{ width: '100%', flexDirection: 'row' }}>
               <Field
                 label="Profissional responsável"
-                value={[professional.name, professional.registration].filter(Boolean).join(' — ')}
+                value={[professional.name, professional.registration].filter(Boolean).join(', ')}
               />
             </View>
           ) : null}

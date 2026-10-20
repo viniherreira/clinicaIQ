@@ -60,7 +60,7 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
       case 'CREATED':
         return { ...base, kind: 'event', text: `Lead criado${d.source ? ` (${SOURCE[d.source] ?? d.source})` : ''}` };
       case 'STAGE_CHANGED': {
-        const motivo = d.event && CLINIC_TEXT[d.event] ? ` — ${CLINIC_TEXT[d.event].toLowerCase()}` : '';
+        const motivo = d.event && CLINIC_TEXT[d.event] ? `: ${CLINIC_TEXT[d.event].toLowerCase()}` : '';
         if (d.to && names.wonStageIds.has(d.to)) {
           return { ...base, kind: 'won', text: `Negócio fechado${motivo}` };
         }
@@ -88,6 +88,12 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
         return { ...base, kind: 'event', text: d.text ? `Tarefa concluída: ${d.text}` : 'Tarefa concluída', taskId: d.taskId };
       case 'CONVERTED':
         return { ...base, kind: 'event', text: d.how === 'linked' ? 'Ligado à ficha de paciente' : 'Convertido em paciente' };
+      case 'FIELD_CHANGED':
+        return {
+          ...base,
+          kind: 'event',
+          text: d.to ? `${d.name ?? 'Campo'}: ${d.from ? `${d.from} → ` : ''}${d.to}` : `${d.name ?? 'Campo'} apagado${d.from ? ` (era ${d.from})` : ''}`,
+        };
       case 'CLINIC_EVENT':
         return {
           ...base,

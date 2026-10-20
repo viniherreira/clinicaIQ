@@ -237,7 +237,7 @@ function componentes(p: EntradaPaciente, hoje: Date, atraso: number | null): Com
     pontos: p.temTelefone ? PESOS.contatavel : 0,
     explicacao: p.temTelefone
       ? 'Tem telefone no cadastro.'
-      : 'Sem telefone no cadastro — não dá para chamar.',
+      : 'Sem telefone no cadastro, não dá para chamar.',
   });
 
   // ── Penalidade ──────────────────────────────────────────────────────────

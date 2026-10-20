@@ -123,7 +123,7 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
             </p>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               O envio acontece aos poucos, para proteger o número da clínica. Você pode fechar esta
-              tela — acompanhe o progresso na lista de campanhas.
+              tela e acompanhar o progresso na lista de campanhas.
             </p>
             <button type="button" onClick={onClose} className="btn-primary btn-md mt-6">
               Entendi
@@ -251,7 +251,7 @@ export function NewCampaign({ onClose }: { onClose: () => void }) {
                   <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
                     <strong>{audience.skipped.semAceite} paciente(s)</strong> ficaram de fora por
                     não terem autorizado mensagens promocionais. O aceite do cadastro cobre o
-                    atendimento, não propaganda — pergunte no balcão e marque a caixa
+                    atendimento, não propaganda. Pergunte no balcão e marque a caixa
                     “Mensagens promocionais” na ficha do paciente. Lembrete de consulta continua
                     indo para todos.
                   </div>

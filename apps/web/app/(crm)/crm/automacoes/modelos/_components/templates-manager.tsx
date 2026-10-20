@@ -166,7 +166,7 @@ function NewTemplate({
         </div>
       </div>
       <div>
-        <label htmlFor={`${id}-corpo`} className="block text-xs font-medium text-muted-foreground">Texto — use {'{{1}}'}, {'{{2}}'}… para as variáveis</label>
+        <label htmlFor={`${id}-corpo`} className="block text-xs font-medium text-muted-foreground">Texto: use {'{{1}}'}, {'{{2}}'}… para as variáveis</label>
         <textarea
           id={`${id}-corpo`}
           value={body}

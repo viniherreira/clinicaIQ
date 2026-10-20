@@ -154,6 +154,7 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status, 
                   <th scope="col" className="px-4 py-3 font-medium hidden md:table-cell">Criado</th>
                   <th scope="col" className="px-4 py-3 font-medium hidden sm:table-cell">Validade</th>
                   <th scope="col" className="px-4 py-3 font-medium text-right">Total</th>
+                  <th scope="col" className="px-4 py-3 font-medium hidden lg:table-cell">Recebido</th>
                   <th scope="col" className="px-4 py-3 font-medium">Situação</th>
                 </tr>
               </thead>
@@ -185,13 +186,32 @@ export function QuotesView({ quotes, total, pages, currentPage, search, status, 
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{format(new Date(q.validUntil), 'dd/MM/yyyy')}</td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-medium tabular-nums">{formatBRL(q.total)}</span>
+                        {/* Em tela média, sem a coluna Recebido, a situação do pagamento fica aqui. */}
                         {q.total > 0 && q.paid >= q.total ? (
-                          <span className="mt-0.5 block text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ Pago</span>
+                          <span className="mt-0.5 block text-xs font-medium text-emerald-600 lg:hidden dark:text-emerald-400">✓ Pago</span>
                         ) : q.paid > 0 ? (
-                          <span className="mt-0.5 block text-xs font-medium text-amber-700 dark:text-amber-400">
+                          <span className="mt-0.5 block text-xs font-medium text-amber-700 lg:hidden dark:text-amber-400">
                             Parcial · {formatBRL(q.paid)}
                           </span>
                         ) : null}
+                      </td>
+                      <td className="hidden px-4 py-3 lg:table-cell">
+                        {q.total > 0 && (
+                          <div className="w-32">
+                            <div className="flex justify-between text-xs tabular-nums">
+                              <span className={q.paid >= q.total ? 'font-medium text-emerald-600 dark:text-emerald-400' : q.paid > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+                                {q.paid >= q.total ? '✓ Quitado' : formatBRL(q.paid)}
+                              </span>
+                              <span className="text-muted-foreground">{Math.min(100, Math.round((q.paid / q.total) * 100))}%</span>
+                            </div>
+                            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-alt" aria-hidden="true">
+                              <div
+                                className={`h-full rounded-full ${q.paid >= q.total ? 'bg-emerald-500' : 'bg-primary'}`}
+                                style={{ width: `${Math.min(100, Math.round((q.paid / q.total) * 100))}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.bg} ${meta.text}`}>

@@ -1,6 +1,7 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipeline';
 import { conversationHash, encryptPhone, phoneHash } from './phone';
+import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
 
 /**
@@ -103,11 +104,32 @@ async function renumberColumn(tx: Tx, tenantId: string, stageId: string, ordered
   );
 }
 
+/** Renumera uma coluna inteira de uma vez (depois de mover muitos leads sem renumerar). */
+export async function renumberStage(db: TenantPrismaClient, tenantId: string, stageId: string) {
+  await db.$transaction(async (tx) => {
+    const coluna = await tx.lead.findMany({
+      where: { tenantId, stageId, ...OPEN_LEAD },
+      orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
+      select: { id: true },
+    });
+    await renumberColumn(tx, tenantId, stageId, coluna.map((l) => l.id));
+  });
+}
+
 export async function moveLead(
   db: TenantPrismaClient,
   actor: Actor,
   leadId: string,
-  input: { stageId: string; index?: number; lostReasonId?: string | null; origin?: Record<string, unknown> },
+  input: {
+    stageId: string;
+    index?: number;
+    lostReasonId?: string | null;
+    origin?: Record<string, unknown>;
+    /** `false`: não agenda as automações da etapa (ações em massa, se a pessoa não pediu). */
+    automations?: boolean;
+    /** `false`: não renumera a coluna agora; quem move muitos renumera no fim (`renumberStage`). */
+    renumber?: boolean;
+  },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId } = actor;
   return db.$transaction(async (tx) => {
@@ -136,11 +158,11 @@ export async function moveLead(
       },
     });
     // As automações da etapa nova (e as da anterior deixam de valer).
-    if (mudouEtapa) await queueStageAutomations(tx, tenantId, lead.id, plan.data.stageId, entrou);
+    if (mudouEtapa && input.automations !== false) await queueStageAutomations(tx, tenantId, lead.id, plan.data.stageId, entrou);
 
     // Fechou e Perdeu não são colunas: não há ordem a manter lá.
     const target = stages.find((s) => s.id === plan.data.stageId)!;
-    if (!isClosedStage(target)) {
+    if (!isClosedStage(target) && input.renumber !== false) {
       const coluna = await tx.lead.findMany({
         where: { tenantId, stageId: target.id, ...OPEN_LEAD },
         orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
@@ -190,6 +212,8 @@ export interface NewLeadInput {
   /** Etapa inicial; padrão: a de papel NEW do funil (`pipelineId` ou o principal). */
   stageId?: string | null;
   pipelineId?: string | null;
+  /** `false`: não agenda as automações da etapa (importação). */
+  automations?: boolean;
 }
 
 export async function createLead(
@@ -236,7 +260,7 @@ export async function createLead(
         updatedById: actor.userId,
       },
     });
-    await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
+    if (input.automations !== false) await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
 
     await tx.leadActivity.create({
       data: {
@@ -362,6 +386,8 @@ export async function setTags(db: TenantPrismaClient, actor: Actor, leadId: stri
     if (saem.length) await tx.leadTagOnLead.deleteMany({ where: { tenantId, leadId, tagId: { in: saem } } });
     if (entram.length) {
       await tx.leadTagOnLead.createMany({ data: entram.map((tagId) => ({ tenantId, leadId, tagId })) });
+      // Robô com gatilho "tag posta no lead" (Salesbot do Kommo).
+      await queueTriggeredBot(tx, tenantId, leadId, { tagIds: entram });
     }
     const historico = [
       ...entram.map((tagId) => ({ type: 'TAG_ADDED' as const, tagId })),

@@ -4,8 +4,10 @@ import { useEffect, useId, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Users, X } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
-import { SOURCE_LABEL } from '@/crm/format';
-import { EMPTY_AUDIENCE, type Audience, type AudienceStatus } from '@/crm/audience';
+import { formatCents, SOURCE_LABEL } from '@/crm/format';
+import { EMPTY_AUDIENCE, type Audience, type AudienceStatus, type AudienceTask } from '@/crm/audience';
+import { FIELD_LABEL, matchingPreset, rangeText, resolvePeriod, type Period } from '@/crm/period';
+import { PeriodPicker } from '@/components/crm-period-picker';
 import { createBroadcastAction, previewAudienceAction, type AudienceSample } from '../actions';
 
 type Option = { id: string; name: string };
@@ -20,20 +22,18 @@ const SITUACOES: { v: AudienceStatus; label: string }[] = [
   { v: 'perdidos', label: 'Perdidos' },
   { v: 'todos', label: 'Todos' },
 ];
+const TAREFAS: { v: AudienceTask; label: string }[] = [
+  { v: '', label: 'Tanto faz' },
+  { v: 'none', label: 'Sem tarefa' },
+  { v: 'overdue', label: 'Com tarefa atrasada' },
+];
 
 const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+const legendCls = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
 /** Minutos que a transmissão leva no QR (mesma conta de `gatewayDurationMinutes`). */
 const minutosQr = (n: number) => Math.ceil((n * 20 + Math.floor(n / 20) * 120) / 60);
-
-/** "AAAA-MM-DD" de hoje menos `dias`, no horário de Brasília. */
-function diaMenos(dias: number) {
-  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-  const d = new Date(`${hoje}T12:00:00-03:00`);
-  d.setUTCDate(d.getUTCDate() - dias);
-  return d.toISOString().slice(0, 10);
-}
 
 function Chip({ on, onClick, children, className = '' }: { on: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
   return (
@@ -50,11 +50,29 @@ function Chip({ on, onClick, children, className = '' }: { on: boolean; onClick:
   );
 }
 
+function Step({ n, id, children }: { n: number; id: string; children: React.ReactNode }) {
+  return (
+    <h3 id={id} className="flex items-center gap-2 text-sm font-semibold">
+      <span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-link">
+        {n}
+      </span>
+      <span className="sr-only">{n}. </span>
+      {children}
+    </h3>
+  );
+}
+
 const alterna = (lista: string[], v: string) => (lista.includes(v) ? lista.filter((x) => x !== v) : [...lista, v]);
 
+const reaisDe = (v: string): number | null => {
+  const n = Number(v.replace(/\./g, '').replace(',', '.'));
+  return v.trim() && Number.isFinite(n) && n >= 0 ? n : null;
+};
+
 /**
- * Nova transmissão: quem recebe (os mesmos filtros da busca de leads), a
- * mensagem e quando. À direita, quantas pessoas recebem e quem são.
+ * Nova transmissão: quem recebe (os mesmos filtros da busca de leads, com o
+ * período no calendário), a mensagem e quando. À direita, quantas pessoas
+ * recebem, por quais critérios e quem são.
  */
 export function BroadcastForm({
   initialAudience,
@@ -63,6 +81,8 @@ export function BroadcastForm({
   team,
   channel,
   templates,
+  today,
+  fromSearch = false,
 }: {
   initialAudience: Audience;
   pipelines: PipelineOption[];
@@ -70,6 +90,10 @@ export function BroadcastForm({
   team: Option[];
   channel: 'cloud' | 'gateway';
   templates: Template[];
+  /** Dia da clínica, "AAAA-MM-DD". */
+  today: string;
+  /** O público veio da busca de leads ("Transmissão para estes leads"). */
+  fromSearch?: boolean;
 }) {
   const id = useId();
   const router = useRouter();
@@ -85,6 +109,8 @@ export function BroadcastForm({
   const [amostra, setAmostra] = useState<AudienceSample>([]);
   const [erro, setErro] = useState('');
   const [pending, start] = useTransition();
+  const [vmin, setVmin] = useState(initialAudience.valueMin != null ? String(initialAudience.valueMin).replace('.', ',') : '');
+  const [vmax, setVmax] = useState(initialAudience.valueMax != null ? String(initialAudience.valueMax).replace('.', ',') : '');
 
   const set = <K extends keyof Audience>(k: K, v: Audience[K]) => setAud((a) => ({ ...a, [k]: v }));
 
@@ -92,10 +118,14 @@ export function BroadcastForm({
   useEffect(() => {
     setPreview(null);
     const t = setTimeout(async () => {
-      const r = await previewAudienceAction(JSON.parse(chave));
-      if (r.ok) {
-        setPreview(r.preview);
-        setAmostra(r.sample);
+      try {
+        const r = await previewAudienceAction(JSON.parse(chave));
+        if (r.ok) {
+          setPreview(r.preview);
+          setAmostra(r.sample);
+        }
+      } catch {
+        // Sem conexão: fica "Contando…" até a próxima mudança.
       }
     }, 300);
     return () => clearTimeout(t);
@@ -105,13 +135,30 @@ export function BroadcastForm({
   const funisVisiveis = aud.pipelineIds.length ? pipelines.filter((p) => aud.pipelineIds.includes(p.id)) : pipelines;
   const tagsVisiveis = useMemo(() => {
     const q = achaTag.trim().toLowerCase();
-    return q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
-  }, [tags, achaTag]);
+    const lista = q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
+    // Marcadas (para receber ou para ficar de fora) sobem.
+    const marcada = (t: TagOption) => Number(aud.tagIds.includes(t.id) || aud.excludeTagIds.includes(t.id));
+    return [...lista].sort((a, b) => marcada(b) - marcada(a));
+  }, [tags, achaTag, aud.tagIds, aud.excludeTagIds]);
 
-  const periodo = (dias: number | 'mes' | '') => {
-    if (dias === '') return setAud((a) => ({ ...a, createdFrom: '', createdTo: '' }));
-    const de = dias === 'mes' ? `${diaMenos(0).slice(0, 8)}01` : diaMenos(dias);
-    setAud((a) => ({ ...a, createdFrom: de, createdTo: '' }));
+  // O período no calendário. O público guarda dias fixos; se eles batem com
+  // um atalho de hoje, o botão mostra o atalho (com os dias ao lado).
+  const periodo: Period = {
+    field: aud.dateField,
+    preset: matchingPreset(aud.dateFrom, aud.dateTo, today),
+    from: aud.dateFrom,
+    to: aud.dateTo,
+  };
+  const mudaPeriodo = (p: Period) => {
+    const r = resolvePeriod(p, today);
+    setAud((a) => ({
+      ...a,
+      dateField: r ? p.field : 'criado',
+      dateFrom: r?.from ?? '',
+      dateTo: r?.to ?? '',
+      // Fechado num período nunca está "em andamento".
+      status: r && p.field === 'fechado' && a.status === 'abertos' ? 'todos' : a.status,
+    }));
   };
 
   const t = templates.find((x) => x.id === templateId) ?? null;
@@ -120,9 +167,29 @@ export function BroadcastForm({
       ? t?.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => (params[Number(n) - 1] || `{{${n}}}`).replace(/\{nome\}/gi, 'Ana')) ?? ''
       : texto.replace(/\{nome\}/gi, 'Ana');
   const n = preview?.reachable ?? 0;
-  const filtros =
-    aud.pipelineIds.length + aud.stageIds.length + aud.tagIds.length + aud.excludeTagIds.length + aud.sources.length +
-    aud.assignedToIds.length + (aud.createdFrom || aud.createdTo ? 1 : 0) + (aud.status !== 'abertos' ? 1 : 0);
+
+  // O que está filtrando, em palavras, para o resumo ao lado.
+  const nomesDe = (ids: string[], opts: Option[]) => ids.map((x) => opts.find((o) => o.id === x)?.name).filter(Boolean).join(', ');
+  const todasEtapas = pipelines.flatMap((p) => p.stages);
+  const criterios: { label: string; valor: string }[] = [];
+  criterios.push({ label: 'Situação', valor: SITUACOES.find((s) => s.v === aud.status)?.label ?? '' });
+  if (aud.dateFrom || aud.dateTo) criterios.push({ label: FIELD_LABEL[aud.dateField], valor: rangeText(aud.dateFrom, aud.dateTo) });
+  if (aud.stageIds.length) criterios.push({ label: 'Etapa', valor: nomesDe(aud.stageIds, todasEtapas) });
+  else if (aud.pipelineIds.length) criterios.push({ label: 'Funil', valor: nomesDe(aud.pipelineIds, pipelines) });
+  if (aud.tagIds.length) criterios.push({ label: aud.tagMode === 'all' ? 'Com todas as tags' : 'Com a tag', valor: nomesDe(aud.tagIds, tags) });
+  if (aud.excludeTagIds.length) criterios.push({ label: 'Sem a tag', valor: nomesDe(aud.excludeTagIds, tags) });
+  if (aud.sources.length) criterios.push({ label: 'Origem', valor: aud.sources.map((s) => SOURCE_LABEL[s]).join(', ') });
+  if (aud.assignedToIds.length) criterios.push({ label: 'Responsável', valor: nomesDe(aud.assignedToIds, team) });
+  if (aud.task) criterios.push({ label: 'Tarefas', valor: TAREFAS.find((x) => x.v === aud.task)?.label ?? '' });
+  if (aud.valueMin != null || aud.valueMax != null) {
+    const r = (v: number) => formatCents(Math.round(v * 100));
+    criterios.push({
+      label: 'Valor',
+      valor: aud.valueMin != null && aud.valueMax != null ? `${r(aud.valueMin)} a ${r(aud.valueMax)}` : aud.valueMin != null ? `a partir de ${r(aud.valueMin)}` : `até ${r(aud.valueMax!)}`,
+    });
+  }
+  if (aud.search) criterios.push({ label: 'Nome contém', valor: `"${aud.search}"` });
+  const filtros = criterios.length - 1 + (aud.status !== 'abertos' ? 1 : 0);
 
   return (
     <form
@@ -145,32 +212,56 @@ export function BroadcastForm({
       <div className="min-w-0 space-y-6">
         <div>
           <label htmlFor={`${id}-nome`} className="block text-xs font-medium text-muted-foreground">Nome (só para a equipe)</label>
-          <input id={`${id}-nome`} value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Promoção de clareamento — outubro" className={`${inputCls} mt-1`} />
+          <input id={`${id}-nome`} value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} placeholder="Promoção de clareamento de outubro" className={`${inputCls} mt-1`} />
         </div>
 
-        <section aria-labelledby={`${id}-publico`} className="space-y-5 rounded-xl border border-border bg-surface p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 id={`${id}-publico`} className="text-sm font-semibold">1. Quem recebe</h3>
+        <section aria-labelledby={`${id}-publico`} className="space-y-5 rounded-xl border border-border bg-surface p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Step n={1} id={`${id}-publico`}>Quem recebe</Step>
             {filtros > 0 && (
-              <button type="button" onClick={() => setAud(EMPTY_AUDIENCE)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => {
+                  setAud(EMPTY_AUDIENCE);
+                  setVmin('');
+                  setVmax('');
+                }}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
                 <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpar filtros
               </button>
             )}
           </div>
-          <p className="-mt-3 text-xs text-muted-foreground">Os mesmos filtros da busca de leads. Grupo sem nada marcado não filtra.</p>
+          <p className="-mt-3 text-xs text-muted-foreground">
+            {fromSearch
+              ? 'Os filtros vieram da busca de leads: quem estava na tela recebe. Ajuste aqui se quiser.'
+              : 'Os mesmos filtros da busca de leads. Grupo sem nada marcado não filtra.'}
+          </p>
 
-          <fieldset>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Situação do lead</legend>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {SITUACOES.map((s) => (
-                <Chip key={s.v} on={aud.status === s.v} onClick={() => set('status', s.v)}>{s.label}</Chip>
-              ))}
-            </div>
-          </fieldset>
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <fieldset>
+              <legend className={legendCls}>Situação do lead</legend>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {SITUACOES.map((s) => (
+                  <Chip
+                    key={s.v}
+                    on={aud.status === s.v}
+                    onClick={() =>
+                      // "Em andamento" não tem data de fechamento: o período volta a contar pela entrada.
+                      setAud((a) => ({ ...a, status: s.v, ...(s.v === 'abertos' && a.dateField === 'fechado' ? { dateField: 'criado' as const } : {}) }))
+                    }
+                  >
+                    {s.label}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <PeriodPicker value={periodo} onChange={mudaPeriodo} today={today} label="Período" showDays />
+          </div>
 
           {pipelines.length > 1 && (
             <fieldset>
-              <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Funil</legend>
+              <legend className={legendCls}>Funil</legend>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {pipelines.map((p) => (
                   <Chip
@@ -191,7 +282,7 @@ export function BroadcastForm({
           )}
 
           <fieldset>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etapa</legend>
+            <legend className={legendCls}>Etapa</legend>
             <div className="mt-1.5 space-y-2">
               {funisVisiveis.map((p) => (
                 <div key={p.id} className="flex flex-wrap items-center gap-1.5">
@@ -207,7 +298,7 @@ export function BroadcastForm({
           </fieldset>
 
           <fieldset>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tags</legend>
+            <legend className={legendCls}>Tags</legend>
             {tags.length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">Nenhuma tag criada.</p>
             ) : (
@@ -258,26 +349,9 @@ export function BroadcastForm({
             )}
           </fieldset>
 
-          <fieldset>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dia em que o lead entrou</legend>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <Chip on={!aud.createdFrom && !aud.createdTo} onClick={() => periodo('')}>Qualquer dia</Chip>
-              <Chip on={aud.createdFrom === diaMenos(0) && !aud.createdTo} onClick={() => periodo(0)}>Hoje</Chip>
-              <Chip on={aud.createdFrom === diaMenos(6) && !aud.createdTo} onClick={() => periodo(6)}>Últimos 7 dias</Chip>
-              <Chip on={aud.createdFrom === diaMenos(29) && !aud.createdTo} onClick={() => periodo(29)}>Últimos 30 dias</Chip>
-              <Chip on={aud.createdFrom === `${diaMenos(0).slice(0, 8)}01` && !aud.createdTo} onClick={() => periodo('mes')}>Este mês</Chip>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <label htmlFor={`${id}-de`} className="text-xs text-muted-foreground">De</label>
-              <input id={`${id}-de`} type="date" value={aud.createdFrom} onChange={(e) => set('createdFrom', e.target.value)} className={`${inputCls} w-auto`} />
-              <label htmlFor={`${id}-ate`} className="text-xs text-muted-foreground">até</label>
-              <input id={`${id}-ate`} type="date" value={aud.createdTo} onChange={(e) => set('createdTo', e.target.value)} className={`${inputCls} w-auto`} />
-            </div>
-          </fieldset>
-
           <div className="grid gap-5 sm:grid-cols-2">
             <fieldset>
-              <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Origem</legend>
+              <legend className={legendCls}>Origem</legend>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {SOURCES.map((s) => (
                   <Chip key={s} on={aud.sources.includes(s)} onClick={() => set('sources', alterna(aud.sources, s) as Audience['sources'])}>
@@ -287,7 +361,7 @@ export function BroadcastForm({
               </div>
             </fieldset>
             <fieldset>
-              <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Responsável</legend>
+              <legend className={legendCls}>Responsável</legend>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {team.map((p) => (
                   <Chip key={p.id} on={aud.assignedToIds.includes(p.id)} onClick={() => set('assignedToIds', alterna(aud.assignedToIds, p.id))}>
@@ -297,10 +371,64 @@ export function BroadcastForm({
               </div>
             </fieldset>
           </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <fieldset>
+              <legend className={legendCls}>Tarefas</legend>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {TAREFAS.map((x) => (
+                  <Chip key={x.v || 'todas'} on={aud.task === x.v} onClick={() => set('task', x.v)}>
+                    {x.label}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={legendCls}>Valor de venda (R$)</legend>
+              <div className="mt-1.5 flex items-center gap-2">
+                <label htmlFor={`${id}-vmin`} className="sr-only">Valor mínimo (R$)</label>
+                <input
+                  id={`${id}-vmin`}
+                  inputMode="decimal"
+                  placeholder="de"
+                  value={vmin}
+                  onChange={(e) => {
+                    setVmin(e.target.value);
+                    set('valueMin', reaisDe(e.target.value));
+                  }}
+                  className={inputCls}
+                />
+                <span aria-hidden="true" className="text-muted-foreground">a</span>
+                <label htmlFor={`${id}-vmax`} className="sr-only">Valor máximo (R$)</label>
+                <input
+                  id={`${id}-vmax`}
+                  inputMode="decimal"
+                  placeholder="até"
+                  value={vmax}
+                  onChange={(e) => {
+                    setVmax(e.target.value);
+                    set('valueMax', reaisDe(e.target.value));
+                  }}
+                  className={inputCls}
+                />
+              </div>
+            </fieldset>
+          </div>
+
+          <div>
+            <label htmlFor={`${id}-busca`} className={`block ${legendCls}`}>Nome do lead ou do negócio contém</label>
+            <input
+              id={`${id}-busca`}
+              value={aud.search}
+              onChange={(e) => set('search', e.target.value.slice(0, 80))}
+              placeholder="Ex.: clareamento"
+              className={`${inputCls} mt-1.5 max-w-sm`}
+            />
+          </div>
         </section>
 
-        <section aria-labelledby={`${id}-msg`} className="space-y-3 rounded-xl border border-border bg-surface p-4">
-          <h3 id={`${id}-msg`} className="text-sm font-semibold">2. Mensagem</h3>
+        <section aria-labelledby={`${id}-msg`} className="space-y-3 rounded-xl border border-border bg-surface p-4 sm:p-5">
+          <Step n={2} id={`${id}-msg`}>Mensagem</Step>
           {channel === 'cloud' ? (
             templates.length === 0 ? (
               <p className="text-sm text-muted-foreground">Na API oficial, transmissão só com modelo aprovado. Crie um em Automações › Modelos.</p>
@@ -346,7 +474,7 @@ export function BroadcastForm({
               />
               <p className="text-xs text-muted-foreground">
                 Pelo QR code, as mensagens saem devagar, como uma pessoa mandando, para o número não ser bloqueado
-                {n > 0 && ` — cerca de ${minutosQr(n)} min para ${n} pessoas`}.
+                {n > 0 && `, cerca de ${minutosQr(n)} min para ${n} pessoas`}.
               </p>
             </>
           )}
@@ -358,8 +486,12 @@ export function BroadcastForm({
           )}
         </section>
 
-        <fieldset className="space-y-2 rounded-xl border border-border bg-surface p-4">
-          <legend className="px-1 text-sm font-semibold">3. Quando</legend>
+        <fieldset className="space-y-2 rounded-xl border border-border bg-surface p-4 sm:p-5">
+          <legend className="sr-only">3. Quando</legend>
+          <p aria-hidden="true" className="flex items-center gap-2 text-sm font-semibold">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-link">3</span>
+            Quando
+          </p>
           <label className="flex items-center gap-2 text-sm">
             <input type="radio" name={`${id}-quando`} checked={quando === 'agora'} onChange={() => setQuando('agora')} className="h-4 w-4 accent-primary" />
             Agora
@@ -383,7 +515,7 @@ export function BroadcastForm({
             <Users className="h-5 w-5 text-link" aria-hidden="true" />
             {preview ? (
               <span>
-                <strong className="text-lg tabular-nums">{preview.reachable}</strong> {preview.reachable === 1 ? 'pessoa recebe' : 'pessoas recebem'}
+                <strong className="text-lg tabular-nums">{preview.reachable.toLocaleString('pt-BR')}</strong> {preview.reachable === 1 ? 'pessoa recebe' : 'pessoas recebem'}
               </span>
             ) : (
               'Contando…'
@@ -392,9 +524,19 @@ export function BroadcastForm({
           {preview && preview.optedOut > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">{preview.optedOut} do filtro pediram para não receber (SAIR) e ficam de fora.</p>
           )}
+
+          <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
+            {criterios.map((c) => (
+              <div key={c.label} className="flex gap-2">
+                <dt className="w-24 shrink-0 text-muted-foreground">{c.label}</dt>
+                <dd className="min-w-0 break-words font-medium text-foreground">{c.valor}</dd>
+              </div>
+            ))}
+          </dl>
+
           {amostra.length > 0 && (
             <>
-              <p className="mt-3 text-xs font-medium text-muted-foreground">Alguns de quem recebe</p>
+              <p className="mt-3 border-t border-border pt-3 text-xs font-medium text-muted-foreground">Alguns de quem recebe</p>
               <ul className="mt-1 divide-y divide-border/70 text-sm">
                 {amostra.map((p) => (
                   <li key={p.id} className="flex items-baseline justify-between gap-2 py-1.5">
@@ -404,7 +546,7 @@ export function BroadcastForm({
                 ))}
               </ul>
               {preview && preview.reachable > amostra.length && (
-                <p className="mt-1 text-xs text-muted-foreground">e mais {preview.reachable - amostra.length}.</p>
+                <p className="mt-1 text-xs text-muted-foreground">e mais {(preview.reachable - amostra.length).toLocaleString('pt-BR')}.</p>
               )}
             </>
           )}

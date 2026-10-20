@@ -53,11 +53,11 @@ export default async function PainelPage({
             <Kpi label="Leads novos" value={String(k.newLeads)} />
             <Kpi label="Ganhos" value={String(k.won)} detail={formatCents(k.wonValueCents)} tone="text-green-700 dark:text-green-300" />
             <Kpi label="Perdidos" value={String(k.lost)} tone="text-red-700 dark:text-red-300" />
-            <Kpi label="Conversão" value={k.conversion == null ? '—' : pct(k.conversion)} detail="ganhos ÷ fechados" />
+            <Kpi label="Conversão" value={k.conversion == null ? '-' : pct(k.conversion)} detail="ganhos ÷ fechados" />
             <Kpi label="No funil agora" value={String(k.openLeads)} detail={formatCents(k.openValueCents)} />
             <Kpi
               label="Tempo de resposta"
-              value={k.responseMinutes == null ? '—' : formatMinutes(k.responseMinutes)}
+              value={k.responseMinutes == null ? '-' : formatMinutes(k.responseMinutes)}
               detail="mediana no WhatsApp"
             />
           </ul>

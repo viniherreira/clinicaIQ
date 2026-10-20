@@ -274,7 +274,7 @@ function CommunicationPanel({
             role="status"
             className="mx-5 mb-5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
           >
-            Sem conexão, nenhuma confirmação nem lembrete sai — e o paciente não é avisado disso.
+            Sem conexão, nenhuma confirmação nem lembrete sai, e o paciente não é avisado disso.
           </p>
         )}
       </section>
@@ -397,15 +397,15 @@ function BusinessHoursSection({ initialHours }: { initialHours: DayHours[] }) {
                   checked={h.open}
                   onChange={(e) => update(i, { open: e.target.checked })}
                   className="h-4 w-4 rounded accent-primary"
-                  aria-label={`${DAY_LABELS[i]} — aberto`}
+                  aria-label={`${DAY_LABELS[i]}, aberto`}
                 />
                 <span className="text-sm font-medium">{DAY_LABELS[i]}</span>
               </label>
               {h.open ? (
                 <div className="flex items-center gap-2 text-sm">
-                  <input type="time" value={h.start} onChange={(e) => update(i, { start: e.target.value })} aria-label={`${DAY_LABELS[i]} — abertura`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+                  <input type="time" value={h.start} onChange={(e) => update(i, { start: e.target.value })} aria-label={`${DAY_LABELS[i]}, abertura`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
                   <span className="text-muted-foreground">às</span>
-                  <input type="time" value={h.end} onChange={(e) => update(i, { end: e.target.value })} aria-label={`${DAY_LABELS[i]} — fechamento`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+                  <input type="time" value={h.end} onChange={(e) => update(i, { end: e.target.value })} aria-label={`${DAY_LABELS[i]}, fechamento`} className="rounded-md border border-border bg-background px-2 py-1.5 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
                 </div>
               ) : (
                 <span className="text-sm text-muted-foreground">Fechado</span>
@@ -491,7 +491,7 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
             className={`${inputCls} sm:max-w-xs`}
           />
           <p id="clinic-doc-help" className="text-xs text-muted-foreground">
-            Sai no contrato e no recibo — é o que o paciente usa para deduzir a despesa no Imposto de Renda.
+            Sai no contrato e no recibo. É o que o paciente usa para deduzir a despesa no Imposto de Renda.
           </p>
           {err('document') && <p className="text-xs text-destructive">{err('document')}</p>}
         </div>

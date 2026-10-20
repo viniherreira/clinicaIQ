@@ -3,6 +3,9 @@
  * mostrar: telefone já mascarado, datas como texto ISO, nada cifrado.
  */
 
+import type { FieldFilter, FieldValues } from './custom-fields';
+import type { Period } from './period';
+
 export interface BoardStage {
   id: string;
   name: string;
@@ -54,9 +57,11 @@ export interface BoardLead {
   openQuote: { number: number; totalCents: number } | null;
   wonAt: string | null;
   lostAt: string | null;
+  /** Campos personalizados: { [fieldId]: valor } (lista e exportação). */
+  fields: FieldValues;
+  /** Os campos marcados "mostrar no card", já escritos para a tela. */
+  cardFields: { name: string; value: string }[];
 }
-
-export type CreatedFilter = '' | 'hoje' | '7d' | '30d' | 'mes';
 
 export interface BoardFilters {
   q: string;
@@ -69,10 +74,13 @@ export interface BoardFilters {
   /** Funil. No quadro é sempre o da tela; na lista, vazio = todos. */
   funil: string;
   etapa: string;
-  criado: CreatedFilter;
+  /** Criados ou fechados entre dois dias (crm/period.ts). */
+  periodo: Period;
   /** Valor de venda em reais, mínimo e máximo. */
   valorMin: number | null;
   valorMax: number | null;
+  /** Campos personalizados de lista e sim/não (`campo_<id>=valor`). */
+  campos: FieldFilter[];
 }
 
 export interface LostReasonOption {

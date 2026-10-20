@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors,
@@ -10,6 +10,7 @@ import { Check, Trash2, X } from 'lucide-react';
 import type { BoardLead, BoardStage, LostReasonOption } from '@/crm/types';
 import type { ConversationSummary } from '@/crm/conversations';
 import { deleteLeadAction, moveLeadAction } from '../actions';
+import { BoardNavigator } from './board-navigator';
 import { Column } from './column';
 import { InboxColumn } from './inbox-column';
 import { LeadCard, type MoveTarget } from './lead-card';
@@ -60,6 +61,7 @@ export function Board({
     return () => window.removeEventListener('beforeunload', segurar);
   }, [pending]);
 
+  const quadro = useRef<HTMLDivElement>(null);
   const porEtapa = useMemo(() => {
     const m = new Map<string, BoardLead[]>(stages.map((s) => [s.id, []]));
     for (const l of leads) m.get(l.stageId)?.push(l);
@@ -186,7 +188,8 @@ export function Board({
         onDragCancel={() => setActiveId(null)}
         onDragEnd={onDragEnd}
       >
-        <div className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto bg-board px-4 pb-4 pt-4 sm:px-5" role="list" aria-label="Etapas do funil">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={quadro} className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto bg-board px-4 pb-4 pt-4 sm:px-5" role="list" aria-label="Etapas do funil">
           {inbox.length > 0 && (
             <div role="listitem" className="flex">
               <InboxColumn entries={inbox} onAnnounce={anunciar} />
@@ -205,6 +208,17 @@ export function Board({
               />
             </div>
           ))}
+        </div>
+        {/* Arrastando um card, o rodapé é da barra de Ganho/Perdido. */}
+        {!ativo && (
+          <BoardNavigator
+            target={quadro}
+            columns={[
+              ...(inbox.length > 0 ? [{ id: 'entrada', name: 'Entrada', color: 'amber', count: inbox.length }] : []),
+              ...stages.map((s) => ({ id: s.id, name: s.name, color: s.color, count: porEtapa.get(s.id)?.length ?? 0 })),
+            ]}
+          />
+        )}
         </div>
 
         {ativo && <DropBar canDelete={canDelete} />}

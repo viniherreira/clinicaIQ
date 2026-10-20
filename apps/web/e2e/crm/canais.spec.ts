@@ -123,19 +123,21 @@ test('automações e robô: criar pela tela', async ({ page }) => {
   await page.goto('/crm/automacoes/bots');
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Novo robô' }).click();
-  await page.getByRole('button', { name: /Em branco/ }).click();
+  await page.getByRole('link', { name: /Em branco/ }).click();
+  await page.waitForURL(/\/crm\/automacoes\/bots\/novo/);
   const nome = uniqueName('Robô E2E');
   await page.getByLabel('Nome do robô').fill(nome);
   await page.getByRole('radio', { name: /Palavra-chave/ }).check();
-  // O simulador responde na hora, sem gravar nada.
-  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Oi! Como posso ajudar?');
-  await page.getByRole('log', { name: 'Conversa de teste' }).getByRole('button', { name: 'Opção 1' }).click();
-  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Robô encerrado');
   await page.getByLabel(/^Palavras-chave/).fill(`e2e${Date.now()}`);
-  // Desligado: um robô ligado responderia nos outros testes.
-  await page.getByRole('checkbox', { name: 'Ligado' }).uncheck();
-  await page.getByRole('button', { name: 'Salvar robô' }).click();
-  await expect(page.getByRole('button', { name: `Editar ${nome}` })).toBeVisible();
+  // O teste responde na hora, sem gravar nada.
+  await page.getByRole('button', { name: 'Testar' }).click();
+  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Oi, Ana! Como posso ajudar?');
+  await expect(page.getByRole('log', { name: 'Conversa de teste' })).toContainText('Robô encerrado');
+  // Desligado (padrão de robô novo): um robô ligado responderia nos outros testes.
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.waitForURL(/\/crm\/automacoes\/bots\/(?!novo)[^/]+$/);
+  await page.getByRole('link', { name: 'Robôs' }).click();
+  await expect(page.getByRole('link', { name: `Editar ${nome}` })).toBeVisible();
 
   // Limpa o que criou: o funil e as conversas dos outros testes não podem mudar.
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });

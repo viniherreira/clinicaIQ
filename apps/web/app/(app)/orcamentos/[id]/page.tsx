@@ -9,7 +9,7 @@ import { QUOTE_STATUS, formatBRL, quoteCode } from '../_components/constants';
 import { requireCapability } from '@/lib/guard';
 import { describePayment } from '@/lib/payment-terms';
 import { getReceiptMethods } from '@/lib/clinic-settings';
-import { wallDateBR } from '@/lib/tz';
+import { clinicDayOf, clinicToday, wallDateBR } from '@/lib/tz';
 
 export const metadata = { title: 'Orçamento · DreamClin' };
 
@@ -90,7 +90,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
               ))}
             </ul>
             <p className="mt-1.5 text-xs opacity-80">
-              Dá para gerar mesmo assim — o que faltar sai como linha em branco para completar à caneta.
+              Dá para gerar mesmo assim. O que faltar sai como linha em branco para completar à caneta.
             </p>
           </div>
         </aside>
@@ -118,7 +118,7 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
                 </td>
                 <td className="px-4 py-3 text-center tabular-nums">{it.quantity}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatBRL(it.unitPrice)}</td>
-                <td className="px-4 py-3 text-center tabular-nums hidden sm:table-cell">{it.discountPercent > 0 ? `${it.discountPercent}%` : '—'}</td>
+                <td className="px-4 py-3 text-center tabular-nums hidden sm:table-cell">{it.discountPercent > 0 ? `${it.discountPercent}%` : '-'}</td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums">{formatBRL(it.total)}</td>
               </tr>
             ))}
@@ -133,7 +133,17 @@ export default async function OrcamentoDetailPage({ params }: { params: Promise<
         </div>
       </section>
 
-      <QuotePayments quoteId={quote.id} total={Number(quote.total)} payments={quote.payments} methods={methods} />
+      <QuotePayments
+        quoteId={quote.id}
+        quoteLabel={`${quoteCode(quote.number)} · ${quote.patient.name}`}
+        total={Number(quote.total)}
+        payments={quote.payments}
+        methods={methods}
+        terms={{ downPayment: quote.downPayment, installments: quote.installments, method: quote.paymentMethod }}
+        // O plano começa na aprovação; antes disso, mostra como ficaria a partir do dia em que foi feito.
+        startDay={clinicDayOf(quote.acceptedAt ?? quote.createdAt)}
+        today={clinicToday()}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-4 text-sm">

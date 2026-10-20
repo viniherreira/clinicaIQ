@@ -3,7 +3,7 @@ import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinica
 import { chatKey } from '@/lib/phone';
 import { activeCloudAccount, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
-import { createLead, OPEN_LEAD, type Actor } from './leads';
+import { createLead, OPEN_LEAD, setTags, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 
 /**
@@ -134,12 +134,16 @@ export interface ConversationSummary {
   contactName: string | null;
   phoneMasked: string;
   preview: string;
+  /** Quem mandou a última mensagem, se foi a clínica ("Ana", "Robô"); null se foi o contato. Só na lista. */
+  previewFrom: string | null;
   lastMessageAt: string;
   unread: number;
   awaitingReply: boolean;
   status: 'INBOX' | 'ACTIVE' | 'DECLINED';
   lead: { id: string; label: string; stage: string; assignee: string | null; open: boolean } | null;
   patient: { id: string; name: string } | null;
+  /** As tags do lead, na ordem do nome (aparecem na lista, como no Kommo). */
+  tags: { id: string; name: string; color: string }[];
 }
 
 const summaryInclude = {
@@ -153,6 +157,7 @@ const summaryInclude = {
       deletedAt: true,
       stage: { select: { name: true } },
       assignedTo: { select: { name: true } },
+      tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
     },
   },
   patient: { select: { id: true, name: true } },
@@ -170,6 +175,7 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
     contactName: r.contactName,
     phoneMasked: masked,
     preview: open(r.lastPreviewEncrypted, tenantId),
+    previewFrom: null,
     lastMessageAt: r.lastMessageAt.toISOString(),
     unread: r.unreadCount,
     awaitingReply: r.awaitingReply,
@@ -184,6 +190,7 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
         }
       : null,
     patient: r.patient,
+    tags: (lead?.tags ?? []).map((t) => t.tag).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
   };
 }
 
@@ -191,8 +198,11 @@ export function conversationWhere(
   ctx: { tenantId: string; userId: string },
   tab: InboxTab,
   q: string,
+  tagId: string | null = null,
 ): Prisma.ConversationWhereInput {
   const where: Prisma.ConversationWhereInput = { status: { not: 'DECLINED' } };
+  // Filtro por tag: só conversas ligadas a um lead com a tag.
+  if (tagId) where.AND = [{ lead: { deletedAt: null, tags: { some: { tagId } } } }];
   if (tab === 'inbox') where.status = 'INBOX';
   if (tab === 'mine') where.lead = { assignedToId: ctx.userId };
   if (tab === 'unanswered') where.awaitingReply = true;
@@ -218,14 +228,35 @@ export async function listConversations(
   tab: InboxTab,
   q = '',
   take = 60,
+  tagId: string | null = null,
 ): Promise<ConversationSummary[]> {
   const rows = await db.conversation.findMany({
-    where: conversationWhere(ctx, tab, q),
+    where: conversationWhere(ctx, tab, q, tagId),
     include: summaryInclude,
     orderBy: { lastMessageAt: 'desc' },
     take,
   });
-  return rows.map((r) => toSummary(r, ctx.tenantId));
+  const lista = rows.map((r) => toSummary(r, ctx.tenantId));
+  if (lista.length === 0) return lista;
+  // Quem mandou a última de cada conversa ("Ana: Tenho às 15h", "Robô: Olá!"), como no Kommo.
+  const ultimas = await db.$queryRaw<{ conversationId: string; direction: string; origin: string; name: string | null }[]>`
+    SELECT DISTINCT ON (m."conversationId") m."conversationId", m."direction"::text AS direction, m."origin"::text AS origin, u."name"
+    FROM "chat_messages" m
+    LEFT JOIN "users" u ON u."id" = m."sentById"
+    WHERE m."tenantId" = ${ctx.tenantId} AND m."conversationId" = ANY(${lista.map((c) => c.id)})
+    ORDER BY m."conversationId", m."at" DESC, m."createdAt" DESC`;
+  const de = new Map(ultimas.map((u) => [u.conversationId, previewAuthor(u)]));
+  for (const c of lista) c.previewFrom = de.get(c.id) ?? null;
+  return lista;
+}
+
+function previewAuthor(m: { direction: string; origin: string; name: string | null }): string | null {
+  if (m.direction === 'INBOUND') return null;
+  if (m.origin === 'BOT') return 'Robô';
+  if (m.origin === 'AUTOMATION') return 'Automático';
+  if (m.origin === 'BROADCAST') return 'Transmissão';
+  if (m.origin === 'PHONE') return 'Celular da clínica';
+  return m.name?.split(' ')[0] ?? 'Equipe';
 }
 
 /** Os números das abas e do menu. */
@@ -448,7 +479,7 @@ export async function writeChatMessage(
           lastPreviewEncrypted: seal(previewText(opts.media?.kind ?? 'TEXT', text || null), tenantId),
           // Quem responde é a equipe: leu, respondeu e o robô sai da conversa.
           ...(origin === 'CRM'
-            ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 }
+            ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null }
             : {}),
         },
       });
@@ -496,12 +527,14 @@ export async function simulateSent(db: TenantPrismaClient, chatMessageId: string
 
 /**
  * Aceitar (Entrada) ou "Criar negócio" (conversa de paciente sem negócio aberto):
- * vira lead em Novo, com origem WhatsApp e o nome que a pessoa usa lá.
+ * vira lead em Novo, com origem WhatsApp e o nome que a pessoa usa lá. Pelo
+ * painel ao lado da conversa dá para escolher nome, funil, etapa e tags.
  */
 export async function acceptConversation(
   db: TenantPrismaClient,
   actor: Actor & { userId: string },
   conversationId: string,
+  opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const conv = await db.conversation.findFirst({
     where: { id: conversationId },
@@ -523,12 +556,15 @@ export async function acceptConversation(
 
   const phone = decryptPhone(conv.phoneEncrypted, actor.tenantId);
   const r = await createLead(db, actor, {
-    name: conv.patient?.name ?? conv.contactName ?? 'Contato do WhatsApp',
+    name: opts.name?.trim() || (conv.patient?.name ?? conv.contactName ?? 'Contato do WhatsApp'),
     phone,
     source: 'WHATSAPP',
     patientId: conv.patientId,
+    stageId: opts.stageId || null,
+    pipelineId: opts.pipelineId || null,
   });
   if (!r.ok) return r;
+  if (opts.tagIds?.length) await setTags(db, actor, r.leadId, opts.tagIds);
   // createLead já liga pela chave do número; garante mesmo se o número da
   // conversa e o do lead diferirem na forma.
   await db.conversation.update({

@@ -32,6 +32,10 @@ export default async function NovaTransmissaoPage({
     tagCounts(ctx),
   ]);
 
+  const today = clinicToday();
+  // Veio da busca de leads ("Transmissão para estes leads")? Qualquer filtro na URL diz que sim.
+  const daBusca = Object.keys(sp).some((k) => ['q', 'resp', 'tarefa', 'tag', 'origem', 'funil', 'etapa', 'periodo', 'de', 'ate', 'criado', 'vmin', 'vmax', 'situacao'].includes(k));
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Link href="/crm/automacoes/transmissoes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -39,7 +43,9 @@ export default async function NovaTransmissaoPage({
       </Link>
       <h2 className="mt-2 text-xl font-semibold tracking-tight">Nova transmissão</h2>
       <BroadcastForm
-        initialAudience={audienceFromSearch(sp, clinicToday())}
+        today={today}
+        fromSearch={daBusca}
+        initialAudience={audienceFromSearch(sp, today, ctx.userId)}
         pipelines={basics.pipelines.map((p) => ({ id: p.id, name: p.name, stages: p.columns.map((s) => ({ id: s.id, name: s.name })) }))}
         tags={basics.tags.map((t) => ({ id: t.id, name: t.name, color: t.color, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}

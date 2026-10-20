@@ -31,7 +31,7 @@ export function AcessoEncerrado({ clinica, em }: { clinica: string; em: Date | s
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         A clínica <strong className="text-foreground">{clinica}</strong> encerrou o seu acesso
         {data && <> em {data}</>}. Quem administra a clínica pode convidar você de novo pelo mesmo
-        e-mail quando quiser — o que você registrou lá continua guardado.
+        e-mail quando quiser. O que você registrou lá continua guardado.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">

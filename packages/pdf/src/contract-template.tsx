@@ -89,7 +89,7 @@ function Clause({ n, title, children }: { n: number; title: string; children: Re
   return (
     <View style={{ marginTop: 11 }}>
       <Text minPresenceAhead={36} style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: color.ink, marginBottom: 4 }}>
-        CLÁUSULA {ORDINAIS[n - 1] ?? n} — {title}
+        CLÁUSULA {ORDINAIS[n - 1] ?? n}: {title}
       </Text>
       {children}
     </View>
@@ -128,7 +128,7 @@ export function ContractDocument({ clinic, patient, professional, contract }: Co
   const next = () => ++n;
 
   return (
-    <Document title={`${contract.title} — ${patient.name}`} author={clinic.name} language="pt-BR">
+    <Document title={`${contract.title} · ${patient.name}`} author={clinic.name} language="pt-BR">
       <Page size="A4" style={s.page}>
         <DocHeader
           clinic={clinic}
@@ -337,7 +337,7 @@ export function ContractDocument({ clinic, patient, professional, contract }: Co
             />
             <Signature
               title={clinic.name}
-              lines={['CONTRATADA', signer ? [signer.name, signer.registration].filter(Boolean).join(' — ') : undefined]}
+              lines={['CONTRATADA', signer ? [signer.name, signer.registration].filter(Boolean).join(', ') : undefined]}
             />
           </View>
           <View style={{ flexDirection: 'row', marginTop: 4, marginHorizontal: -12 }}>

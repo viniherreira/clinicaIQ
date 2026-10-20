@@ -5,6 +5,7 @@ import { liveInfoForLeads } from './live';
 import { decryptPhone, maskPhone } from './phone';
 import { taskStatus } from './tasks-status';
 import { toTimeline, type TimelineEntry } from './timeline';
+import { readFieldValues, type FieldValues } from './custom-fields';
 import type { BoardTag, BoardTaskStatus } from './types';
 
 export interface LeadDetail {
@@ -20,6 +21,8 @@ export interface LeadDetail {
   valueCents: number | null;
   assignedToId: string | null;
   tags: BoardTag[];
+  /** Campos personalizados: { [fieldId]: valor } (`crm/custom-fields.ts`). */
+  fields: FieldValues;
   patient: { id: string; name: string; controlNumber: number } | null;
   wonAt: string | null;
   lostAt: string | null;
@@ -87,6 +90,7 @@ export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date 
     valueCents: lead.estimatedValueCents,
     assignedToId: lead.assignedToId,
     tags: lead.tags.map((t) => ({ id: t.tag.id, name: t.tag.name, color: t.tag.color })),
+    fields: readFieldValues(lead.fields),
     patient: lead.patient,
     wonAt: lead.wonAt?.toISOString() ?? null,
     lostAt: lead.lostAt?.toISOString() ?? null,

@@ -288,7 +288,7 @@ export function AppointmentModal({
                     <span className={`${labelCls} block`} id="proc-label">Procedimento</span>
                     <Select value={procId || undefined} onValueChange={(v) => onProcedureChange(v === '__none__' ? '' : v)}>
                       <SelectTrigger aria-labelledby="proc-label">
-                        <SelectValue placeholder="— Selecione —" />
+                        <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Nenhum procedimento</SelectItem>

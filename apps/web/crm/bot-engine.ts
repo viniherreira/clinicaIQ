@@ -8,7 +8,8 @@
  */
 
 /** Onde a resposta de uma pergunta é guardada. */
-export type BotSaveField = 'name' | 'email' | 'note';
+/** Onde a resposta da pergunta é guardada: nome, e-mail, anotação ou um campo personalizado (`field:<id>`). */
+export type BotSaveField = 'name' | 'email' | 'note' | `field:${string}`;
 
 export type BotAction =
   | { type: 'createLead'; stageId?: string }
@@ -27,6 +28,25 @@ export interface BotOption {
   actions?: BotAction[];
 }
 
+/** Depois de uma resposta personalizada: encerra, mostra o menu inicial, continua esperando no mesmo passo ou chama a equipe. */
+export type BotRuleThen = 'end' | 'menu' | 'stay' | 'handoff';
+
+/**
+ * Resposta personalizada (a "Condição" do Salesbot do Kommo): se o que a
+ * pessoa escreveu tem alguma destas palavras — inteiras, sem acento, plural
+ * vale —, o robô responde isto e age no CRM. Vale nos menus (quando a pessoa
+ * escreve em vez de tocar num botão) e nas perguntas.
+ */
+export interface BotRule {
+  id: string;
+  keywords: string[];
+  reply?: string;
+  then: BotRuleThen;
+  actions?: BotAction[];
+}
+
+export const MAX_RULES = 20;
+
 export interface BotStep {
   id: string;
   /** Menu (padrão) ou pergunta aberta. */
@@ -36,6 +56,54 @@ export interface BotStep {
   /** Pergunta: onde guardar a resposta e o que fazer depois. */
   saveTo?: BotSaveField;
   answer?: { reply?: string; next?: string; actions?: BotAction[] };
+  /** Respostas personalizadas por palavra, na ordem: vale a primeira que bater. */
+  rules?: BotRule[];
+}
+
+/** O que o robô sabe para personalizar o texto: `{nome}`, `{primeiro_nome}` e `{clinica}`. */
+export interface BotVars {
+  name?: string | null;
+  clinic?: string | null;
+}
+
+export const BOT_VARS = [
+  { token: '{primeiro_nome}', label: 'Primeiro nome' },
+  { token: '{nome}', label: 'Nome completo' },
+  { token: '{clinica}', label: 'Nome da clínica' },
+] as const;
+
+/**
+ * Troca as variáveis pelo nome da pessoa e da clínica. Sem o nome, some sem
+ * deixar rastro: "Oi, {primeiro_nome}!" vira "Oi!".
+ */
+export function fillVars(text: string, vars: BotVars = {}): string {
+  const nome = (vars.name ?? '').trim().replace(/\s+/g, ' ');
+  // Nome que é só telefone ou "Contato do WhatsApp" não serve para chamar a pessoa.
+  const usavel = nome && !/^[\d\s+()•*-]+$/.test(nome) && !/^contato do whatsapp$/i.test(nome) ? nome : '';
+  const primeiro = usavel.split(' ')[0] ?? '';
+  return text
+    .replace(/\{primeiro_nome\}/gi, primeiro)
+    .replace(/\{nome\}/gi, usavel)
+    .replace(/\{clinica\}/gi, (vars.clinic ?? '').trim() || 'a clínica')
+    .replace(/,\s*([!.?])/g, '$1')
+    .replace(/[ \t]+([,!.?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A palavra (ou frase) está no texto, inteira? Aceita o plural com "s" ou "es". */
+export function hasWord(text: string, word: string): boolean {
+  const t = normalize(text);
+  const k = normalize(word);
+  if (!t || !k) return false;
+  return new RegExp(`(^| )${escapeRe(k)}(s|es)?( |$)`).test(t);
+}
+
+/** A primeira resposta personalizada do passo que bate com o que a pessoa escreveu. */
+export function matchRule(step: BotStep, text: string): BotRule | null {
+  return (step.rules ?? []).find((r) => r.keywords.some((k) => hasWord(text, k))) ?? null;
 }
 
 /** Quando o robô pode começar uma conversa (horário de Brasília). */
@@ -50,10 +118,61 @@ export interface BotHours {
 
 export const DEFAULT_HOURS: BotHours = { mode: 'always', days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' };
 
+/**
+ * Para quem o robô começa, pelas tags do lead da conversa (a captação põe a
+ * tag na primeira mensagem, então o robô certo já responde). Vazio = todos.
+ */
+export interface BotAudience {
+  /** Só para leads com pelo menos uma destas tags. */
+  anyTags: string[];
+  /** Nunca para leads com alguma destas (ex.: paciente, não perturbe). */
+  noneTags: string[];
+}
+
+export const EMPTY_AUDIENCE: BotAudience = { anyTags: [], noneTags: [] };
+
 export interface BotSteps {
   start: string;
   steps: Record<string, BotStep>;
   hours?: BotHours;
+  audience?: BotAudience;
+}
+
+/** O público como veio do banco ou da tela, limpo. */
+export function readAudience(raw: unknown): BotAudience {
+  const r = (raw ?? {}) as Partial<BotAudience>;
+  const lista = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.length > 0))].slice(0, 30) : []);
+  return { anyTags: lista(r.anyTags), noneTags: lista(r.noneTags) };
+}
+
+/** O robô pode começar para um lead com estas tags? (sem lead: lista vazia) */
+export function fitsAudience(audience: BotAudience | undefined, leadTagIds: readonly string[]): boolean {
+  if (!audience) return true;
+  const tem = new Set(leadTagIds);
+  if (audience.noneTags.some((t) => tem.has(t))) return false;
+  if (audience.anyTags.length > 0 && !audience.anyTags.some((t) => tem.has(t))) return false;
+  return true;
+}
+
+/** Robô que pede tag: mais específico, passa na frente do geral. */
+export const isTargeted = (steps: Pick<BotSteps, 'audience'>) => (steps.audience?.anyTags.length ?? 0) > 0;
+
+/**
+ * Qual robô começa agora (ou nenhum). Palavra-chave vale em qualquer
+ * mensagem; contato novo, só na primeira. Em cada caso, o que pede tag vem
+ * antes do geral, e depois a ordem dada (o mais antigo primeiro).
+ * Fora do horário do robô ou do público dele, ele não conta.
+ */
+export function pickBot<T extends { trigger: 'NEW_CONTACT' | 'KEYWORD'; keywords: string[]; steps: Pick<BotSteps, 'hours' | 'audience'> }>(
+  flows: readonly T[],
+  ctx: { text: string; newContact: boolean; tagIds: readonly string[]; now: Date },
+): T | null {
+  const aptos = flows.filter((f) => shouldStart(f.steps.hours, ctx.now) && fitsAudience(f.steps.audience, ctx.tagIds));
+  const ordem = (lista: T[]) => [...lista.filter((f) => isTargeted(f.steps)), ...lista.filter((f) => !isTargeted(f.steps))];
+  const porPalavra = ordem(aptos.filter((f) => f.trigger === 'KEYWORD' && isKeyword(ctx.text, f.keywords)))[0];
+  if (porPalavra) return porPalavra;
+  if (!ctx.newContact) return null;
+  return ordem(aptos.filter((f) => f.trigger === 'NEW_CONTACT'))[0] ?? null;
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -99,7 +218,7 @@ export function normalize(s: string): string {
 export function parseSteps(raw: unknown): BotSteps | null {
   const r = raw as BotSteps | null;
   if (!r || typeof r.start !== 'string' || typeof r.steps !== 'object' || !r.steps[r.start]) return null;
-  return r;
+  return r.audience ? { ...r, audience: readAudience(r.audience) } : r;
 }
 
 /** O texto do menu com as opções numeradas (funciona até onde os botões não aparecem) e os botões. */
@@ -144,21 +263,36 @@ export type BotDecision = {
   next: { stepId: string; misses: number } | null;
 };
 
+const comVars = (d: BotDecision, vars?: BotVars): BotDecision =>
+  vars ? { ...d, messages: d.messages.map((m) => ({ ...m, text: fillVars(m.text, vars) })) } : d;
+
 /** Começar o robô: manda o primeiro menu. */
-export function startBot(flow: BotSteps): BotDecision {
+export function startBot(flow: BotSteps, vars?: BotVars): BotDecision {
   const step = flow.steps[flow.start];
   const r = renderStep(step);
-  return { messages: [{ text: r.text, buttons: r.buttons.length ? r.buttons : undefined }], actions: [], next: { stepId: step.id, misses: 0 } };
+  return comVars({ messages: [{ text: r.text, buttons: r.buttons.length ? r.buttons : undefined }], actions: [], next: { stepId: step.id, misses: 0 } }, vars);
 }
 
-/** O robô está num menu e a pessoa respondeu. */
-export function continueBot(flow: BotSteps, state: { stepId: string; misses: number }, input: { text: string; buttonId?: string | null }): BotDecision {
+/** O robô está num menu ou numa pergunta e a pessoa respondeu. */
+export function continueBot(
+  flow: BotSteps,
+  state: { stepId: string; misses: number },
+  input: { text: string; buttonId?: string | null },
+  vars?: BotVars,
+): BotDecision {
+  return comVars(decide(flow, state, input), vars);
+}
+
+function decide(flow: BotSteps, state: { stepId: string; misses: number }, input: { text: string; buttonId?: string | null }): BotDecision {
   const step = flow.steps[state.stepId];
   if (!step) return { messages: [], actions: [], next: null };
 
   if (step.kind === 'question') return answerQuestion(flow, step, state, input.text);
 
   const opt = matchOption(step, input);
+  // Escreveu em vez de tocar num botão: vê se é uma das respostas personalizadas.
+  const regra = opt || input.buttonId ? null : matchRule(step, input.text);
+  if (regra) return applyRule(flow, step, regra, []);
   if (!opt) {
     // Primeira vez: repete o menu. Segunda: chama alguém.
     if (state.misses >= 1) return { messages: [{ text: HANDOFF_TEXT }], actions: [{ type: 'handoff' }], next: null };
@@ -188,6 +322,12 @@ export function continueBot(flow: BotSteps, state: { stepId: string; misses: num
 function answerQuestion(flow: BotSteps, step: BotStep, state: { stepId: string; misses: number }, text: string): BotDecision {
   const valor = text.trim().slice(0, 500);
   const emailRuim = step.saveTo === 'email' && !EMAIL.test(valor);
+  // Resposta personalizada: guarda o que a pessoa disse (se servir) e responde do jeito combinado.
+  const regra = matchRule(step, valor);
+  if (regra) {
+    const salvar: BotAction[] = valor && !emailRuim && step.saveTo ? [{ type: 'save', field: step.saveTo, question: step.text.trim(), value: valor }] : [];
+    return applyRule(flow, step, regra, salvar);
+  }
   if (!valor || emailRuim) {
     // Uma segunda chance; na segunda vez segue sem guardar.
     if (state.misses < 1) {
@@ -210,6 +350,26 @@ function answerQuestion(flow: BotSteps, step: BotStep, state: { stepId: string; 
   return { messages, actions, next: null };
 }
 
+/** O que acontece quando uma resposta personalizada bate. */
+function applyRule(flow: BotSteps, step: BotStep, rule: BotRule, antes: BotAction[]): BotDecision {
+  const messages: BotOutMessage[] = [];
+  if (rule.reply?.trim()) messages.push({ text: rule.reply.trim() });
+  const actions: BotAction[] = [...antes, ...(rule.actions ?? []).filter((a) => a.type !== 'handoff')];
+  if (rule.then === 'handoff') {
+    actions.push({ type: 'handoff' });
+    if (!rule.reply?.trim()) messages.push({ text: HANDOFF_TEXT });
+    return { messages, actions, next: null };
+  }
+  if (rule.then === 'menu') {
+    const inicio = flow.steps[flow.start];
+    const r = renderStep(inicio);
+    messages.push({ text: r.text, buttons: r.buttons.length ? r.buttons : undefined });
+    return { messages, actions, next: { stepId: inicio.id, misses: 0 } };
+  }
+  if (rule.then === 'stay') return { messages, actions, next: { stepId: step.id, misses: 0 } };
+  return { messages, actions, next: null };
+}
+
 /** A mensagem é uma das palavras-chave do robô? */
 export function isKeyword(text: string, keywords: string[]): boolean {
   const t = normalize(text);
@@ -229,6 +389,14 @@ export function stepsProblem(flow: BotSteps): string | null {
     if (!h.days.length) return 'Marque pelo menos um dia de atendimento.';
   }
   for (const s of Object.values(flow.steps)) {
+    const regras = s.rules ?? [];
+    if (regras.length > MAX_RULES) return `No máximo ${MAX_RULES} respostas personalizadas por menu ou pergunta.`;
+    for (const r of regras) {
+      if (!r.keywords.some((k) => normalize(k))) return 'Cada resposta personalizada precisa de pelo menos uma palavra.';
+      if (!r.reply?.trim() && !(r.actions ?? []).length && r.then !== 'handoff' && r.then !== 'menu') {
+        return 'Cada resposta personalizada precisa de um texto ou de uma ação.';
+      }
+    }
     if (s.kind === 'question') {
       if (!s.text.trim()) return 'Escreva a pergunta.';
       if (!s.saveTo) return 'Escolha onde guardar a resposta da pergunta.';

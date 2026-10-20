@@ -213,7 +213,7 @@ export function Field({
       ) : blank ? (
         <View style={{ borderBottomWidth: 0.75, borderBottomColor: color.faint, height: 12 }} />
       ) : (
-        <Text style={{ fontSize: 9.5, color: color.faint }}>—</Text>
+        <Text style={{ fontSize: 9.5, color: color.faint }}>-</Text>
       )}
     </View>
   );
@@ -313,7 +313,7 @@ export function TreatmentTable({ items, compact = false }: { items: TreatmentIte
           <Text style={{ width: cols.unit, textAlign: 'right' }}>{formatCurrency(it.unitPrice)}</Text>
           {anyDiscount ? (
             <Text style={{ width: cols.disc, textAlign: 'right', color: color.muted }}>
-              {it.discountPercent > 0 ? `${formatPercent(it.discountPercent)}` : '—'}
+              {it.discountPercent > 0 ? `${formatPercent(it.discountPercent)}` : '-'}
             </Text>
           ) : null}
           <Text style={{ width: cols.total, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: color.ink }}>
@@ -354,7 +354,7 @@ export function TotalsBox({
             <Text style={{ color: color.muted }}>Desconto{discountLabel ? ` (${discountLabel})` : ''}</Text>
             {/* Traço "–" e não o sinal "−": a Helvetica embutida do PDF não tem
                 o U+2212, e o desconto saía como se fosse valor positivo. */}
-            <Text>– {formatCurrency(discountAmount)}</Text>
+            <Text>- {formatCurrency(discountAmount)}</Text>
           </View>
         </>
       ) : null}

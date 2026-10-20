@@ -216,10 +216,20 @@ export async function listQuoteProcedures() {
   const procedures = await db.procedure.findMany({
     where: { active: true, deletedAt: null },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, basePrice: true, allowsDiscount: true, maxDiscountPercent: true },
+    select: {
+      id: true,
+      name: true,
+      basePrice: true,
+      allowsDiscount: true,
+      maxDiscountPercent: true,
+      durationMinutes: true,
+      internalCode: true,
+      category: { select: { name: true } },
+    },
   });
-  return procedures.map((p) => ({
+  return procedures.map(({ category, ...p }) => ({
     ...p,
+    category: category?.name ?? null,
     basePrice: Number(p.basePrice),
     maxDiscountPercent: p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : null,
   }));
@@ -530,11 +540,28 @@ const quotePaymentSchema = z.object({
   amount: z.string().transform(parseBRL).refine((v) => v > 0, { message: 'Valor obrigatório' }),
   method: z.string().trim().max(40).optional().or(z.literal('')),
   notes: z.string().trim().max(300).optional().or(z.literal('')),
+  /** Dia do pagamento na clínica (AAAA-MM-DD). Vazio = agora. */
+  paidOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .or(z.literal('')),
 });
 
 export type QuotePaymentState =
-  | { success: true }
+  | { success: true; paymentId: string }
   | { success: false; errors: Record<string, string[]> };
+
+/**
+ * O instante gravado para um pagamento lançado com data: hoje é agora; outro
+ * dia é meio-dia de Brasília (15h UTC), para cair no mesmo dia em qualquer
+ * relatório por data.
+ */
+function paidAtFor(day: string | undefined, today: string): Date | 'futuro' {
+  if (!day || day === today) return new Date();
+  if (day > today) return 'futuro';
+  return new Date(`${day}T15:00:00.000Z`);
+}
 
 export async function addQuotePayment(
   quoteId: string,
@@ -555,9 +582,21 @@ export async function addQuotePayment(
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId },
-    select: { id: true, patientId: true },
+    select: { id: true, patientId: true, total: true, payments: { select: { amount: true } } },
   });
   if (!quote) return { success: false, errors: { amount: ['Orçamento não encontrado'] } };
+
+  // Não deixa receber mais do que o orçamento vale: quase sempre é dígito a mais.
+  const pago = quote.payments.reduce((t, p) => t + Number(p.amount), 0);
+  const falta = Math.round((Number(quote.total) - pago) * 100) / 100;
+  if (parsed.data.amount > falta + 0.004) {
+    return {
+      success: false,
+      errors: { amount: [falta > 0 ? `Passa do que falta receber (${formatBRLText(falta)}).` : 'Este orçamento já está todo pago.'] },
+    };
+  }
+  const paidAt = paidAtFor(parsed.data.paidOn || undefined, clinicToday());
+  if (paidAt === 'futuro') return { success: false, errors: { paidOn: ['A data do pagamento não pode ser no futuro.'] } };
 
   const payment = await prisma.payment.create({
     data: {
@@ -567,6 +606,7 @@ export async function addQuotePayment(
       amount: parsed.data.amount,
       method: parsed.data.method || null,
       notes: parsed.data.notes || null,
+      paidAt,
       createdById: userId,
     },
   });
@@ -578,8 +618,11 @@ export async function addQuotePayment(
   revalidatePath(`/orcamentos/${quoteId}`);
   revalidatePath('/orcamentos');
   revalidatePath(`/pacientes/${quote.patientId}`);
-  return { success: true };
+  revalidatePath('/financeiro');
+  return { success: true, paymentId: payment.id };
 }
+
+const formatBRLText = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
 export async function deleteQuotePayment(paymentId: string, quoteId: string) {
   const { tenantId, userId } = await requireTenant();
@@ -589,12 +632,13 @@ export async function deleteQuotePayment(paymentId: string, quoteId: string) {
 
   const semAcesso = await capabilityBlocked(tenantId, 'financeiro');
   if (semAcesso) return;
-  await prisma.payment.deleteMany({ where: { id: paymentId, tenantId } });
+  await prisma.payment.deleteMany({ where: { id: paymentId, tenantId, quoteId } });
   await prisma.auditLog.create({
     data: { tenantId, userId, action: 'DELETE', entity: 'Payment', entityId: paymentId },
   });
   revalidatePath(`/orcamentos/${quoteId}`);
   revalidatePath('/orcamentos');
+  revalidatePath('/financeiro');
 }
 
 /** Clinic-side approval: marks the quote ACCEPTED so it counts in the financial
