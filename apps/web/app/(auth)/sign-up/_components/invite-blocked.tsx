@@ -48,7 +48,7 @@ export function InviteBlocked({ ticket, quem }: { ticket: string; quem: string }
       </button>
 
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-        Se a conta atual é sua e o convite é de outra pessoa, não saia — peça para ela abrir o
+        Se a conta atual é sua e o convite é de outra pessoa, não saia. Peça para ela abrir o
         e-mail no computador dela, ou abra o link numa janela anônima.
       </p>
     </div>

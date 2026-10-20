@@ -71,8 +71,8 @@ export async function Pricing() {
             Um preço que acompanha o tamanho da sua clínica
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
-            Comece grátis por {TRIAL_DAYS} dias, sem cartão. Depois escolha o plano que fizer sentido — paga
-            por PIX, boleto ou cartão, e cancela quando quiser.
+            Comece grátis por {TRIAL_DAYS} dias, sem cartão. Depois, escolha o plano que fizer sentido,
+            pague por PIX, boleto ou cartão e cancele quando quiser.
           </p>
         </div>
 
