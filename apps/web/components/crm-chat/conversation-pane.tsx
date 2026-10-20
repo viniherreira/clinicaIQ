@@ -31,6 +31,7 @@ export function ConversationPane({
   onBack,
   compact = false,
   canManage = false,
+  headerAction,
 }: {
   thread: ChatThread;
   quickReplies: QuickReplyOption[];
@@ -40,6 +41,8 @@ export function ConversationPane({
   compact?: boolean;
   /** Pode criar modelos (crm_config). */
   canManage?: boolean;
+  /** Botão extra no cabeçalho (nas Conversas: abrir o lead em tela pequena). */
+  headerAction?: React.ReactNode;
 }) {
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
@@ -47,7 +50,7 @@ export function ConversationPane({
 
   return (
     <section aria-label={`Conversa com ${c.name}`} className="flex min-h-0 flex-1 flex-col">
-      {!compact && <PaneHeader thread={thread} onChanged={onChanged} onBack={onBack} onAnnounce={setAviso} />}
+      {!compact && <PaneHeader thread={thread} onChanged={onChanged} onBack={onBack} onAnnounce={setAviso} action={headerAction} />}
 
       <ChatMessages
         messages={thread.messages}
@@ -114,11 +117,13 @@ function PaneHeader({
   onChanged,
   onBack,
   onAnnounce,
+  action,
 }: {
   thread: ChatThread;
   onChanged: () => void;
   onBack?: () => void;
   onAnnounce: (s: string) => void;
+  action?: React.ReactNode;
 }) {
   const c = thread.conversation;
   const [pending, start] = useTransition();
@@ -161,6 +166,7 @@ function PaneHeader({
         <div className="hidden flex-wrap items-center justify-end gap-2 sm:flex">
           <Links thread={thread} />
         </div>
+        {action}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
@@ -170,13 +176,14 @@ function PaneHeader({
       {(entrada || semNegocio) && (
         <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 ${entrada ? 'bg-amber-50 dark:bg-amber-950/40' : 'bg-surface-alt'}`}>
           <p className="mr-auto text-sm">
-            {entrada ? 'Número novo. Aceite para virar lead, ou ligue a quem já está no sistema.' : 'Sem negócio aberto com esta pessoa.'}
+            {entrada ? 'Número novo: crie o lead ou ligue a quem já está no sistema.' : 'Sem negócio aberto com esta pessoa.'}
           </p>
           <button
             type="button"
             disabled={pending}
             onClick={() => run(() => acceptConversationAction(c.id), entrada ? 'Aceito. O lead foi criado em Novo.' : 'Negócio criado em Novo.')}
-            className="btn-primary btn-sm"
+            // Na tela de Conversas larga, o "Criar lead" (com funil, etapa e tags) fica no painel ao lado.
+            className={`btn-primary btn-sm ${entrada && action ? 'xl:hidden' : ''}`}
           >
             {entrada ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
             {entrada ? 'Aceitar' : 'Criar negócio'}
@@ -190,7 +197,7 @@ function PaneHeader({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => declineConversationAction(c.id), 'Conversa recusada.')}
-                className="btn-ghost btn-sm"
+                className={`btn-ghost btn-sm ${action ? 'xl:hidden' : ''}`}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" /> Recusar
               </button>

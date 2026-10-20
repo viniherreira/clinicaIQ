@@ -1,3 +1,4 @@
+import { clinicToday } from '@/lib/tz';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
@@ -66,6 +67,7 @@ export default async function EditarOrcamentoPage({ params }: { params: Promise<
         procedures={procedures}
         professionals={comResponsavel}
         defaultValidUntil={fallbackValid}
+        today={clinicToday()}
         initial={initial}
       />
     </div>

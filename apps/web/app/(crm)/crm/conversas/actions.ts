@@ -42,13 +42,18 @@ const asTab = (t: string): InboxTab => ((INBOX_TABS as readonly string[]).includ
  * O que a tela de Conversas mostra agora. Chamada a cada poucos segundos
  * enquanto a tela está aberta; quem está com uma conversa aberta a lê.
  */
-export async function refreshInboxAction(input: { tab: string; q: string; selectedId: string | null }): Promise<Result<{ snapshot: InboxSnapshot }>> {
+export async function refreshInboxAction(input: {
+  tab: string;
+  q: string;
+  selectedId: string | null;
+  tagId?: string | null;
+}): Promise<Result<{ snapshot: InboxSnapshot }>> {
   const g = await guardCrmAction('crm', { write: false });
   if (!g.ok) return g;
   // A tela de Conversas aberta também dá o compasso do relógio do CRM.
   nudgeTick();
   const [list, counts, thread] = await Promise.all([
-    listConversations(g.db, g, asTab(input.tab), input.q),
+    listConversations(g.db, g, asTab(input.tab), input.q, 60, input.tagId || null),
     inboxCounts(g.db),
     input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId) : Promise.resolve(null),
   ]);
@@ -149,10 +154,18 @@ export async function startLeadChatAction(leadId: string, text: string): Promise
   return { ok: true, conversationId: conv.conversationId };
 }
 
-export async function acceptConversationAction(conversationId: string): Promise<Result<{ leadId: string }>> {
+export async function acceptConversationAction(
+  conversationId: string,
+  opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
+): Promise<Result<{ leadId: string }>> {
   const g = await guardCrmAction('crm');
   if (!g.ok) return g;
-  const r = await acceptConversation(g.db, g, conversationId);
+  const r = await acceptConversation(g.db, g, conversationId, {
+    name: typeof opts.name === 'string' ? opts.name.slice(0, 120) : undefined,
+    stageId: typeof opts.stageId === 'string' ? opts.stageId : null,
+    pipelineId: typeof opts.pipelineId === 'string' ? opts.pipelineId : null,
+    tagIds: Array.isArray(opts.tagIds) ? opts.tagIds.filter((t) => typeof t === 'string').slice(0, 20) : [],
+  });
   if (r.ok) revalidatePath('/crm');
   return r;
 }

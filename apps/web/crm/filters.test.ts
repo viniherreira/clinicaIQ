@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createdSince, parseFilters } from './filters';
+import { parseFilters } from './filters';
+import { NO_PERIOD } from './period';
 
 describe('parseFilters', () => {
   it('sem nada: leads ativos de todos', () => {
     expect(parseFilters({})).toEqual({
-      q: '', resp: 'all', tarefa: '', tags: [], origem: '', funil: '', etapa: '', criado: '', valorMin: null, valorMax: null,
+      q: '', resp: 'all', tarefa: '', tags: [], origem: '', funil: '', etapa: '', periodo: NO_PERIOD, valorMin: null, valorMax: null, campos: [],
     });
+  });
+
+  it('campos personalizados: campo_<id>=valor', () => {
+    expect(parseFilters({ campo_clx1abc2def3: 'Amil', campo_x: 'y' }).campos).toEqual([{ id: 'clx1abc2def3', value: 'Amil' }]);
   });
 
   it('várias tags separadas por vírgula; o que não parece id sai', () => {
@@ -19,32 +24,20 @@ describe('parseFilters', () => {
     expect(parseFilters({ vmin: 'abc' }).valorMin).toBeNull();
   });
 
-  it('origem, tarefa e período só aceitam os valores conhecidos', () => {
-    const f = parseFilters({ origem: 'HACK', tarefa: 'qualquer', criado: 'ontem' });
-    expect([f.origem, f.tarefa, f.criado]).toEqual(['', '', '']);
-    expect(parseFilters({ origem: 'INSTAGRAM', tarefa: 'overdue', criado: '7d' })).toMatchObject({
-      origem: 'INSTAGRAM',
-      tarefa: 'overdue',
-      criado: '7d',
+  it('origem e tarefa só aceitam os valores conhecidos', () => {
+    const f = parseFilters({ origem: 'HACK', tarefa: 'qualquer' });
+    expect([f.origem, f.tarefa]).toEqual(['', '']);
+    expect(parseFilters({ origem: 'INSTAGRAM', tarefa: 'overdue' })).toMatchObject({ origem: 'INSTAGRAM', tarefa: 'overdue' });
+  });
+
+  it('período: atalho, dias do calendário e o "criado" dos links antigos', () => {
+    expect(parseFilters({ periodo: 'mes-passado' }).periodo).toEqual({ field: 'criado', preset: 'mes-passado', from: '', to: '' });
+    expect(parseFilters({ de: '2026-10-01', ate: '2026-10-15' }).periodo).toEqual({
+      field: 'criado',
+      preset: '',
+      from: '2026-10-01',
+      to: '2026-10-15',
     });
-  });
-});
-
-describe('createdSince (fuso de Brasília)', () => {
-  // 13/10/2026 às 01:30 em Brasília = 04:30 UTC.
-  const agora = new Date('2026-10-13T04:30:00Z');
-
-  it('hoje começa à meia-noite de Brasília', () => {
-    expect(createdSince('hoje', agora)?.toISOString()).toBe('2026-10-13T03:00:00.000Z');
-  });
-
-  it('logo depois da meia-noite UTC ainda é o dia anterior em Brasília', () => {
-    expect(createdSince('hoje', new Date('2026-10-13T01:00:00Z'))?.toISOString()).toBe('2026-10-12T03:00:00.000Z');
-  });
-
-  it('7 dias contam hoje e os 6 anteriores; o mês começa no dia 1', () => {
-    expect(createdSince('7d', agora)?.toISOString()).toBe('2026-10-07T03:00:00.000Z');
-    expect(createdSince('mes', agora)?.toISOString()).toBe('2026-10-01T03:00:00.000Z');
-    expect(createdSince('', agora)).toBeNull();
+    expect(parseFilters({ criado: '7d' }).periodo.preset).toBe('7d');
   });
 });

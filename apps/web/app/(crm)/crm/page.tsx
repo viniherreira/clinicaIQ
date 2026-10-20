@@ -1,6 +1,10 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { requireCrm } from '@/crm/guard';
-import { loadBoardLeads, parseFilters, tagCounts } from '@/crm/board-data';
+import { BOARD_LIMIT, countLeads, loadBoardLeads, parseFilters, tagCounts } from '@/crm/board-data';
+import { OPEN_LEAD } from '@/crm/leads';
+import { hasPeriod } from '@/crm/period';
+import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
 import { classifyPending, listConversations } from '@/crm/conversations';
 import { can } from '@/lib/permissions';
@@ -17,6 +21,14 @@ export default async function FunilPage({
 }) {
   const ctx = await requireCrm('crm');
   const sp = await searchParams;
+  // Leads fechados não têm coluna no quadro: período de fechamento abre a lista.
+  const pedido = parseFilters(sp);
+  if (pedido.periodo.field === 'fechado' && hasPeriod(pedido.periodo)) {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (typeof v === 'string' && v && k !== 'editar') q.set(k, v);
+    if (!q.get('situacao')) q.set('situacao', 'todos');
+    redirect(`/crm/leads?${q.toString()}`);
+  }
   const canConfig = can(ctx.role, 'crm_config');
   // O funil da URL; sem ela, o último aberto; sem nada, o principal.
   const lembrado = (await cookies()).get('crm-funil')?.value;
@@ -28,8 +40,9 @@ export default async function FunilPage({
   const editando = sp.editar === '1' && canConfig;
 
   await classifyPending(ctx.db, ctx.tenantId);
-  const [leads, inbox, counts, porEtapa] = await Promise.all([
+  const [leads, total, inbox, counts, porEtapa] = await Promise.all([
     editando ? Promise.resolve([]) : loadBoardLeads(ctx, filters),
+    editando ? Promise.resolve(0) : countLeads(ctx, filters, OPEN_LEAD),
     editando ? Promise.resolve([]) : listConversations(ctx.db, ctx, 'inbox', '', 30),
     tagCounts(ctx),
     editando
@@ -61,13 +74,21 @@ export default async function FunilPage({
         filters={filters}
         tags={basics.tags.map((t) => ({ ...t, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
+        fields={basics.fields}
         procedures={basics.procedures}
         meId={ctx.userId}
-        summary={{ count: leads.length, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
+        summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
         pipelines={basics.pipelines}
         currentPipeline={funil}
         canConfig={canConfig}
+        today={clinicToday()}
       />
+      {total > BOARD_LIMIT && (
+        <p role="status" className="border-b border-border bg-surface-alt px-4 py-2 text-xs text-muted-foreground">
+          O quadro mostra os {BOARD_LIMIT.toLocaleString('pt-BR')} primeiros de {total.toLocaleString('pt-BR')} leads. Use os filtros
+          (período, etapa, tags) para chegar nos outros, ou a Lista.
+        </p>
+      )}
       <Board
         key={funil.id}
         stages={funil.columns}

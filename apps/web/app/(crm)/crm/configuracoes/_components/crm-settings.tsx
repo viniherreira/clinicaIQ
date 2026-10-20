@@ -7,6 +7,8 @@ import { Plus, Save, Trash2 } from 'lucide-react';
 import { COLOR_LABEL, colorClasses } from '@/crm/colors';
 import { CRM_COLORS } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
+import type { FieldDef } from '@/crm/custom-fields';
+import { FieldsTab } from './fields-tab';
 import {
   deleteQuickReplyAction, deleteTagAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
 } from '../actions';
@@ -22,7 +24,7 @@ const inputCls =
 const iconBtn =
   'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40';
 
-export type SettingsTab = 'funis' | 'tags' | 'motivos' | 'respostas';
+export type SettingsTab = 'funis' | 'tags' | 'campos' | 'motivos' | 'respostas';
 
 /** As abas das configurações do CRM. Automações, robôs e modelos ficam em Automações. */
 export function CrmSettings({
@@ -30,10 +32,12 @@ export function CrmSettings({
   tags,
   reasons,
   quickReplies,
+  fields,
   initialTab = 'funis',
 }: {
   pipelines: PipelineRow[];
   tags: Tag[];
+  fields: FieldDef[];
   reasons: Reason[];
   quickReplies: QuickReply[];
   initialTab?: SettingsTab;
@@ -54,6 +58,7 @@ export function CrmSettings({
   const abas = [
     { key: 'funis' as const, label: 'Funis' },
     { key: 'tags' as const, label: 'Tags' },
+    { key: 'campos' as const, label: 'Campos' },
     { key: 'motivos' as const, label: 'Motivos de perda' },
     { key: 'respostas' as const, label: 'Respostas rápidas' },
   ];
@@ -80,6 +85,7 @@ export function CrmSettings({
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} className="pt-5">
         {aba === 'funis' && <Funis pipelines={pipelines} />}
         {aba === 'tags' && <Tags tags={tags} pending={pending} agir={agir} />}
+        {aba === 'campos' && <FieldsTab fields={fields} pending={pending} agir={agir} />}
         {aba === 'motivos' && <Motivos reasons={reasons} pending={pending} agir={agir} />}
         {aba === 'respostas' && <Respostas items={quickReplies} pending={pending} agir={agir} />}
       </div>

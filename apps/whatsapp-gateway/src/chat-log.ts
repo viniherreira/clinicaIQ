@@ -164,7 +164,7 @@ export async function recordChatMessage(
       // Quem respondeu pelo celular leu, e o robô do CRM sai da conversa.
       data.unreadCount = 0;
       data.awaitingReply = false;
-      Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0 });
+      Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null });
     }
     if (Object.keys(data).length > 0) {
       await prisma.conversation.update({ where: { id: conv.id }, data });

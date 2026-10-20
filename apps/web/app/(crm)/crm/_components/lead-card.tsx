@@ -8,9 +8,12 @@ import { colorClasses } from '@/crm/colors';
 import { formatCents, formatDue, formatWallDateTime, initials, timeAgo } from '@/crm/format';
 import type { BoardLead, BoardStage } from '@/crm/types';
 
-/** "09/10/2026", como no card do Kommo. */
+/** "09/10" neste ano, "09/10/2025" nos outros — sobra espaço para o nome no card. */
 function dataCurta(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const fmt = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', ...o });
+  const d = new Date(iso);
+  const mesmoAno = fmt(d, { year: 'numeric' }) === fmt(new Date(), { year: 'numeric' });
+  return mesmoAno ? fmt(d, { day: '2-digit', month: '2-digit' }) : fmt(d, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export type MoveTarget = { kind: 'stage'; stageId: string } | { kind: 'won' } | { kind: 'lost' } | { kind: 'delete' };
@@ -73,12 +76,12 @@ export function LeadCard({
           <div className="flex items-start justify-between gap-2">
             <Link
               href={`/crm/leads/${lead.id}`}
-              className="min-w-0 truncate font-semibold leading-snug text-foreground after:absolute after:inset-0 after:rounded-[5px] hover:text-link focus-visible:outline-none"
+              className="line-clamp-2 min-w-0 break-words font-semibold leading-snug text-foreground after:absolute after:inset-0 after:rounded-[5px] hover:text-link focus-visible:outline-none"
             >
               {titulo}
             </Link>
             <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground">
-              <span title={`Nesta etapa ${timeAgo(new Date(lead.stageEnteredAt))}`}>
+              <span title={`Criado em ${new Date(lead.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} · nesta etapa ${timeAgo(new Date(lead.stageEnteredAt))}`} className="tabular-nums">
                 <span className="sr-only">Criado em </span>
                 {dataCurta(lead.createdAt)}
               </span>
@@ -110,6 +113,11 @@ export function LeadCard({
           {lead.valueCents != null && lead.valueCents > 0 && (
             <p className="text-xs tabular-nums text-foreground/90">{formatCents(lead.valueCents)}</p>
           )}
+          {lead.cardFields.map((c) => (
+            <p key={c.name} className="truncate text-xs text-muted-foreground">
+              {c.name}: <span className="text-foreground/90">{c.value}</span>
+            </p>
+          ))}
         </div>
       </div>
 

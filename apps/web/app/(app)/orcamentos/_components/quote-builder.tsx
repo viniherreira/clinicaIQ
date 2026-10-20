@@ -2,22 +2,19 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Search, Trash2, Loader2, Copy, ClipboardList } from 'lucide-react';
 import { createQuote, updateQuote, searchQuotePatients, type QuoteFormState } from '../actions';
 import { formatBRL, maskBRLInput, brlToNumber } from './constants';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { describePayment, MAX_INSTALLMENTS, PAYMENT_METHODS } from '@/lib/payment-terms';
+import { paymentSchedule } from '@/lib/payment-schedule';
+import { parseTeeth, teethLabel } from '@/lib/teeth';
+import { ProcedurePicker, type ProcedureOption } from './procedure-picker';
+import { ToothPicker } from './tooth-picker';
 
 /** O Select do Radix não aceita valor vazio; isto faz o papel de "nenhum". */
 const NENHUM = 'none';
 
-interface ProcedureOption {
-  id: string;
-  name: string;
-  basePrice: number;
-  allowsDiscount: boolean;
-  maxDiscountPercent: number | null;
-}
 interface Patient {
   id: string;
   name: string;
@@ -45,6 +42,8 @@ interface Props {
   procedures: ProcedureOption[];
   professionals: ProfessionalOption[];
   defaultValidUntil: string;
+  /** Hoje na clínica (AAAA-MM-DD), para a prévia das parcelas. */
+  today?: string;
   initial?: {
     patient: Patient;
     professionalId: string | null;
@@ -72,6 +71,7 @@ export function QuoteBuilder({
   procedures,
   professionals,
   defaultValidUntil,
+  today,
   initial,
   initialPatient,
 }: Props) {
@@ -93,7 +93,6 @@ export function QuoteBuilder({
   const [validUntil, setValidUntil] = useState(initial?.validUntil ?? defaultValidUntil);
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [internalNotes, setInternalNotes] = useState(initial?.internalNotes ?? '');
-  const [procToAdd, setProcToAdd] = useState('');
   // Com um profissional só, ele é o responsável — perguntar seria burocracia.
   const [professionalId, setProfessionalId] = useState<string>(
     initial ? (initial.professionalId ?? NENHUM) : professionals.length === 1 ? professionals[0].id : NENHUM,
@@ -126,9 +125,7 @@ export function QuoteBuilder({
     return { subtotal, discountAmount, total };
   }, [items, discountType, discountValue]);
 
-  function addProcedure(id: string) {
-    const proc = procedures.find((p) => p.id === id);
-    if (!proc) return;
+  function addProcedure(proc: ProcedureOption) {
     setItems((prev) => [
       ...prev,
       {
@@ -142,7 +139,21 @@ export function QuoteBuilder({
         maxDiscount: proc.allowsDiscount ? (proc.maxDiscountPercent ?? 100) : 0,
       },
     ]);
-    setProcToAdd('');
+  }
+
+  /** O mesmo procedimento em outro dente: copia tudo menos dente e região. */
+  function duplicateItem(key: string) {
+    setItems((prev) => {
+      const i = prev.findIndex((it) => it.key === key);
+      if (i < 0) return prev;
+      const copia = { ...prev[i], key: newKey(), description: '', quantity: 1 };
+      return [...prev.slice(0, i + 1), copia, ...prev.slice(i + 1)];
+    });
+  }
+
+  /** Dentes escolhidos no odontograma viram o texto do item e a quantidade (um por dente). */
+  function setTeeth(key: string, teeth: number[]) {
+    updateItem(key, { description: teethLabel(teeth), quantity: Math.max(1, teeth.length) });
   }
 
   function addCustom() {
@@ -172,6 +183,11 @@ export function QuoteBuilder({
     method: paymentMethod === NENHUM ? null : paymentMethod,
   });
   const downTooBig = downPayment > totals.total + 0.004 && totals.total > 0;
+  // Como ficariam as parcelas se o orçamento fosse aprovado hoje.
+  const plano = paymentSchedule(
+    { total: totals.total, downPayment: effectiveDown, installments, method: paymentMethod === NENHUM ? null : paymentMethod },
+    today ?? new Date().toISOString().slice(0, 10),
+  );
 
   const fieldErr = (k: string) => (state && !state.success ? state.errors?.[k]?.[0] : undefined);
   const inputCls = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
@@ -235,82 +251,101 @@ export function QuoteBuilder({
         </section>
 
         {/* Items */}
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Procedimentos</h2>
-            <div className="flex items-center gap-2">
-              <Select value={procToAdd || undefined} onValueChange={(v) => addProcedure(v)}>
-                <SelectTrigger className="h-9 w-56 max-w-full" aria-label="Adicionar procedimento">
-                  <SelectValue placeholder="+ Adicionar procedimento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {procedures.length === 0 && <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum procedimento ativo</div>}
-                  {procedures.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} — {formatBRL(p.basePrice)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button type="button" onClick={addCustom} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-sm hover:bg-surface-alt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Item
-              </button>
-            </div>
+        <section aria-labelledby="q-itens" className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <h2 id="q-itens" className="text-sm font-semibold">Procedimentos</h2>
+            {items.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {items.length} {items.length === 1 ? 'item' : 'itens'} · {formatBRL(totals.subtotal)}
+              </span>
+            )}
           </div>
+          <ProcedurePicker procedures={procedures} onPick={addProcedure} onCustom={addCustom} />
 
           {items.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border py-8 text-center text-sm text-muted-foreground">Adicione procedimentos ao orçamento.</p>
+            <div className="mt-3 flex flex-col items-center gap-1 rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+              <ClipboardList className="h-6 w-6" aria-hidden="true" />
+              Busque um procedimento acima para começar. Enter adiciona.
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {items.map((it) => (
-                <li key={it.key} className="rounded-lg border border-border p-3">
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="text"
-                      value={it.name}
-                      onChange={(e) => updateItem(it.key, { name: e.target.value })}
-                      placeholder="Nome do item"
-                      aria-label="Nome do item"
-                      maxLength={160}
-                      className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                    />
-                    <input
-                      type="text"
-                      value={it.description}
-                      onChange={(e) => updateItem(it.key, { description: e.target.value })}
-                      placeholder="Dente / região"
-                      aria-label={`Dente ou região de ${it.name || 'item'}`}
-                      maxLength={160}
-                      className="h-9 w-36 shrink-0 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-44"
-                    />
-                    <button type="button" onClick={() => removeItem(it.key)} aria-label={`Remover ${it.name || 'item'}`} className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      Valor unit.
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-                        <input inputMode="numeric" value={it.unitPrice ? maskBRLInput(String(Math.round(it.unitPrice * 100))) : ''} onChange={(e) => updateItem(it.key, { unitPrice: brlToNumber(e.target.value) })} className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" placeholder="0,00" aria-label="Valor unitário" />
-                      </div>
-                    </label>
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      Qtd.
-                      <input type="number" min={1} max={999} value={it.quantity} onChange={(e) => updateItem(it.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Quantidade" />
-                    </label>
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      Desc. {it.maxDiscount != null && it.maxDiscount < 100 ? `(máx ${it.maxDiscount}%)` : '%'}
-                      <input type="number" min={0} max={it.maxDiscount ?? 100} value={it.discountPercent || ''} onChange={(e) => updateItem(it.key, { discountPercent: Math.min(it.maxDiscount ?? 100, Math.max(0, Number(e.target.value) || 0)) })} className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Desconto do item em %" />
-                    </label>
-                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      Subtotal
-                      <span className="flex h-9 items-center justify-end px-1 text-sm font-medium tabular-nums text-foreground">
-                        {formatBRL(round2(it.unitPrice * it.quantity * (1 - (it.discountPercent || 0) / 100)))}
+            <ol className="mt-3 divide-y divide-border rounded-lg border border-border">
+              {items.map((it, i) => {
+                const linha = round2(it.unitPrice * it.quantity * (1 - (it.discountPercent || 0) / 100));
+                const dentes = parseTeeth(it.description);
+                return (
+                  <li key={it.key} className="p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="mt-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-alt text-[11px] font-semibold text-muted-foreground" aria-hidden="true">
+                        {i + 1}
                       </span>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            value={it.name}
+                            onChange={(e) => updateItem(it.key, { name: e.target.value })}
+                            placeholder="Nome do item"
+                            aria-label="Nome do item"
+                            maxLength={160}
+                            className="h-9 min-w-[180px] flex-1 rounded-md border border-border bg-background px-2.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                          />
+                          <input
+                            type="text"
+                            value={it.description}
+                            onChange={(e) => updateItem(it.key, { description: e.target.value })}
+                            placeholder="Dente / região"
+                            aria-label={`Dente ou região de ${it.name || 'item'}`}
+                            maxLength={160}
+                            className="h-9 w-40 rounded-md border border-border bg-background px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-48"
+                          />
+                          <ToothPicker value={dentes} onChange={(t) => setTeeth(it.key, t)} itemName={it.name} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_80px_100px_1fr]">
+                          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Valor unitário
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                              <input inputMode="numeric" value={it.unitPrice ? maskBRLInput(String(Math.round(it.unitPrice * 100))) : ''} onChange={(e) => updateItem(it.key, { unitPrice: brlToNumber(e.target.value) })} className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" placeholder="0,00" aria-label="Valor unitário" />
+                            </div>
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Qtd.
+                            <input type="number" min={1} max={999} value={it.quantity} onChange={(e) => updateItem(it.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="Quantidade" />
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Desconto {it.maxDiscount === 0 ? '(não aceita)' : it.maxDiscount != null && it.maxDiscount < 100 ? `(até ${it.maxDiscount}%)` : '%'}
+                            <input
+                              type="number"
+                              min={0}
+                              max={it.maxDiscount ?? 100}
+                              value={it.discountPercent || ''}
+                              disabled={it.maxDiscount === 0}
+                              title={it.maxDiscount === 0 ? 'Este procedimento não aceita desconto (ver Procedimentos).' : undefined}
+                              onChange={(e) => updateItem(it.key, { discountPercent: Math.min(it.maxDiscount ?? 100, Math.max(0, Number(e.target.value) || 0)) })}
+                              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm tabular-nums disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                              aria-label="Desconto do item em %"
+                              placeholder="0"
+                            />
+                          </label>
+                          <div className="col-span-2 flex flex-col gap-1 text-xs text-muted-foreground sm:col-span-1">
+                            <span className="sm:text-right">Total do item</span>
+                            <span className="flex h-9 items-center justify-end text-base font-semibold tabular-nums text-foreground">{formatBRL(linha)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <button type="button" onClick={() => duplicateItem(it.key)} aria-label={`Duplicar ${it.name || 'item'}`} title="Duplicar (outro dente)" className="rounded-md p-2 text-muted-foreground hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                          <Copy className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => removeItem(it.key)} aria-label={`Remover ${it.name || 'item'}`} title="Remover" className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                );
+              })}
+            </ol>
           )}
           {fieldErr('items') && <p className="mt-2 text-xs text-destructive">{fieldErr('items')}</p>}
         </section>
@@ -361,19 +396,29 @@ export function QuoteBuilder({
           )}
 
           <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Desconto geral</span>
+            <span id="q-desc-label" className="text-xs font-medium text-muted-foreground">Desconto geral</span>
             <div className="flex gap-2">
-              <Select value={discountType} onValueChange={(v) => setDiscountType(v as 'PERCENT' | 'FIXED')}>
-                <SelectTrigger className="w-20 shrink-0" aria-label="Tipo de desconto"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PERCENT">%</SelectItem>
-                  <SelectItem value="FIXED">R$</SelectItem>
-                </SelectContent>
-              </Select>
+              <div role="group" aria-labelledby="q-desc-label" className="segmented shrink-0">
+                {(['PERCENT', 'FIXED'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={discountType === t}
+                    onClick={() => {
+                      setDiscountType(t);
+                      setDiscountValue(0);
+                    }}
+                    className="segmented-item px-3"
+                  >
+                    {t === 'PERCENT' ? '%' : 'R$'}
+                    <span className="sr-only">{t === 'PERCENT' ? ' em porcentagem' : ' em reais'}</span>
+                  </button>
+                ))}
+              </div>
               {discountType === 'PERCENT' ? (
-                <input type="number" min={0} max={100} value={discountValue || ''} onChange={(e) => setDiscountValue(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={inputCls} placeholder="0" aria-label="Valor do desconto em porcentagem" />
+                <input type="number" min={0} max={100} value={discountValue || ''} onChange={(e) => setDiscountValue(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={`${inputCls} min-w-0`} placeholder="0" aria-label="Valor do desconto em porcentagem" />
               ) : (
-                <input inputMode="numeric" value={discountValue ? maskBRLInput(String(Math.round(discountValue * 100))) : ''} onChange={(e) => setDiscountValue(brlToNumber(e.target.value))} className={inputCls} placeholder="0,00" aria-label="Valor do desconto em reais" />
+                <input inputMode="numeric" value={discountValue ? maskBRLInput(String(Math.round(discountValue * 100))) : ''} onChange={(e) => setDiscountValue(brlToNumber(e.target.value))} className={`${inputCls} min-w-0`} placeholder="0,00" aria-label="Valor do desconto em reais" />
               )}
             </div>
           </div>
@@ -451,6 +496,18 @@ export function QuoteBuilder({
             >
               {downTooBig ? 'A entrada é maior que o total do orçamento.' : paymentPreview}
             </p>
+            {!downTooBig && plano.length > 1 && (
+              <ol aria-label="Parcelas, contando da aprovação" className="max-h-40 space-y-1 overflow-y-auto text-xs">
+                {plano.map((p) => (
+                  <li key={p.key} className="flex justify-between gap-2 tabular-nums">
+                    <span className="text-muted-foreground">
+                      {p.label} · {p.dueDate.split('-').reverse().join('/')}
+                    </span>
+                    <span className="font-medium">{formatBRL(p.amount)}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </fieldset>
 
           <button type="submit" disabled={pending} className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

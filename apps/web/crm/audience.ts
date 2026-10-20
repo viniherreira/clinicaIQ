@@ -1,13 +1,16 @@
 import type { LeadSource, Prisma } from '@clinicaiq/db';
+import { isDay, parsePeriod, rangeWhere, resolvePeriod, type PeriodField } from './period';
+import { anyFieldWhere, parseFieldFilters, type FieldFilter } from './custom-fields';
 
 /**
  * Quem recebe uma transmissão: os mesmos filtros da busca de leads (funil,
- * etapa, tags, dia de entrada, situação, origem, responsável). Puro — a tela
- * monta, o servidor confere de novo com `parseAudience`.
+ * etapa, tags, período, situação, origem, responsável, tarefas, valor e nome).
+ * Puro — a tela monta, o servidor confere de novo com `parseAudience`.
  *
  * Lista vazia = não filtra por aquilo.
  */
 export type AudienceStatus = 'abertos' | 'ganhos' | 'perdidos' | 'todos';
+export type AudienceTask = '' | 'none' | 'overdue';
 
 export interface Audience {
   pipelineIds: string[];
@@ -19,10 +22,22 @@ export interface Audience {
   excludeTagIds: string[];
   sources: LeadSource[];
   assignedToIds: string[];
-  /** Dia em que o lead entrou, "AAAA-MM-DD" no horário da clínica (inclusive). */
-  createdFrom: string;
-  createdTo: string;
+  /** Qual data conta no período: entrada do lead ou fechamento (ganho/perdido). */
+  dateField: PeriodField;
+  /** "AAAA-MM-DD" no horário da clínica, inclusive. Dias fixos: a transmissão
+      agendada para amanhã manda para quem estava no período escolhido hoje. */
+  dateFrom: string;
+  dateTo: string;
   status: AudienceStatus;
+  /** Situação da tarefa na hora do envio: sem tarefa aberta ou com atrasada. */
+  task: AudienceTask;
+  /** Valor de venda em reais. */
+  valueMin: number | null;
+  valueMax: number | null;
+  /** Nome ou título do negócio contém. */
+  search: string;
+  /** Campos personalizados (lista e sim/não), vindos da busca de leads. */
+  fields: FieldFilter[];
 }
 
 export const EMPTY_AUDIENCE: Audience = {
@@ -33,20 +48,29 @@ export const EMPTY_AUDIENCE: Audience = {
   excludeTagIds: [],
   sources: [],
   assignedToIds: [],
-  createdFrom: '',
-  createdTo: '',
+  dateField: 'criado',
+  dateFrom: '',
+  dateTo: '',
   status: 'abertos',
+  task: '',
+  valueMin: null,
+  valueMax: null,
+  search: '',
+  fields: [],
 };
 
 const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
 const STATUS: readonly AudienceStatus[] = ['abertos', 'ganhos', 'perdidos', 'todos'];
-const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Lê o público vindo da tela (ou de uma transmissão antiga) sem confiar em nada. */
 export function parseAudience(raw: unknown): Audience {
   const a = (raw ?? {}) as Record<string, unknown>;
   const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 50) : []);
-  const dia = (v: unknown) => (typeof v === 'string' && DIA.test(v) && !Number.isNaN(Date.parse(v)) ? v : '');
+  const dia = (v: unknown) => (typeof v === 'string' && isDay(v) ? v : '');
+  const reais = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(v, 100_000_000) : null);
+  // Transmissões gravadas antes do período por fechamento guardavam "createdFrom/To".
+  const de = dia(a.dateFrom) || dia(a.createdFrom);
+  const ate = dia(a.dateTo) || dia(a.createdTo);
   return {
     pipelineIds: ids(a.pipelineIds),
     stageIds: ids(a.stageIds),
@@ -55,18 +79,25 @@ export function parseAudience(raw: unknown): Audience {
     excludeTagIds: ids(a.excludeTagIds),
     sources: ids(a.sources).filter((s): s is LeadSource => (SOURCES as readonly string[]).includes(s)),
     assignedToIds: ids(a.assignedToIds),
-    createdFrom: dia(a.createdFrom),
-    createdTo: dia(a.createdTo),
+    dateField: a.dateField === 'fechado' && (de || ate) ? 'fechado' : 'criado',
+    dateFrom: de,
+    dateTo: ate,
     status: STATUS.includes(a.status as AudienceStatus) ? (a.status as AudienceStatus) : 'abertos',
+    task: a.task === 'none' || a.task === 'overdue' ? a.task : '',
+    valueMin: reais(a.valueMin),
+    valueMax: reais(a.valueMax),
+    search: typeof a.search === 'string' ? a.search.trim().slice(0, 80) : '',
+    fields: Array.isArray(a.fields)
+      ? a.fields
+          .filter((f): f is FieldFilter => !!f && typeof f === 'object' && typeof (f as FieldFilter).id === 'string' && typeof (f as FieldFilter).value === 'string')
+          .slice(0, 10)
+          .map((f) => ({ id: f.id.slice(0, 40), value: f.value.slice(0, 60) }))
+      : [],
   };
 }
 
-/** Início do dia (00:00 em Brasília, sem horário de verão) e o fim (23:59:59.999). */
-const inicioDoDia = (d: string) => new Date(`${d}T00:00:00-03:00`);
-const fimDoDia = (d: string) => new Date(`${d}T23:59:59.999-03:00`);
-
 /** Os leads que batem com o público. Nunca os excluídos. */
-export function audienceWhere(a: Audience): Prisma.LeadWhereInput {
+export function audienceWhere(a: Audience, now: Date = new Date()): Prisma.LeadWhereInput {
   const and: Prisma.LeadWhereInput[] = [];
   if (a.status === 'abertos') and.push({ wonAt: null, lostAt: null });
   if (a.status === 'ganhos') and.push({ wonAt: { not: null } });
@@ -81,40 +112,66 @@ export function audienceWhere(a: Audience): Prisma.LeadWhereInput {
   if (a.excludeTagIds.length) and.push({ tags: { none: { tagId: { in: a.excludeTagIds } } } });
   if (a.sources.length) and.push({ source: { in: a.sources } });
   if (a.assignedToIds.length) and.push({ assignedToId: { in: a.assignedToIds } });
-  if (a.createdFrom || a.createdTo) {
+  const periodo = rangeWhere(a.dateField, a.dateFrom, a.dateTo);
+  if (periodo) and.push(periodo);
+  // As mesmas regras de `taskStatus`: sem tarefa aberta; ou alguma aberta já vencida.
+  if (a.task === 'none') and.push({ tasks: { none: { completedAt: null } } });
+  if (a.task === 'overdue') and.push({ tasks: { some: { completedAt: null, dueAt: { lt: now } } } });
+  if (a.valueMin != null || a.valueMax != null) {
     and.push({
-      createdAt: {
-        ...(a.createdFrom ? { gte: inicioDoDia(a.createdFrom) } : {}),
-        ...(a.createdTo ? { lte: fimDoDia(a.createdTo) } : {}),
+      estimatedValueCents: {
+        ...(a.valueMin != null ? { gte: Math.round(a.valueMin * 100) } : {}),
+        ...(a.valueMax != null ? { lte: Math.round(a.valueMax * 100) } : {}),
       },
     });
   }
+  if (a.search) and.push({ OR: [{ name: { contains: a.search, mode: 'insensitive' } }, { title: { contains: a.search, mode: 'insensitive' } }] });
+  for (const f of a.fields) and.push(anyFieldWhere(f));
   return { deletedAt: null, ...(and.length ? { AND: and } : {}) };
 }
 
 /**
  * O público a partir dos filtros da busca de leads (a URL do funil ou da
- * lista), para o "Enviar transmissão para estes leads".
+ * lista), para o "Enviar transmissão para estes leads": a lista de quem
+ * recebe é a mesma que estava na tela.
+ *
+ * `meId` resolve "Meus leads". O período vira dias fixos (os de hoje).
+ * Busca por telefone não vira público — é uma pessoa só.
  */
-export function audienceFromSearch(sp: Record<string, string | string[] | undefined>, today: string): Audience {
+export function audienceFromSearch(
+  sp: Record<string, string | string[] | undefined>,
+  today: string,
+  meId?: string,
+): Audience {
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
   const lista = (k: string) => one(k).split(',').map((x) => x.trim()).filter(Boolean);
-  const criado = one('criado');
-  const desde = (dias: number) => {
-    const d = new Date(`${today}T12:00:00-03:00`);
-    d.setUTCDate(d.getUTCDate() - dias);
-    return d.toISOString().slice(0, 10);
+  const reais = (k: string) => {
+    const n = Number(one(k).replace(',', '.'));
+    return one(k) && Number.isFinite(n) && n >= 0 ? n : null;
   };
-  const createdFrom =
-    criado === 'hoje' ? today : criado === '7d' ? desde(6) : criado === '30d' ? desde(29) : criado === 'mes' ? `${today.slice(0, 8)}01` : '';
+  const periodo = parsePeriod(sp);
+  const dias = resolvePeriod(periodo, today);
   const situacao = one('situacao');
+  const resp = one('resp');
+  const tarefa = one('tarefa');
+  const q = one('q').trim();
+  let status: AudienceStatus = situacao === 'ganhos' || situacao === 'perdidos' || situacao === 'todos' ? situacao : 'abertos';
+  // Fechados num período nunca estão abertos: a lista mostrava todos os fechados.
+  if (dias && periodo.field === 'fechado' && status === 'abertos') status = 'todos';
   return parseAudience({
     pipelineIds: one('funil') ? [one('funil')] : [],
     stageIds: one('etapa') ? [one('etapa')] : [],
     tagIds: lista('tag'),
     sources: one('origem') ? [one('origem')] : [],
-    assignedToIds: one('resp') && one('resp') !== 'me' ? [one('resp')] : [],
-    createdFrom,
-    status: situacao === 'ganhos' || situacao === 'perdidos' || situacao === 'todos' ? situacao : 'abertos',
+    assignedToIds: resp === 'me' ? (meId ? [meId] : []) : resp && resp !== 'all' ? [resp] : [],
+    dateField: periodo.field,
+    dateFrom: dias?.from ?? '',
+    dateTo: dias?.to ?? '',
+    status,
+    task: tarefa,
+    valueMin: reais('vmin'),
+    valueMax: reais('vmax'),
+    search: q.replace(/\D/g, '').length >= 10 ? '' : q,
+    fields: parseFieldFilters(sp),
   });
 }
