@@ -347,7 +347,7 @@ function ConversationList({
                 <span className="mt-0.5 flex items-center gap-2">
                   <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>
                     {c.previewFrom && <span className="font-medium">{c.previewFrom}: </span>}
-                    {c.preview || '—'}
+                    {c.preview || '-'}
                   </span>
                   {!lida && (
                     <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">

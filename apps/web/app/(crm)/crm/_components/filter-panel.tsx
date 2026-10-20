@@ -55,9 +55,9 @@ function chipsFor(
   const out: { key: string; label: string; clear: Partial<BoardFilters> }[] = [];
   const atalho = presetLabel(f) !== 'Filtro';
   if (hasPeriod(f.periodo)) out.push({ key: 'periodo', label: periodLabel(f.periodo), clear: { periodo: { ...NO_PERIOD } } });
-  if (f.etapa) out.push({ key: 'etapa', label: `Etapa: ${ctx.stages.find((s) => s.id === f.etapa)?.name ?? '—'}`, clear: { etapa: '' } });
+  if (f.etapa) out.push({ key: 'etapa', label: `Etapa: ${ctx.stages.find((s) => s.id === f.etapa)?.name ?? '-'}`, clear: { etapa: '' } });
   if (f.funil && ctx.pipelines.length > 1) {
-    out.push({ key: 'funil', label: `Funil: ${ctx.pipelines.find((p) => p.id === f.funil)?.name ?? '—'}`, clear: { funil: '', etapa: '' } });
+    out.push({ key: 'funil', label: `Funil: ${ctx.pipelines.find((p) => p.id === f.funil)?.name ?? '-'}`, clear: { funil: '', etapa: '' } });
   }
   if (f.tags.length) {
     const nome = f.tags.length === 1 ? ctx.tags.find((t) => t.id === f.tags[0])?.name : null;
@@ -70,13 +70,13 @@ function chipsFor(
   }
   if (!atalho && f.resp === 'me') out.push({ key: 'resp', label: 'Responsável: eu', clear: { resp: 'all' } });
   if (f.resp !== 'all' && f.resp !== 'me') {
-    out.push({ key: 'resp', label: `Responsável: ${ctx.team.find((p) => p.id === f.resp)?.name ?? '—'}`, clear: { resp: 'all' } });
+    out.push({ key: 'resp', label: `Responsável: ${ctx.team.find((p) => p.id === f.resp)?.name ?? '-'}`, clear: { resp: 'all' } });
   }
   if (!atalho && f.tarefa) out.push({ key: 'tarefa', label: f.tarefa === 'none' ? 'Sem tarefas' : 'Tarefas atrasadas', clear: { tarefa: '' } });
   if (f.valorMin != null || f.valorMax != null) {
     const v =
       f.valorMin != null && f.valorMax != null
-        ? `${reaisCurto(f.valorMin)} – ${reaisCurto(f.valorMax)}`
+        ? `${reaisCurto(f.valorMin)} a ${reaisCurto(f.valorMax)}`
         : f.valorMin != null
           ? `a partir de ${reaisCurto(f.valorMin)}`
           : `até ${reaisCurto(f.valorMax!)}`;
@@ -231,7 +231,7 @@ export function FilterSearch({
           className="shrink-0 rounded bg-primary/15 px-2 py-0.5 text-xs font-medium text-link hover:bg-primary/25 focus-visible:outline-2 focus-visible:outline-ring"
         >
           {label}
-          <span className="sr-only"> — abrir filtros</span>
+          <span className="sr-only">, abrir filtros</span>
         </button>
         {chips.length > 0 && (
           <ul aria-label="Filtros ligados" className="hidden flex-none items-center gap-1 md:flex">
@@ -405,7 +405,7 @@ export function FilterSearch({
                     onChange={(e) => setRascunho({ ...rascunho, valorMin: reais(e.target.value) })}
                     className={campo}
                   />
-                  <span aria-hidden="true" className="text-muted-foreground">–</span>
+                  <span aria-hidden="true" className="text-muted-foreground">a</span>
                   <label htmlFor={`${id}-vmax`} className="sr-only">Valor de venda máximo (R$)</label>
                   <input
                     id={`${id}-vmax`}
