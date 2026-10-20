@@ -11,8 +11,10 @@ const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-int
 
 export const metadata: Metadata = {
   // Base dos endereços da imagem de compartilhamento: o WhatsApp só mostra a
-  // prévia com URL completa.
-  metadataBase: new URL(siteUrl()),
+  // prévia com URL completa. No Preview da Vercel, o próprio endereço do deploy.
+  metadataBase: new URL(
+    process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : siteUrl(),
+  ),
   title: {
     default: 'DreamClin',
     template: '%s | DreamClin',

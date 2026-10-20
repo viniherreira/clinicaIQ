@@ -27,7 +27,32 @@ export const dynamic = 'force-static';
 const SIZE = { width: 1200, height: 630 };
 const MODULES = ['Agenda', 'WhatsApp', 'Orçamentos', 'Prontuário', 'Financeiro'];
 
-export function GET() {
+/**
+ * Inter, a fonte da marca, no peso pedido. O gerador da imagem só traz uma
+ * fonte comum, sem negrito. Sem rede, a imagem sai assim mesmo, com a comum.
+ */
+async function inter(weight: number): Promise<ArrayBuffer | null> {
+  try {
+    // Sem user-agent de navegador, o Google Fonts responde com TTF, que é o
+    // formato que o gerador lê (woff2 ele não lê).
+    const css = await (await fetch(`https://fonts.googleapis.com/css2?family=Inter:wght@${weight}`)).text();
+    const url = css.match(/src: url\((.+?)\) format\('(?:opentype|truetype)'\)/)?.[1];
+    return url ? await (await fetch(url)).arrayBuffer() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET() {
+  const fonts = (
+    await Promise.all(
+      ([500, 700, 800] as const).map(async (weight) => {
+        const data = await inter(weight);
+        return data ? { name: 'Inter', data, weight, style: 'normal' as const } : null;
+      }),
+    )
+  ).filter((f) => f !== null);
+
   return new ImageResponse(
     (
       <div
@@ -39,6 +64,8 @@ export function GET() {
           justifyContent: 'space-between',
           padding: '64px 72px',
           color: 'white',
+          fontFamily: 'Inter',
+          fontWeight: 500,
           // Mesmo degradê do `bg-brand-gradient` do site.
           backgroundImage: 'linear-gradient(135deg, hsl(175 77% 26%), hsl(217 79% 28%))',
         }}
@@ -84,10 +111,10 @@ export function GET() {
           >
             {TRIAL_DAYS} dias grátis, sem cartão
           </div>
-          <div style={{ fontSize: 30, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>dreamclin.com</div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>dreamclin.com</div>
         </div>
       </div>
     ),
-    SIZE,
+    { ...SIZE, fonts: fonts.length ? fonts : undefined },
   );
 }
