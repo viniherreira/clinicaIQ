@@ -1,8 +1,8 @@
 import { prisma, type TemplateStatus } from '@clinicaiq/db';
 import { CloudApiError } from '@clinicaiq/whatsapp';
 import { activeCloudAccount, cloudClient, type CloudAccount } from './cloud-account';
+import { DEFAULT_AGENDA_BUTTONS, agendaButtonsOr, sameButtons, type AgendaButton } from './agenda-options';
 import {
-  AGENDA_BUTTONS,
   AGENDA_PURPOSES,
   AGENDA_TEMPLATE_PREFIX,
   agendaTemplateName,
@@ -40,6 +40,8 @@ export interface ApprovedAgendaTemplate {
   language: string;
   body: string;
   varKeys: AgendaKey[];
+  /** Na ordem do modelo: o payload de cada um vai junto no envio. */
+  buttons: AgendaButton[];
 }
 
 /** O modelo aprovado mais novo deste aviso, ou null (ainda nenhum aprovado). */
@@ -47,10 +49,11 @@ export async function approvedAgendaTemplate(tenantId: string, purpose: AgendaPu
   const t = await prisma.messageTemplate.findFirst({
     where: { tenantId, purpose, status: 'APPROVED' },
     orderBy: { createdAt: 'desc' },
-    select: { name: true, language: true, body: true, varKeys: true },
+    select: { name: true, language: true, body: true, varKeys: true, buttons: true },
   });
   const varKeys = t ? readVarKeys(t.varKeys) : null;
-  return t && varKeys ? { name: t.name, language: t.language, body: t.body, varKeys } : null;
+  // Os modelos de antes da escolha de botões foram todos com Confirmar e Reagendar.
+  return t && varKeys ? { name: t.name, language: t.language, body: t.body, varKeys, buttons: agendaButtonsOr(t.buttons) } : null;
 }
 
 /** A próxima versão livre do nome (`dc_lembrete_<n>`). */
@@ -65,15 +68,16 @@ async function nextVersion(tenantId: string, purpose: AgendaPurpose): Promise<nu
 export type SubmitResult = { ok: true; submitted: boolean } | { ok: false; message: string };
 
 /**
- * Manda o texto da clínica para a Meta como versão nova do modelo. Não manda de
- * novo o mesmo texto (nem o recusado: seria recusado outra vez). Sem conta
- * oficial ativa, não faz nada.
+ * Manda o texto e os botões da clínica para a Meta como versão nova do modelo.
+ * Não manda de novo o mesmo texto com os mesmos botões (nem o recusado: seria
+ * recusado outra vez). Sem conta oficial ativa, não faz nada.
  */
 export async function submitAgendaTemplate(
   tenantId: string,
   purpose: AgendaPurpose,
   text: string,
   account?: CloudAccount | null,
+  buttons: AgendaButton[] = DEFAULT_AGENDA_BUTTONS,
 ): Promise<SubmitResult> {
   const conta = account === undefined ? await activeCloudAccount(tenantId) : account;
   if (!conta) return { ok: true, submitted: false };
@@ -85,9 +89,9 @@ export async function submitAgendaTemplate(
   const ultimo = await prisma.messageTemplate.findFirst({
     where: { tenantId, purpose },
     orderBy: { createdAt: 'desc' },
-    select: { sourceText: true },
+    select: { sourceText: true, buttons: true },
   });
-  if (ultimo?.sourceText === fonte) return { ok: true, submitted: false };
+  if (ultimo?.sourceText === fonte && sameButtons(agendaButtonsOr(ultimo.buttons), buttons)) return { ok: true, submitted: false };
 
   const api = cloudClient(conta);
   let versao = await nextVersion(tenantId, purpose);
@@ -101,7 +105,7 @@ export async function submitAgendaTemplate(
         language: 'pt_BR',
         body: draft.body,
         examples: draft.examples,
-        quickReplies: AGENDA_BUTTONS.map((b) => b.text),
+        quickReplies: buttons.map((b) => b.text),
       });
       const values = {
         category: 'UTILITY' as const,
@@ -113,6 +117,7 @@ export async function submitAgendaTemplate(
         purpose,
         varKeys: draft.varKeys,
         sourceText: fonte,
+        buttons: buttons.map((b) => ({ payload: b.payload, text: b.text })),
       };
       await prisma.messageTemplate.upsert({
         where: { tenantId_name_language: { tenantId, name, language: 'pt_BR' } },
@@ -134,14 +139,16 @@ export async function ensureAgendaTemplates(tenantId: string, account?: CloudAcc
   if (!conta) return [];
   const textos = await prisma.whatsAppSession.findUnique({
     where: { tenantId },
-    select: { createdMessage: true, reminderMessage: true },
+    select: { createdMessage: true, reminderMessage: true, createdButtons: true, reminderButtons: true },
   });
-  const custom: Record<AgendaPurpose, string | null | undefined> = {
-    APPOINTMENT_CREATED: textos?.createdMessage,
-    APPOINTMENT_REMINDER: textos?.reminderMessage,
+  const custom: Record<AgendaPurpose, { text: string | null | undefined; buttons: unknown }> = {
+    APPOINTMENT_CREATED: { text: textos?.createdMessage, buttons: textos?.createdButtons },
+    APPOINTMENT_REMINDER: { text: textos?.reminderMessage, buttons: textos?.reminderButtons },
   };
   const out: SubmitResult[] = [];
-  for (const p of AGENDA_PURPOSES) out.push(await submitAgendaTemplate(tenantId, p, agendaText(p, custom[p]), conta));
+  for (const p of AGENDA_PURPOSES) {
+    out.push(await submitAgendaTemplate(tenantId, p, agendaText(p, custom[p].text), conta, agendaButtonsOr(custom[p].buttons)));
+  }
   return out;
 }
 

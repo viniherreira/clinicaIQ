@@ -1,5 +1,4 @@
 import {
-  CONFIRMATION_BUTTONS,
   CONFIRMATION_PROMPT,
   LEGACY_CONFIRMATION_PROMPT,
   buildAppointmentConfirmationBody,
@@ -30,9 +29,6 @@ export function agendaTemplateVersion(purpose: AgendaPurpose, name: string): num
   const m = new RegExp(`^${AGENDA_TEMPLATE_PREFIX[purpose]}_(\\d+)$`).exec(name);
   return m ? Number(m[1]) : null;
 }
-
-/** Os botões de resposta rápida; o payload é o mesmo id que a agenda já entende. */
-export const AGENDA_BUTTONS = CONFIRMATION_BUTTONS.map((b) => ({ payload: b.id, text: b.title }));
 
 export const AGENDA_KEYS = ['nome', 'clinica', 'data', 'hora', 'profissional', 'procedimento'] as const;
 export type AgendaKey = (typeof AGENDA_KEYS)[number];

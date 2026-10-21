@@ -34,6 +34,7 @@ import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
 import type { ContractDocumentProps, QuoteDocumentProps, ReceiptDocumentProps } from '@clinicaiq/pdf';
 import { buildBirthdayBody } from '@clinicaiq/whatsapp';
 import { DEFAULT_AGENDA_TEXT, agendaText, toMetaTemplate, withButtonPrompt, type AgendaPurpose } from '@/lib/agenda-templates';
+import { AGENDA_PAYLOADS, agendaButtonsOr, checkAgendaButtons, readReminderDays, type AgendaButton } from '@/lib/agenda-options';
 import {
   agendaTemplateViews,
   refreshAgendaTemplates,
@@ -1089,6 +1090,11 @@ export interface MessageSettings {
   createdMessage: string | null;
   reminderMessage: string | null;
   birthdayMessage: string | null;
+  /** Quantos dias antes da consulta sai cada lembrete (0 = no dia). */
+  reminderDays: number[];
+  /** Os botões de cada aviso da agenda (os padrão, se a clínica nunca mexeu). */
+  createdButtons: AgendaButton[];
+  reminderButtons: AgendaButton[];
   /** Os padrões, para mostrar como ponto de partida na tela. */
   defaults: { created: string; reminder: string; birthday: string };
   /** Com a API oficial: a situação de cada aviso da agenda na Meta. Nulo = sem API oficial. */
@@ -1112,6 +1118,9 @@ export async function getMessageSettings(): Promise<MessageSettings> {
       createdMessage: true,
       reminderMessage: true,
       birthdayMessage: true,
+      reminderDays: true,
+      createdButtons: true,
+      reminderButtons: true,
     },
   });
 
@@ -1132,6 +1141,9 @@ export async function getMessageSettings(): Promise<MessageSettings> {
     createdMessage: session?.createdMessage ? withButtonPrompt(session.createdMessage) : null,
     reminderMessage: session?.reminderMessage ? withButtonPrompt(session.reminderMessage) : null,
     birthdayMessage: session?.birthdayMessage ?? null,
+    reminderDays: session ? readReminderDays(session.reminderDays) : [1],
+    createdButtons: agendaButtonsOr(session?.createdButtons),
+    reminderButtons: agendaButtonsOr(session?.reminderButtons),
     // Com as variáveis, não com um paciente de exemplo: salvar sem mexer não
     // pode mandar "Olá, Maria!" para todo mundo.
     defaults: {
@@ -1150,6 +1162,9 @@ const messagesSchema = z.object({
   createdMessage: z.string().trim().max(900),
   reminderMessage: z.string().trim().max(900),
   birthdayMessage: z.string().trim().max(600),
+  reminderDays: z.array(z.number().int()).max(5),
+  createdButtons: z.array(z.object({ payload: z.enum(AGENDA_PAYLOADS as [AgendaButton['payload'], ...AgendaButton['payload'][]]), text: z.string().max(60) })).max(3),
+  reminderButtons: z.array(z.object({ payload: z.enum(AGENDA_PAYLOADS as [AgendaButton['payload'], ...AgendaButton['payload'][]]), text: z.string().max(60) })).max(3),
 });
 
 export async function saveMessageSettings(
@@ -1169,6 +1184,11 @@ export async function saveMessageSettings(
   }
   const d = parsed.data;
 
+  const reminderDays = readReminderDays(d.reminderDays);
+  if (d.notifyReminder && reminderDays.length === 0) {
+    return { ok: false, message: 'Lembrete antes da consulta: escolha pelo menos um dia, ou desligue o lembrete.' };
+  }
+
   // Com a API oficial, o texto vira modelo da Meta: o que a Meta não aceita
   // nem chega a ser salvo, para a clínica corrigir na hora.
   const conta = await activeCloudAccount(tenantId);
@@ -1176,11 +1196,15 @@ export async function saveMessageSettings(
     APPOINTMENT_CREATED: agendaText('APPOINTMENT_CREATED', d.createdMessage),
     APPOINTMENT_REMINDER: agendaText('APPOINTMENT_REMINDER', d.reminderMessage),
   };
-  if (conta) {
-    for (const [p, nome] of [
-      ['APPOINTMENT_CREATED', 'Ao marcar a consulta'],
-      ['APPOINTMENT_REMINDER', 'Lembrete do dia anterior'],
-    ] as const) {
+  const botoes = {} as Record<AgendaPurpose, AgendaButton[]>;
+  for (const [p, nome, lista] of [
+    ['APPOINTMENT_CREATED', 'Ao marcar a consulta', d.createdButtons],
+    ['APPOINTMENT_REMINDER', 'Lembrete antes da consulta', d.reminderButtons],
+  ] as const) {
+    const b = checkAgendaButtons([...lista]);
+    if (!b.ok) return { ok: false, message: `${nome}: ${b.message}` };
+    botoes[p] = b.buttons;
+    if (conta) {
       const r = toMetaTemplate(textos[p]);
       if (!r.ok) return { ok: false, message: `${nome}: ${r.message}` };
     }
@@ -1207,6 +1231,9 @@ export async function saveMessageSettings(
     createdMessage: proprio(d.createdMessage, DEFAULT_AGENDA_TEXT.APPOINTMENT_CREATED),
     reminderMessage: proprio(d.reminderMessage, DEFAULT_AGENDA_TEXT.APPOINTMENT_REMINDER),
     birthdayMessage: d.birthdayMessage || null,
+    reminderDays,
+    createdButtons: botoes.APPOINTMENT_CREATED.map((b) => ({ payload: b.payload, text: b.text })),
+    reminderButtons: botoes.APPOINTMENT_REMINDER.map((b) => ({ payload: b.payload, text: b.text })),
   };
   // Só com a API oficial uma clínica sem a linha de QR guarda os textos.
   await prisma.whatsAppSession.upsert({ where: { tenantId }, create: { tenantId, ...valores }, update: valores });
@@ -1226,7 +1253,7 @@ export async function saveMessageSettings(
   if (conta) {
     const enviados: string[] = [];
     for (const p of ['APPOINTMENT_CREATED', 'APPOINTMENT_REMINDER'] as const) {
-      const r = await submitAgendaTemplate(tenantId, p, textos[p], conta);
+      const r = await submitAgendaTemplate(tenantId, p, textos[p], conta, botoes[p]);
       if (!r.ok) message = `Salvo, mas a Meta não recebeu o texto: ${r.message}`;
       else if (r.submitted) enviados.push(p);
     }

@@ -4,6 +4,14 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveMessageSettings, type MessageSettings } from '../actions';
 import type { AgendaTemplateView } from '@/lib/agenda-templates-sync';
+import {
+  AGENDA_BUTTON_MAX,
+  AGENDA_BUTTON_OPTIONS,
+  REMINDER_DAY_OPTIONS,
+  previewAgendaText,
+  type AgendaButton,
+  type AgendaPayload,
+} from '@/lib/agenda-options';
 
 /**
  * A clínica escolhe o que sai e escreve o que sai.
@@ -59,6 +67,142 @@ function SituacaoMeta({ view }: { view: AgendaTemplateView }) {
   return <p className={`mt-1.5 text-xs font-medium ${tom}`}>API oficial: {texto}</p>;
 }
 
+type Botoes = Record<AgendaPayload, { on: boolean; text: string }>;
+
+/** Os botões salvos como a tela edita: todos os possíveis, ligados ou não. */
+function paraEditar(salvos: AgendaButton[]): Botoes {
+  return Object.fromEntries(
+    AGENDA_BUTTON_OPTIONS.map((o) => {
+      const b = salvos.find((x) => x.payload === o.payload);
+      return [o.payload, { on: Boolean(b), text: b?.text ?? o.text }];
+    }),
+  ) as Botoes;
+}
+
+const ligados = (b: Botoes): AgendaButton[] =>
+  AGENDA_BUTTON_OPTIONS.filter((o) => b[o.payload].on).map((o) => ({ payload: o.payload, text: b[o.payload].text }));
+
+/** *negrito* do WhatsApp na prévia. */
+function ComNegrito({ texto }: { texto: string }) {
+  return (
+    <>
+      {texto.split(/(\*[^*\n]+\*)/g).map((parte, i) =>
+        /^\*[^*\n]+\*$/.test(parte) ? <strong key={i}>{parte.slice(1, -1)}</strong> : <span key={i}>{parte}</span>,
+      )}
+    </>
+  );
+}
+
+/** Como a mensagem chega no WhatsApp do paciente, com um paciente de exemplo. */
+function PreviaWhatsApp({ texto, botoes }: { texto: string; botoes: AgendaButton[] }) {
+  return (
+    <figure className="rounded-lg bg-board p-3">
+      <figcaption className="mb-2 text-xs font-medium text-muted-foreground">Como chega no WhatsApp (paciente de exemplo)</figcaption>
+      <div className="overflow-hidden rounded-lg bg-surface text-sm shadow-[0_1px_2px_rgba(15,30,60,0.10)]">
+        <p className="whitespace-pre-wrap break-words px-3 py-2">
+          <ComNegrito texto={previewAgendaText(texto)} />
+        </p>
+        {botoes.length > 0 && (
+          <ul aria-label="Botões da mensagem" className="divide-y divide-border border-t border-border">
+            {botoes.map((b) => (
+              <li key={b.payload} className="px-3 py-2 text-center text-sm font-medium text-primary">
+                {b.text || '(sem nome)'}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </figure>
+  );
+}
+
+function EditorDeBotoes({
+  id,
+  botoes,
+  mudar,
+}: {
+  id: string;
+  botoes: Botoes;
+  mudar: (payload: AgendaPayload, patch: Partial<{ on: boolean; text: string }>) => void;
+}) {
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Botões da mensagem</legend>
+      <p className="mt-1 text-xs text-muted-foreground">
+        O paciente toca e a resposta cai sozinha na agenda. Até 3 botões; você pode mudar o nome de cada um.
+      </p>
+      <ul className="mt-2 space-y-2">
+        {AGENDA_BUTTON_OPTIONS.map((o) => {
+          const b = botoes[o.payload];
+          return (
+            <li key={o.payload} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <label className="flex w-28 shrink-0 cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={b.on}
+                  onChange={(e) => mudar(o.payload, { on: e.target.checked })}
+                  className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                />
+                <span>{o.text}</span>
+              </label>
+              <label htmlFor={`${id}-btn-${o.payload}`} className="sr-only">
+                Nome do botão {o.text}
+              </label>
+              <input
+                id={`${id}-btn-${o.payload}`}
+                type="text"
+                value={b.text}
+                maxLength={AGENDA_BUTTON_MAX}
+                disabled={!b.on}
+                onChange={(e) => mudar(o.payload, { text: e.target.value })}
+                className="h-8 w-40 rounded-md border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+              />
+              <span className="text-xs text-muted-foreground">{o.faz}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Mudou os botões? Ajuste também a frase do texto que fala deles (por exemplo, &quot;Toque em Confirmar ou Reagendar&quot;).
+      </p>
+    </fieldset>
+  );
+}
+
+function DiasDoLembrete({ dias, mudar }: { dias: number[]; mudar: (dias: number[]) => void }) {
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quando mandar</legend>
+      <p className="mt-1 text-xs text-muted-foreground">Marque um ou mais. Cada um sai uma vez, por volta das 9h.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {REMINDER_DAY_OPTIONS.map((o) => {
+          const marcado = dias.includes(o.days);
+          return (
+            <label
+              key={o.days}
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring ${
+                marcado ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-border hover:bg-surface-alt'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={marcado}
+                onChange={(e) => mudar(e.target.checked ? [...dias, o.days] : dias.filter((d) => d !== o.days))}
+                className="sr-only"
+              />
+              <span aria-hidden="true">{marcado ? '✓' : '+'}</span>
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+      {dias.includes(0) && (
+        <p className="mt-1.5 text-xs text-muted-foreground">No dia, só sai para as consultas a partir das 10h.</p>
+      )}
+    </fieldset>
+  );
+}
+
 interface Campo {
   id: 'created' | 'reminder' | 'birthday';
   titulo: string;
@@ -92,6 +236,14 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
     },
   });
 
+  const [botoes, setBotoes] = useState({
+    created: paraEditar(settings.createdButtons),
+    reminder: paraEditar(settings.reminderButtons),
+  });
+  const [dias, setDias] = useState(settings.reminderDays);
+  const mudarBotao = (aviso: 'created' | 'reminder') => (payload: AgendaPayload, patch: Partial<{ on: boolean; text: string }>) =>
+    setBotoes((b) => ({ ...b, [aviso]: { ...b[aviso], [payload]: { ...b[aviso][payload], ...patch } } }));
+
   const campos: Campo[] = [
     {
       id: 'created',
@@ -104,9 +256,9 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
     },
     {
       id: 'reminder',
-      titulo: 'Lembrete do dia anterior',
+      titulo: 'Lembrete antes da consulta',
       quando:
-        'Sai uma vez por dia, de manhã, para as consultas do dia seguinte. Quem marcou em cima da hora recebe só a mensagem acima.',
+        'Sai de manhã nos dias que você escolher. Quem marcou há menos de 12 horas não recebe o lembrete daquele dia: acabou de receber a mensagem acima.',
       ligado: estado.reminder.on,
       texto: estado.reminder.texto,
       variaveis: VARIAVEIS_AGENDAMENTO,
@@ -134,6 +286,9 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
         createdMessage: estado.created.texto,
         reminderMessage: estado.reminder.texto,
         birthdayMessage: estado.birthday.texto,
+        reminderDays: dias,
+        createdButtons: ligados(botoes.created),
+        reminderButtons: ligados(botoes.reminder),
       });
       if (!r.ok) setErro(r.message ?? 'Não foi possível salvar.');
       else {
@@ -194,7 +349,8 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
             </div>
 
             {c.ligado && (
-              <div className="mt-3">
+              <div className={c.id === 'birthday' ? 'mt-3' : 'mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]'}>
+              <div className="min-w-0">
                 <label htmlFor={`msg-${c.id}`} className="sr-only">
                   Texto da mensagem: {c.titulo}
                 </label>
@@ -218,19 +374,23 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
                   </button>
                 </div>
                 {c.meta && <SituacaoMeta view={c.meta} />}
-                {c.id !== 'birthday' &&
-                  (oficial ? (
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Pela API oficial a mensagem vai com os botões <strong>Confirmar</strong> e{' '}
-                      <strong>Reagendar</strong>, e a resposta cai na agenda. Cada texto novo passa pela
-                      aprovação da Meta.
-                    </p>
-                  ) : (
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Conecte a API oficial da Meta na página WhatsApp para a mensagem ir com os botões{' '}
-                      <strong>Confirmar</strong> e <strong>Reagendar</strong>.
-                    </p>
-                  ))}
+                {c.id !== 'birthday' && (
+                  <>
+                    {c.id === 'reminder' && <DiasDoLembrete dias={dias} mudar={setDias} />}
+                    <EditorDeBotoes id={`msg-${c.id}`} botoes={botoes[c.id]} mudar={mudarBotao(c.id)} />
+                  </>
+                )}
+              </div>
+              {c.id !== 'birthday' && (
+                <div className="lg:sticky lg:top-4 lg:self-start">
+                  <PreviaWhatsApp texto={c.texto} botoes={ligados(botoes[c.id])} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {oficial
+                      ? 'Cada texto ou botão novo passa pela aprovação da Meta antes de sair.'
+                      : 'Os botões só vão com a API oficial da Meta (conecte na página WhatsApp).'}
+                  </p>
+                </div>
+              )}
               </div>
             )}
           </div>

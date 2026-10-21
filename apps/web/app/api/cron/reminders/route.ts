@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
-import { addDays, format, parseISO } from 'date-fns';
 import { prisma } from '@clinicaiq/db';
-import { WHATSAPP_TEMPLATES } from '@clinicaiq/whatsapp';
-import { dispatchAppointmentMessage } from '@/lib/whatsapp';
-import { clinicToday } from '@/lib/tz';
 import { bearerMatches } from '@/lib/bearer';
 import { reconcileSubscriptions } from '@/lib/subscription-sync';
 import { refreshAgendaTemplates } from '@/lib/agenda-templates-sync';
+import { sendDueReminders } from '@/lib/reminder-sweep';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
  * Daily reminder job. Vercel Cron hits this once a day (see vercel.json); it
- * sends the confirmation/reminder WhatsApp for every appointment happening
- * *tomorrow* (clinic timezone) that hasn't been reminded yet. Runs across all
- * tenants. Replaces the BullMQ delayed job, which is a no-op without a worker.
+ * sends the confirmation/reminder WhatsApp for every appointment that falls on
+ * one of the clinic's chosen reminder days (1 week, 3, 2, 1 day before, or the
+ * day itself; clinic timezone) and hasn't had that reminder yet. Runs across
+ * all tenants. Replaces the BullMQ delayed job, which is a no-op without a worker.
  */
 /**
  * Falha fechada, e só pelo cabeçalho.
@@ -57,42 +55,14 @@ export async function GET(req: Request) {
   });
   for (const t of emAnalise) await refreshAgendaTemplates(t.tenantId).catch(() => undefined);
 
-  // Appointments are stored as wall-clock-in-UTC, so "tomorrow in the clinic"
-  // is the UTC calendar day matching tomorrow's clinic date.
-  const tomorrow = format(addDays(parseISO(clinicToday()), 1), 'yyyy-MM-dd');
-  const from = new Date(`${tomorrow}T00:00:00.000Z`);
-  const to = new Date(`${tomorrow}T23:59:59.999Z`);
-
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      startTime: { gte: from, lte: to },
-      status: { in: ['SCHEDULED', 'CONFIRMED', 'RESCHEDULED'] },
-      messages: {
-        none: { direction: 'OUTBOUND', templateName: WHATSAPP_TEMPLATES.appointmentConfirmation },
-      },
-    },
-    select: { id: true },
-    take: 500,
-  });
-
-  let sent = 0;
-  let failed = 0;
-  for (const appt of appointments) {
-    try {
-      const res = await dispatchAppointmentMessage(appt.id, 'reminder');
-      if (res.success) sent++;
-      else failed++;
-    } catch {
-      failed++;
-    }
-  }
+  const porDia = await sendDueReminders();
 
   return NextResponse.json({
     ok: true,
-    date: tomorrow,
-    candidates: appointments.length,
-    sent,
-    failed,
+    reminders: porDia,
+    candidates: porDia.reduce((n, d) => n + d.candidates, 0),
+    sent: porDia.reduce((n, d) => n + d.sent, 0),
+    failed: porDia.reduce((n, d) => n + d.failed, 0),
     subscriptions,
   });
 }

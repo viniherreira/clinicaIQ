@@ -52,8 +52,8 @@ test('orçamento completo: busca, dentes, parcelas, aprovar, receber a parcela e
 
   // Dois dentes: o texto e a quantidade saem do odontograma.
   await page.getByRole('button', { name: /^Dentes de/ }).click();
-  await page.getByRole('button', { name: /^11 — / }).click();
-  await page.getByRole('button', { name: /^21 — / }).click();
+  await page.getByRole('button', { name: /^11 · / }).click();
+  await page.getByRole('button', { name: /^21 · / }).click();
   expect((await axe()).violations).toEqual([]);
   await page.getByRole('button', { name: 'Pronto' }).click();
   await expect(page.getByRole('textbox', { name: /^Dente ou região/ })).toHaveValue('Dentes 11 e 21');

@@ -337,7 +337,7 @@ function Features() {
     {
       icon: MessageCircle,
       title: 'WhatsApp automático',
-      text: 'O paciente recebe a confirmação assim que o horário é marcado e um lembrete no dia anterior. A recepção não precisa digitar mensagem nenhuma.',
+      text: 'O paciente recebe a confirmação assim que o horário é marcado e lembretes antes da consulta, nos dias que a clínica escolher. A recepção não precisa digitar mensagem nenhuma.',
       chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
     },
     {
@@ -491,7 +491,7 @@ function FAQ() {
     },
     {
       q: 'Como funciona a confirmação pelo WhatsApp?',
-      a: 'Ao criar um agendamento, o paciente recebe automaticamente uma mensagem de confirmação no WhatsApp. No dia anterior à consulta, um lembrete é enviado. Tudo sem a recepção digitar nada.',
+      a: 'Ao criar um agendamento, o paciente recebe automaticamente uma mensagem de confirmação no WhatsApp. Antes da consulta saem os lembretes (1 semana, 3 dias, 1 dia antes ou no dia: a clínica escolhe), com botões para o paciente confirmar. Tudo sem a recepção digitar nada.',
     },
     {
       q: 'Meus dados e os dos pacientes estão seguros?',

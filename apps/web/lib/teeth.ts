@@ -16,7 +16,7 @@ const TODOS = new Set([...UPPER_ROW, ...LOWER_ROW]);
 const NOMES = ['', 'incisivo central', 'incisivo lateral', 'canino', '1º pré-molar', '2º pré-molar', '1º molar', '2º molar', '3º molar'];
 const QUADRANTES = ['', 'superior direito', 'superior esquerdo', 'inferior esquerdo', 'inferior direito'];
 
-/** "11 — incisivo central superior direito", para leitor de tela e dica. */
+/** "11 · incisivo central superior direito", para leitor de tela e dica. */
 export function toothName(n: number): string {
   return `${n} · ${NOMES[n % 10]} ${QUADRANTES[Math.floor(n / 10)]}`;
 }
