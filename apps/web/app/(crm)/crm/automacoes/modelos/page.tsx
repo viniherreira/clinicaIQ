@@ -14,6 +14,8 @@ export default async function ModelosPage() {
   const [cloud, templates] = await Promise.all([
     activeCloudAccount(ctx.tenantId),
     ctx.db.messageTemplate.findMany({
+      // Os avisos da agenda (purpose) são cuidados no painel de mensagens da gestão.
+      where: { purpose: null },
       orderBy: [{ status: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, category: true, status: true, body: true, rejectedReason: true },
     }),

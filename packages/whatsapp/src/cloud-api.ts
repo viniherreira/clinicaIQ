@@ -138,16 +138,19 @@ export class CloudApi {
     });
   }
 
-  sendTemplate(to: string, name: string, language: string, bodyParams: string[]) {
+  /**
+   * Modelo aprovado. `quickReplies` são os payloads dos botões de resposta
+   * rápida, na ordem dos botões do modelo: é o que volta no webhook quando a
+   * pessoa toca.
+   */
+  sendTemplate(to: string, name: string, language: string, bodyParams: string[], quickReplies: string[] = []) {
+    const components = [
+      ...(bodyParams.length ? [{ type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) }] : []),
+      ...quickReplies.map((payload, i) => ({ type: 'button', sub_type: 'quick_reply', index: String(i), parameters: [{ type: 'payload', payload }] })),
+    ];
     return this.send(to, {
       type: 'template',
-      template: {
-        name,
-        language: { code: language },
-        ...(bodyParams.length
-          ? { components: [{ type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text })) }] }
-          : {}),
-      },
+      template: { name, language: { code: language }, ...(components.length ? { components } : {}) },
     });
   }
 
@@ -222,8 +225,10 @@ export class CloudApi {
     return out;
   }
 
-  createTemplate(t: { name: string; category: string; language: string; body: string; examples: string[] }) {
+  /** `quickReplies`: textos dos botões de resposta rápida (até 3, 25 caracteres). */
+  createTemplate(t: { name: string; category: string; language: string; body: string; examples: string[]; quickReplies?: string[] }) {
     if (!this.cfg.wabaId) throw new Error('wabaId necessário para criar modelo');
+    const botoes = (t.quickReplies ?? []).slice(0, 3);
     return this.call<{ id: string; status: string; category?: string }>(`${this.cfg.wabaId}/message_templates`, {
       body: {
         name: t.name,
@@ -235,6 +240,7 @@ export class CloudApi {
             text: t.body,
             ...(t.examples.length ? { example: { body_text: [t.examples] } } : {}),
           },
+          ...(botoes.length ? [{ type: 'BUTTONS', buttons: botoes.map((text) => ({ type: 'QUICK_REPLY', text: text.slice(0, 25) })) }] : []),
         ],
       },
     });

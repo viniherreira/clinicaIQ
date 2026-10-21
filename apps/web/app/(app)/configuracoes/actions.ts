@@ -32,11 +32,15 @@ import { describePayment } from '@/lib/payment-terms';
 import { deleteObject, signObject, storageEnabled, uploadObject } from '@/lib/storage';
 import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
 import type { ContractDocumentProps, QuoteDocumentProps, ReceiptDocumentProps } from '@clinicaiq/pdf';
+import { buildBirthdayBody } from '@clinicaiq/whatsapp';
+import { DEFAULT_AGENDA_TEXT, agendaText, toMetaTemplate, type AgendaPurpose } from '@/lib/agenda-templates';
 import {
-  buildAppointmentConfirmationBody,
-  buildAppointmentCreatedBody,
-  buildBirthdayBody,
-} from '@clinicaiq/whatsapp';
+  agendaTemplateViews,
+  refreshAgendaTemplates,
+  submitAgendaTemplate,
+  type AgendaTemplateView,
+} from '@/lib/agenda-templates-sync';
+import { activeCloudAccount } from '@/lib/cloud-account';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -1087,6 +1091,8 @@ export interface MessageSettings {
   birthdayMessage: string | null;
   /** Os padrões, para mostrar como ponto de partida na tela. */
   defaults: { created: string; reminder: string; birthday: string };
+  /** Com a API oficial: a situação de cada aviso da agenda na Meta. Nulo = sem API oficial. */
+  official: { created: AgendaTemplateView; reminder: AgendaTemplateView } | null;
 }
 
 /**
@@ -1097,30 +1103,27 @@ export interface MessageSettings {
  */
 export async function getMessageSettings(): Promise<MessageSettings> {
   const { tenantId } = await requireOwner();
-  const [session, tenant] = await Promise.all([
-    prisma.whatsAppSession.findUnique({
-      where: { tenantId },
-      select: {
-        notifyOnCreate: true,
-        notifyReminder: true,
-        notifyBirthday: true,
-        createdMessage: true,
-        reminderMessage: true,
-        birthdayMessage: true,
-      },
-    }),
-    prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
-  ]);
+  const session = await prisma.whatsAppSession.findUnique({
+    where: { tenantId },
+    select: {
+      notifyOnCreate: true,
+      notifyReminder: true,
+      notifyBirthday: true,
+      createdMessage: true,
+      reminderMessage: true,
+      birthdayMessage: true,
+    },
+  });
 
-  // Exemplo com dados fictícios só para a clínica ver o formato.
-  const exemplo = {
-    patientName: 'Maria Aparecida',
-    clinicName: tenant?.name ?? 'sua clínica',
-    professionalName: 'Dra. Michele',
-    procedureName: 'Limpeza',
-    dateLabel: 'quinta-feira, 28/05',
-    timeLabel: '14:30',
-  };
+  // Com a API oficial, a tela mostra o que a Meta disse de cada texto (e pergunta
+  // de novo pelo que ainda está em análise).
+  const conta = await activeCloudAccount(tenantId);
+  let official: MessageSettings['official'] = null;
+  if (conta) {
+    await refreshAgendaTemplates(tenantId).catch(() => undefined);
+    const views = await agendaTemplateViews(tenantId);
+    official = { created: views.APPOINTMENT_CREATED, reminder: views.APPOINTMENT_REMINDER };
+  }
 
   return {
     notifyOnCreate: session?.notifyOnCreate ?? true,
@@ -1129,14 +1132,14 @@ export async function getMessageSettings(): Promise<MessageSettings> {
     createdMessage: session?.createdMessage ?? null,
     reminderMessage: session?.reminderMessage ?? null,
     birthdayMessage: session?.birthdayMessage ?? null,
+    // Com as variáveis, não com um paciente de exemplo: salvar sem mexer não
+    // pode mandar "Olá, Maria!" para todo mundo.
     defaults: {
-      created: buildAppointmentCreatedBody(exemplo),
-      reminder: buildAppointmentConfirmationBody(exemplo),
-      birthday: buildBirthdayBody({
-        patientName: exemplo.patientName,
-        clinicName: exemplo.clinicName,
-      }),
+      created: DEFAULT_AGENDA_TEXT.APPOINTMENT_CREATED,
+      reminder: DEFAULT_AGENDA_TEXT.APPOINTMENT_REMINDER,
+      birthday: buildBirthdayBody({ patientName: '{nome}', clinicName: '{clinica}' }),
     },
+    official,
   };
 }
 
@@ -1166,30 +1169,47 @@ export async function saveMessageSettings(
   }
   const d = parsed.data;
 
-  // Vazio volta a ser nulo, não string vazia: nulo quer dizer "usa o padrão", e
-  // string vazia mandaria mensagem em branco para o paciente.
+  // Com a API oficial, o texto vira modelo da Meta: o que a Meta não aceita
+  // nem chega a ser salvo, para a clínica corrigir na hora.
+  const conta = await activeCloudAccount(tenantId);
+  const textos: Record<AgendaPurpose, string> = {
+    APPOINTMENT_CREATED: agendaText('APPOINTMENT_CREATED', d.createdMessage),
+    APPOINTMENT_REMINDER: agendaText('APPOINTMENT_REMINDER', d.reminderMessage),
+  };
+  if (conta) {
+    for (const [p, nome] of [
+      ['APPOINTMENT_CREATED', 'Ao marcar a consulta'],
+      ['APPOINTMENT_REMINDER', 'Lembrete do dia anterior'],
+    ] as const) {
+      const r = toMetaTemplate(textos[p]);
+      if (!r.ok) return { ok: false, message: `${nome}: ${r.message}` };
+    }
+  }
+
   const existe = await prisma.whatsAppSession.findUnique({
     where: { tenantId },
     select: { tenantId: true },
   });
-  if (!existe) {
+  if (!existe && !conta) {
     return {
       ok: false,
       message: 'Conecte o WhatsApp da clínica antes de configurar as mensagens.',
     };
   }
 
-  await prisma.whatsAppSession.update({
-    where: { tenantId },
-    data: {
-      notifyOnCreate: d.notifyOnCreate,
-      notifyReminder: d.notifyReminder,
-      notifyBirthday: d.notifyBirthday,
-      createdMessage: d.createdMessage || null,
-      reminderMessage: d.reminderMessage || null,
-      birthdayMessage: d.birthdayMessage || null,
-    },
-  });
+  // Vazio (ou igual ao padrão) volta a ser nulo: nulo quer dizer "usa o padrão",
+  // e string vazia mandaria mensagem em branco para o paciente.
+  const proprio = (texto: string, padrao: string) => (texto && texto !== padrao ? texto : null);
+  const valores = {
+    notifyOnCreate: d.notifyOnCreate,
+    notifyReminder: d.notifyReminder,
+    notifyBirthday: d.notifyBirthday,
+    createdMessage: proprio(d.createdMessage, DEFAULT_AGENDA_TEXT.APPOINTMENT_CREATED),
+    reminderMessage: proprio(d.reminderMessage, DEFAULT_AGENDA_TEXT.APPOINTMENT_REMINDER),
+    birthdayMessage: d.birthdayMessage || null,
+  };
+  // Só com a API oficial uma clínica sem a linha de QR guarda os textos.
+  await prisma.whatsAppSession.upsert({ where: { tenantId }, create: { tenantId, ...valores }, update: valores });
 
   await prisma.auditLog.create({
     data: {
@@ -1201,9 +1221,23 @@ export async function saveMessageSettings(
     },
   });
 
+  // Texto novo vai para a Meta aprovar; até lá sai o último aprovado.
+  let message: string | undefined;
+  if (conta) {
+    const enviados: string[] = [];
+    for (const p of ['APPOINTMENT_CREATED', 'APPOINTMENT_REMINDER'] as const) {
+      const r = await submitAgendaTemplate(tenantId, p, textos[p], conta);
+      if (!r.ok) message = `Salvo, mas a Meta não recebeu o texto: ${r.message}`;
+      else if (r.submitted) enviados.push(p);
+    }
+    if (!message && enviados.length) {
+      message = 'Salvo. O texto novo foi para a Meta aprovar (costuma levar minutos); até lá, sai o texto aprovado antes.';
+    }
+  }
+
   revalidatePath('/configuracoes');
   revalidatePath('/whatsapp');
-  return { ok: true };
+  return { ok: true, message };
 }
 
 /**

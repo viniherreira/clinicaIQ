@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getWhatsAppHealth } from '@/lib/whatsapp';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
+import { graphVersion, metaSignupConfigured } from '@/lib/cloud-account';
+import * as oficial from '@/lib/cloud-account-admin';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -23,6 +25,19 @@ async function requireTenant() {
 export interface WhatsAppPanelData {
   /** False when WHATSAPP_GATEWAY_URL/TOKEN aren't set on this deployment. */
   gatewayReady: boolean;
+  /** A API oficial da Meta: a conta (nunca o token) e o botão da Meta, se configurado. */
+  official: {
+    account: {
+      active: boolean;
+      status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+      displayPhone: string | null;
+      verifiedName: string | null;
+      coexistence: boolean;
+      lastError: string | null;
+      connectedAt: string;
+    } | null;
+    signup: { appId: string; configId: string; version: string } | null;
+  };
   status: WhatsAppConnectionStatus;
   phoneNumber: string | null;
   displayName: string | null;
@@ -58,6 +73,23 @@ export async function getWhatsAppPanel(): Promise<WhatsAppPanelData> {
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
   const session = await ensureSession(tenantId);
+  const conta = await oficial.cloudAccountSummary(tenantId);
+  const official: WhatsAppPanelData['official'] = {
+    account: conta
+      ? {
+          active: conta.active,
+          status: conta.status,
+          displayPhone: conta.displayPhone,
+          verifiedName: conta.verifiedName,
+          coexistence: conta.coexistence,
+          lastError: conta.lastError,
+          connectedAt: conta.connectedAt.toISOString(),
+        }
+      : null,
+    signup: metaSignupConfigured()
+      ? { appId: process.env.META_APP_ID!, configId: process.env.META_ES_CONFIG_ID!, version: graphVersion() }
+      : null,
+  };
 
   const since = new Date(Date.now() - 7 * 86400000);
   const [sent, failed, last7d, recent] = await Promise.all([
@@ -97,6 +129,7 @@ export async function getWhatsAppPanel(): Promise<WhatsAppPanelData> {
   }
 
   return {
+    official,
     gatewayReady: gatewayConfigured(),
     status,
     phoneNumber: session.phoneNumber,
@@ -232,6 +265,45 @@ export async function disconnectWhatsApp(): Promise<{ ok: boolean }> {
   revalidatePath('/whatsapp');
   return { ok: true };
 }
+
+// ─── API oficial da Meta ─────────────────────────────────────────────────────
+
+type OfficialResult = { ok: true } | { ok: false; message: string };
+
+/** Mexer na conexão: dono ou quem tem `configuracoes`, com a assinatura em dia. */
+async function officialGuard(): Promise<{ ok: true; tenantId: string; userId: string | null } | { ok: false; message: string }> {
+  const { tenantId } = await requireTenant();
+  const bloqueio = await writeBlocked(tenantId);
+  if (bloqueio) return { ok: false, message: bloqueio };
+  const semAcesso = await capabilityBlocked(tenantId, 'configuracoes');
+  if (semAcesso) return { ok: false, message: semAcesso };
+  const { userId: clerkUserId } = await auth();
+  const user = clerkUserId
+    ? await prisma.user.findFirst({ where: { tenantId, clerkUserId }, select: { id: true } })
+    : null;
+  return { ok: true, tenantId, userId: user?.id ?? null };
+}
+
+async function official(fn: (g: { tenantId: string; userId: string | null }) => Promise<OfficialResult>): Promise<OfficialResult> {
+  const g = await officialGuard();
+  if (!g.ok) return g;
+  const r = await fn(g);
+  if (r.ok) {
+    revalidatePath('/whatsapp');
+    revalidatePath('/configuracoes');
+  }
+  return r;
+}
+
+export const connectOfficialManual = async (input: { token: string; phoneNumberId: string; wabaId: string }) =>
+  official((g) => oficial.connectManual(g.tenantId, g.userId, input));
+
+export const finishOfficialSignup = async (input: { code: string; wabaId: string; phoneNumberId: string; coexistence: boolean }) =>
+  official((g) => oficial.finishEmbeddedSignup(g.tenantId, g.userId, input));
+
+export const disconnectOfficial = async () => official((g) => oficial.disconnectCloud(g.tenantId, g.userId));
+
+export const checkOfficial = async () => official((g) => oficial.checkCloud(g.tenantId));
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 

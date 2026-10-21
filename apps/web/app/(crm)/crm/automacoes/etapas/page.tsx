@@ -13,7 +13,7 @@ export default async function AutomacoesEtapasPage() {
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, stageId: true, action: true, config: true, delayMinutes: true, active: true },
     }),
-    ctx.db.messageTemplate.findMany({ where: { status: 'APPROVED' }, orderBy: { name: 'asc' }, select: { id: true, name: true, variables: true } }),
+    ctx.db.messageTemplate.findMany({ where: { status: 'APPROVED', purpose: null }, orderBy: { name: 'asc' }, select: { id: true, name: true, variables: true } }),
   ]);
   // Todas as etapas, inclusive Fechou e Perdeu (dá para agradecer quem fechou).
   const varios = basics.pipelines.length > 1;

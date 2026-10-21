@@ -23,6 +23,8 @@ export default async function CrmWhatsAppPage() {
     }),
     ctx.db.whatsAppSession.findFirst({ select: { status: true, phoneNumber: true } }),
     ctx.db.messageTemplate.findMany({
+      // Os avisos da agenda (purpose) são cuidados no painel de mensagens da gestão.
+      where: { purpose: null },
       orderBy: [{ status: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, category: true, status: true, body: true, rejectedReason: true },
     }),

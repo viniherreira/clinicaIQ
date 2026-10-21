@@ -1,5 +1,6 @@
 import { prisma, decrypt, type AppointmentStatus } from '@clinicaiq/db';
 import {
+  CloudApiError,
   getWhatsAppProvider,
   getGatewayProvider,
   WHATSAPP_TEMPLATES,
@@ -21,6 +22,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { normalizeBrazilPhone } from './phone';
 import { siteUrl } from './company';
+import { activeCloudAccount, cloudClient, type CloudAccount } from './cloud-account';
+import { AGENDA_BUTTONS, agendaParams, fillMetaBody, type AgendaPurpose } from './agenda-templates';
+import { approvedAgendaTemplate } from './agenda-templates-sync';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -72,6 +76,7 @@ const PERMANENT_ERRORS = new Set([
   'invalid-number',
   'empty-body',
   'automation-disabled',
+  'template-pending',
 ]);
 
 /** Turns internal send-failure codes into something the clinic can act on. */
@@ -87,6 +92,8 @@ function friendlyError(code: string): string {
     'gateway-unreachable': 'Serviço de WhatsApp fora do ar. Reenviando automaticamente',
     'gateway-timeout': 'O WhatsApp demorou para responder. Reenviando automaticamente',
     'empty-body': 'Mensagem vazia',
+    'template-pending':
+      'Aguardando a Meta aprovar o texto desta mensagem. Acompanhe em Configurações › Comunicação',
   };
   if (map[code]) return map[code];
   if (code.startsWith('gateway-http-')) {
@@ -118,27 +125,25 @@ type ProviderOutcome =
   | { kind: 'send'; resolved: ResolvedProvider }
   | { kind: 'skip'; error: string };
 
+/** A clínica deixou esta mensagem ligada? (Configurações › Comunicação) */
+async function automationEnabled(tenantId: string, automation: WhatsAppAutomation): Promise<boolean> {
+  const s = await prisma.whatsAppSession.findUnique({
+    where: { tenantId },
+    select: { notifyOnCreate: true, notifyReminder: true, notifyBirthday: true },
+  });
+  return automation === 'onCreate'
+    ? (s?.notifyOnCreate ?? true)
+    : automation === 'reminder'
+      ? (s?.notifyReminder ?? true)
+      : (s?.notifyBirthday ?? false);
+}
+
 async function resolveProvider(
   tenantId: string,
   automation: WhatsAppAutomation,
 ): Promise<ProviderOutcome> {
-  const session = await prisma.whatsAppSession.findUnique({
-    where: { tenantId },
-    select: {
-      status: true,
-      notifyOnCreate: true,
-      notifyReminder: true,
-      notifyBirthday: true,
-    },
-  });
-
-  const enabled =
-    automation === 'onCreate'
-      ? (session?.notifyOnCreate ?? true)
-      : automation === 'reminder'
-        ? (session?.notifyReminder ?? true)
-        : (session?.notifyBirthday ?? false);
-  if (!enabled) return { kind: 'skip', error: 'automation-disabled' };
+  if (!(await automationEnabled(tenantId, automation))) return { kind: 'skip', error: 'automation-disabled' };
+  const session = await prisma.whatsAppSession.findUnique({ where: { tenantId }, select: { status: true } });
 
   // A clinic that paired its own number is committed to that number: patients
   // recognise it, and replies come back through it. If it's down we surface a
@@ -425,7 +430,26 @@ export async function prepareAppointmentMessage(
       ? buildAppointmentConfirmationBody(data)
       : buildAppointmentCreatedBody(data);
 
-  const outcome = await resolveProvider(appt.tenantId, isReminder ? 'reminder' : 'onCreate');
+  const automation = isReminder ? 'reminder' : 'onCreate';
+  // A API oficial da clínica ganha de tudo: sai pelo número dela, com o modelo aprovado.
+  const cloud = await activeCloudAccount(appt.tenantId);
+  if (cloud) {
+    if (!(await automationEnabled(appt.tenantId, automation))) {
+      return { kind: 'done', result: { success: false, error: 'automation-disabled' } };
+    }
+    return prepareCloudAppointment(cloud, {
+      tenantId: appt.tenantId,
+      patientId: appt.patient.id,
+      appointmentId: appt.id,
+      templateName,
+      purpose: isReminder ? 'APPOINTMENT_REMINDER' : 'APPOINTMENT_CREATED',
+      to: normalizeBrazilPhone(phone),
+      data,
+      fallbackBody: body,
+    });
+  }
+
+  const outcome = await resolveProvider(appt.tenantId, automation);
   if (outcome.kind === 'skip') {
     await recordSkip(outcome.error, {
       tenantId: appt.tenantId,
@@ -473,6 +497,56 @@ export async function prepareAppointmentMessage(
       },
     },
   };
+}
+
+/**
+ * O aviso da agenda pela API oficial: o modelo aprovado mais novo do aviso, com
+ * as variáveis na ordem dele e os botões Confirmar/Reagendar. Sem modelo
+ * aprovado ainda, fica registrado no histórico e nada sai.
+ */
+async function prepareCloudAppointment(
+  account: CloudAccount,
+  m: {
+    tenantId: string;
+    patientId: string;
+    appointmentId: string;
+    templateName: string;
+    purpose: AgendaPurpose;
+    to: string;
+    data: AppointmentMessageData;
+    fallbackBody: string;
+  },
+): Promise<Preparation> {
+  const entry = { tenantId: m.tenantId, patientId: m.patientId, appointmentId: m.appointmentId, templateName: m.templateName };
+  const modelo = await approvedAgendaTemplate(m.tenantId, m.purpose);
+  if (!modelo) {
+    await recordSkip('template-pending', { ...entry, content: m.fallbackBody });
+    return { kind: 'done', result: { success: false, error: 'template-pending' } };
+  }
+  const params = agendaParams(modelo.varKeys, m.data);
+  const content = fillMetaBody(modelo.body, params);
+
+  const rowId = await openOutboxRow({ ...entry, content });
+  if (!rowId) return { kind: 'done', result: { success: false, error: 'outbox-write-failed' } };
+
+  const provider: WhatsAppProvider = {
+    async sendMessage(p) {
+      try {
+        const r = await cloudClient(account).sendTemplate(
+          p.to,
+          modelo.name,
+          modelo.language,
+          params,
+          AGENDA_BUTTONS.map((b) => b.payload),
+        );
+        return { success: true, messageId: r.id };
+      } catch (e) {
+        return { success: false, error: e instanceof CloudApiError ? e.userMessage : 'send-failed' };
+      }
+    },
+    parseWebhook: () => null,
+  };
+  return { kind: 'send', send: { rowId, provider, ownLine: false, params: { to: m.to, body: content, ref: rowId } } };
 }
 
 /**
@@ -708,6 +782,17 @@ export async function applyAppointmentResponse(
   // vaza. Mas esta função é exportada: conferir o tenant quando ele é conhecido
   // impede que um chamador futuro confirme o agendamento de outra clínica.
   if (opts.tenantId && appt.tenantId !== opts.tenantId) return false;
+
+  // A Meta reenvia o mesmo evento quando não recebe 200 a tempo: a resposta já registrada não conta de novo.
+  if (
+    opts.externalId &&
+    (await prisma.whatsAppMessage.findFirst({
+      where: { tenantId: appt.tenantId, externalId: opts.externalId, direction: 'INBOUND' },
+      select: { id: true },
+    }))
+  ) {
+    return false;
+  }
 
   await prisma.appointment.update({
     where: { id: appt.id },
