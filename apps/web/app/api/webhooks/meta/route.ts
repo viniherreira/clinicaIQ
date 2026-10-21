@@ -34,6 +34,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const raw = await req.text();
   if (!verifyMetaSignature(raw, req.headers.get('x-hub-signature-256'), process.env.META_APP_SECRET)) {
+    // Sem isto a recusa é silenciosa: a Meta mostra o evento como entregue e nada entra no CRM.
+    console.warn('[meta webhook] assinatura recusada', process.env.META_APP_SECRET ? 'confira META_APP_SECRET' : 'META_APP_SECRET ausente');
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 

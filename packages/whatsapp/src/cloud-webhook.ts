@@ -152,8 +152,10 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
 
 /** Confere `X-Hub-Signature-256` (HMAC-SHA256 do corpo cru com o segredo do app). */
 export function verifyMetaSignature(rawBody: string, header: string | null, appSecret: string | undefined): boolean {
-  if (!appSecret || !header?.startsWith('sha256=')) return false;
-  const expected = createHmac('sha256', appSecret).update(rawBody, 'utf8').digest('hex');
+  // A chave colada no painel da hospedagem às vezes vem com espaço ou quebra de linha.
+  const secret = appSecret?.trim();
+  if (!secret || !header?.startsWith('sha256=')) return false;
+  const expected = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
   const got = header.slice(7);
   if (got.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(got), Buffer.from(expected));
