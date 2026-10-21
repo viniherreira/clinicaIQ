@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveMessageSettings, type MessageSettings } from '../actions';
+import type { AgendaTemplateView } from '@/lib/agenda-templates-sync';
 
 /**
  * A clínica escolhe o que sai e escreve o que sai.
@@ -39,9 +40,29 @@ function Variaveis({ lista }: { lista: typeof VARIAVEIS_AGENDAMENTO }) {
   );
 }
 
+/**
+ * O que a Meta disse do texto, na API oficial. A pessoa precisa saber se o que
+ * escreveu já está saindo, e o que sai enquanto não está.
+ */
+function SituacaoMeta({ view }: { view: AgendaTemplateView }) {
+  const l = view.latest;
+  const antes = view.hasApproved ? 'Enquanto isso, sai o texto aprovado antes.' : 'Enquanto isso, esta mensagem não sai.';
+  const [tom, texto] = !l
+    ? (['text-muted-foreground', 'Ainda não foi para a Meta. Salve para enviar.'] as const)
+    : l.status === 'APPROVED'
+      ? (['text-success', '✓ Aprovado pela Meta. É este texto que sai.'] as const)
+      : l.status === 'PENDING'
+        ? (['text-amber-700 dark:text-amber-300', `Em análise na Meta (costuma levar minutos). ${antes}`] as const)
+        : l.status === 'REJECTED'
+          ? (['text-destructive', `A Meta recusou este texto${l.rejectedReason ? ` (${l.rejectedReason})` : ''}. Mude o texto e salve de novo. ${antes}`] as const)
+          : (['text-destructive', `A Meta pausou este texto. Mude o texto e salve de novo. ${antes}`] as const);
+  return <p className={`mt-1.5 text-xs font-medium ${tom}`}>API oficial: {texto}</p>;
+}
+
 interface Campo {
   id: 'created' | 'reminder' | 'birthday';
   titulo: string;
+  meta?: AgendaTemplateView;
   quando: string;
   ligado: boolean;
   texto: string;
@@ -53,6 +74,8 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const oficial = settings.official;
 
   const [estado, setEstado] = useState({
     created: {
@@ -77,6 +100,7 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
       ligado: estado.created.on,
       texto: estado.created.texto,
       variaveis: VARIAVEIS_AGENDAMENTO,
+      meta: oficial?.created,
     },
     {
       id: 'reminder',
@@ -86,6 +110,7 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
       ligado: estado.reminder.on,
       texto: estado.reminder.texto,
       variaveis: VARIAVEIS_AGENDAMENTO,
+      meta: oficial?.reminder,
     },
     {
       id: 'birthday',
@@ -100,6 +125,7 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
   function salvar() {
     setErro(null);
     setSalvo(false);
+    setAviso(null);
     startTransition(async () => {
       const r = await saveMessageSettings({
         notifyOnCreate: estado.created.on,
@@ -112,6 +138,7 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
       if (!r.ok) setErro(r.message ?? 'Não foi possível salvar.');
       else {
         setSalvo(true);
+        setAviso(r.message ?? null);
         router.refresh();
       }
     });
@@ -190,12 +217,20 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
                     Voltar ao texto padrão
                   </button>
                 </div>
-                {c.id !== 'birthday' && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    O convite para responder <strong>1</strong> ou <strong>2</strong> é o que faz a
-                    confirmação do paciente cair na agenda. Se tirar do texto, ninguém confirma.
-                  </p>
-                )}
+                {c.meta && <SituacaoMeta view={c.meta} />}
+                {c.id !== 'birthday' &&
+                  (oficial ? (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Pela API oficial a mensagem vai com os botões <strong>Confirmar</strong> e{' '}
+                      <strong>Reagendar</strong>, e a resposta cai na agenda. Cada texto novo passa pela
+                      aprovação da Meta.
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      O convite para responder <strong>1</strong> ou <strong>2</strong> é o que faz a
+                      confirmação do paciente cair na agenda. Se tirar do texto, ninguém confirma.
+                    </p>
+                  ))}
               </div>
             )}
           </div>
@@ -207,7 +242,7 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
           {pending ? 'Salvando…' : 'Salvar mensagens'}
         </button>
         <span aria-live="polite" className="text-sm text-success">
-          {salvo && '✓ Salvo'}
+          {salvo && (aviso ?? '✓ Salvo')}
         </span>
       </div>
     </section>

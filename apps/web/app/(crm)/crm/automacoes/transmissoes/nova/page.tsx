@@ -25,7 +25,7 @@ export default async function NovaTransmissaoPage({
     loadCrmBasics(ctx),
     activeCloudAccount(ctx.tenantId),
     ctx.db.messageTemplate.findMany({
-      where: { status: 'APPROVED', category: { in: ['MARKETING', 'UTILITY'] } },
+      where: { status: 'APPROVED', category: { in: ['MARKETING', 'UTILITY'] }, purpose: null },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, body: true, variables: true },
     }),

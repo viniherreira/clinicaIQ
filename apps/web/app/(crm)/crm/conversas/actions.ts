@@ -238,7 +238,7 @@ export async function approvedTemplatesAction(): Promise<Result<{ templates: Tem
   const g = await guardCrmAction('crm', { write: false });
   if (!g.ok) return g;
   const rows = await g.db.messageTemplate.findMany({
-    where: { status: 'APPROVED' },
+    where: { status: 'APPROVED', purpose: null },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, category: true, body: true, variables: true },
   });

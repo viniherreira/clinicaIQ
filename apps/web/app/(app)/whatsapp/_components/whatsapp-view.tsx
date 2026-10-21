@@ -19,6 +19,7 @@ import {
   sendTestMessage,
   type WhatsAppPanelData,
 } from '../actions';
+import { OfficialCard } from './official-card';
 import { OptInCard } from './opt-in-card';
 import { PairingModal } from './pairing-modal';
 
@@ -61,6 +62,8 @@ export function WhatsAppView({ data }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const connected = data.status === 'CONNECTED';
+  // Com a API oficial ligada, o QR code sai de cena: os avisos saem por ela.
+  const oficial = Boolean(data.official.account?.active);
 
   function onDisconnect() {
     if (!confirm('Desconectar o WhatsApp da clínica? As confirmações deixam de ser enviadas.')) return;
@@ -80,7 +83,9 @@ export function WhatsAppView({ data }: Props) {
         </p>
       </header>
 
-      {!data.gatewayReady && (
+      <OfficialCard official={data.official} />
+
+      {!oficial && !data.gatewayReady && (
         <div className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-amber-950/40">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
           <div>
@@ -97,6 +102,7 @@ export function WhatsAppView({ data }: Props) {
       )}
 
       {/* Connection card */}
+      {!oficial && (
       <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex gap-4">
@@ -125,7 +131,7 @@ export function WhatsAppView({ data }: Props) {
                 </p>
               ) : (
                 <p className="mt-0.5 max-w-md text-sm text-muted-foreground">
-                  Leia um QR code com o celular da clínica, do mesmo jeito que você faz no WhatsApp Web.
+                  Outra forma, não oficial: ler um QR code com o celular da clínica, como no WhatsApp Web.
                 </p>
               )}
               {data.lastError && !connected && (
@@ -159,12 +165,13 @@ export function WhatsAppView({ data }: Props) {
 
         {connected && <TestMessage />}
       </section>
+      )}
 
       {/* Opt-in: the patient speaking first is what makes delivery work */}
-      {connected && <OptInCard phoneNumber={data.phoneNumber} />}
+      {!oficial && connected && <OptInCard phoneNumber={data.phoneNumber} />}
 
       {/* Automations */}
-      <AutomationSettings initial={data.settings} connected={connected} />
+      <AutomationSettings initial={data.settings} connected={connected || oficial} />
 
       {/* Stats */}
       <section aria-label="Envios" className="grid grid-cols-3 gap-4">

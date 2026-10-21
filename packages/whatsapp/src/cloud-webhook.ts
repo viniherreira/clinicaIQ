@@ -44,6 +44,16 @@ export type CloudEvent =
       status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
       recipient: string;
       error: string | null;
+    }
+  | {
+      /** A Meta aprovou, recusou ou pausou um modelo. Vem pela conta (WABA), sem número. */
+      kind: 'template';
+      wabaId: string;
+      templateId: string;
+      name: string | null;
+      /** Como a Meta escreve: APPROVED, REJECTED, PENDING, PAUSED, DISABLED… */
+      event: string;
+      reason: string | null;
     };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,6 +121,16 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
   for (const entry of b.entry ?? []) {
     for (const change of entry?.changes ?? []) {
       const v = change?.value;
+      if (change?.field === 'message_template_status_update') {
+        const wabaId = clean(String(entry?.id ?? ''));
+        const templateId = clean(String(v?.message_template_id ?? ''));
+        const event = clean(v?.event);
+        if (wabaId && templateId && event) {
+          const reason = clean(v?.reason);
+          out.push({ kind: 'template', wabaId, templateId, name: clean(v?.message_template_name), event, reason: reason === 'NONE' ? null : reason });
+        }
+        continue;
+      }
       const phoneNumberId = clean(v?.metadata?.phone_number_id);
       if (!phoneNumberId) continue;
 

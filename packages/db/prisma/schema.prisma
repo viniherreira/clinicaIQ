@@ -1517,6 +1517,13 @@ model MessageTemplate {
   externalId     String?
   rejectedReason String?
   lastSyncedAt   DateTime?
+  /// Modelo dos avisos da agenda: APPOINTMENT_CREATED ou APPOINTMENT_REMINDER.
+  /// Nulo = modelo do CRM (transmissões, conversas).
+  purpose        String?
+  /// Ordem das variáveis da agenda: ["nome", "data", …] = {{1}}, {{2}}, …
+  varKeys        Json?
+  /// O texto da clínica que gerou este modelo (com {nome}, {data}…).
+  sourceText     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1525,6 +1532,7 @@ model MessageTemplate {
   broadcasts Broadcast[]
 
   @@unique([tenantId, name, language])
+  @@index([tenantId, purpose])
   @@map("message_templates")
 }
 

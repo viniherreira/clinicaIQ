@@ -79,7 +79,7 @@ interface Props {
   billing: React.ReactNode;
   /** "Acesso ao CRM" na aba Equipe, renderizado no servidor (lê a cobrança do CRM). */
   crmSeats?: React.ReactNode;
-  whatsapp: { status: string; phoneNumber: string | null };
+  whatsapp: { status: string; phoneNumber: string | null; official?: boolean };
   /** As três abas de administração. Quem não alcança não recebe nem os dados. */
   podeEquipe: boolean;
   podePlano: boolean;
@@ -230,7 +230,7 @@ function CommunicationPanel({
   whatsapp,
   messages,
 }: {
-  whatsapp: { status: string; phoneNumber: string | null };
+  whatsapp: { status: string; phoneNumber: string | null; official?: boolean };
   messages: MessageSettings;
 }) {
   const s = STATUS_WHATSAPP[whatsapp.status] ?? {
@@ -261,6 +261,7 @@ function CommunicationPanel({
                 · {whatsapp.phoneNumber}
               </span>
             )}
+            {whatsapp.official && <span className="ml-2 text-muted-foreground">· API oficial da Meta</span>}
           </p>
           <Link
             href="/whatsapp"

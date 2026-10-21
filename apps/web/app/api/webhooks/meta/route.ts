@@ -1,22 +1,28 @@
 import { NextResponse, after } from 'next/server';
 import { parseCloudWebhook, verifyMetaSignature } from '@clinicaiq/whatsapp';
-import { accountByPhoneNumberId } from '@/crm/cloud';
+import { accountByPhoneNumberId, accountByWabaId } from '@/lib/cloud-account';
+import { AGENDA_BUTTONS } from '@/lib/agenda-templates';
+import { applyTemplateStatus } from '@/lib/agenda-templates-sync';
 import { applyChatStatus, ingestChat } from '@/crm/chat-ingest';
 import { afterInbound } from '@/crm/inbound';
 import { getTenantModules } from '@/lib/access';
 import { secretMatches } from '@/lib/bearer';
-import { applyAppointmentResponse, resolveAppointmentByPhone } from '@/lib/whatsapp';
+import { applyAppointmentResponse, applyMessageStatus, resolveAppointmentByPhone, resolveResponseStatus } from '@/lib/whatsapp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+const AGENDA_PAYLOADS = new Set<string>(AGENDA_BUTTONS.map((b) => b.payload));
+
 /**
- * Webhook da API oficial do WhatsApp (Cloud API) para as conversas do CRM.
+ * Webhook da API oficial do WhatsApp (Cloud API): as conversas do CRM e as
+ * respostas aos avisos da agenda (com ou sem CRM).
  *
  * Cada evento traz o `phone_number_id` do número que recebeu: é por ele que se
- * descobre a clínica. A assinatura da Meta (`X-Hub-Signature-256`) é conferida
- * antes de qualquer coisa; sem `META_APP_SECRET`, nada é aceito.
+ * descobre a clínica. A situação dos modelos vem pela conta (WABA). A
+ * assinatura da Meta (`X-Hub-Signature-256`) é conferida antes de qualquer
+ * coisa; sem `META_APP_SECRET`, nada é aceito.
  *
  * O webhook antigo (/api/webhooks/whatsapp, um número fixo) continua como está.
  */
@@ -46,12 +52,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const tenants = new Map<string, string | null>();
+  // Clínica de cada número. O CRM é opcional: sem ele, só os avisos da agenda.
+  const tenants = new Map<string, { tenantId: string; crm: boolean } | null>();
   const tenantOf = async (phoneNumberId: string) => {
     if (!tenants.has(phoneNumberId)) {
       const account = await accountByPhoneNumberId(phoneNumberId);
-      const ok = account && account.active && (await getTenantModules(account.tenantId)).crm;
-      tenants.set(phoneNumberId, ok ? account.tenantId : null);
+      tenants.set(phoneNumberId, account?.active ? { tenantId: account.tenantId, crm: (await getTenantModules(account.tenantId)).crm } : null);
     }
     return tenants.get(phoneNumberId) ?? null;
   };
@@ -59,14 +65,37 @@ export async function POST(req: Request) {
   // A Meta reenvia o que não recebeu 200; um evento ruim não pode travar os outros.
   for (const ev of parseCloudWebhook(body)) {
     try {
-      const tenantId = await tenantOf(ev.phoneNumberId);
-      if (!tenantId) continue;
-
-      if (ev.kind === 'status') {
-        await applyChatStatus(tenantId, ev.id, ev.status, ev.error);
+      if (ev.kind === 'template') {
+        const account = await accountByWabaId(ev.wabaId);
+        if (account) await applyTemplateStatus(account.tenantId, ev.templateId, ev.event, ev.reason);
         continue;
       }
 
+      const t = await tenantOf(ev.phoneNumberId);
+      if (!t) continue;
+      const { tenantId } = t;
+
+      if (ev.kind === 'status') {
+        await applyMessageStatus(ev.id, ev.status.toLowerCase() as Lowercase<typeof ev.status>);
+        if (t.crm) await applyChatStatus(tenantId, ev.id, ev.status, ev.error);
+        continue;
+      }
+
+      // Resposta a um aviso da agenda (botão Confirmar/Reagendar, ou "1"/"2").
+      let tocouBotaoDaAgenda = false;
+      if (ev.kind === 'message') {
+        const text = ev.content.text ?? undefined;
+        const buttonReplyId = ev.content.buttonId;
+        if (resolveResponseStatus(buttonReplyId, text)) {
+          const appointmentId = await resolveAppointmentByPhone(ev.from, tenantId);
+          const aplicou = appointmentId
+            ? await applyAppointmentResponse(appointmentId, { buttonReplyId, text, externalId: ev.id, tenantId })
+            : false;
+          tocouBotaoDaAgenda = aplicou && AGENDA_PAYLOADS.has(buttonReplyId ?? '');
+        }
+      }
+
+      if (!t.crm) continue;
       const r = await ingestChat(tenantId, {
         externalId: ev.id,
         direction: ev.kind === 'message' ? 'INBOUND' : 'OUTBOUND',
@@ -83,16 +112,8 @@ export async function POST(req: Request) {
       if (ev.kind === 'message' && r.recorded) {
         const conversationId = r.conversationId;
         const messageId = r.messageId;
-        after(() => afterInbound(tenantId, conversationId, messageId));
-
-        // Resposta a uma confirmação de consulta chegando pelo número oficial.
-        const from = ev.from;
-        const text = ev.content.text ?? undefined;
-        const buttonReplyId = ev.content.buttonId;
-        after(async () => {
-          const appointmentId = await resolveAppointmentByPhone(from, tenantId);
-          if (appointmentId) await applyAppointmentResponse(appointmentId, { buttonReplyId, text, externalId: ev.id, tenantId });
-        });
+        // Quem tocou Confirmar no lembrete não deve cair no menu do robô.
+        after(() => afterInbound(tenantId, conversationId, messageId, { skipBot: tocouBotaoDaAgenda }));
       }
     } catch (e) {
       console.error('[meta webhook] evento não processado', e instanceof Error ? e.message : e);

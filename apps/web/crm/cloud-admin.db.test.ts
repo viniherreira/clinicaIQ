@@ -74,7 +74,7 @@ describe.skipIf(!process.env.DATABASE_URL)('conectar a API oficial (banco)', asy
       ),
     );
     expect(await syncTemplates(tenant.id)).toEqual({ ok: true, count: 1 });
-    expect(await prisma.messageTemplate.findFirst({ where: { tenantId: tenant.id } })).toMatchObject({ name: 'retomar', status: 'APPROVED', variables: 1 });
+    expect(await prisma.messageTemplate.findFirst({ where: { tenantId: tenant.id, name: 'retomar' } })).toMatchObject({ name: 'retomar', status: 'APPROVED', variables: 1 });
   });
 
   it('desconectar volta para o QR', async () => {

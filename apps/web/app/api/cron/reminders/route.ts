@@ -6,6 +6,7 @@ import { dispatchAppointmentMessage } from '@/lib/whatsapp';
 import { clinicToday } from '@/lib/tz';
 import { bearerMatches } from '@/lib/bearer';
 import { reconcileSubscriptions } from '@/lib/subscription-sync';
+import { refreshAgendaTemplates } from '@/lib/agenda-templates-sync';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -46,6 +47,15 @@ export async function GET(req: Request) {
   } catch {
     subscriptions = { error: 'falhou' };
   }
+
+  // Textos da agenda em análise na Meta: pergunta antes de mandar, para o que
+  // foi aprovado desde ontem já sair hoje (o webhook também avisa, mas pode falhar).
+  const emAnalise = await prisma.messageTemplate.findMany({
+    where: { purpose: { not: null }, status: 'PENDING' },
+    select: { tenantId: true },
+    distinct: ['tenantId'],
+  });
+  for (const t of emAnalise) await refreshAgendaTemplates(t.tenantId).catch(() => undefined);
 
   // Appointments are stored as wall-clock-in-UTC, so "tomorrow in the clinic"
   // is the UTC calendar day matching tomorrow's clinic date.

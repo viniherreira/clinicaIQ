@@ -18,7 +18,12 @@ function masterKey(): string {
   return key;
 }
 
-export async function afterInbound(tenantId: string, conversationId: string, messageId: string | null): Promise<void> {
+export async function afterInbound(
+  tenantId: string,
+  conversationId: string,
+  messageId: string | null,
+  opts: { skipBot?: boolean } = {},
+): Promise<void> {
   const db = getTenantClient(tenantId);
   await classifyConversation(db, tenantId, conversationId);
   if (!messageId) return;
@@ -60,6 +65,8 @@ export async function afterInbound(tenantId: string, conversationId: string, mes
     }
   }
 
+  // Resposta pelos botões de um aviso da agenda: a agenda já tratou, o robô fica quieto.
+  if (opts.skipBot) return;
   try {
     await runBotOnInbound(tenantId, conversationId, msg.id, new Date(), { newContact: first && conv?.status === 'INBOX' });
   } catch (e) {

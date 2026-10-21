@@ -19,6 +19,7 @@ import { BillingPanel } from './_components/billing-panel';
 import { CrmSeatsSection } from '@/components/crm-seats-section';
 
 import { requireCapability } from '@/lib/guard';
+import { cloudAccountSummary } from '@/lib/cloud-account-admin';
 import { can } from '@/lib/permissions';
 export const metadata = { title: 'Configurações · DreamClin' };
 
@@ -34,7 +35,7 @@ export default async function ConfiguracoesPage() {
 
   // As abas de administração nem são buscadas para quem não vai vê-las. Esconder
   // a aba mas mandar a lista da equipe junto no HTML seria esconder com a mão.
-  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents, units, rules] =
+  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents, units, rules, oficial] =
     await Promise.all([
       listProfessionals(),
       suggestColor(),
@@ -51,7 +52,9 @@ export default async function ConfiguracoesPage() {
       getDocumentSettings(),
       listUnitsForSettings(),
       getClinicRules(),
+      cloudAccountSummary(clinic.id),
     ]);
+  const apiOficial = oficial?.active && oficial.status === 'CONNECTED';
 
   return (
     <SettingsView
@@ -83,10 +86,11 @@ export default async function ConfiguracoesPage() {
         ) : null
       }
       crmSeats={podeEquipe ? <CrmSeatsSection /> : null}
-      whatsapp={{
-        status: session?.status ?? 'DISCONNECTED',
-        phoneNumber: session?.phoneNumber ?? null,
-      }}
+      whatsapp={
+        apiOficial
+          ? { status: 'CONNECTED', phoneNumber: oficial.displayPhone, official: true }
+          : { status: session?.status ?? 'DISCONNECTED', phoneNumber: session?.phoneNumber ?? null }
+      }
     />
   );
 }

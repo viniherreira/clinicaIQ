@@ -38,6 +38,28 @@ describe('CloudApi', () => {
     });
   });
 
+  it('modelo com botões: cria com resposta rápida e manda o payload de cada botão', async () => {
+    const f = vi.fn(async () => ok({ id: 'T1', status: 'PENDING', messages: [{ id: 'w' }] }));
+    const api = new CloudApi({ token: 't', phoneNumberId: '1', wabaId: '9', fetchImpl: f as unknown as typeof fetch });
+    await api.createTemplate({ name: 'dc_lembrete_1', category: 'UTILITY', language: 'pt_BR', body: 'Oi {{1}}.', examples: ['Ana'], quickReplies: ['Confirmar', 'Reagendar'] });
+    const criado = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(criado.components[1]).toEqual({
+      type: 'BUTTONS',
+      buttons: [
+        { type: 'QUICK_REPLY', text: 'Confirmar' },
+        { type: 'QUICK_REPLY', text: 'Reagendar' },
+      ],
+    });
+
+    await api.sendTemplate('55', 'dc_lembrete_1', 'pt_BR', ['Ana'], ['confirm', 'reschedule']);
+    const enviado = JSON.parse(String((f.mock.calls[1] as unknown as [string, RequestInit])[1].body));
+    expect(enviado.template.components).toEqual([
+      { type: 'body', parameters: [{ type: 'text', text: 'Ana' }] },
+      { type: 'button', sub_type: 'quick_reply', index: '0', parameters: [{ type: 'payload', payload: 'confirm' }] },
+      { type: 'button', sub_type: 'quick_reply', index: '1', parameters: [{ type: 'payload', payload: 'reschedule' }] },
+    ]);
+  });
+
   it('arquivo: sobe para a Meta e manda pelo id, com legenda e nome do documento', async () => {
     const f = vi.fn(async (url: string) => (url.endsWith('/media') ? ok({ id: 'MID' }) : ok({ messages: [{ id: 'w' }] })));
     const api = new CloudApi({ token: 't', phoneNumberId: '1', fetchImpl: f as unknown as typeof fetch });
@@ -115,6 +137,27 @@ const envelope = (field: string, value: object) => ({
 });
 
 describe('parseCloudWebhook', () => {
+  it('situação de modelo vem pela conta (WABA), sem número', () => {
+    const corpo = (event: string, reason: string) => ({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'WABA1',
+          changes: [
+            {
+              field: 'message_template_status_update',
+              value: { event, message_template_id: 777, message_template_name: 'dc_lembrete_1', message_template_language: 'pt_BR', reason },
+            },
+          ],
+        },
+      ],
+    });
+    expect(parseCloudWebhook(corpo('APPROVED', 'NONE'))).toEqual([
+      { kind: 'template', wabaId: 'WABA1', templateId: '777', name: 'dc_lembrete_1', event: 'APPROVED', reason: null },
+    ]);
+    expect(parseCloudWebhook(corpo('REJECTED', 'INVALID_FORMAT'))[0]).toMatchObject({ event: 'REJECTED', reason: 'INVALID_FORMAT' });
+  });
+
   it('mensagem de texto com o nome do contato', () => {
     const ev = parseCloudWebhook(
       envelope('messages', {
