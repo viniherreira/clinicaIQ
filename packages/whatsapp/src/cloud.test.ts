@@ -182,4 +182,8 @@ describe('verifyMetaSignature', () => {
     expect(verifyMetaSignature(body, null, 'segredo')).toBe(false);
     expect(verifyMetaSignature(body, sig, undefined)).toBe(false);
   });
+  it('ignora espaço e quebra de linha na chave colada', () => {
+    expect(verifyMetaSignature(body, sig, ' segredo\n')).toBe(true);
+    expect(verifyMetaSignature(body, sig, '  ')).toBe(false);
+  });
 });
