@@ -16,6 +16,7 @@ export {
   WHATSAPP_TEMPLATES,
   CONFIRMATION_BUTTONS,
   CONFIRMATION_PROMPT,
+  LEGACY_CONFIRMATION_PROMPT,
   firstName,
   buildAppointmentCreatedBody,
   buildAppointmentConfirmationBody,

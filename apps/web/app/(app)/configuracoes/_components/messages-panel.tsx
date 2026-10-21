@@ -227,8 +227,8 @@ export function MessagesPanel({ settings }: { settings: MessageSettings }) {
                     </p>
                   ) : (
                     <p className="mt-1.5 text-xs text-muted-foreground">
-                      O convite para responder <strong>1</strong> ou <strong>2</strong> é o que faz a
-                      confirmação do paciente cair na agenda. Se tirar do texto, ninguém confirma.
+                      Conecte a API oficial da Meta na página WhatsApp para a mensagem ir com os botões{' '}
+                      <strong>Confirmar</strong> e <strong>Reagendar</strong>.
                     </p>
                   ))}
               </div>

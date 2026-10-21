@@ -286,6 +286,8 @@ export interface ChatLine {
   hasMedia: boolean;
   mimeType: string | null;
   templateName: string | null;
+  /** Botões que foram junto (robô): a equipe vê o que a pessoa podia tocar. */
+  buttons: string[];
 }
 
 export interface ChatThread {
@@ -335,6 +337,7 @@ export async function loadThread(
       hasMedia: Boolean(m.mediaRef),
       mimeType: m.mimeType,
       templateName: m.templateName,
+      buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
     }));
   const cloud = await activeCloudAccount(tenantId);
   return {

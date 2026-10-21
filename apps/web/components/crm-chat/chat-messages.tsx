@@ -148,6 +148,15 @@ export function ChatMessages({
                       </p>
                     )}
                     {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
+                    {m.buttons.length > 0 && (
+                      <ul aria-label="Botões da mensagem" className="mt-2 flex flex-col gap-1">
+                        {m.buttons.map((b, j) => (
+                          <li key={j} className="rounded-md border border-border bg-surface-alt px-2 py-1 text-center text-xs font-medium text-primary">
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {m.status === 'FAILED' && (
                       <div className="mt-1 flex flex-wrap items-center justify-end gap-2 text-xs">
                         {m.error && <span className="text-destructive">{m.error}</span>}

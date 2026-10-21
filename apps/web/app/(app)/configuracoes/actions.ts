@@ -33,7 +33,7 @@ import { deleteObject, signObject, storageEnabled, uploadObject } from '@/lib/st
 import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
 import type { ContractDocumentProps, QuoteDocumentProps, ReceiptDocumentProps } from '@clinicaiq/pdf';
 import { buildBirthdayBody } from '@clinicaiq/whatsapp';
-import { DEFAULT_AGENDA_TEXT, agendaText, toMetaTemplate, type AgendaPurpose } from '@/lib/agenda-templates';
+import { DEFAULT_AGENDA_TEXT, agendaText, toMetaTemplate, withButtonPrompt, type AgendaPurpose } from '@/lib/agenda-templates';
 import {
   agendaTemplateViews,
   refreshAgendaTemplates,
@@ -1129,8 +1129,8 @@ export async function getMessageSettings(): Promise<MessageSettings> {
     notifyOnCreate: session?.notifyOnCreate ?? true,
     notifyReminder: session?.notifyReminder ?? true,
     notifyBirthday: session?.notifyBirthday ?? false,
-    createdMessage: session?.createdMessage ?? null,
-    reminderMessage: session?.reminderMessage ?? null,
+    createdMessage: session?.createdMessage ? withButtonPrompt(session.createdMessage) : null,
+    reminderMessage: session?.reminderMessage ? withButtonPrompt(session.reminderMessage) : null,
     birthdayMessage: session?.birthdayMessage ?? null,
     // Com as variáveis, não com um paciente de exemplo: salvar sem mexer não
     // pode mandar "Olá, Maria!" para todo mundo.

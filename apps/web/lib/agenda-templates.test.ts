@@ -92,3 +92,19 @@ describe('nomes, versões e leitura', () => {
     expect(readVarKeys(null)).toBeNull();
   });
 });
+
+describe('convite para os botões', () => {
+  it('o texto padrão aponta para os botões, sem "responda 1 ou 2"', () => {
+    for (const t of Object.values(DEFAULT_AGENDA_TEXT)) {
+      expect(t).toContain('Toque em *Confirmar* ou *Reagendar*');
+      expect(t).not.toMatch(/\*1\*|\*2\*/);
+    }
+  });
+
+  it('texto salvo com o convite antigo passa a apontar para os botões', () => {
+    const salvo = 'Olá, {nome}!\nPodemos confirmar sua presença?\nResponda *1* para confirmar ou *2* para reagendar.';
+    expect(agendaText('APPOINTMENT_REMINDER', salvo)).toBe(
+      'Olá, {nome}!\nPodemos confirmar sua presença?\nToque em *Confirmar* ou *Reagendar* aqui embaixo.',
+    );
+  });
+});

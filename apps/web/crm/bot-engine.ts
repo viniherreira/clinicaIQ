@@ -200,7 +200,8 @@ export const EMAIL_RETRY_TEXT = 'Não parece um e-mail. Pode escrever de novo? (
 
 export const MAX_OPTIONS = 10;
 export const BOT_IDLE_MS = 24 * 60 * 60 * 1000;
-export const MISS_TEXT = 'Não entendi. Responda com o número de uma das opções:';
+export const MISS_TEXT = 'Não entendi. Toque em uma das opções abaixo.';
+export const CHOOSE_TEXT = 'Escolha uma opção:';
 export const HANDOFF_TEXT = 'Já vou chamar alguém da equipe para te ajudar. 😊';
 
 /** Sem acento, minúsculo, sem pontuação nas pontas — para comparar o que a pessoa digitou. */
@@ -221,12 +222,12 @@ export function parseSteps(raw: unknown): BotSteps | null {
   return r.audience ? { ...r, audience: readAudience(r.audience) } : r;
 }
 
-/** O texto do menu com as opções numeradas (funciona até onde os botões não aparecem) e os botões. */
+/** O texto do menu e as opções como botões (sem "1 - ..." no texto: a pessoa toca no botão). */
 export function renderStep(step: BotStep): { text: string; buttons: { id: string; title: string }[] } {
   if (step.kind === 'question') return { text: step.text.trim(), buttons: [] };
-  const lista = step.options.map((o, i) => `${i + 1} - ${o.label}`).join('\n');
   return {
-    text: lista ? `${step.text.trim()}\n\n${lista}` : step.text.trim(),
+    // A Meta não manda botão sem texto.
+    text: step.text.trim() || (step.options.length ? CHOOSE_TEXT : ''),
     buttons: step.options.map((o) => ({ id: `bot:${step.id}:${o.id}`, title: o.label })),
   };
 }
@@ -298,7 +299,7 @@ function decide(flow: BotSteps, state: { stepId: string; misses: number }, input
     if (state.misses >= 1) return { messages: [{ text: HANDOFF_TEXT }], actions: [{ type: 'handoff' }], next: null };
     const r = renderStep(step);
     return {
-      messages: [{ text: `${MISS_TEXT}\n\n${r.text.split('\n\n').slice(1).join('\n\n')}`, buttons: r.buttons }],
+      messages: [{ text: MISS_TEXT, buttons: r.buttons }],
       actions: [],
       next: { stepId: step.id, misses: state.misses + 1 },
     };

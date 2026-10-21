@@ -78,5 +78,5 @@ test('lead → paciente → agendou → cancelou → reagendou → orçamento �
   await expectColumn(page, lead.title, 'fora do quadro');
   await page.goto(leadUrl);
   await expect(page.getByText('Negócio fechado', { exact: true })).toBeVisible();
-  await expect(page.getByText('Negócio fechado — orçamento aprovado')).toBeVisible();
+  await expect(page.getByText('Negócio fechado: orçamento aprovado')).toBeVisible();
 });
