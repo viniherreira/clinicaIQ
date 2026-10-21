@@ -130,6 +130,12 @@ export async function startBotOnConversation(tenantId: string, conversationId: s
   return true;
 }
 
+/** A equipe tirou o robô da conversa (botão "Parar robô" nas Conversas). */
+export async function stopBotOnConversation(db: TenantPrismaClient, conversationId: string): Promise<boolean> {
+  const { count } = await db.conversation.updateMany({ where: { id: conversationId, botFlowId: { not: null } }, data: CLEAR });
+  return count > 0;
+}
+
 type Flow = { id: string; state: unknown };
 
 /** Roda o motor, executa o que ele pediu e guarda onde ficou esperando. */

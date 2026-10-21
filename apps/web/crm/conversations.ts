@@ -301,6 +301,8 @@ export interface ChatThread {
   windowOpen: boolean;
   /** Dá para mandar arquivo por este canal. */
   mediaOk: boolean;
+  /** O robô que está conversando agora (ou esperando a resposta da pessoa). */
+  bot: { id: string; name: string } | null;
 }
 
 const THREAD_LIMIT = 200;
@@ -339,7 +341,10 @@ export async function loadThread(
       templateName: m.templateName,
       buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
     }));
-  const cloud = await activeCloudAccount(tenantId);
+  const [cloud, bot] = await Promise.all([
+    activeCloudAccount(tenantId),
+    conv.botFlowId ? db.chatbotFlow.findFirst({ where: { id: conv.botFlowId }, select: { id: true, name: true } }) : null,
+  ]);
   return {
     conversation: toSummary(conv, tenantId),
     messages,
@@ -348,6 +353,7 @@ export async function loadThread(
     windowOpen: windowOpen(conv.lastInboundAt),
     // Arquivo sai pela API oficial; sem canal nenhum (desenvolvimento), é simulado.
     mediaOk: Boolean(cloud) || (!process.env.WHATSAPP_GATEWAY_URL && process.env.NODE_ENV !== 'production'),
+    bot,
   };
 }
 

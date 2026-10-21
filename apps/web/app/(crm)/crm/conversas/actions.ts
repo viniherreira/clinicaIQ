@@ -25,7 +25,8 @@ import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
 import { checkChatMedia } from '@/crm/media-rules';
 import { nudgeTick } from '@/crm/tick-nudge';
 import { deleteChatMedia, mediaStoreReady, saveChatMedia } from '@/crm/media-store';
-import { activeCloudAccount } from '@/crm/cloud';
+import { activeCloudAccount, windowOpen } from '@/crm/cloud';
+import { startBotOnConversation, stopBotOnConversation } from '@/crm/bot';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
@@ -272,4 +273,56 @@ export async function sendTemplateAction(
   if (!r.ok) return r;
   after(() => dispatchChat(g.tenantId, r.messageId));
   return { ok: true, conversationId };
+}
+
+// ─── Robô na conversa (o "Executar Salesbot" do Kommo) ───────────────────────
+
+export interface BotOption {
+  id: string;
+  name: string;
+}
+
+/** Os robôs ligados, para o botão "Executar robô" da conversa. */
+export async function botOptionsAction(): Promise<Result<{ bots: BotOption[] }>> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  const bots = await g.db.chatbotFlow.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
+  return { ok: true, bots };
+}
+
+/**
+ * Começa um robô nesta conversa, do primeiro passo, mesmo que outro esteja
+ * esperando (a equipe escolheu). Na API oficial, só dentro da janela de 24 h:
+ * o robô manda texto livre, e fora dela a Meta recusa.
+ */
+export async function startBotAction(conversationId: string, flowId: string): Promise<Result<{ name: string }>> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  const [conv, flow, cloud] = await Promise.all([
+    g.db.conversation.findFirst({ where: { id: conversationId }, select: { id: true, status: true, leadId: true, lastInboundAt: true } }),
+    g.db.chatbotFlow.findFirst({ where: { id: flowId, active: true }, select: { id: true, name: true } }),
+    activeCloudAccount(g.tenantId),
+  ]);
+  if (!conv) return { ok: false, message: 'Conversa não encontrada.' };
+  if (conv.status === 'DECLINED') return { ok: false, message: 'A conversa foi recusada.' };
+  if (!flow) return { ok: false, message: 'Este robô foi desligado. Ligue em Automações › Bots.' };
+  if (cloud && !windowOpen(conv.lastInboundAt)) {
+    return { ok: false, message: 'Passaram 24 horas desde a última mensagem da pessoa: o robô só pode começar depois que ela responder.' };
+  }
+  const ok = await startBotOnConversation(g.tenantId, conv.id, flow.id);
+  if (!ok) return { ok: false, message: 'Não foi possível começar o robô.' };
+  if (conv.leadId) {
+    await g.db.leadActivity.create({
+      data: { tenantId: g.tenantId, leadId: conv.leadId, type: 'NOTE', actorId: g.userId, data: { text: `Robô “${flow.name}” iniciado na conversa.` } },
+    });
+  }
+  return { ok: true, name: flow.name };
+}
+
+/** Tira o robô da conversa: a equipe assume. */
+export async function stopBotAction(conversationId: string): Promise<Result> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  await stopBotOnConversation(g.db, conversationId);
+  return { ok: true };
 }
