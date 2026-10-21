@@ -4,7 +4,7 @@
  *
  * O CRM é um adicional por cima de qualquer plano: plano + preço por usuário
  * com acesso. 14 dias grátis uma vez; cortesia inclui o CRM.
- * Spec: docs/superpowers/specs/2026-10-09-crm-adicional-pago-design.md
+ * Spec: docs/specs/2026-10-09-crm-adicional-pago-design.md
  */
 
 export const CRM_TRIAL_DAYS = 14;
