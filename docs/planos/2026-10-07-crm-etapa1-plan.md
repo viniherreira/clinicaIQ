@@ -1,6 +1,6 @@
 # Plano de implementação — CRM etapa 1 (leads, funil, tags e tarefas)
 
-Spec: [`docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md`](../specs/2026-10-07-crm-etapa1-leads-funil-design.md)
+Spec: [`docs/specs/2026-10-07-crm-etapa1-leads-funil-design.md`](../specs/2026-10-07-crm-etapa1-leads-funil-design.md)
 Branch: `feat/crm-etapa1`
 
 ## Regras para todas as tarefas
@@ -179,7 +179,7 @@ Uma linha `after(() => notifyCrm(...))` depois de salvar, em:
 
 ### 15. Documentação ✅
 
-- `CLAUDE.md`: corrigir "BullMQ + Redis" (é outbox no Postgres + gateway no
+- `docs/GUIA-DO-PROJETO.md`: corrigir "BullMQ + Redis" (é outbox no Postgres + gateway no
   Fly), seção do CRM e do ambiente local (Postgres local, `e2e/README.md`).
 - `ROADMAP.md`: estado real e etapas 1–5 do CRM.
 

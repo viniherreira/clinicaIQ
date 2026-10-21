@@ -252,7 +252,7 @@ export function AppointmentDetailModal({ open, appointmentId, labels, onClose, o
                             <span className="capitalize">{format(new Date(a.startTime), "EEEE, dd/MM/yyyy", { locale: ptBR })}</span>
                           </Info>
                           <Info label="Horário">
-                            <span className="tabular-nums">{wallClockTime(a.startTime)} – {wallClockTime(a.endTime)}</span>
+                            <span className="tabular-nums">{wallClockTime(a.startTime)} às {wallClockTime(a.endTime)}</span>
                           </Info>
                           <Info label="Profissional">{a.professional.name}</Info>
                           {a.procedure && <Info label="Procedimento">{a.procedure.name}</Info>}

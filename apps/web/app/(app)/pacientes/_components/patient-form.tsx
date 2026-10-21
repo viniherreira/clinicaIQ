@@ -368,7 +368,7 @@ export function PatientForm({
           />
           <span className="text-sm text-muted-foreground">
             O paciente autoriza receber <strong className="text-foreground">promoções e
-            novidades</strong> da clínica por WhatsApp. Opcional — lembretes de consulta
+            novidades</strong> da clínica por WhatsApp. Opcional: lembretes de consulta
             continuam sendo enviados de qualquer forma.
           </span>
         </label>

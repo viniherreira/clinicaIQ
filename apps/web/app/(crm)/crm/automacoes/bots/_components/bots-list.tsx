@@ -30,7 +30,7 @@ const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function hoursText(h: BotHours) {
   if (h.mode === 'always') return 'a qualquer hora';
   const dias = h.days.length === 7 ? 'todos os dias' : h.days.map((d) => DIAS[d]).join(', ');
-  return `${h.mode === 'outside' ? 'só fora do horário' : 'só no horário'} (${dias}, ${h.start}–${h.end})`;
+  return `${h.mode === 'outside' ? 'só fora do horário' : 'só no horário'} (${dias}, ${h.start} às ${h.end})`;
 }
 
 const GRUPOS: { key: ChatbotTrigger; titulo: string; dica: string }[] = [

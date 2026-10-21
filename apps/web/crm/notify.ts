@@ -2,7 +2,7 @@ import 'server-only';
 
 import { getTenantClient, type Prisma } from '@clinicaiq/db';
 import { getTenantModules } from '@/lib/access';
-import { planForEvent, type ClinicEvent } from './automation';
+import { planForEvent, withOldTaskTexts, type ClinicEvent } from './automation';
 import { clinicDateAt, clinicNowWall } from './clock';
 import { moveLead, OPEN_LEAD } from './leads';
 import { completeTask, createTask } from './tasks';
@@ -139,7 +139,7 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
 
   if (plan.completes?.length) {
     const resolvidas = await db.leadTask.findMany({
-      where: { leadId: lead.id, origin: 'AUTOMATION', completedAt: null, text: { in: plan.completes } },
+      where: { leadId: lead.id, origin: 'AUTOMATION', completedAt: null, text: { in: withOldTaskTexts(plan.completes) } },
       select: { id: true },
     });
     for (const t of resolvidas) await completeTask(db, automacao, t.id);

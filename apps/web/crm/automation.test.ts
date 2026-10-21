@@ -5,6 +5,7 @@ import {
   TASK_FALTOU,
   TASK_REAGENDAR,
   TASK_RETOMAR,
+  withOldTaskTexts,
   type AutomationContext,
   type ClinicEvent,
 } from './automation';
@@ -152,5 +153,15 @@ describe('relógio da clínica', () => {
     expect(clinicLocalToInstant('2026-10-10T10:00')?.toISOString()).toBe('2026-10-10T13:00:00.000Z');
     expect(instantToClinicLocal(new Date('2026-10-10T13:00:00Z'))).toBe('2026-10-10T10:00');
     expect(clinicLocalToInstant('ontem')).toBeNull();
+  });
+});
+
+describe('withOldTaskTexts', () => {
+  it('conclui também a tarefa aberta com o texto antigo, de antes da troca do travessão', () => {
+    expect(withOldTaskTexts([TASK_REAGENDAR, TASK_FALTOU])).toEqual([
+      TASK_REAGENDAR,
+      TASK_FALTOU,
+      'Faltou na avaliação \u2014 reagendar',
+    ]);
   });
 });

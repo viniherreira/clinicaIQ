@@ -123,7 +123,7 @@ export function LeadTable({
     <div className="mx-4 rounded-xl border border-border bg-surface sm:mx-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="text-xs text-muted-foreground">
-          {total === 0 ? 'Nenhum lead' : `${primeira.toLocaleString('pt-BR')}–${ultima.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
+          {total === 0 ? 'Nenhum lead' : `${primeira.toLocaleString('pt-BR')} a ${ultima.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}`}
         </p>
         <p role="status" aria-live="polite" className="text-xs font-medium text-foreground empty:hidden">
           {aviso}
@@ -206,13 +206,13 @@ export function LeadTable({
                   </div>
                 </td>
                 {visivel('etapa') && <td className="px-3 py-2.5">{l.wonAt ? 'Fechou' : l.lostAt ? 'Perdeu' : l.stageName}</td>}
-                {visivel('funil') && <td className="px-3 py-2.5">{nomeFunil.get(l.pipelineId) ?? '—'}</td>}
-                {visivel('responsavel') && <td className="px-3 py-2.5">{l.assignee?.name ?? <span className="text-muted-foreground">—</span>}</td>}
-                {visivel('valor') && <td className="px-3 py-2.5 tabular-nums">{l.valueCents != null ? formatCents(l.valueCents) : '—'}</td>}
+                {visivel('funil') && <td className="px-3 py-2.5">{nomeFunil.get(l.pipelineId) ?? '-'}</td>}
+                {visivel('responsavel') && <td className="px-3 py-2.5">{l.assignee?.name ?? <span className="text-muted-foreground">-</span>}</td>}
+                {visivel('valor') && <td className="px-3 py-2.5 tabular-nums">{l.valueCents != null ? formatCents(l.valueCents) : '-'}</td>}
                 {visivel('proxima') && (
                   <td className="px-3 py-2.5">
                     {l.wonAt || l.lostAt ? (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">-</span>
                     ) : l.task.kind === 'none' ? (
                       <span className="font-medium text-amber-700 dark:text-amber-300">Sem tarefa</span>
                     ) : l.task.kind === 'overdue' ? (
@@ -232,19 +232,19 @@ export function LeadTable({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                 )}
                 {camposVisiveis.map((f) => (
                   <td key={f.id} className="px-3 py-2.5">
-                    {formatFieldValue(f, l.fields[f.id]) || <span className="text-muted-foreground">—</span>}
+                    {formatFieldValue(f, l.fields[f.id]) || <span className="text-muted-foreground">-</span>}
                   </td>
                 ))}
                 {visivel('criado') && <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{instantDateBR(l.createdAt)}</td>}
                 {showClosed && (
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                    {l.wonAt ? instantDateBR(l.wonAt) : l.lostAt ? instantDateBR(l.lostAt) : '—'}
+                    {l.wonAt ? instantDateBR(l.wonAt) : l.lostAt ? instantDateBR(l.lostAt) : '-'}
                   </td>
                 )}
               </tr>

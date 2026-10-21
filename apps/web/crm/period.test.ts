@@ -101,8 +101,8 @@ describe('parsePeriod (URL)', () => {
 
 describe('textos', () => {
   it('período do calendário encurta o ano repetido', () => {
-    expect(rangeText('2026-10-01', '2026-10-15')).toBe('01/10 – 15/10/2026');
-    expect(rangeText('2025-12-28', '2026-01-05')).toBe('28/12/2025 – 05/01/2026');
+    expect(rangeText('2026-10-01', '2026-10-15')).toBe('01/10 a 15/10/2026');
+    expect(rangeText('2025-12-28', '2026-01-05')).toBe('28/12/2025 a 05/01/2026');
     expect(rangeText('2026-10-01', '2026-10-01')).toBe('01/10/2026');
     expect(rangeText('2026-10-01', '')).toBe('desde 01/10/2026');
     expect(rangeText('', '2026-10-15')).toBe('até 15/10/2026');
@@ -110,7 +110,7 @@ describe('textos', () => {
 
   it('o rótulo diz qual data conta', () => {
     expect(periodLabel({ field: 'criado', preset: '7d', from: '', to: '' })).toBe('Criados: últimos 7 dias');
-    expect(periodLabel({ field: 'fechado', preset: '', from: '2026-10-15', to: '2026-10-01' })).toBe('Fechados: 01/10 – 15/10/2026');
+    expect(periodLabel({ field: 'fechado', preset: '', from: '2026-10-15', to: '2026-10-01' })).toBe('Fechados: 01/10 a 15/10/2026');
     expect(periodLabel(NO_PERIOD)).toBe('');
   });
 });

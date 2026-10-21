@@ -219,7 +219,7 @@ export async function searchLinkTargetsAction(q: string): Promise<Result<{ targe
   return {
     ok: true,
     targets: [
-      ...leads.map((l) => ({ kind: 'lead' as const, id: l.id, label: l.title ? `${l.title} — ${l.name}` : l.name, detail: `Lead · ${l.stage.name}` })),
+      ...leads.map((l) => ({ kind: 'lead' as const, id: l.id, label: l.title ? `${l.title} · ${l.name}` : l.name, detail: `Lead · ${l.stage.name}` })),
       ...patients.map((p) => ({ kind: 'patient' as const, id: p.id, label: p.name, detail: `Paciente nº ${p.controlNumber}` })),
     ],
   };

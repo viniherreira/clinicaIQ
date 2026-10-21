@@ -407,7 +407,7 @@ export async function cancelPlan(): Promise<{ ok: boolean; error?: string; until
       return {
         ok: false,
         error:
-          'Não foi possível cancelar a cobrança agora. Tente de novo em alguns minutos — nada foi alterado.',
+          'Não foi possível cancelar a cobrança agora. Tente de novo em alguns minutos. Nada foi alterado.',
       };
     }
   }

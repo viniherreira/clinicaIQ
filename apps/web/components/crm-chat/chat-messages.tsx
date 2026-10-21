@@ -143,7 +143,7 @@ export function ChatMessages({
                         <media.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                         <span>
                           {media.label}
-                          {!saida && <span className="text-xs"> — abra no celular para ver</span>}
+                          {!saida && <span className="text-xs">: abra no celular para ver</span>}
                         </span>
                       </p>
                     )}

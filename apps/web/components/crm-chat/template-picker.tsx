@@ -41,7 +41,7 @@ export function TemplatePicker({
     <div className="border-t border-border bg-surface p-3">
       <p className="mb-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
         <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        Passaram 24 horas desde a última mensagem da pessoa. Pela regra da Meta, só dá para mandar um modelo aprovado — quando ela
+        Passaram 24 horas desde a última mensagem da pessoa. Pela regra da Meta, só dá para mandar um modelo aprovado. Quando ela
         responder, a conversa volta ao normal.
       </p>
       {templates === null ? (

@@ -18,7 +18,7 @@ describe('dentes (FDI)', () => {
   });
 
   it('nome do dente', () => {
-    expect(toothName(11)).toBe('11 — incisivo central superior direito');
-    expect(toothName(36)).toBe('36 — 1º molar inferior esquerdo');
+    expect(toothName(11)).toBe('11 · incisivo central superior direito');
+    expect(toothName(36)).toBe('36 · 1º molar inferior esquerdo');
   });
 });

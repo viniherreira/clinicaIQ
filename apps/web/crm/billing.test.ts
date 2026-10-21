@@ -74,8 +74,8 @@ describe('subscriptionValueCents', () => {
 
 describe('subscriptionDescription', () => {
   it('a fatura diz o que está sendo cobrado', () => {
-    expect(subscriptionDescription('Profissional', 'paid', 2)).toBe('DreamClin — plano Profissional + CRM (2 usuários)');
-    expect(subscriptionDescription('Essencial', 'paid', 1)).toBe('DreamClin — plano Essencial + CRM (1 usuário)');
-    expect(subscriptionDescription('Clínica', 'trial', 3)).toBe('DreamClin — plano Clínica');
+    expect(subscriptionDescription('Profissional', 'paid', 2)).toBe('DreamClin: plano Profissional + CRM (2 usuários)');
+    expect(subscriptionDescription('Essencial', 'paid', 1)).toBe('DreamClin: plano Essencial + CRM (1 usuário)');
+    expect(subscriptionDescription('Clínica', 'trial', 3)).toBe('DreamClin: plano Clínica');
   });
 });

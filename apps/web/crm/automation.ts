@@ -5,7 +5,7 @@ import { fallbackStageAfterCancel, progressIndex, stageByRole, type StageLike } 
  *
  * Este arquivo só decide — é puro e testado por tabela. Quem busca o contexto
  * e grava é `notify.ts`. As regras estão na spec
- * (docs/superpowers/specs/2026-10-07-crm-etapa1-leads-funil-design.md):
+ * (docs/specs/2026-10-07-crm-etapa1-leads-funil-design.md):
  *
  * 1. Avançar só para frente: se a recepção já pôs o card mais adiante, a
  *    automação não o puxa para trás.
@@ -67,7 +67,17 @@ export interface AutomationPlan {
 }
 
 export const TASK_REAGENDAR = 'Reagendar avaliação';
-export const TASK_FALTOU = 'Faltou na avaliação — reagendar';
+export const TASK_FALTOU = 'Faltou na avaliação, reagendar';
+/**
+ * Textos antigos das tarefas automáticas, de antes da troca do travessão.
+ * Tarefa aberta com o texto antigo ainda precisa ser concluída sozinha.
+ */
+const OLD_TASK_TEXT: Record<string, string> = { [TASK_FALTOU]: 'Faltou na avaliação \u2014 reagendar' };
+
+/** Os textos a concluir, com os antigos de cada um. */
+export function withOldTaskTexts(texts: readonly string[]): string[] {
+  return texts.flatMap((t) => (OLD_TASK_TEXT[t] ? [t, OLD_TASK_TEXT[t]] : [t]));
+}
 export const TASK_ENVIAR_ORCAMENTO = 'Enviar orçamento';
 export const TASK_RETOMAR = 'Retomar negociação';
 

@@ -214,7 +214,7 @@ function Colunas({
                 <th scope="row" className="py-2 pr-3 text-left font-medium">
                   {h || <span className="text-muted-foreground">(sem nome)</span>}
                 </th>
-                <td className="max-w-[220px] truncate py-2 pr-3 text-muted-foreground">{exemplo(j) || '—'}</td>
+                <td className="max-w-[220px] truncate py-2 pr-3 text-muted-foreground">{exemplo(j) || '-'}</td>
                 <td className="py-2">
                   <label htmlFor={`${id}-${j}`} className="sr-only">
                     Coluna {h || j + 1} vai para
@@ -441,7 +441,7 @@ function Conferir({
                     onChange={() => setDuplicates(d.value)}
                   />
                   <span className="font-medium">
-                    {d.label} <span className="font-normal text-muted-foreground">— {d.hint}</span>
+                    {d.label} <span className="font-normal text-muted-foreground">· {d.hint}</span>
                   </span>
                 </label>
               ))}

@@ -227,7 +227,7 @@ export function WhatsAppView({ data }: Props) {
                     )}
                     {stuck && !m.errorMessage && (
                       <p className="mt-1 text-xs text-warning">
-                        Sem confirmação de entrega — o WhatsApp não confirmou que chegou.
+                        Sem confirmação de entrega: o WhatsApp não confirmou que chegou.
                       </p>
                     )}
                   </div>

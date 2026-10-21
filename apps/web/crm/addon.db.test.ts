@@ -70,7 +70,7 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
   it('acabou o teste: plano + R$ 39 × 2, com a descrição na fatura', async () => {
     const depois = new Date(Date.now() + 15 * 86_400_000);
     expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 27_500 });
-    expect(enviados.at(-1)?.description).toBe('DreamClin — plano Profissional + CRM (2 usuários)');
+    expect(enviados.at(-1)?.description).toBe('DreamClin: plano Profissional + CRM (2 usuários)');
     expect((await loadCrmAddon(tenant.id, depois)).status).toBe('paid');
   });
 

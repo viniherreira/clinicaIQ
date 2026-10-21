@@ -3,9 +3,9 @@ import { redirect } from 'next/navigation';
 import { LandingPage } from './landing';
 
 export const metadata: Metadata = {
-  title: 'DreamClin — Gestão inteligente para clínicas odontológicas e estéticas',
+  title: 'DreamClin | Gestão inteligente para clínicas odontológicas e estéticas',
   description:
-    'Agenda por profissional, confirmação automática pelo WhatsApp, orçamentos com link e PDF, ficha clínica com odontograma e financeiro claro. Sistema de gestão para clínicas, grátis no acesso antecipado.',
+    'Agenda por profissional, confirmação automática pelo WhatsApp, orçamentos com link e PDF, ficha clínica com odontograma e financeiro claro. Sistema de gestão para clínicas: 14 dias grátis, sem cartão.',
   keywords: [
     'sistema para clínica odontológica',
     'software para dentista',
@@ -16,11 +16,17 @@ export const metadata: Metadata = {
     'odontograma digital',
   ],
   openGraph: {
-    title: 'DreamClin — Gestão inteligente para clínicas',
+    title: 'DreamClin | Gestão inteligente para clínicas',
     description:
-      'Agenda, WhatsApp automático, orçamentos, odontograma e financeiro em um só lugar. Grátis no acesso antecipado.',
+      'Agenda, WhatsApp automático, orçamentos, odontograma e financeiro em um só lugar. Teste grátis por 14 dias.',
     locale: 'pt_BR',
     type: 'website',
+    siteName: 'DreamClin',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DreamClin: gestão inteligente para clínicas' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og.png'],
   },
 };
 

@@ -157,7 +157,7 @@ export function SelectField({
         onKeyDown={onKeyDown}
         className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background pl-3 pr-2.5 text-sm font-medium transition-colors hover:border-muted-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className="truncate">{selecionada?.label ?? '—'}</span>
+        <span className="truncate">{selecionada?.label ?? '-'}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"

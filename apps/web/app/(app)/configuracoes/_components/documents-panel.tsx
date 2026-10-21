@@ -54,12 +54,12 @@ function Readiness({ settings }: { settings: DocumentSettings }) {
             {c.ok ? (
               <span>
                 {c.label}
-                <span className="sr-only"> — preenchido</span>
+                <span className="sr-only">, preenchido</span>
               </span>
             ) : (
               <a href={c.href} className="underline underline-offset-2 hover:no-underline">
                 {c.label}
-                <span className="sr-only"> — falta preencher</span>
+                <span className="sr-only">, falta preencher</span>
               </a>
             )}
           </li>
@@ -101,7 +101,7 @@ function LogoSection({ settings }: { settings: DocumentSettings }) {
       <div className="border-b border-border px-5 py-4">
         <h2 id="logo-heading" className="text-base font-semibold">Logotipo</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Sai no topo de todo orçamento, contrato e recibo. PNG ou JPG, até 1 MB — de preferência quadrado e com
+          Sai no topo de todo orçamento, contrato e recibo. PNG ou JPG, até 1 MB, de preferência quadrado e com
           fundo transparente.
         </p>
       </div>
@@ -240,8 +240,8 @@ function TextsSection({ settings }: { settings: DocumentSettings }) {
               Cláusulas adicionais do contrato <span className="font-normal text-muted-foreground">(opcional)</span>
             </label>
             <p id="doc-contract-help" className="text-xs text-muted-foreground">
-              Garantias, uso de imagem, regras próprias da clínica. Separe cada cláusula com uma linha em branco —
-              elas entram numeradas antes da cláusula de foro.
+              Garantias, uso de imagem, regras próprias da clínica. Separe cada cláusula com uma linha em branco.
+              Elas entram numeradas antes da cláusula de foro.
             </p>
             <textarea
               id="doc-contract-terms"

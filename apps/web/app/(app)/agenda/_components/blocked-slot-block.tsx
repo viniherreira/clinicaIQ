@@ -35,7 +35,7 @@ export function BlockedSlotBlock({
       className="group absolute left-1 right-1 z-10 flex flex-col overflow-hidden rounded-md border border-border bg-muted/80 px-2 py-1 text-left text-muted-foreground shadow-sm [background-image:repeating-linear-gradient(45deg,transparent_0,transparent_5px,hsl(var(--muted-foreground)/0.12)_5px,hsl(var(--muted-foreground)/0.12)_6px)] transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
       style={{ top: topPx, height: heightPx }}
       aria-label={`Horário bloqueado das ${wallClockTime(start)} às ${wallClockTime(end)}${slot.reason ? `, ${slot.reason}` : ''}. Clique para remover.`}
-      title={slot.reason ? `Bloqueado — ${slot.reason}` : 'Bloqueado'}
+      title={slot.reason ? `Bloqueado: ${slot.reason}` : 'Bloqueado'}
     >
       <div className="flex min-w-0 items-center gap-1">
         <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />

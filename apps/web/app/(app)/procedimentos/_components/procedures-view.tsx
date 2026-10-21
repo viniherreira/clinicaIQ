@@ -281,7 +281,7 @@ export function ProceduresView(props: Props) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <caption className="sr-only">Lista de procedimentos — {total} no total</caption>
+              <caption className="sr-only">Lista de procedimentos, {total} no total</caption>
               <thead>
                 <tr className="border-b border-border bg-surface-alt text-left text-xs text-muted-foreground">
                   <SortHeader col="name" label="Procedimento" />

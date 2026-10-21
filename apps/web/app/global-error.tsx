@@ -59,7 +59,7 @@ export default function GlobalError({
           </svg>
           <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>Algo deu errado</h1>
           <p style={{ fontSize: 14, color: '#6b6b68', margin: '0 0 20px', lineHeight: 1.5 }}>
-            Tivemos um problema inesperado. Já registramos o ocorrido — tente recarregar.
+            Tivemos um problema inesperado. Já registramos o ocorrido. Tente recarregar.
           </p>
           <button
             type="button"

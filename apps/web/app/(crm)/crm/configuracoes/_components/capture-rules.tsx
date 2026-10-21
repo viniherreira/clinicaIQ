@@ -56,7 +56,7 @@ export function CaptureRules({ rules, tags, pipelines }: { rules: CaptureRow[]; 
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Quando um número manda a primeira mensagem com uma destas palavras, o lead já entra com a tag, no funil e com a origem que você
-            escolher — antes do robô responder. Ex.: quem chega do anúncio com “Quero saber do implante” entra com a tag implante.
+            escolher, antes de o robô responder. Ex.: quem chega do anúncio com “Quero saber do implante” entra com a tag implante.
           </p>
         </div>
         {!editando && (
