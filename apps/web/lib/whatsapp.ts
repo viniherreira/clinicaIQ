@@ -23,7 +23,7 @@ import { ptBR } from 'date-fns/locale';
 import { normalizeBrazilPhone } from './phone';
 import { siteUrl } from './company';
 import { activeCloudAccount, cloudClient, type CloudAccount } from './cloud-account';
-import { AGENDA_BUTTONS, agendaParams, fillMetaBody, type AgendaPurpose } from './agenda-templates';
+import { AGENDA_BUTTONS, agendaParams, fillMetaBody, withButtonPrompt, type AgendaPurpose } from './agenda-templates';
 import { approvedAgendaTemplate } from './agenda-templates-sync';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -420,9 +420,8 @@ export async function prepareAppointmentMessage(
     where: { tenantId: appt.tenantId },
     select: { createdMessage: true, reminderMessage: true },
   });
-  const personalizado = (
-    isReminder ? escolhido?.reminderMessage : escolhido?.createdMessage
-  )?.trim();
+  const salvo = (isReminder ? escolhido?.reminderMessage : escolhido?.createdMessage)?.trim();
+  const personalizado = salvo ? withButtonPrompt(salvo) : undefined;
 
   const body = personalizado
     ? renderAppointmentTemplate(personalizado, data)
@@ -483,12 +482,10 @@ export async function prepareAppointmentMessage(
         body,
         ref: rowId,
         // On the clinic's own line (QR) we send plain text: WhatsApp doesn't
-        // reliably render tappable buttons on that path, and the body already
-        // carries the "responda 1 ou 2" prompt — which works on every device and
-        // keeps the number looking like a normal person, not an automation. On
-        // Meta with approved templates we send the structured template + its
-        // {{1}}..{{5}} params (business-initiated, no 24h window). The
-        // webhook/inbound route understands typed "1"/"2"/"confirmar" either way.
+        // reliably render tappable buttons on that path. On Meta with approved
+        // templates we send the structured template + its {{1}}..{{5}} params
+        // (business-initiated, no 24h window). The webhook/inbound route still
+        // understands a typed "1"/"2"/"confirmar" either way.
         ...(resolved.ownLine
           ? {}
           : templatesEnabled()
@@ -704,7 +701,7 @@ const BUTTON_TO_STATUS: Record<string, AppointmentStatus> = {
 };
 
 /** Maps a button id (preferred) or free text to an appointment status. The
- *  numbered replies match the "responda 1 ou 2" prompt in the message body. */
+ *  numbered replies are still understood from older messages that asked for them. */
 export function resolveResponseStatus(
   buttonReplyId?: string,
   text?: string,

@@ -97,7 +97,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
 
   it('número novo: o robô cumprimenta com o menu; submenu; opção final responde e põe a tag', async () => {
     const id = await escreve('11 96666-0001', 'Boa tarde!');
-    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?\n\n1 - Agendar avaliação\n2 - Valores']);
+    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?']);
     const primeira = await db.chatMessage.findFirst({ where: { conversationId: id, origin: 'BOT' } });
     expect(primeira?.buttons).toEqual([
       { id: 'bot:inicio:agendar', title: 'Agendar avaliação' },
@@ -207,7 +207,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(conv?.lead?.tags.map((t) => t.tagId)).toEqual([implante.id]);
     expect(conv?.lead?.activities.some((a) => a.type === 'NOTE' && JSON.stringify(a.data).includes('implante'))).toBe(true);
     // O lead nasceu antes do robô, mas para o robô continua sendo um número novo.
-    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?\n\n1 - Agendar avaliação\n2 - Valores']);
+    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?']);
 
     // Só a primeira mensagem conta.
     const id2 = await escreve('11 96666-0011', 'Boa tarde');
@@ -253,7 +253,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     };
     expect(await saveBot(db, tenant.id, { name: 'Regras', trigger: 'KEYWORD', keywords: ['ajuda'], steps: regras, active: true })).toMatchObject({ ok: true });
     const id = await escreve('11 96666-0030', 'ajuda');
-    expect(await saidas(id)).toEqual(['Oi, Ana! Em que posso ajudar?\n\n1 - Agendar']);
+    expect(await saidas(id)).toEqual(['Oi, Ana! Em que posso ajudar?']);
     await escreve('11 96666-0030', 'qual o preço?');
     expect((await saidas(id)).at(-1)).toBe('Depende da avaliação, Ana.');
     const conv = await db.conversation.findFirst({ where: { id }, include: { lead: { include: { tags: true } } } });
@@ -279,7 +279,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(await saveBot(db, tenant.id, { name: 'Novo', trigger: 'KEYWORD', keywords: ['novo'], steps: fluxo, active: true })).toMatchObject({ ok: true });
 
     const a = await escreve('11 96666-0040', 'novo');
-    expect(await saidas(a)).toEqual(['Oi, Ana! Posso ajudar?\n\n1 - Sim']);
+    expect(await saidas(a)).toEqual(['Oi, Ana! Posso ajudar?']);
     const esperando = await db.conversation.findFirst({ where: { id: a } });
     expect(esperando?.botWakeAt).toBeInstanceOf(Date);
 

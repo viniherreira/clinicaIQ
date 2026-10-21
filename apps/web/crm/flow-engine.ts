@@ -183,7 +183,7 @@ export interface FlowTriggerConfig {
 // ─── Execução ─────────────────────────────────────────────────────────────────
 
 export const MAX_STEPS_PER_RUN = 50;
-export const FLOW_MISS_TEXT = 'Não entendi. Responda com o número de uma das opções:';
+export const FLOW_MISS_TEXT = 'Não entendi. Toque em uma das opções abaixo.';
 export const FLOW_HANDOFF_TEXT = 'Já vou chamar alguém da equipe para te ajudar. 😊';
 
 /** O que o motor sabe da conversa para decidir (as ações mudam isso na hora). */
@@ -247,13 +247,13 @@ export function renderText(text: string, ctx: Pick<FlowContext, 'vars'>, lastMes
   return fillVars(t, { name: ctx.vars.name, clinic: ctx.vars.clinic });
 }
 
-/** O texto e os botões de uma mensagem (as opções numeradas valem onde o botão não aparece). */
+/** O texto e os botões de uma mensagem (sem "1 - ..." no texto: a pessoa toca no botão). */
 export function renderMessage(step: MessageStep, ctx: Pick<FlowContext, 'vars'>, lastMessage: string): Omit<FlowOutMessage, 'stepId'> {
   const texto = renderText(step.text, ctx, lastMessage);
   if (step.buttons.length === 0) return { text: texto };
-  const lista = step.buttons.map((b, i) => `${i + 1} - ${b.label}`).join('\n');
   return {
-    text: texto ? `${texto}\n\n${lista}` : lista,
+    // A Meta não manda botão sem texto.
+    text: texto || 'Escolha uma opção:',
     buttons: step.buttons.map((b) => ({ id: `bot:${step.id}:${b.id}`, title: b.label })),
   };
 }
@@ -412,8 +412,7 @@ export function runFlow(doc: FlowDoc, state: FlowState | null, event: FlowEvent,
       }
       misses += 1;
       const r = renderMessage(alvo, ctx, lastMessage);
-      const opcoes = r.text.split('\n\n').slice(1).join('\n\n');
-      messages.push({ stepId: alvo.id, text: `${FLOW_MISS_TEXT}\n\n${opcoes}`, buttons: r.buttons });
+      messages.push({ stepId: alvo.id, text: FLOW_MISS_TEXT, buttons: r.buttons });
       return esperar(alvo.id, alvo.timeoutMinutes ? addMinutes(ctx.now, alvo.timeoutMinutes) : null);
     }
 

@@ -45,9 +45,9 @@ const FLOW: BotSteps = {
 };
 
 describe('renderStep', () => {
-  it('opções numeradas no texto e os botões com id do menu', () => {
+  it('o texto sem "1 - ..." e as opções como botões com id do menu', () => {
     const r = renderStep(FLOW.steps.inicio);
-    expect(r.text).toBe('Oi! Sou o assistente da clínica. Como posso ajudar?\n\n1 - Agendar avaliação\n2 - Valores\n3 - Endereço');
+    expect(r.text).toBe('Oi! Sou o assistente da clínica. Como posso ajudar?');
     expect(r.buttons[1]).toEqual({ id: 'bot:inicio:valores', title: 'Valores' });
   });
 });
@@ -104,7 +104,8 @@ describe('conversa com o robô', () => {
     const a = continueBot(FLOW, { stepId: 'inicio', misses: 0 }, { text: 'hã?' });
     expect(a.next).toEqual({ stepId: 'inicio', misses: 1 });
     expect(a.messages[0].text).toMatch(/^Não entendi/);
-    expect(a.messages[0].text).toContain('1 - Agendar avaliação');
+    expect(a.messages[0].text).not.toContain('1 - ');
+    expect(a.messages[0].buttons?.[0]).toEqual({ id: 'bot:inicio:agendar', title: 'Agendar avaliação' });
     const b = continueBot(FLOW, { stepId: 'inicio', misses: 1 }, { text: 'hã?' });
     expect(b).toEqual({ messages: [{ text: HANDOFF_TEXT }], actions: [{ type: 'handoff' }], next: null });
   });

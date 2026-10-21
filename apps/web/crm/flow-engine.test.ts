@@ -167,7 +167,7 @@ describe('passos do Salesbot', () => {
     const [r] = conversa(KOMMO, []);
     expect(r.messages[0]).toEqual({
       stepId: 'boas',
-      text: 'Olá, Ana Souza! Bem-vinda à Sorriso. Quer agendar?\n\n1 - Sim\n2 - Agora não',
+      text: 'Olá, Ana Souza! Bem-vinda à Sorriso. Quer agendar?',
       buttons: [
         { id: 'bot:boas:sim', title: 'Sim' },
         { id: 'bot:boas:nao', title: 'Agora não' },

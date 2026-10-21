@@ -28,9 +28,12 @@ export const CONFIRMATION_BUTTONS = [
   { id: 'reschedule', title: 'Reagendar' },
 ] as const;
 
-/** Numbered fallback shown in the body, so the message works even when the
- *  tappable buttons don't render on the patient's device. */
-export const CONFIRMATION_PROMPT = 'Responda *1* para confirmar ou *2* para reagendar.';
+/** O convite no texto aponta para os botões Confirmar/Reagendar que a API
+ *  oficial manda junto (sem "responda 1 ou 2": o paciente toca no botão). */
+export const CONFIRMATION_PROMPT = 'Toque em *Confirmar* ou *Reagendar* aqui embaixo.';
+
+/** O convite antigo, numerado. Texto salvo com ele troca para o novo. */
+export const LEGACY_CONFIRMATION_PROMPT = 'Responda *1* para confirmar ou *2* para reagendar.';
 
 export type ConfirmationButtonId = (typeof CONFIRMATION_BUTTONS)[number]['id'];
 

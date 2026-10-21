@@ -1,5 +1,7 @@
 import {
   CONFIRMATION_BUTTONS,
+  CONFIRMATION_PROMPT,
+  LEGACY_CONFIRMATION_PROMPT,
   buildAppointmentConfirmationBody,
   buildAppointmentCreatedBody,
   firstName,
@@ -111,9 +113,12 @@ export function fillMetaBody(body: string, params: string[]): string {
   return body.replace(/\{\{(\d+)\}\}/g, (m, n: string) => params[Number(n) - 1] ?? m);
 }
 
+/** Texto salvo com o antigo "responda 1 ou 2" passa a apontar para os botões. */
+export const withButtonPrompt = (text: string) => text.split(LEGACY_CONFIRMATION_PROMPT).join(CONFIRMATION_PROMPT);
+
 /** O texto da clínica para um propósito: o que ela escreveu, ou o padrão. */
 export const agendaText = (purpose: AgendaPurpose, custom: string | null | undefined) =>
-  custom?.trim() ? custom.trim() : DEFAULT_AGENDA_TEXT[purpose];
+  custom?.trim() ? withButtonPrompt(custom.trim()) : DEFAULT_AGENDA_TEXT[purpose];
 
 /** `varKeys` vindo do banco (jsonb), conferido. */
 export function readVarKeys(raw: unknown): AgendaKey[] | null {
