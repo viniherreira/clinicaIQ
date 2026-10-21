@@ -1,9 +1,12 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
-import { FileText, Film, Image as ImageIcon, Mic, Paperclip, SendHorizontal, X } from 'lucide-react';
+import Link from 'next/link';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { FileText, Film, Image as ImageIcon, MessageSquareText, Mic, Paperclip, SendHorizontal, Settings, X } from 'lucide-react';
 import { fillQuickReply } from '@/crm/quick-replies';
 import { CHAT_MEDIA_ACCEPT, checkChatMedia, formatBytes, MEDIA_KIND_LABEL, type ChatMediaKind } from '@/crm/media-rules';
+import { MENU_CONTENT, MENU_ITEM } from './bot-menu';
 
 const KIND_ICON: Record<ChatMediaKind, typeof FileText> = { IMAGE: ImageIcon, DOCUMENT: FileText, AUDIO: Mic, VIDEO: Film };
 
@@ -15,8 +18,10 @@ export interface QuickReplyOption {
 
 /**
  * A caixa de texto da conversa. Enter envia, Shift+Enter quebra a linha.
- * Começar com "/" abre as respostas rápidas, filtradas pelo que vem depois.
+ * As respostas rápidas abrem pelo botão ao lado (todas) ou começando com "/"
+ * (filtradas pelo que vem depois), como no Kommo.
  * Com `onSendMedia`, o clipe anexa um arquivo; o texto vira a legenda.
+ * `tools`: botões a mais na barra (nas Conversas, "Executar robô").
  */
 export function ChatComposer({
   onSend,
@@ -26,6 +31,8 @@ export function ChatComposer({
   disabled,
   disabledReason,
   placeholder = 'Escreva uma mensagem…',
+  tools,
+  canManage = false,
 }: {
   onSend: (text: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Manda arquivo + legenda. Sem ele, o clipe não aparece. */
@@ -35,6 +42,9 @@ export function ChatComposer({
   disabled?: boolean;
   disabledReason?: string;
   placeholder?: string;
+  tools?: React.ReactNode;
+  /** Pode cadastrar respostas rápidas (crm_config): mostra o atalho no menu. */
+  canManage?: boolean;
 }) {
   const id = useId();
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -182,6 +192,14 @@ export function ChatComposer({
             </button>
           </>
         )}
+        <QuickReplyMenu
+          quickReplies={quickReplies}
+          disabled={disabled || audio || enviando}
+          canManage={canManage}
+          onPick={escolher}
+          onClosed={() => ref.current?.focus()}
+        />
+        {tools}
         <label htmlFor={`${id}-texto`} className="sr-only">
           Mensagem
         </label>
@@ -255,5 +273,75 @@ export function ChatComposer({
         </p>
       )}
     </div>
+  );
+}
+
+/** O botão das respostas rápidas: a lista inteira, para quem não lembra do atalho. */
+function QuickReplyMenu({
+  quickReplies,
+  disabled,
+  canManage,
+  onPick,
+  onClosed,
+}: {
+  quickReplies: QuickReplyOption[];
+  disabled?: boolean;
+  canManage: boolean;
+  onPick: (q: QuickReplyOption) => void;
+  /** Escolheu uma: o foco volta para o texto (e não para o botão). */
+  onClosed: () => void;
+}) {
+  const escolheu = useRef(false);
+  return (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger disabled={disabled} className="btn-ghost h-10 w-10 shrink-0 p-0" aria-label="Respostas rápidas" title="Respostas rápidas">
+        <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          className={MENU_CONTENT}
+          onCloseAutoFocus={(e) => {
+            if (!escolheu.current) return;
+            escolheu.current = false;
+            e.preventDefault();
+            onClosed();
+          }}
+        >
+          <DropdownMenu.Label className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground">Respostas rápidas</DropdownMenu.Label>
+          {quickReplies.length === 0 ? (
+            <DropdownMenu.Item disabled className={MENU_ITEM}>
+              Nenhuma resposta rápida ainda.
+            </DropdownMenu.Item>
+          ) : (
+            quickReplies.map((q) => (
+              <DropdownMenu.Item
+                key={q.id}
+                className={`${MENU_ITEM} flex-col gap-0.5`}
+                onSelect={() => {
+                  escolheu.current = true;
+                  onPick(q);
+                }}
+              >
+                <span className="font-medium">/{q.title}</span>
+                <span className="line-clamp-2 text-xs text-muted-foreground">{q.body}</span>
+              </DropdownMenu.Item>
+            ))
+          )}
+          {canManage && (
+            <>
+              <DropdownMenu.Separator className="my-1 h-px bg-border" />
+              <DropdownMenu.Item asChild className={MENU_ITEM}>
+                <Link href="/crm/configuracoes?aba=respostas">
+                  <Settings className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /> Gerenciar respostas rápidas
+                </Link>
+              </DropdownMenu.Item>
+            </>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

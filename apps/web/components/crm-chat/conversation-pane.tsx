@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Briefcase, Check, Link2, Plus, Search, Stethoscope, X } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Check, Link2, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
@@ -13,8 +13,10 @@ import {
   searchLinkTargetsAction,
   sendChatAction,
   sendMediaAction,
+  stopBotAction,
   type LinkTarget,
 } from '@/app/(crm)/crm/conversas/actions';
+import { BotMenu } from './bot-menu';
 import { ChatComposer, type QuickReplyOption } from './chat-composer';
 import { ChatMessages } from './chat-messages';
 import { TemplatePicker } from './template-picker';
@@ -47,6 +49,7 @@ export function ConversationPane({
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
+  const [erroRobo, setErroRobo] = useState('');
 
   return (
     <section aria-label={`Conversa com ${c.name}`} className="flex min-h-0 flex-1 flex-col">
@@ -77,8 +80,42 @@ export function ConversationPane({
           }}
         />
       ) : (
+      <>
+      {erroRobo && (
+        <p role="alert" className="flex items-start gap-2 border-t border-border bg-surface px-3 py-2 text-xs text-destructive">
+          <span className="mr-auto">{erroRobo}</span>
+          <button type="button" onClick={() => setErroRobo('')} className="rounded p-0.5 hover:bg-surface-alt" aria-label="Fechar o aviso">
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </p>
+      )}
+      {thread.bot && c.status !== 'DECLINED' && (
+        <BotBanner
+          conversationId={c.id}
+          name={thread.bot.name}
+          onStopped={() => {
+            setAviso(`Robô ${thread.bot?.name ?? ''} parado. A conversa está com a equipe.`);
+            onChanged();
+          }}
+        />
+      )}
       <ChatComposer
         quickReplies={quickReplies}
+        canManage={canManage}
+        tools={
+          <BotMenu
+            conversationId={c.id}
+            disabled={c.status === 'DECLINED'}
+            canManage={canManage}
+            onDone={(r) => {
+              setErroRobo(r.ok ? '' : r.message);
+              if (r.ok) {
+                setAviso(`Robô ${r.name} começou a conversar.`);
+                onChanged();
+              }
+            }}
+          />
+        }
         // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
         contactName={c.name === c.phoneMasked ? null : c.name}
         disabled={c.status === 'DECLINED'}
@@ -104,6 +141,7 @@ export function ConversationPane({
             : undefined
         }
       />
+      </>
       )}
       <p role="status" aria-live="polite" className="sr-only">
         {aviso}
@@ -212,6 +250,40 @@ function PaneHeader({
         </p>
       )}
     </header>
+  );
+}
+
+/** Um robô está conversando: quem é e o botão para a equipe assumir. */
+function BotBanner({ conversationId, name, onStopped }: { conversationId: string; name: string; onStopped: () => void }) {
+  const [pending, start] = useTransition();
+  const [erro, setErro] = useState('');
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-border bg-surface-alt px-3 py-2 text-xs">
+      <Bot className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <p className="mr-auto min-w-0">
+        O robô <strong className="font-semibold">{name}</strong> está conversando. Se você responder, ele para.
+      </p>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setErro('');
+            const r = await stopBotAction(conversationId).catch(() => ({ ok: false as const, message: 'Não foi possível parar o robô. Tente de novo.' }));
+            if (!r.ok) return setErro(r.message);
+            onStopped();
+          })
+        }
+        className="btn-outline btn-sm"
+      >
+        <Square className="h-3 w-3" aria-hidden="true" /> Parar robô
+      </button>
+      {erro && (
+        <p role="alert" className="w-full text-destructive">
+          {erro}
+        </p>
+      )}
+    </div>
   );
 }
 
