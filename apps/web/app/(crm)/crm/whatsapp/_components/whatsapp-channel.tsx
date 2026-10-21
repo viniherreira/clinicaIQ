@@ -77,7 +77,7 @@ export function WhatsAppChannel({
                 <BadgeCheck className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-medium">API oficial do WhatsApp{account.manual ? ' (conexão de teste)' : ''}</p>
+                <p className="font-medium">API oficial do WhatsApp{account.manual ? ' (conexão manual)' : ''}</p>
                 <p className="text-sm text-muted-foreground">
                   {[account.verifiedName, account.displayPhone].filter(Boolean).join(' · ') || 'Número conectado'}
                   {account.coexistence && ' · o celular da clínica continua funcionando'}
@@ -149,7 +149,7 @@ export function WhatsAppChannel({
               com o número de teste da Meta abaixo.
             </p>
           )}
-          <ManualConnect pending={pending} onSubmit={(input) => agir(() => connectManualAction(input), 'API oficial conectada (teste).')} />
+          <ManualConnect pending={pending} onSubmit={(input) => agir(() => connectManualAction(input), 'API oficial conectada.')} />
         </section>
       )}
 
@@ -304,10 +304,10 @@ function ManualConnect({ pending, onSubmit }: { pending: boolean; onSubmit: (i: 
   const id = useId();
   return (
     <details className="mt-4 rounded-lg border border-border p-3">
-      <summary className="cursor-pointer text-sm font-medium">Conexão de teste (número de teste da Meta)</summary>
+      <summary className="cursor-pointer text-sm font-medium">Conectar com token (número de teste ou da mesma empresa do app)</summary>
       <p className="mt-2 text-xs text-muted-foreground">
-        No painel do app na Meta, em WhatsApp → Configuração da API, copie o token, o ID do número de telefone e o ID da conta do
-        WhatsApp Business. O token fica cifrado e nunca aparece de novo.
+        Use um token permanente de um usuário do sistema da Meta, o ID do número de telefone e o ID da conta do WhatsApp Business
+        (no Gestor do WhatsApp). O token fica cifrado e nunca aparece de novo.
       </p>
       <form
         className="mt-3 space-y-2"
@@ -332,7 +332,7 @@ function ManualConnect({ pending, onSubmit }: { pending: boolean; onSubmit: (i: 
           </div>
         </div>
         <button type="submit" disabled={pending || !token || !phoneNumberId || !wabaId} className="btn-outline btn-sm">
-          Conectar teste
+          Conectar
         </button>
       </form>
     </details>
