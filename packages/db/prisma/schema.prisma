@@ -573,6 +573,9 @@ model WhatsAppMessage {
   /// of a patient who was never told and a clinic that never found out.
   attempts      Int       @default(0)
   lastAttemptAt DateTime?
+  /// Lembrete da agenda: quantos dias antes da consulta ele saiu (um por dia escolhido).
+  /// Nulo nos lembretes antigos, que eram todos de 1 dia.
+  reminderDays  Int?
   /// When the next attempt becomes due. Null once the row is settled — either
   /// handed to WhatsApp or failed for a reason no retry would fix.
   nextAttemptAt DateTime?
@@ -747,6 +750,11 @@ model WhatsAppSession {
   birthdayMessage String?
   createdMessage  String?
   reminderMessage String?
+  /// Quantos dias antes da consulta sai cada lembrete (0 = no dia, de manhã).
+  reminderDays    Int[]   @default([1])
+  /// Botões de cada aviso da agenda: [{ payload, text }]. Nulo = Confirmar e Reagendar.
+  createdButtons  Json?
+  reminderButtons Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1524,6 +1532,8 @@ model MessageTemplate {
   varKeys        Json?
   /// O texto da clínica que gerou este modelo (com {nome}, {data}…).
   sourceText     String?
+  /// Botões do modelo da agenda, na ordem: [{ payload, text }]. Nulo = Confirmar e Reagendar.
+  buttons        Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

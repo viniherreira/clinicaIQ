@@ -23,7 +23,7 @@ import { ptBR } from 'date-fns/locale';
 import { normalizeBrazilPhone } from './phone';
 import { siteUrl } from './company';
 import { activeCloudAccount, cloudClient, type CloudAccount } from './cloud-account';
-import { AGENDA_BUTTONS, agendaParams, fillMetaBody, withButtonPrompt, type AgendaPurpose } from './agenda-templates';
+import { agendaParams, fillMetaBody, withButtonPrompt, type AgendaPurpose } from './agenda-templates';
 import { approvedAgendaTemplate } from './agenda-templates-sync';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -228,6 +228,8 @@ interface OutboxEntry {
   quoteId?: string;
   templateName: string;
   content: string;
+  /** Lembrete da agenda: quantos dias antes da consulta. */
+  reminderDays?: number;
 }
 
 /**
@@ -252,6 +254,7 @@ async function recordSkip(error: string, entry: OutboxEntry): Promise<void> {
         direction: 'OUTBOUND',
         templateName: entry.templateName,
         content: entry.content,
+        reminderDays: entry.reminderDays ?? null,
         status: retryable ? 'PENDING' : 'FAILED',
         nextAttemptAt: retryable ? new Date() : null,
         errorMessage: friendlyError(error),
@@ -279,6 +282,7 @@ async function openOutboxRow(entry: OutboxEntry): Promise<string | null> {
         direction: 'OUTBOUND',
         templateName: entry.templateName,
         content: entry.content,
+        reminderDays: entry.reminderDays ?? null,
         status: 'PENDING',
         // This call is attempt one; the grace keeps the gateway's retry loop off
         // the row while it is still in flight.
@@ -376,6 +380,7 @@ export type Preparation =
 export async function prepareAppointmentMessage(
   appointmentId: string,
   kind: 'created' | 'reminder',
+  opts: { reminderDays?: number } = {},
 ): Promise<Preparation> {
   const appt = await prisma.appointment.findUnique({
     where: { id: appointmentId },
@@ -409,6 +414,7 @@ export async function prepareAppointmentMessage(
   };
 
   const isReminder = kind === 'reminder';
+  const reminderDays = isReminder ? opts.reminderDays : undefined;
   const templateName = isReminder
     ? WHATSAPP_TEMPLATES.appointmentConfirmation
     : WHATSAPP_TEMPLATES.appointmentCreated;
@@ -441,6 +447,7 @@ export async function prepareAppointmentMessage(
       patientId: appt.patient.id,
       appointmentId: appt.id,
       templateName,
+      reminderDays,
       purpose: isReminder ? 'APPOINTMENT_REMINDER' : 'APPOINTMENT_CREATED',
       to: normalizeBrazilPhone(phone),
       data,
@@ -455,6 +462,7 @@ export async function prepareAppointmentMessage(
       patientId: appt.patient.id,
       appointmentId: appt.id,
       templateName,
+      reminderDays,
       content: body,
     });
     return { kind: 'done', result: { success: false, error: outcome.error } };
@@ -467,6 +475,7 @@ export async function prepareAppointmentMessage(
     patientId: appt.patient.id,
     appointmentId: appt.id,
     templateName,
+    reminderDays,
     content: body,
   });
   if (!rowId) return { kind: 'done', result: { success: false, error: 'outbox-write-failed' } };
@@ -498,7 +507,7 @@ export async function prepareAppointmentMessage(
 
 /**
  * O aviso da agenda pela API oficial: o modelo aprovado mais novo do aviso, com
- * as variáveis na ordem dele e os botões Confirmar/Reagendar. Sem modelo
+ * as variáveis na ordem dele e os botões que a clínica escolheu. Sem modelo
  * aprovado ainda, fica registrado no histórico e nada sai.
  */
 async function prepareCloudAppointment(
@@ -508,13 +517,20 @@ async function prepareCloudAppointment(
     patientId: string;
     appointmentId: string;
     templateName: string;
+    reminderDays?: number;
     purpose: AgendaPurpose;
     to: string;
     data: AppointmentMessageData;
     fallbackBody: string;
   },
 ): Promise<Preparation> {
-  const entry = { tenantId: m.tenantId, patientId: m.patientId, appointmentId: m.appointmentId, templateName: m.templateName };
+  const entry = {
+    tenantId: m.tenantId,
+    patientId: m.patientId,
+    appointmentId: m.appointmentId,
+    templateName: m.templateName,
+    reminderDays: m.reminderDays,
+  };
   const modelo = await approvedAgendaTemplate(m.tenantId, m.purpose);
   if (!modelo) {
     await recordSkip('template-pending', { ...entry, content: m.fallbackBody });
@@ -534,7 +550,7 @@ async function prepareCloudAppointment(
           modelo.name,
           modelo.language,
           params,
-          AGENDA_BUTTONS.map((b) => b.payload),
+          modelo.buttons.map((b) => b.payload),
         );
         return { success: true, messageId: r.id };
       } catch (e) {
@@ -563,8 +579,9 @@ export async function deliverPrepared(send: PreparedSend): Promise<SendMessageRe
 export async function dispatchAppointmentMessage(
   appointmentId: string,
   kind: 'created' | 'reminder',
+  opts: { reminderDays?: number } = {},
 ): Promise<SendMessageResult> {
-  const prepared = await prepareAppointmentMessage(appointmentId, kind);
+  const prepared = await prepareAppointmentMessage(appointmentId, kind, opts);
   return prepared.kind === 'done' ? prepared.result : deliverPrepared(prepared.send);
 }
 

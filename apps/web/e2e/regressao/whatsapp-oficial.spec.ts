@@ -30,9 +30,36 @@ test('página WhatsApp: cartão da API oficial com a conexão por token, sem vio
 test('mensagens automáticas começam com as variáveis, não com um paciente de exemplo', async ({ page }) => {
   await page.goto('/configuracoes#comunicacao');
   await page.waitForLoadState('networkidle');
-  const lembrete = page.getByLabel('Texto da mensagem: Lembrete do dia anterior');
+  const lembrete = page.getByLabel('Texto da mensagem: Lembrete antes da consulta');
   if (!(await lembrete.isVisible())) test.skip(true, 'lembrete desligado nesta clínica de teste');
   await expect(lembrete).toHaveValue(/\{nome\}/);
   await expect(lembrete).toHaveValue(/\{data\} às \{hora\}/);
   await expect(lembrete).not.toHaveValue(/Maria/);
+});
+
+test('lembrete: escolher os dias e os botões, com a prévia de como chega', async ({ page }) => {
+  await page.goto('/configuracoes#comunicacao');
+  await page.waitForLoadState('networkidle');
+  const lembrete = page.getByLabel('Texto da mensagem: Lembrete antes da consulta');
+  if (!(await lembrete.isVisible())) test.skip(true, 'lembrete desligado nesta clínica de teste');
+
+  // Nada é salvo aqui: a clínica de teste é compartilhada.
+  const semana = page.getByRole('checkbox', { name: /1 semana antes/ });
+  // O dia é um chip: a caixa fica escondida e quem clica é no chip (ou espaço com o foco nele).
+  const marcado = await semana.isChecked();
+  await page.locator('label', { hasText: '1 semana antes' }).click();
+  await expect(semana).toBeChecked({ checked: !marcado });
+  await semana.press('Space');
+  await expect(semana).toBeChecked({ checked: marcado });
+  if (!marcado) await page.locator('label', { hasText: '1 semana antes' }).click();
+  await expect(semana).toBeChecked();
+
+  const bloco = page.getByRole('group', { name: 'Botões da mensagem' }).last();
+  await bloco.getByRole('checkbox', { name: 'Cancelar' }).check();
+  await bloco.getByLabel('Nome do botão Cancelar').fill('Não vou poder');
+
+  const previa = page.getByRole('figure').filter({ hasText: 'Como chega no WhatsApp' }).last();
+  await expect(previa).toContainText('Olá, Ana!');
+  await expect(previa.getByRole('list', { name: 'Botões da mensagem' })).toContainText('Não vou poder');
+  expect((await axe(page)).violations).toEqual([]);
 });

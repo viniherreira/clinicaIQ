@@ -40,6 +40,10 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
   const { submitAgendaTemplate, approvedAgendaTemplate } = await import('./agenda-templates-sync');
   const { dispatchAppointmentMessage } = await import('./whatsapp');
   const { POST } = await import('@/app/api/webhooks/meta/route');
+  const { sendDueReminders } = await import('./reminder-sweep');
+  const { resolveAppointmentByPhone } = await import('./whatsapp');
+  const { clinicToday } = await import('./tz');
+  const { addDays, format, parseISO } = await import('date-fns');
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const tenant = await prisma.tenant.create({ data: { clerkOrgId: `agof_${suffix}`, name: 'Clínica Oficial', slug: `agof-${suffix}` } });
@@ -188,5 +192,93 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     // Enquanto a versão 2 está em análise, continua saindo a 1.
     expect(await approvedAgendaTemplate(tenant.id, 'APPOINTMENT_REMINDER')).toMatchObject({ name: 'dc_lembrete_1' });
     expect(await submitAgendaTemplate(tenant.id, 'APPOINTMENT_REMINDER', '{nome}, até amanhã')).toMatchObject({ ok: false });
+  });
+  it('botões escolhidos pela clínica: o Cancelar vai junto, e só mudar os botões já é versão nova', async () => {
+    const meta = metaFalsa();
+    vi.stubGlobal('fetch', meta.fetchFalso);
+    const texto = 'Oi {nome}! Lembrete: {data} às {hora} na {clinica}. Responda pelos botões.';
+    const botoes = [
+      { payload: 'confirm' as const, text: 'Vou sim' },
+      { payload: 'cancel' as const, text: 'Não vou poder' },
+    ];
+    expect(await submitAgendaTemplate(tenant.id, 'APPOINTMENT_REMINDER', texto, undefined, botoes)).toEqual({ ok: true, submitted: true });
+    const criado = meta.chamadas.find((c) => c.body?.name === 'dc_lembrete_3');
+    expect((criado?.body?.components as { buttons?: unknown }[])[1]).toEqual({
+      type: 'BUTTONS',
+      buttons: [{ type: 'QUICK_REPLY', text: 'Vou sim' }, { type: 'QUICK_REPLY', text: 'Não vou poder' }],
+    });
+    expect(await submitAgendaTemplate(tenant.id, 'APPOINTMENT_REMINDER', texto, undefined, botoes)).toEqual({ ok: true, submitted: false });
+
+    const t = await prisma.messageTemplate.findFirstOrThrow({ where: { tenantId: tenant.id, name: 'dc_lembrete_3' } });
+    await webhook({
+      object: 'whatsapp_business_account',
+      entry: [{ id: waba, changes: [{ field: 'message_template_status_update', value: { event: 'APPROVED', message_template_id: t.externalId, message_template_name: t.name, reason: 'NONE' } }] }],
+    });
+    expect(await approvedAgendaTemplate(tenant.id, 'APPOINTMENT_REMINDER')).toMatchObject({ name: 'dc_lembrete_3', buttons: botoes });
+  });
+
+  it('lembretes nos dias que a clínica escolheu, cada um uma vez só', async () => {
+    const meta = metaFalsa();
+    vi.stubGlobal('fetch', meta.fetchFalso);
+    await prisma.whatsAppSession.create({ data: { tenantId: tenant.id, reminderDays: [7, 1], notifyOnCreate: true } });
+    const dia = (n: number) => format(addDays(parseISO(clinicToday()), n), 'yyyy-MM-dd');
+    const marcar = (n: number, criadaHa: number) =>
+      prisma.appointment.create({
+        data: {
+          tenantId: tenant.id,
+          patientId: paciente.id,
+          professionalId: profissional.id,
+          startTime: new Date(`${dia(n)}T15:00:00.000Z`),
+          endTime: new Date(`${dia(n)}T15:30:00.000Z`),
+          createdAt: new Date(Date.now() - criadaHa * 3_600_000),
+        },
+      });
+    const semana = await marcar(7, 48);
+    const amanha = await marcar(1, 48);
+    const emTresDias = await marcar(3, 48);
+    const recemMarcada = await marcar(7, 1);
+
+    const rodadas = await sendDueReminders({ tenantId: tenant.id });
+    expect(rodadas.map((r) => [r.days, r.sent])).toEqual([[7, 1], [1, 1]]);
+
+    const lembretes = await prisma.whatsAppMessage.findMany({
+      where: { tenantId: tenant.id, appointmentId: { in: [semana.id, amanha.id, emTresDias.id, recemMarcada.id] } },
+      select: { appointmentId: true, reminderDays: true, status: true },
+    });
+    expect(lembretes).toHaveLength(2);
+    expect(lembretes.find((l) => l.appointmentId === semana.id)).toMatchObject({ reminderDays: 7, status: 'SENT' });
+    expect(lembretes.find((l) => l.appointmentId === amanha.id)).toMatchObject({ reminderDays: 1, status: 'SENT' });
+
+    // Saiu pelo modelo com os botões escolhidos, na ordem dele.
+    const envio = meta.chamadas.find((c) => c.url.includes(`${pn}/messages`));
+    const template = envio?.body?.template as { name: string; components: { type: string; parameters: { payload?: string }[] }[] };
+    expect(template.name).toBe('dc_lembrete_3');
+    expect(template.components.slice(1).map((c) => c.parameters[0].payload)).toEqual(['confirm', 'cancel']);
+
+    // No dia seguinte (ou se o cron rodar de novo), não repete.
+    expect((await sendDueReminders({ tenantId: tenant.id })).map((r) => r.sent)).toEqual([0, 0]);
+  });
+
+  it('o paciente toca em Cancelar: a consulta é desmarcada', async () => {
+    const alvo = await resolveAppointmentByPhone(`55${telefone}`, tenant.id);
+    expect(alvo).toBeTruthy();
+    await webhook({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: waba,
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                metadata: { phone_number_id: pn },
+                messages: [{ from: `55${telefone}`, id: `wamid.cancel.${suffix}`, timestamp: String(Math.floor(Date.now() / 1000)), type: 'button', button: { text: 'Não vou poder', payload: 'cancel' } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect((await prisma.appointment.findUniqueOrThrow({ where: { id: alvo! } })).status).toBe('CANCELLED');
   });
 });

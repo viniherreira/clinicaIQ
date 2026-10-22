@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { parseCloudWebhook, verifyMetaSignature } from '@clinicaiq/whatsapp';
 import { accountByPhoneNumberId, accountByWabaId } from '@/lib/cloud-account';
-import { AGENDA_BUTTONS } from '@/lib/agenda-templates';
+import { AGENDA_PAYLOADS as PAYLOADS } from '@/lib/agenda-options';
 import { applyTemplateStatus } from '@/lib/agenda-templates-sync';
 import { applyChatStatus, ingestChat } from '@/crm/chat-ingest';
 import { afterInbound } from '@/crm/inbound';
@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const AGENDA_PAYLOADS = new Set<string>(AGENDA_BUTTONS.map((b) => b.payload));
+const AGENDA_PAYLOADS = new Set<string>(PAYLOADS);
 
 /**
  * Webhook da API oficial do WhatsApp (Cloud API): as conversas do CRM e as
