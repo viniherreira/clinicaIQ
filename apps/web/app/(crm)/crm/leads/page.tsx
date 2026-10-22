@@ -19,6 +19,7 @@ import { COLUMNS_COOKIE, parseColumns } from '@/crm/list-columns';
 import { hasPeriod } from '@/crm/period';
 import { CrmToolbar } from '../_components/toolbar';
 import { LeadTable } from './_components/lead-table';
+import { AutoRefresh } from '@/components/auto-refresh';
 
 export const metadata = { title: 'Leads · DreamClin' };
 
@@ -68,6 +69,7 @@ export default async function LeadsPage({
 
   return (
     <div className="flex h-full flex-col gap-4 pb-6">
+      <AutoRefresh every={15_000} />
       <CrmToolbar
         view="lista"
         filters={filters}

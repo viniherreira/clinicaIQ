@@ -544,7 +544,8 @@ export async function simulateSent(db: TenantPrismaClient, chatMessageId: string
  */
 export async function acceptConversation(
   db: TenantPrismaClient,
-  actor: Actor & { userId: string },
+  /** `userId: null`: número novo aceito sozinho ao chegar (`crm/inbound.ts`). */
+  actor: Actor,
   conversationId: string,
   opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
