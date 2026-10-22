@@ -5,6 +5,14 @@ import { CLINIC_TZ } from '@/lib/tz';
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 export const formatCents = (cents: number) => brl.format(Math.round(cents / 100));
 
+export const usersLabel = (n: number) => `${n} ${n === 1 ? 'usuário' : 'usuários'}`;
+
+/** Quanto o CRM soma à mensalidade: "R$ 120 por mês com 3 usuários; cada um a mais, R$ 39". */
+export function crmOfferText(p: { packagePriceCents: number; includedSeats: number; seatPriceCents: number }): string {
+  if (p.packagePriceCents <= 0) return `${formatCents(p.seatPriceCents)} por usuário por mês`;
+  return `${formatCents(p.packagePriceCents)} por mês com ${usersLabel(p.includedSeats)}; cada um a mais, ${formatCents(p.seatPriceCents)}`;
+}
+
 export const SOURCE_LABEL: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
   INDICACAO: 'Indicação',

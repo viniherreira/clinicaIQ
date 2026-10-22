@@ -47,6 +47,10 @@ export interface PlanOption {
   whatsappEnabled: boolean;
   campaignsEnabled: boolean;
   advancedReports: boolean;
+  /** O plano com CRM: quanto o CRM soma, quantos usuários inclui e o preço de cada um a mais. */
+  crmPackagePriceCents: number;
+  crmIncludedSeats: number;
+  crmSeatPriceCents: number;
   current: boolean;
 }
 
@@ -153,6 +157,9 @@ export async function getBillingData(): Promise<BillingData> {
       whatsappEnabled: p.whatsappEnabled,
       campaignsEnabled: p.campaignsEnabled,
       advancedReports: p.advancedReports,
+      crmPackagePriceCents: p.crmPackagePriceCents,
+      crmIncludedSeats: p.crmIncludedSeats,
+      crmSeatPriceCents: p.crmSeatPriceCents,
       current: subscription?.tier === p.tier,
     })),
     access,
@@ -303,7 +310,7 @@ export async function choosePlan(
         phone: tenant.phone,
       }));
 
-    // Plano + CRM (por usuário), numa cobrança só.
+    // Plano + CRM (pacote e quem passar do incluído), numa cobrança só.
     const cobranca = await billingFor(tenantId, plan);
 
     // Switching plans updates the existing subscription instead of opening a

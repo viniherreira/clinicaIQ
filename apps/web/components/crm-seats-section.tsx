@@ -9,8 +9,8 @@ import { CrmSeatToggle } from './crm-addon-controls';
 const PAPEL: Record<string, string> = { OWNER: 'Proprietário', ADMIN: 'Administrador', RECEPTIONIST: 'Recepção' };
 
 /**
- * "Acesso ao CRM" na aba Equipe: quem da equipe entra no CRM. É por pessoa
- * que o CRM é cobrado, então a chave diz quanto custa (ou que está incluído).
+ * "Acesso ao CRM" na aba Equipe: quem da equipe entra no CRM. O plano com CRM
+ * inclui algumas pessoas e cobra as que passarem, então a chave diz quanto custa.
  */
 export async function CrmSeatsSection() {
   const acesso = await currentAccess();
@@ -45,7 +45,11 @@ export async function CrmSeatsSection() {
     select: { id: true, name: true, role: true, crmSeat: true },
   });
   const custo =
-    a.status === 'trial' ? 'grátis no teste' : `${formatCents(a.seatPriceCents)}/mês`;
+    a.status === 'trial'
+      ? 'grátis no teste'
+      : a.packagePriceCents > 0
+        ? `${a.includedSeats} no plano; a mais, ${formatCents(a.seatPriceCents)}/mês`
+        : `${formatCents(a.seatPriceCents)}/mês`;
 
   return (
     <section aria-labelledby="crm-acesso" className="rounded-xl border border-border bg-surface p-4 shadow-card">

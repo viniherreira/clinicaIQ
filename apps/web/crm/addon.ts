@@ -2,6 +2,8 @@ import { prisma } from '@clinicaiq/db';
 import {
   CRM_ELIGIBLE_ROLES,
   CRM_TRIAL_DAYS,
+  crmPriceCents,
+  crmPriceOf,
   crmStatus,
   seatsCharged,
   subscriptionDescription,
@@ -19,6 +21,17 @@ import {
  */
 
 type Result = { ok: true } | { ok: false; message: string };
+
+/** O que a cobrança precisa saber de um plano. */
+const PLAN_PRICE = {
+  name: true,
+  monthlyPriceCents: true,
+  crmSeatPriceCents: true,
+  crmPackagePriceCents: true,
+  crmIncludedSeats: true,
+} as const;
+
+type PlanPrice = { name: string; monthlyPriceCents: number; crmSeatPriceCents: number; crmPackagePriceCents: number; crmIncludedSeats: number };
 
 /** O que `syncBillingValue` precisa do Asaas — injetável para teste. */
 export interface BillingGateway {
@@ -54,7 +67,7 @@ export async function syncBillingValue(
       complimentary: true,
       asaasSubscriptionId: true,
       billedValueCents: true,
-      plan: { select: { name: true, monthlyPriceCents: true, crmSeatPriceCents: true } },
+      plan: { select: PLAN_PRICE },
     },
   });
   if (!sub) return { sent: false, reason: 'no-subscription' };
@@ -70,12 +83,7 @@ export async function syncBillingValue(
   const users = await prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } });
   const status = crmStatus(sub, now);
   const seats = seatsCharged(users);
-  const valueCents = subscriptionValueCents({
-    planPriceCents: sub.plan.monthlyPriceCents,
-    seatPriceCents: sub.plan.crmSeatPriceCents,
-    seats,
-    status,
-  });
+  const valueCents = subscriptionValueCents({ planPriceCents: sub.plan.monthlyPriceCents, ...crmPriceOf(sub.plan), seats, status });
   if (sub.billedValueCents === valueCents) return { sent: false, reason: 'unchanged' };
 
   const gw = gateway ?? (await defaultGateway());
@@ -92,7 +100,7 @@ export async function syncBillingValue(
  */
 export async function billingFor(
   tenantId: string,
-  plan: { name: string; monthlyPriceCents: number; crmSeatPriceCents: number },
+  plan: PlanPrice,
   now: Date = new Date(),
 ): Promise<{ valueCents: number; description: string }> {
   const [sub, users] = await Promise.all([
@@ -105,12 +113,7 @@ export async function billingFor(
   const status = crmStatus(sub, now);
   const seats = seatsCharged(users);
   return {
-    valueCents: subscriptionValueCents({
-      planPriceCents: plan.monthlyPriceCents,
-      seatPriceCents: plan.crmSeatPriceCents,
-      seats,
-      status,
-    }),
+    valueCents: subscriptionValueCents({ planPriceCents: plan.monthlyPriceCents, ...crmPriceOf(plan), seats, status }),
     description: subscriptionDescription(plan.name, status, seats),
   };
 }
@@ -221,23 +224,23 @@ export async function loadCrmAddon(tenantId: string, now: Date = new Date()) {
         crmEnabled: true,
         crmTrialEndsAt: true,
         complimentary: true,
-        plan: { select: { name: true, monthlyPriceCents: true, crmSeatPriceCents: true } },
+        plan: { select: PLAN_PRICE },
       },
     }),
     prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } }),
   ]);
   const status = crmStatus(sub, now);
   const seats = seatsCharged(users);
-  const seatPriceCents = sub?.plan.crmSeatPriceCents ?? 3900;
+  const preco = sub ? crmPriceOf(sub.plan) : { packagePriceCents: 0, includedSeats: 0, seatPriceCents: 3900 };
   return {
     status,
     seats,
-    seatPriceCents,
+    ...preco,
     trialAvailable: !sub?.complimentary && trialAvailable(sub),
     trialEndsAt: sub?.crmTrialEndsAt?.toISOString() ?? null,
     planName: sub?.plan.name ?? null,
     planPriceCents: sub?.plan.monthlyPriceCents ?? 0,
     /** O que a parte do CRM custará (ou custa) por mês com as pessoas de hoje. */
-    crmMonthlyCents: seats * seatPriceCents,
+    crmMonthlyCents: crmPriceCents(preco, seats),
   };
 }

@@ -21,7 +21,7 @@ export async function CrmTrialBanner() {
 
     return (
       <div role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 sm:px-6">
-        O teste grátis do CRM termina {dias <= 1 ? 'amanhã' : `em ${dias} dias`}. Depois, a cobrança por usuário entra na mensalidade.{' '}
+        O teste grátis do CRM termina {dias <= 1 ? 'amanhã' : `em ${dias} dias`}. Depois, o CRM entra na mensalidade.{' '}
         <Link href="/configuracoes#plano" className="font-medium underline underline-offset-2">Ver o plano</Link>
       </div>
     );

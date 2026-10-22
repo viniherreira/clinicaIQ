@@ -875,22 +875,26 @@ enum ChargeStatus {
 /// Um plano vendável. Os limites moram aqui, e não no código, para que mudar
 /// preço ou liberar um recurso não exija deploy.
 model Plan {
-  tier              PlanTier @id
-  name              String
-  description       String
-  monthlyPriceCents Int
+  tier                 PlanTier @id
+  name                 String
+  description          String
+  monthlyPriceCents    Int
   /// Teto de profissionais; null = ilimitado.
-  maxProfessionals  Int?
-  whatsappEnabled   Boolean  @default(true)
-  campaignsEnabled  Boolean  @default(false)
-  assistantEnabled  Boolean  @default(false)
-  advancedReports   Boolean  @default(false)
+  maxProfessionals     Int?
+  whatsappEnabled      Boolean  @default(true)
+  campaignsEnabled     Boolean  @default(false)
+  assistantEnabled     Boolean  @default(false)
+  advancedReports      Boolean  @default(false)
   /// Preço do CRM por usuário com acesso, por mês. O CRM é um adicional pago
   /// por cima de qualquer plano (docs/specs/2026-10-09-crm-adicional-pago-design.md).
-  crmSeatPriceCents Int      @default(3900)
+  crmSeatPriceCents    Int      @default(3900)
+  /// O plano "com CRM": quanto o CRM soma à mensalidade, já com `crmIncludedSeats`
+  /// usuários; cada usuário a mais paga `crmSeatPriceCents`. 0 = só por usuário.
+  crmPackagePriceCents Int      @default(0)
+  crmIncludedSeats     Int      @default(0)
   /// Ordem de exibição na tela de planos.
-  sortOrder         Int      @default(0)
-  active            Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  active               Boolean  @default(true)
 
   subscriptions Subscription[]
 

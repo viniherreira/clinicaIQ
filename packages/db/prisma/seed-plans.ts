@@ -1,5 +1,7 @@
 /**
- * The sellable plans. Idempotent — safe to run on every deploy.
+ * The sellable plans: Essencial R$ 139, Profissional R$ 239, Clínica R$ 339, e
+ * cada um com CRM por R$ 199, R$ 359 e R$ 519 (1, 3 e 5 usuários no CRM).
+ * Idempotent — safe to run on every deploy.
  *
  *   pnpm --filter @clinicaiq/db exec tsx prisma/seed-plans.ts
  *
@@ -14,40 +16,49 @@ const PLANS = [
   {
     tier: 'ESSENCIAL' as const,
     name: 'Essencial',
-    description: 'Para o consultório de um profissional. Agenda, pacientes e confirmação por WhatsApp.',
-    monthlyPriceCents: 9_700,
+    description: 'Para o consultório de um profissional. Agenda, prontuário, orçamentos e WhatsApp oficial.',
+    monthlyPriceCents: 13_900,
     maxProfessionals: 1,
     whatsappEnabled: true,
     campaignsEnabled: false,
     assistantEnabled: false,
     advancedReports: false,
     crmSeatPriceCents: 3_900,
+    // O plano com CRM: soma este valor, já com 1 usuário no CRM.
+    crmPackagePriceCents: 6_000,
+    crmIncludedSeats: 1,
     sortOrder: 1,
   },
   {
     tier: 'PROFISSIONAL' as const,
     name: 'Profissional',
-    description: 'Para clínicas em crescimento. Até 3 profissionais, orçamentos e campanhas em massa.',
-    monthlyPriceCents: 19_700,
+    description: 'Para clínicas em crescimento. Até 3 profissionais e campanhas em massa.',
+    monthlyPriceCents: 23_900,
     maxProfessionals: 3,
     whatsappEnabled: true,
     campaignsEnabled: true,
     assistantEnabled: false,
     advancedReports: false,
     crmSeatPriceCents: 3_900,
+    // O plano com CRM: soma este valor, já com 3 usuários no CRM.
+    crmPackagePriceCents: 12_000,
+    crmIncludedSeats: 3,
     sortOrder: 2,
   },
   {
     tier: 'CLINICA' as const,
     name: 'Clínica',
     description: 'Para clínicas com muitos profissionais. Equipe ilimitada e relatórios completos.',
-    monthlyPriceCents: 29_700,
+    monthlyPriceCents: 33_900,
     maxProfessionals: null,
     whatsappEnabled: true,
     campaignsEnabled: true,
     assistantEnabled: false,
     advancedReports: true,
     crmSeatPriceCents: 3_900,
+    // O plano com CRM: soma este valor, já com 5 usuários no CRM.
+    crmPackagePriceCents: 18_000,
+    crmIncludedSeats: 5,
     sortOrder: 3,
   },
 ];

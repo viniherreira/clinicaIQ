@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { KanbanSquare } from 'lucide-react';
 import { currentAccess } from '@/lib/guard';
 import { loadCrmAddon } from '@/crm/addon';
-import { formatCents } from '@/crm/format';
+import { crmOfferText, formatCents, usersLabel } from '@/crm/format';
 import { CrmTurnOnButton } from './crm-turn-on-button';
 import { CrmTurnOffButton } from './crm-addon-controls';
 
@@ -17,17 +17,17 @@ export async function CrmAddonCard() {
   const acesso = await currentAccess();
   if (!acesso) return null;
   const a = await loadCrmAddon(acesso.tenantId);
-  const preco = formatCents(a.seatPriceCents);
-  const usuarios = `${a.seats} ${a.seats === 1 ? 'usuário' : 'usuários'}`;
+  const oferta = crmOfferText(a);
+  const usuarios = usersLabel(a.seats);
 
   const situacao =
     a.status === 'off'
-      ? `Desligado. ${preco} por usuário por mês, somado à mensalidade.`
+      ? `Desligado. ${oferta}, somado à mensalidade.`
       : a.status === 'trial'
-        ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${preco} por usuário (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
+        ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${oferta} (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
         : a.status === 'complimentary'
           ? 'Incluído na cortesia, sem custo: toda a equipe com perfil de dono, administração ou recepção tem acesso.'
-          : `Ativo · ${usuarios} × ${preco} = ${formatCents(a.crmMonthlyCents)}/mês.`;
+          : `Ativo · ${usuarios} no CRM = ${formatCents(a.crmMonthlyCents)}/mês (${oferta}).`;
 
   return (
     <section aria-labelledby="crm-adicional" className="rounded-xl border border-border bg-surface p-5 shadow-card">

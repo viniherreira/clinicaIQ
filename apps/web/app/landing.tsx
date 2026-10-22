@@ -19,7 +19,7 @@ import Image from 'next/image';
 import {
   ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
   BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
-  Users, Heart, PlusCircle, TrendingUp,
+  Users, Heart, PlusCircle, TrendingUp, BadgeCheck, KanbanSquare, Bot, Inbox,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { companyLine, salesWhatsAppUrl } from '@/lib/company';
@@ -37,6 +37,7 @@ function Header() {
 
         <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
           <a href="#recursos" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Recursos</a>
+          <a href="#whatsapp-oficial" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">WhatsApp oficial</a>
           <a href="#diferenciais" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Diferenciais</a>
           <a href="#planos" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Planos</a>
           <a href="#perguntas" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Perguntas</a>
@@ -218,7 +219,7 @@ function HeroVisual() {
 
 function Hero() {
   const bullets = [
-    'Menos faltas com confirmação e lembrete automáticos no WhatsApp',
+    'Menos faltas com confirmação e lembretes no WhatsApp oficial, com botões',
     'Mais orçamentos aceitos com link de aprovação online e PDF',
     'Agenda, prontuário com odontograma e financeiro em um só lugar',
   ];
@@ -246,9 +247,10 @@ function Hero() {
           </h1>
 
           <p className="animate-fade-in-up mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg" style={{ animationDelay: '160ms' }}>
-            Agenda por profissional, confirmação automática no WhatsApp, orçamentos com
-            link e PDF, ficha clínica com odontograma e dashboard financeiro. Feito para
-            clínicas odontológicas e estéticas no Brasil.
+            Agenda por profissional, confirmação automática pela API oficial do WhatsApp,
+            orçamentos com link e PDF, ficha clínica com odontograma, financeiro e um CRM
+            para não perder nenhum interessado. Feito para clínicas odontológicas e
+            estéticas no Brasil.
           </p>
 
           <ul className="animate-fade-in-up mt-6 space-y-2.5" style={{ animationDelay: '240ms' }}>
@@ -305,6 +307,7 @@ function Hero() {
 
 function TrustStrip() {
   const items = [
+    { icon: BadgeCheck, label: 'API oficial do WhatsApp', color: 'text-emerald-600 dark:text-emerald-400' },
     { icon: ShieldCheck, label: 'LGPD por padrão', color: 'text-emerald-600 dark:text-emerald-400' },
     { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-blue-800 dark:text-blue-400' },
     { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-teal-700 dark:text-teal-400' },
@@ -336,8 +339,8 @@ function Features() {
     },
     {
       icon: MessageCircle,
-      title: 'WhatsApp automático',
-      text: 'O paciente recebe a confirmação assim que o horário é marcado e lembretes antes da consulta, nos dias que a clínica escolher. A recepção não precisa digitar mensagem nenhuma.',
+      title: 'WhatsApp oficial e automático',
+      text: 'Pela API oficial da Meta, no número da clínica: confirmação assim que o horário é marcado e lembretes nos dias que você escolher, com botões para o paciente responder. A recepção não digita nada.',
       chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
     },
     {
@@ -397,6 +400,120 @@ function Features() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── WhatsApp oficial + CRM ──────────────────────────────────────────────────
+
+/** A mensagem como o paciente vê, com os botões. Ilustração: nada aqui é clicável. */
+function WhatsAppMock() {
+  return (
+    <div className="mx-auto w-full max-w-sm rounded-[2rem] border border-border bg-surface p-3 shadow-2xl" aria-hidden="true">
+      <div className="flex items-center gap-2.5 rounded-t-[1.4rem] bg-emerald-800 px-4 py-3 text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-bold text-emerald-800">CS</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1 text-sm font-semibold">
+            Clínica Sorriso <BadgeCheck className="h-3.5 w-3.5" />
+          </span>
+          <span className="block text-[11px] text-white">Conta comercial oficial</span>
+        </span>
+      </div>
+      <div className="space-y-2 rounded-b-[1.4rem] bg-board p-3">
+        <div className="max-w-[85%] overflow-hidden rounded-lg rounded-tl-sm bg-surface text-[13px] shadow-sm">
+          <p className="px-3 py-2 leading-relaxed">
+            Olá, Ana! Passando para lembrar do seu horário na <strong>Clínica Sorriso</strong>:
+            <br />
+            <br />📅 quinta-feira, 28/05 às 14:30
+            <br />👩‍⚕️ Dra. Paula (Limpeza)
+          </p>
+          <div className="divide-y divide-border border-t border-border text-center text-[13px] font-medium text-primary">
+            <p className="py-2">Confirmar</p>
+            <p className="py-2">Reagendar</p>
+            <p className="py-2">Cancelar</p>
+          </div>
+        </div>
+        <div className="ml-auto w-fit rounded-lg rounded-tr-sm bg-bubble-out px-3 py-2 text-[13px] shadow-sm">Confirmar</div>
+        <div className="mx-auto w-fit rounded-full bg-surface px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm dark:text-emerald-400">
+          ✓ Consulta confirmada na agenda
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppOficial() {
+  const pontos = [
+    'Mensagens saem do número da clínica, com o nome dela, sem QR code nem celular ligado',
+    'Confirmação na hora em que marca e lembretes 1 semana, 3 dias, 1 dia antes ou no dia: você escolhe',
+    'Botões Confirmar, Reagendar e Cancelar, com os nomes que você quiser: a resposta cai sozinha na agenda',
+    'O texto é seu: a gente manda para a Meta aprovar e avisa quando liberar',
+  ];
+  const crm = [
+    { icon: KanbanSquare, title: 'Funil de captação', text: 'Cada interessado num cartão, andando sozinho quando marca, falta ou aprova o orçamento.' },
+    { icon: Inbox, title: 'Conversas da equipe', text: 'O WhatsApp da clínica no computador, com toda a recepção respondendo no mesmo número.' },
+    { icon: Bot, title: 'Robô e transmissões', text: 'Atendimento automático com botões e mensagens em massa para quem aceitou receber.' },
+  ];
+  return (
+    <section id="whatsapp-oficial" aria-labelledby="whatsapp-oficial-titulo" className="scroll-mt-20 border-t border-border py-16 lg:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
+        <div>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+            <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> API oficial do WhatsApp (Meta)
+          </p>
+          <h2 id="whatsapp-oficial-titulo" className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+            O WhatsApp da sua clínica, do jeito oficial
+          </h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+            O DreamClin conecta o número da clínica direto na Meta. É o mesmo caminho que as grandes
+            empresas usam: mais estável, sem gambiarra e sem o risco de um aparelho desconectado deixar
+            paciente sem aviso.
+          </p>
+          <ul className="mt-6 space-y-3">
+            {pontos.map((p) => (
+              <li key={p} className="flex items-start gap-2.5 text-sm sm:text-[15px]">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                  <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                </span>
+                {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <WhatsAppMock />
+      </div>
+
+      <div className="mx-auto mt-16 max-w-6xl px-4 sm:px-6">
+        <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-xl">
+              <p className="text-sm font-semibold uppercase tracking-wider text-primary">CRM opcional</p>
+              <h3 className="mt-1 text-2xl font-bold tracking-tight">Quer captar mais? Ligue o CRM no mesmo número</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Para quem ainda não virou paciente: do primeiro &quot;oi&quot; no WhatsApp ao orçamento aprovado.
+                Escolha o plano com CRM agora ou ligue depois, com 14 dias grátis.
+              </p>
+            </div>
+            <a href="#planos" className="btn-outline btn-md">
+              Ver os planos com CRM
+              <ArrowDown className="h-4 w-4" aria-hidden="true" />
+            </a>
+          </div>
+          <ul className="mt-6 grid gap-4 sm:grid-cols-3">
+            {crm.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="rounded-xl border border-border bg-background p-4">
+                <p className="flex items-center gap-2 font-semibold">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  {title}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>
@@ -479,7 +596,15 @@ function FAQ() {
   const faqs = [
     {
       q: 'Quanto custa o DreamClin?',
-      a: `Os primeiros ${TRIAL_DAYS} dias são grátis e sem cartão. Depois, você escolhe um dos planos acima e paga por PIX, boleto ou cartão. Sem fidelidade e sem taxa de instalação.`,
+      a: `Os primeiros ${TRIAL_DAYS} dias são grátis e sem cartão. Depois, você escolhe um dos planos acima, com ou sem o CRM, e paga por PIX, boleto ou cartão. Sem fidelidade e sem taxa de instalação.`,
+    },
+    {
+      q: 'O WhatsApp é oficial mesmo?',
+      a: 'É. O DreamClin usa a API oficial do WhatsApp, da Meta, no número da sua clínica. Nada de QR code ou celular ligado. As mensagens de aviso passam pela aprovação da Meta, e o uso do WhatsApp é cobrado pela Meta direto da clínica, conforme a tabela dela.',
+    },
+    {
+      q: 'Preciso do CRM?',
+      a: 'Não. A gestão da clínica (agenda, prontuário, orçamentos, financeiro e os avisos no WhatsApp) funciona sozinha. O CRM é para captar: acompanhar quem chamou no WhatsApp até virar paciente. Dá para ligar depois, com 14 dias grátis.',
     },
     {
       q: 'O que acontece quando o teste acaba?',
@@ -631,6 +756,7 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
           <p className="text-sm font-semibold">Produto</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li><a href="#recursos" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Recursos</a></li>
+            <li><a href="#whatsapp-oficial" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">WhatsApp oficial</a></li>
             <li><a href="#diferenciais" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Diferenciais</a></li>
           <li><a href="#planos" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Planos</a></li>
             <li><a href="#perguntas" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Perguntas frequentes</a></li>
@@ -683,6 +809,7 @@ export function LandingPage() {
         <Hero />
         <TrustStrip />
         <Features />
+        <WhatsAppOficial />
         <Differentiators />
         <Pricing />
         <FAQ />
