@@ -1,22 +1,23 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bot, Briefcase, Check, Link2, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Check, Clock, Link2, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
   acceptConversationAction,
+  botOptionsAction,
   declineConversationAction,
   linkConversationAction,
   retryChatAction,
   searchLinkTargetsAction,
   sendChatAction,
   sendMediaAction,
+  startBotAction,
   stopBotAction,
   type LinkTarget,
 } from '@/app/(crm)/crm/conversas/actions';
-import { BotMenu } from './bot-menu';
 import { ChatComposer, type QuickReplyOption } from './chat-composer';
 import { ChatMessages } from './chat-messages';
 import { TemplatePicker } from './template-picker';
@@ -49,7 +50,27 @@ export function ConversationPane({
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
-  const [erroRobo, setErroRobo] = useState('');
+  // Os robôs do "/" (como o Salesbot do Kommo). Guardado por conversa: a tela atualiza a cada poucos segundos.
+  const onChangedRef = useRef(onChanged);
+  useEffect(() => {
+    onChangedRef.current = onChanged;
+  }, [onChanged]);
+  const robots = useMemo(
+    () => ({
+      load: async () => {
+        const r = await botOptionsAction();
+        return r.ok ? r.bots : [];
+      },
+      run: async (botId: string) => {
+        const r = await startBotAction(c.id, botId);
+        if (!r.ok) return r;
+        setAviso(`Robô ${r.name} começou a conversar.`);
+        onChangedRef.current();
+        return { ok: true as const };
+      },
+    }),
+    [c.id],
+  );
 
   return (
     <section aria-label={`Conversa com ${c.name}`} className="flex min-h-0 flex-1 flex-col">
@@ -81,14 +102,6 @@ export function ConversationPane({
         />
       ) : (
       <>
-      {erroRobo && (
-        <p role="alert" className="flex items-start gap-2 border-t border-border bg-surface px-3 py-2 text-xs text-destructive">
-          <span className="mr-auto">{erroRobo}</span>
-          <button type="button" onClick={() => setErroRobo('')} className="rounded p-0.5 hover:bg-surface-alt" aria-label="Fechar o aviso">
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </p>
-      )}
       {thread.bot && c.status !== 'DECLINED' && (
         <BotBanner
           conversationId={c.id}
@@ -102,20 +115,7 @@ export function ConversationPane({
       <ChatComposer
         quickReplies={quickReplies}
         canManage={canManage}
-        tools={
-          <BotMenu
-            conversationId={c.id}
-            disabled={c.status === 'DECLINED'}
-            canManage={canManage}
-            onDone={(r) => {
-              setErroRobo(r.ok ? '' : r.message);
-              if (r.ok) {
-                setAviso(`Robô ${r.name} começou a conversar.`);
-                onChanged();
-              }
-            }}
-          />
-        }
+        robots={robots}
         // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
         contactName={c.name === c.phoneMasked ? null : c.name}
         disabled={c.status === 'DECLINED'}
@@ -141,6 +141,7 @@ export function ConversationPane({
             : undefined
         }
       />
+      {thread.channel === 'cloud' && thread.windowEndsAt && <SessionTimer endsAt={thread.windowEndsAt} />}
       </>
       )}
       <p role="status" aria-live="polite" className="sr-only">
@@ -250,6 +251,26 @@ function PaneHeader({
         </p>
       )}
     </header>
+  );
+}
+
+/** "A sessão de mensagens termina em: 23h 18m" (janela de 24 h da API oficial), como no Kommo. */
+function SessionTimer({ endsAt }: { endsAt: string }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const resta = new Date(endsAt).getTime() - agora;
+  if (resta <= 0) return null;
+  const h = Math.floor(resta / 3_600_000);
+  const m = Math.floor((resta % 3_600_000) / 60_000);
+  const pouco = resta < 3_600_000;
+  return (
+    <p className={`flex items-center justify-end gap-1.5 bg-surface px-3 pb-2 text-xs ${pouco ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
+      <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+      A sessão de mensagens termina em: <strong className="font-semibold tabular-nums">{h > 0 ? `${h}h ${m}m` : `${m}m`}</strong>
+    </p>
   );
 }
 

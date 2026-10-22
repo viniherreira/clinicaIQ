@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
-import { activeCloudAccount, windowOpen } from './cloud';
+import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
@@ -303,6 +303,8 @@ export interface ChatThread {
   mediaOk: boolean;
   /** O robô que está conversando agora (ou esperando a resposta da pessoa). */
   bot: { id: string; name: string } | null;
+  /** Quando fecha a janela de 24 h (ISO), se aberta. */
+  windowEndsAt: string | null;
 }
 
 const THREAD_LIMIT = 200;
@@ -354,6 +356,7 @@ export async function loadThread(
     // Arquivo sai pela API oficial; sem canal nenhum (desenvolvimento), é simulado.
     mediaOk: Boolean(cloud) || (!process.env.WHATSAPP_GATEWAY_URL && process.env.NODE_ENV !== 'production'),
     bot,
+    windowEndsAt: conv.lastInboundAt && windowOpen(conv.lastInboundAt) ? new Date(conv.lastInboundAt.getTime() + WINDOW_MS).toISOString() : null,
   };
 }
 
