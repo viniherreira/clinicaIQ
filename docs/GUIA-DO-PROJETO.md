@@ -70,7 +70,8 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 
 ## CRM
 
-- **O CRM é um adicional pago** do sistema de agenda: R$ 39 por usuário/mês (`Plan.crmSeatPriceCents`), 14 dias grátis uma vez, cortesia inclui. Uma cobrança só no Asaas (plano + CRM) — `crm/billing.ts` (regras puras) e `crm/addon.ts` (ligar, desligar, acesso, `syncBillingValue`). Qualquer mudança que afete o valor chama `syncBillingValue`; a rotina diária também.
+- **Planos** (desde 2026-10-22): Essencial R$ 139, Profissional R$ 239, Clínica R$ 339; com CRM R$ 199, R$ 359 e R$ 519. Preços no banco (`plans`, `seed-plans.ts`); a página de vendas (`app/pricing-section.tsx` + `pricing-plans.tsx`, chave "sem/com CRM") e a tela de planos leem de lá.
+- **O CRM é um adicional pago** do sistema de agenda: um pacote por plano com usuários incluídos (`Plan.crmPackagePriceCents`/`crmIncludedSeats`: +R$ 60 com 1, +R$ 120 com 3, +R$ 180 com 5) e R$ 39 por usuário a mais (`Plan.crmSeatPriceCents`); pacote 0 = só por usuário. 14 dias grátis uma vez, cortesia inclui. Uma cobrança só no Asaas (plano + CRM) — `crm/billing.ts` (regras puras) e `crm/addon.ts` (ligar, desligar, acesso, `syncBillingValue`). Qualquer mudança que afete o valor chama `syncBillingValue`; a rotina diária também.
 - Entrar no CRM exige três coisas: CRM ligado na clínica (`Subscription.crmEnabled`), perfil com `crm` (dono, admin, recepção; `crm_config` para dono e admin) e a chave da pessoa (`User.crmSeat`). Páginas usam `requireCrm`, actions usam `guardCrmAction` (`apps/web/crm/guard.ts`).
 - O lead é um negócio, não a pessoa: a mesma pessoa pode ter vários. `Lead.patientId` liga ao paciente depois da conversão.
 - **A agenda e os orçamentos nunca dependem do CRM.** A única ligação é `after(() => notifyCrm(tenantId, evento))` depois de salvar (`apps/web/crm/notify.ts`), que não faz nada sem o módulo e nunca lança. Não importe nada mais de `crm/` em código da clínica.

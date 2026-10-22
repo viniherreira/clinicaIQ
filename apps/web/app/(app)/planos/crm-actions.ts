@@ -47,7 +47,7 @@ export async function turnOnCrmAction(): Promise<Result> {
         ? 'CRM ligado: 14 dias grátis. Você já tem acesso.'
         : r.mode === 'complimentary'
           ? 'CRM ligado, incluído na cortesia.'
-          : 'CRM ligado. A cobrança por usuário entra na mensalidade.',
+          : 'CRM ligado. O valor do CRM entra na mensalidade.',
   };
 }
 

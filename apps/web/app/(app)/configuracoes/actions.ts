@@ -12,7 +12,7 @@ import { can, isRole, type Role } from '@/lib/permissions';
 import { podeRemover } from '@/lib/team';
 import { syncBillingValue } from '@/crm/addon';
 
-/** Mudanças na equipe mexem na cobrança do CRM (por usuário). Falha no Asaas
+/** Mudanças na equipe mexem na cobrança do CRM (quem passar do incluído no plano). Falha no Asaas
  *  não desfaz a mudança: a rotina diária acerta o valor depois. */
 async function sincronizarCobranca(tenantId: string) {
   try {

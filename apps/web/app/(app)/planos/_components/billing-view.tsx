@@ -226,7 +226,7 @@ function features(plan: PlanOption): string[] {
       : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`,
     'Agenda, pacientes e prontuário',
     'Orçamentos em PDF',
-    plan.whatsappEnabled ? 'Confirmação por WhatsApp' : null,
+    plan.whatsappEnabled ? 'WhatsApp oficial, com confirmação e lembretes' : null,
     plan.campaignsEnabled ? 'Campanhas em massa' : null,
     plan.advancedReports ? 'Relatórios completos' : null,
   ].filter((f): f is string => f !== null);
@@ -649,6 +649,15 @@ export function BillingView({
                     </span>
                     <span className="text-sm text-muted-foreground">/mês</span>
                   </p>
+                  {plan.crmPackagePriceCents > 0 && (
+                    <p className="mt-1.5 text-sm text-muted-foreground">
+                      Com CRM:{' '}
+                      <span className="font-medium text-foreground tabular-nums">
+                        {brl(plan.monthlyPriceCents + plan.crmPackagePriceCents)}/mês
+                      </span>{' '}
+                      ({plan.crmIncludedSeats} {plan.crmIncludedSeats === 1 ? 'usuário' : 'usuários'} no CRM)
+                    </p>
+                  )}
 
                   <ul className="mt-6 flex-1 space-y-2.5">
                     {features(plan).map((f) => (

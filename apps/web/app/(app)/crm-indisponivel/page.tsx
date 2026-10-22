@@ -4,7 +4,7 @@ import { prisma } from '@clinicaiq/db';
 import { currentAccess } from '@/lib/guard';
 import { can } from '@/lib/permissions';
 import { loadCrmAddon } from '@/crm/addon';
-import { formatCents } from '@/crm/format';
+import { crmOfferText } from '@/crm/format';
 import { CrmTurnOnButton } from '@/components/crm-turn-on-button';
 
 export const metadata = { title: 'CRM · DreamClin' };
@@ -42,13 +42,13 @@ export default async function CrmIndisponivelPage() {
   }
 
   const podeContratar = can(acesso?.role, 'planos');
-  const preco = formatCents(addon?.seatPriceCents ?? 3900);
+  const oferta = addon ? crmOfferText(addon) : null;
 
   return (
     <Cartao icone={<KanbanSquare className="h-6 w-6 text-muted-foreground" aria-hidden="true" />} titulo="Conheça o CRM do DreamClin">
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         Acompanhe cada interessado do primeiro contato até o orçamento aprovado, com o funil andando sozinho
-        conforme a recepção usa a agenda. {preco} por usuário por mês, somado à mensalidade.
+        conforme a recepção usa a agenda.{oferta ? ` ${oferta}, somado à mensalidade.` : ''}
         {podeContratar ? '' : ' Fale com o responsável pela clínica para ativar.'}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">

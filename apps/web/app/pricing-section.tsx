@@ -4,41 +4,15 @@
  * Reads the same `plans` rows the billing screen uses, so a price change is one
  * update and never leaves the shop window disagreeing with the checkout — the
  * kind of mismatch that costs trust exactly when someone is deciding to pay.
+ * Each plan shows with and without the CRM (`pricing-plans.tsx` holds the switch).
  */
-import Link from 'next/link';
-import { ArrowRight, Check, Sparkles } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import { prisma } from '@clinicaiq/db';
 import { TRIAL_DAYS } from '@/lib/subscription';
-
-const brl = (cents: number) =>
-  (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-interface PlanRow {
-  tier: string;
-  name: string;
-  description: string;
-  monthlyPriceCents: number;
-  maxProfessionals: number | null;
-  whatsappEnabled: boolean;
-  campaignsEnabled: boolean;
-  advancedReports: boolean;
-}
-
-function features(plan: PlanRow): string[] {
-  return [
-    plan.maxProfessionals === null
-      ? 'Profissionais ilimitados'
-      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`,
-    'Agenda, pacientes e prontuário',
-    'Orçamentos em PDF',
-    plan.whatsappEnabled ? 'Confirmação por WhatsApp' : null,
-    plan.campaignsEnabled ? 'Campanhas em massa' : null,
-    plan.advancedReports ? 'Relatórios completos' : null,
-  ].filter((f): f is string => f !== null);
-}
+import { PricingPlans, type PublicPlan } from './pricing-plans';
 
 export async function Pricing() {
-  let plans: PlanRow[] = [];
+  let plans: PublicPlan[] = [];
   try {
     plans = await prisma.plan.findMany({
       where: { active: true },
@@ -49,9 +23,11 @@ export async function Pricing() {
         description: true,
         monthlyPriceCents: true,
         maxProfessionals: true,
-        whatsappEnabled: true,
         campaignsEnabled: true,
         advancedReports: true,
+        crmPackagePriceCents: true,
+        crmIncludedSeats: true,
+        crmSeatPriceCents: true,
       },
     });
   } catch {
@@ -65,73 +41,29 @@ export async function Pricing() {
   return (
     <section id="planos" className="scroll-mt-20 border-y border-border bg-surface py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="max-w-2xl">
+        <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Planos</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             Um preço que acompanha o tamanho da sua clínica
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
-            Comece grátis por {TRIAL_DAYS} dias, sem cartão. Depois, escolha o plano que fizer sentido,
+            Comece grátis por {TRIAL_DAYS} dias, sem cartão. Depois, escolha o plano, com ou sem o CRM,
             pague por PIX, boleto ou cartão e cancele quando quiser.
           </p>
         </div>
 
-        <ul className="mt-12 grid items-start gap-6 lg:grid-cols-3">
-          {plans.map((plan, index) => {
-            const featured = index === 1;
-            return (
-              <li key={plan.tier} className={featured ? 'lg:-mt-4' : undefined}>
-                <article
-                  className={`relative flex h-full flex-col rounded-2xl border bg-background p-7 ${
-                    featured ? 'border-primary/50 shadow-lg' : 'border-border'
-                  }`}
-                >
-                  {featured && (
-                    <span className="absolute -top-3 left-7 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                      <Sparkles className="h-3 w-3" aria-hidden="true" /> Mais escolhido
-                    </span>
-                  )}
+        <PricingPlans plans={plans} />
 
-                  <h3 className="mt-1 text-xl font-bold tracking-tight">
-                    {plan.name}
-                  </h3>
-                  <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-muted-foreground">
-                    {plan.description}
-                  </p>
+        <div className="mx-auto mt-10 flex max-w-3xl items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
+          <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
+          <p className="text-sm leading-relaxed text-emerald-950 dark:text-emerald-100">
+            <strong>Todos os planos usam a API oficial do WhatsApp, da Meta.</strong> As mensagens saem do número
+            da sua clínica, sem QR code e sem celular ligado o dia todo. As conversas com o WhatsApp são cobradas
+            pela Meta direto da clínica, conforme a tabela dela.
+          </p>
+        </div>
 
-                  <p className="mt-6 flex items-baseline gap-1.5">
-                    <span className="text-4xl font-bold tracking-tight tabular-nums">
-                      {brl(plan.monthlyPriceCents)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/mês</span>
-                  </p>
-
-                  <ul className="mt-7 flex-1 space-y-3">
-                    {features(plan).map((f) => (
-                      <li key={f} className="flex gap-3 text-sm">
-                        <Check
-                          className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                          aria-hidden="true"
-                        />
-                        <span className="leading-snug">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link
-                    href="/sign-up"
-                    className={`${featured ? 'btn-primary' : 'btn-outline'} btn-md mt-8 w-full justify-center`}
-                  >
-                    Começar grátis
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </Link>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
-
-        <p className="mt-8 text-center text-sm text-muted-foreground">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           Todos os planos incluem acessibilidade WCAG 2.1 AA, backup diário e suporte por WhatsApp.
           Sem fidelidade e sem taxa de instalação.
         </p>

@@ -58,7 +58,7 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
   });
 
   it('no teste, o Asaas recebe só o valor do plano', async () => {
-    expect(await syncBillingValue(tenant.id, asaas)).toEqual({ sent: true, valueCents: 19_700 });
+    expect(await syncBillingValue(tenant.id, asaas)).toEqual({ sent: true, valueCents: 23_900 });
     expect(await syncBillingValue(tenant.id, asaas)).toEqual({ sent: false, reason: 'unchanged' });
   });
 
@@ -67,9 +67,9 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
     expect(await setCrmSeat(tenant.id, dono.id, recepcao.id, true)).toEqual({ ok: true });
   });
 
-  it('acabou o teste: plano + R$ 39 × 2, com a descrição na fatura', async () => {
+  it('acabou o teste: Profissional com CRM (2 dos 3 usuários incluídos), com a descrição na fatura', async () => {
     const depois = new Date(Date.now() + 15 * 86_400_000);
-    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 27_500 });
+    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 35_900 });
     expect(enviados.at(-1)?.description).toBe('DreamClin: plano Profissional + CRM (2 usuários)');
     expect((await loadCrmAddon(tenant.id, depois)).status).toBe('paid');
   });
@@ -82,9 +82,9 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
   it('desligar tira o CRM da cobrança; religar não dá teste de novo', async () => {
     const depois = new Date(Date.now() + 15 * 86_400_000);
     await turnOffCrm(tenant.id, dono.id);
-    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 19_700 });
+    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 23_900 });
     expect(await turnOnCrm(tenant.id, dono.id, depois)).toEqual({ ok: true, mode: 'paid' });
-    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 23_600 });
+    expect(await syncBillingValue(tenant.id, asaas, depois)).toEqual({ sent: true, valueCents: 35_900 });
   });
 
   it('cortesia: CRM incluído, nada vai ao Asaas', async () => {

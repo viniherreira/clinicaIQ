@@ -55,20 +55,30 @@ describe('seatsCharged', () => {
 });
 
 describe('subscriptionValueCents', () => {
-  const base = { planPriceCents: 19_700, seatPriceCents: 3_900, seats: 2 };
+  // Profissional: R$ 239, com CRM R$ 359 (3 usuários incluídos), usuário a mais R$ 39.
+  const base = { planPriceCents: 23_900, packagePriceCents: 12_000, includedSeats: 3, seatPriceCents: 3_900, seats: 2 };
 
-  it('pago: plano + R$ 39 por usuário', () => {
-    expect(subscriptionValueCents({ ...base, status: 'paid' })).toBe(27_500);
+  it('pago, dentro do incluído: plano com CRM', () => {
+    expect(subscriptionValueCents({ ...base, status: 'paid' })).toBe(35_900);
+    expect(subscriptionValueCents({ ...base, seats: 3, status: 'paid' })).toBe(35_900);
+  });
+
+  it('pago, passou do incluído: R$ 39 por usuário a mais', () => {
+    expect(subscriptionValueCents({ ...base, seats: 5, status: 'paid' })).toBe(43_700);
+  });
+
+  it('pago sem ninguém com acesso: o pacote continua (o CRM está ligado)', () => {
+    expect(subscriptionValueCents({ ...base, seats: 0, status: 'paid' })).toBe(35_900);
   });
 
   it('em teste, cortesia ou desligado: só o plano', () => {
     for (const status of ['trial', 'complimentary', 'off'] as const) {
-      expect(subscriptionValueCents({ ...base, status })).toBe(19_700);
+      expect(subscriptionValueCents({ ...base, status })).toBe(23_900);
     }
   });
 
-  it('pago sem ninguém com acesso: só o plano', () => {
-    expect(subscriptionValueCents({ ...base, seats: 0, status: 'paid' })).toBe(19_700);
+  it('plano sem pacote (0): só por usuário, como antes', () => {
+    expect(subscriptionValueCents({ ...base, packagePriceCents: 0, includedSeats: 0, status: 'paid' })).toBe(31_700);
   });
 });
 
