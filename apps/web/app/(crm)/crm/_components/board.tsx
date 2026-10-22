@@ -16,6 +16,7 @@ import { InboxColumn } from './inbox-column';
 import { LeadCard, type MoveTarget } from './lead-card';
 import { LostReasonModal } from './lost-reason-modal';
 import { boardKeyboardCoordinates } from './keyboard-coordinates';
+import { AutoRefresh } from '@/components/auto-refresh';
 
 /**
  * O quadro do funil.
@@ -172,6 +173,8 @@ export function Board({
 
   return (
     <>
+      {/* Lead novo do WhatsApp aparece sozinho; nunca no meio de um arrasto ou de uma janela. */}
+      <AutoRefresh paused={Boolean(activeId) || Boolean(perder) || pending} />
       <DndContext
         // Id fixo: sem ele o dnd-kit numera os textos de acessibilidade num
         // contador que dá um número no servidor e outro no navegador.

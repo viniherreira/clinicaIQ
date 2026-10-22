@@ -1,13 +1,14 @@
 import { decrypt, getTenantClient } from '@clinicaiq/db';
 import { runBotOnInbound } from './bot';
 import { applyCapture } from './capture';
-import { classifyConversation } from './conversations';
+import { acceptConversation, classifyConversation } from './conversations';
 
 /**
  * O que acontece no CRM depois de gravada uma mensagem do contato — venha ela
  * do gateway de QR (aviso em /api/whatsapp/conversation) ou da API oficial
  * (webhook da Meta): ligar a conversa, registrar o pedido de sair, a captação
- * (palavras da primeira mensagem viram lead com tag) e deixar o robô responder.
+ * (palavras da primeira mensagem viram lead com tag), o lead automático do
+ * número novo (em Novo, sem Aceitar) e deixar o robô responder.
  */
 
 export const OPT_OUT = /^\s*(sair|parar|descadastrar|remover|stop)\b/i;
@@ -57,6 +58,7 @@ export async function afterInbound(
   // o lead (a conversa sai da Entrada) — o robô de contato novo continua valendo.
   const conv = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
   const first = (await db.chatMessage.count({ where: { conversationId, origin: 'CONTACT' } })) === 1;
+  const novo = first && conv?.status === 'INBOX';
   if (first) {
     try {
       await applyCapture(db, tenantId, conversationId, text);
@@ -65,10 +67,21 @@ export async function afterInbound(
     }
   }
 
+  // Número novo cai sozinho no funil, em Novo, como no Kommo: ninguém precisa
+  // tocar em Aceitar. A captação pode já ter criado (com tags e funil); aí nada muda.
+  if (novo) {
+    try {
+      const ainda = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
+      if (ainda?.status === 'INBOX') await acceptConversation(db, { tenantId, userId: null }, conversationId);
+    } catch (e) {
+      console.error('[crm] lead automático falhou', e instanceof Error ? e.message : e);
+    }
+  }
+
   // Resposta pelos botões de um aviso da agenda: a agenda já tratou, o robô fica quieto.
   if (opts.skipBot) return;
   try {
-    await runBotOnInbound(tenantId, conversationId, msg.id, new Date(), { newContact: first && conv?.status === 'INBOX' });
+    await runBotOnInbound(tenantId, conversationId, msg.id, new Date(), { newContact: novo });
   } catch (e) {
     console.error('[crm] robô falhou', e instanceof Error ? e.message : e);
   }

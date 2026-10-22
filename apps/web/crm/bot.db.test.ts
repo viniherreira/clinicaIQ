@@ -117,6 +117,19 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
     expect(conv?.status).toBe('ACTIVE');
   });
 
+  it('número novo cai sozinho em Novo, sem Aceitar (como no Kommo), antes de responder ao robô', async () => {
+    const id = await escreve('11 96666-0009', 'Oi');
+    const conv = await db.conversation.findFirst({ where: { id }, include: { lead: { include: { stage: true } } } });
+    expect(conv?.status).toBe('ACTIVE');
+    expect(conv?.lead).toMatchObject({ source: 'WHATSAPP', name: 'Ana Souza', createdById: null });
+    expect(conv?.lead?.stage.role).toBe('NEW');
+    // O robô de número novo começou mesmo assim.
+    expect(await saidas(id)).toEqual(['Oi! Como posso ajudar?']);
+    // A segunda mensagem não cria outro lead.
+    await escreve('11 96666-0009', 'tudo bem?');
+    expect(await db.lead.count({ where: { phoneHash: (await db.lead.findFirst({ where: { id: conv!.leadId! } }))!.phoneHash } })).toBe(1);
+  });
+
   it('"agendar": cria o lead na etapa escolhida e passa para a equipe', async () => {
     const id = await escreve('11 96666-0002', 'Oi');
     await escreve('11 96666-0002', '1');

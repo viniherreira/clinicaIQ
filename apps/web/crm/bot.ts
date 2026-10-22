@@ -256,7 +256,15 @@ async function openLead(db: TenantPrismaClient, tenantId: string, conv: Conv, st
 async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: FlowEffect): Promise<void> {
   if (a.type === 'handoff' || a.type === 'startBot') return;
   if (a.type === 'createLead') {
-    await openLead(db, tenantId, conv, a.stageId);
+    const leadId = await openLead(db, tenantId, conv, a.stageId);
+    // O número novo já chega com lead em Novo (`crm/inbound.ts`). "Criar o lead
+    // na etapa X" continua valendo: se ele ainda está na entrada do funil, vai para X.
+    if (leadId && a.stageId) {
+      const lead = await db.lead.findFirst({ where: { id: leadId }, select: { stageId: true, stage: { select: { role: true } } } });
+      if (lead && lead.stageId !== a.stageId && lead.stage.role === 'NEW') {
+        await moveLead(db, { tenantId, userId: null }, leadId, { stageId: a.stageId, origin: { event: 'bot' } });
+      }
+    }
     return;
   }
   const leadId = await openLead(db, tenantId, conv);
