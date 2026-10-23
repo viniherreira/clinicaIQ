@@ -85,7 +85,12 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
       case 'TASK_CREATED':
         return { ...base, kind: 'task', text: `Tarefa: ${d.text ?? ''}`, taskId: d.taskId };
       case 'TASK_COMPLETED':
-        return { ...base, kind: 'event', text: d.text ? `Tarefa concluída: ${d.text}` : 'Tarefa concluída', taskId: d.taskId };
+        return {
+          ...base,
+          kind: 'event',
+          text: `${d.text ? `Tarefa concluída: ${d.text}` : 'Tarefa concluída'}${d.result ? `. Resultado: ${d.result}` : ''}`,
+          taskId: d.taskId,
+        };
       case 'CONVERTED':
         return { ...base, kind: 'event', text: d.how === 'linked' ? 'Ligado à ficha de paciente' : d.how === 'auto' ? 'Cadastrado como paciente na agenda (mesmo WhatsApp)' : 'Convertido em paciente' };
       case 'FIELD_CHANGED':

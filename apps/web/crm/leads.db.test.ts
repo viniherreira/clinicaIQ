@@ -111,6 +111,13 @@ describe.skipIf(!process.env.DATABASE_URL)('leads e tarefas (banco)', async () =
     await completeTask(db, actor, t.taskId);
     await completeTask(db, actor, t.taskId);
     expect(await db.leadActivity.count({ where: { leadId: bia.id, type: 'TASK_COMPLETED' } })).toBe(1);
+
+    // Concluir com o resultado, como no Kommo: vai para o histórico.
+    const t2 = await createTask(db, actor, bia.id, { text: 'Retornar', dueAt: new Date(Date.now() + 3_600_000) });
+    if (!t2.ok) throw new Error(t2.message);
+    await completeTask(db, actor, t2.taskId, '  Vai pensar e retorna sexta  ');
+    const feita = await db.leadActivity.findFirst({ where: { leadId: bia.id, type: 'TASK_COMPLETED', data: { path: ['taskId'], equals: t2.taskId } } });
+    expect(feita?.data).toMatchObject({ text: 'Retornar', result: 'Vai pensar e retorna sexta' });
   });
 
   it('acha paciente pelo telefone e liga o lead a ele', async () => {

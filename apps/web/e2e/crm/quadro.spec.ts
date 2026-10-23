@@ -63,6 +63,9 @@ test('ficha: tarefa, nota e conclusão ficam no histórico', async ({ page }) =>
   await page.getByRole('button', { name: 'Salvar nota' }).click();
   await expect(page.getByText('Prefere atendimento à tarde.')).toBeVisible();
 
+  // Concluir pede o resultado (opcional), como no Kommo, e ele vai para o histórico.
   await page.getByRole('button', { name: 'Concluir tarefa: Ligar para tirar dúvidas' }).click();
-  await expect(page.getByText('Tarefa concluída: Ligar para tirar dúvidas')).toBeVisible();
+  await page.getByLabel('Resultado (opcional)').fill('Vai pensar e retorna sexta');
+  await page.getByRole('button', { name: 'Concluir', exact: true }).click();
+  await expect(page.getByText('Tarefa concluída: Ligar para tirar dúvidas. Resultado: Vai pensar e retorna sexta')).toBeVisible();
 });

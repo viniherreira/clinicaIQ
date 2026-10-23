@@ -13,23 +13,34 @@ export interface TaskRow {
   automatic: boolean;
 }
 
+/** Como no Kommo: o que venceu, hoje, amanhã, o resto da semana e depois. */
 export interface TaskGroups {
   atrasadas: TaskRow[];
   hoje: TaskRow[];
-  proximas: TaskRow[];
+  amanha: TaskRow[];
+  semana: TaskRow[];
+  depois: TaskRow[];
 }
 
 const diaDaClinica = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TZ }).format(d);
 
-/** Separa pelo relógio da clínica: venceu, vence hoje, vence depois. */
+/** O dia da clínica (aaaa-mm-dd) daqui a `n` dias. */
+const diaMais = (now: Date, n: number) => diaDaClinica(new Date(now.getTime() + n * 86_400_000));
+
+/** Separa pelo relógio da clínica: venceu, hoje, amanhã, nos próximos 7 dias, depois. */
 export function groupTasks(rows: TaskRow[], now: Date = new Date()): TaskGroups {
   const hoje = diaDaClinica(now);
-  const g: TaskGroups = { atrasadas: [], hoje: [], proximas: [] };
+  const amanha = diaMais(now, 1);
+  const fimDaSemana = diaMais(now, 7);
+  const g: TaskGroups = { atrasadas: [], hoje: [], amanha: [], semana: [], depois: [] };
   for (const r of rows) {
     const due = new Date(r.dueAt);
+    const dia = diaDaClinica(due);
     if (due.getTime() < now.getTime()) g.atrasadas.push(r);
-    else if (diaDaClinica(due) === hoje) g.hoje.push(r);
-    else g.proximas.push(r);
+    else if (dia === hoje) g.hoje.push(r);
+    else if (dia === amanha) g.amanha.push(r);
+    else if (dia <= fimDaSemana) g.semana.push(r);
+    else g.depois.push(r);
   }
   return g;
 }

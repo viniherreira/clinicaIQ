@@ -115,10 +115,10 @@ export async function createTaskAction(
   return r.ok ? { ok: true } : r;
 }
 
-export async function completeTaskAction(taskId: string, leadId: string): Promise<Result> {
+export async function completeTaskAction(taskId: string, leadId: string, result?: string): Promise<Result> {
   const g = await guardCrmAction('crm');
   if (!g.ok) return g;
-  const r = await completeTask(g.db, g, taskId);
+  const r = await completeTask(g.db, g, taskId, typeof result === 'string' ? result : undefined);
   if (r.ok) {
     refresh(leadId);
     revalidatePath('/crm/tarefas');

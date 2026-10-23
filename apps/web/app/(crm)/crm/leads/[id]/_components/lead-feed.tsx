@@ -2,13 +2,14 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, CalendarClock, Check, CheckCircle2, CircleDot, FileText, StickyNote, Trophy, XCircle } from 'lucide-react';
+import { Bot, CalendarClock, CheckCircle2, CircleDot, FileText, StickyNote, Trophy, XCircle } from 'lucide-react';
 import { formatDue } from '@/crm/format';
 import { instantToClinicLocal } from '@/crm/clock';
 import type { LeadDetail } from '@/crm/lead-detail';
 import type { TimelineKind } from '@/crm/timeline';
 import type { BoardPerson } from '@/crm/types';
-import { addNoteAction, completeTaskAction, createTaskAction } from '../actions';
+import { addNoteAction, createTaskAction } from '../actions';
+import { TaskItem } from '@/components/crm-task-item';
 
 const ICON: Record<TimelineKind, typeof CircleDot> = {
   event: CircleDot,
@@ -74,41 +75,26 @@ export function LeadFeed({ lead, team, meId }: { lead: LeadDetail; team: BoardPe
 }
 
 function PendingTasks({ lead }: { lead: LeadDetail }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [aviso, setAviso] = useState('');
-
   if (lead.pendingTasks.length === 0) return null;
   return (
     <div className="border-b border-border bg-surface-alt/40 px-5 py-3">
       <h2 className="text-xs font-medium text-muted-foreground">Tarefas pendentes</h2>
       <ul className="mt-2 space-y-1.5">
         {lead.pendingTasks.map((t) => (
-          <li key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                start(async () => {
-                  const r = await completeTaskAction(t.id, lead.id);
-                  setAviso(r.ok ? `Tarefa "${t.text}" concluída.` : r.message);
-                  if (r.ok) router.refresh();
-                })
-              }
-              aria-label={`Concluir tarefa: ${t.text}`}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-border text-transparent hover:border-success hover:text-success focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              <Check className="h-3 w-3" aria-hidden="true" />
-            </button>
-            <span className="min-w-0 flex-1 truncate">{t.text}</span>
-            <span className={`shrink-0 text-xs ${t.overdue ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
-              {t.overdue ? 'Atrasada · ' : ''}
-              {formatDue(new Date(t.dueAt))} · {t.assignee}
-            </span>
-          </li>
+          <TaskItem
+            key={t.id}
+            task={{ id: t.id, text: t.text, leadId: lead.id }}
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+            main={<span className="block truncate">{t.text}</span>}
+            meta={
+              <span className={`shrink-0 text-xs ${t.overdue ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+                {t.overdue ? 'Atrasada · ' : ''}
+                {formatDue(new Date(t.dueAt))} · {t.assignee}
+              </span>
+            }
+          />
         ))}
       </ul>
-      <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
     </div>
   );
 }
