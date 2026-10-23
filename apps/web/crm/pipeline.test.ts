@@ -15,7 +15,7 @@ describe('funil padrão', () => {
   it('cada papel aparece uma vez e todos existem', () => {
     const papeis = DEFAULT_STAGES.map((s) => s.role).filter(Boolean);
     expect(new Set(papeis).size).toBe(papeis.length);
-    expect(papeis.sort()).toEqual(['LOST', 'NEGOTIATION', 'NEW', 'SCHEDULED', 'WON']);
+    expect(papeis.sort()).toEqual(['CANCELLED', 'LOST', 'NEGOTIATION', 'NEW', 'SCHEDULED', 'WON']);
   });
 });
 
@@ -25,6 +25,7 @@ describe('boardStages', () => {
       'Novo',
       'Em conversa',
       'Avaliação agendada',
+      'Desmarcou',
       'Em negociação',
     ]);
   });
@@ -48,17 +49,26 @@ describe('progressIndex', () => {
 });
 
 describe('fallbackStageAfterCancel', () => {
-  it('no funil padrão, volta para "Em conversa"', () => {
-    expect(fallbackStageAfterCancel(padrao)?.name).toBe('Em conversa');
+  it('no funil padrão, vai para "Desmarcou" (pelo papel: renomear não quebra)', () => {
+    expect(fallbackStageAfterCancel(padrao)?.name).toBe('Desmarcou');
+    const renomeado = padrao.map((s) => (s.role === 'CANCELLED' ? { ...s, name: 'Faltou ou desmarcou' } : s));
+    expect(fallbackStageAfterCancel(renomeado)?.name).toBe('Faltou ou desmarcou');
+  });
+
+  // Os testes abaixo são do funil sem "Desmarcou" (de antes dela existir).
+  const antigo = padrao.filter((s) => s.role !== 'CANCELLED');
+
+  it('sem "Desmarcou", volta para "Em conversa"', () => {
+    expect(fallbackStageAfterCancel(antigo)?.name).toBe('Em conversa');
   });
 
   it('acha pela posição, não pelo nome: renomear não quebra', () => {
-    const renomeado = padrao.map((s) => (s.name === 'Em conversa' ? { ...s, name: 'Contato feito' } : s));
+    const renomeado = antigo.map((s) => (s.name === 'Em conversa' ? { ...s, name: 'Contato feito' } : s));
     expect(fallbackStageAfterCancel(renomeado)?.name).toBe('Contato feito');
   });
 
   it('sem nenhuma coluna antes da avaliação, cai em Novo', () => {
-    const semConversa = padrao.filter((s) => s.name !== 'Em conversa');
+    const semConversa = antigo.filter((s) => s.name !== 'Em conversa');
     const novoDepois = semConversa.map((s) => (s.role === 'NEW' ? { ...s, order: 35 } : s));
     expect(fallbackStageAfterCancel(novoDepois)?.role).toBe('NEW');
   });
@@ -71,6 +81,9 @@ describe('canDeleteStage', () => {
     const r = canDeleteStage(padrao[0], 0);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.message).toContain('renomear');
+    const desmarcou = canDeleteStage(padrao.find((s) => s.role === 'CANCELLED')!, 0);
+    expect(desmarcou.ok).toBe(false);
+    if (!desmarcou.ok) expect(desmarcou.message).toContain('agenda');
   });
 
   it('etapa vazia da clínica sai', () => {

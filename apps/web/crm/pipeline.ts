@@ -45,6 +45,9 @@ export function progressIndex(stages: readonly StageLike[], stageId: string): nu
  * Novo.
  */
 export function fallbackStageAfterCancel<T extends StageLike>(stages: readonly T[]): T | undefined {
+  // Com a etapa "Desmarcou", é para lá. Funis de antes dela voltam uma coluna.
+  const desmarcou = stageByRole(stages, 'CANCELLED');
+  if (desmarcou) return desmarcou;
   const board = boardStages(stages);
   const scheduled = board.findIndex((s) => s.role === 'SCHEDULED');
   if (scheduled > 0) return board[scheduled - 1];
@@ -65,7 +68,7 @@ export function canDeleteStage(
   leadCount: number,
   target?: StageLike | null,
 ): DeleteCheck {
-  if (stage.role === 'SCHEDULED' || stage.role === 'NEGOTIATION') {
+  if (stage.role === 'SCHEDULED' || stage.role === 'CANCELLED' || stage.role === 'NEGOTIATION') {
     return {
       ok: false,
       message: `"${stage.name}" é usada pela integração com a agenda e os orçamentos. Dá para renomear, mas não apagar.`,

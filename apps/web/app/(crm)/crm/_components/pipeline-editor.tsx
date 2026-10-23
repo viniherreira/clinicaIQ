@@ -17,6 +17,7 @@ type Result = { ok: true } | { ok: false; message: string };
 const ROLE_HINT: Record<string, string> = {
   NEW: 'Entrada: todo lead novo começa aqui',
   SCHEDULED: 'A agenda move para cá ao marcar a avaliação',
+  CANCELLED: 'A agenda move para cá quando desmarca ou falta',
   NEGOTIATION: 'Os orçamentos movem para cá',
   WON: 'Negócio fechado',
   LOST: 'Negócio perdido',

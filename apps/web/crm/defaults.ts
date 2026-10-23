@@ -20,8 +20,8 @@ export interface DefaultStage {
  * chega, conversa, agenda a avaliação, recebe o orçamento e fecha.
  *
  * Os papéis (`role`) são o que a automação procura — a clínica pode renomear
- * qualquer etapa. "Em conversa" não tem papel: só a recepção move para lá,
- * ou o cancelamento de uma avaliação devolve para lá.
+ * qualquer etapa. "Em conversa" não tem papel: só a recepção move para lá.
+ * Desmarcar ou faltar na avaliação leva para "Desmarcou"; agendar de novo tira.
  *
  * Fechou e Perdeu ficam com ordem alta só para ficarem no fim de qualquer
  * lista; no quadro elas não são colunas, e sim a barra de "solte aqui".
@@ -30,6 +30,7 @@ export const DEFAULT_STAGES: readonly DefaultStage[] = [
   { name: 'Novo', color: 'gray', order: 10, role: 'NEW' },
   { name: 'Em conversa', color: 'blue', order: 20, role: null },
   { name: 'Avaliação agendada', color: 'teal', order: 30, role: 'SCHEDULED' },
+  { name: 'Desmarcou', color: 'orange', order: 35, role: 'CANCELLED' },
   { name: 'Em negociação', color: 'amber', order: 40, role: 'NEGOTIATION' },
   { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
   { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },

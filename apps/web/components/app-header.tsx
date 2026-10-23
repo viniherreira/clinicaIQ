@@ -8,6 +8,7 @@ import { can } from '@/lib/permissions';
 import { activeHref, navFor } from './app-sidebar';
 import { ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
+import { CrmThemeToggle } from './crm-theme';
 import { Logo, LogoMark } from './logo';
 import { UserMenu } from './user-menu';
 import { UnitSwitcher, type UnitChoice } from './unit-switcher';
@@ -105,8 +106,8 @@ export function AppHeader({
           </form>
         )}
 
-        {/* O CRM é sempre escuro (components/crm-theme.tsx). */}
-        {space !== 'crm' && <ThemeToggle />}
+        {/* O CRM guarda o tema dele, à parte do resto (components/crm-theme.tsx). */}
+        {space === 'crm' ? <CrmThemeToggle /> : <ThemeToggle />}
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
 
         <UserMenu

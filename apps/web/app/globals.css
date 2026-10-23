@@ -205,9 +205,35 @@
   }
 
   /*
-   * O CRM é escuro, no azul-marinho da marca (#0F3B82, matiz 217), como o Kommo
+   * O CRM no claro (`crm-light`, escolhido no botão de tema do CRM): cinza
+   * azulado frio no fundo, cartões brancos e o menu marinho, como o Kommo claro.
+   * Mesmos contrastes do claro da clínica (texto 13% sobre 97%).
+   */
+  .crm-light:not(.dark):not(.high-contrast) {
+    --background: 214 32% 97%;
+    --surface-alt: 214 30% 95%;
+    --border: 214 24% 88%;
+    --border-strong: 214 18% 78%;
+    --input: 214 24% 86%;
+    --secondary: 214 30% 95%;
+    --muted: 214 30% 95%;
+    --muted-foreground: 217 18% 36%;
+    --canvas: 214 30% 95%;
+    --board: 214 32% 94%;
+    --rail: 219 60% 14%;
+    --rail-foreground: 216 25% 82%;
+    --rail-active: 219 55% 22%;
+    /* Balão da clínica azul-claro, como no Kommo. */
+    --bubble-out: 211 85% 93%;
+    /* Teal um tom mais escuro: passa de 4,5:1 sobre os selos tingidos do fundo frio. */
+    --link: 176 80% 21%;
+  }
+
+  /*
+   * O CRM no escuro, no azul-marinho da marca (#0F3B82, matiz 217), como o Kommo
    * das clínicas: o espaço do CRM liga `dark crm-navy` na página
-   * (components/crm-theme.tsx). O alto contraste, se ligado, continua mandando.
+   * (components/crm-theme.tsx), a não ser que a pessoa escolha o claro. O alto
+   * contraste, se ligado, continua mandando.
    */
   .dark.crm-navy:not(.high-contrast) {
     --background: 219 60% 12%;

@@ -12,8 +12,9 @@ import { MAX_BULK } from '@/crm/bulk-limits';
 import type { BoardLead, BoardPipeline } from '@/crm/types';
 import { instantDateBR } from '@/lib/tz';
 import { BulkBar, type BulkData } from './bulk-bar';
+import { StageChip } from '@/components/crm-stage-chip';
 
-export type ListRow = BoardLead & { stageName: string; pipelineId: string };
+export type ListRow = BoardLead & { stageName: string; stageColor: string; pipelineId: string };
 type SortKey = 'nome' | 'etapa' | 'valor' | 'recentes';
 
 /**
@@ -205,7 +206,11 @@ export function LeadTable({
                     {l.phoneMasked}
                   </div>
                 </td>
-                {visivel('etapa') && <td className="px-3 py-2.5">{l.wonAt ? 'Fechou' : l.lostAt ? 'Perdeu' : l.stageName}</td>}
+                {visivel('etapa') && (
+                  <td className="px-3 py-2.5">
+                    <StageChip name={l.wonAt ? 'Fechou' : l.lostAt ? 'Perdeu' : l.stageName} color={l.wonAt ? 'green' : l.lostAt ? 'red' : l.stageColor} />
+                  </td>
+                )}
                 {visivel('funil') && <td className="px-3 py-2.5">{nomeFunil.get(l.pipelineId) ?? '-'}</td>}
                 {visivel('responsavel') && <td className="px-3 py-2.5">{l.assignee?.name ?? <span className="text-muted-foreground">-</span>}</td>}
                 {visivel('valor') && <td className="px-3 py-2.5 tabular-nums">{l.valueCents != null ? formatCents(l.valueCents) : '-'}</td>}

@@ -5,6 +5,7 @@ import { getTenantModules } from '@/lib/access';
 import { planForEvent, withOldTaskTexts, type ClinicEvent } from './automation';
 import { clinicDateAt, clinicNowWall } from './clock';
 import { moveLead, OPEN_LEAD } from './leads';
+import { adoptLeadByPhone } from './patient-link';
 import { completeTask, createTask } from './tasks';
 import { runDueAutomations } from './stage-automations';
 
@@ -34,6 +35,23 @@ export async function notifyCrm(tenantId: string, event: ClinicEvent): Promise<v
       event: event.type,
       tenantId,
       patientId: event.patientId,
+      message: error instanceof Error ? error.message : 'erro desconhecido',
+    });
+  }
+}
+
+/**
+ * Paciente cadastrado na clínica: se o número já conversava no WhatsApp, o lead
+ * e a conversa passam a ser dele. Mesmas promessas do `notifyCrm`.
+ */
+export async function notifyPatientCreated(tenantId: string, patientId: string): Promise<void> {
+  try {
+    if (!(await getTenantModules(tenantId)).crm) return;
+    await adoptLeadByPhone(getTenantClient(tenantId), tenantId, patientId);
+  } catch (error) {
+    console.error('[crm] ligar paciente novo ao lead falhou', {
+      tenantId,
+      patientId,
       message: error instanceof Error ? error.message : 'erro desconhecido',
     });
   }
@@ -70,6 +88,8 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
       where: { patientId: event.patientId, ...OPEN_LEAD },
       orderBy: { createdAt: 'desc' },
     });
+    // Cadastrado na agenda sem passar pelo CRM: o lead do mesmo WhatsApp vira dele.
+    lead ??= await adoptLeadByPhone(db, tenantId, event.patientId);
   }
   if (!lead) return;
 

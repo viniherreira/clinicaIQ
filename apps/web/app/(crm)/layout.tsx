@@ -22,7 +22,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
         if (!seat) redirect(CRM_NOT_CONTRACTED_PATH);
       }}
     >
-      {/* Escuro antes de pintar; o CrmTheme mantém e desfaz ao sair. */}
+      {/* O tema do CRM antes de pintar; o CrmTheme mantém e desfaz ao sair. */}
       <script dangerouslySetInnerHTML={{ __html: CRM_THEME_SCRIPT }} />
       <CrmTheme />
       <CrmTrialBanner />

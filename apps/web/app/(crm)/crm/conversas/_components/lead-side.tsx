@@ -9,6 +9,7 @@ import { colorClasses } from '@/crm/colors';
 import { initials } from '@/crm/format';
 import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { LeadPanel } from '../../leads/[id]/_components/lead-panel';
+import { ConvertActions } from '../../leads/[id]/_components/convert-actions';
 import type { FieldDef } from '@/crm/custom-fields';
 import { acceptConversationAction, declineConversationAction, leadDetailAction } from '../actions';
 
@@ -65,9 +66,13 @@ function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics: LeadS
         onChanged();
       }}
       actions={
-        <Link href={`/crm/leads/${lead.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Abrir a ficha completa
-        </Link>
+        // Agendar daqui leva o telefone do WhatsApp para a ficha: sem digitar, sem número trocado.
+        <div className="space-y-2">
+          <ConvertActions leadId={lead.id} patient={lead.patient} />
+          <Link href={`/crm/leads/${lead.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Abrir a ficha completa
+          </Link>
+        </div>
       }
     />
   ) : (

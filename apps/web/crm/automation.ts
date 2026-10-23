@@ -9,7 +9,8 @@ import { fallbackStageAfterCancel, progressIndex, stageByRole, type StageLike } 
  *
  * 1. Avançar só para frente: se a recepção já pôs o card mais adiante, a
  *    automação não o puxa para trás.
- * 2. Voltar só no cancelamento ou falta, e só a partir de "Avaliação agendada".
+ * 2. Voltar só no cancelamento ou falta, e só a partir de "Avaliação agendada":
+ *    vai para "Desmarcou" (ou, no funil sem ela, uma coluna antes).
  * 3. Perder nunca é automático.
  * 4. Lead ganho ou perdido não é mexido, exceto quando o orçamento que o ganhou
  *    é reaberto.
@@ -104,8 +105,12 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
   if (!aberto(lead)) return NADA;
 
   switch (event.type) {
-    case 'appointment.created':
-      return { moveTo: avancar(ctx, 'SCHEDULED'), tasks: [], completes: [TASK_REAGENDAR, TASK_FALTOU] };
+    case 'appointment.created': {
+      // De "Desmarcou" volta para "Avaliação agendada", mesmo estando à frente no quadro.
+      const atual = ctx.stages.find((s) => s.id === lead.stageId);
+      const moveTo = atual?.role === 'CANCELLED' ? stageByRole(ctx.stages, 'SCHEDULED')?.id : avancar(ctx, 'SCHEDULED');
+      return { moveTo, tasks: [], completes: [TASK_REAGENDAR, TASK_FALTOU] };
+    }
 
     case 'appointment.rescheduled':
       // A data nova aparece sozinha no card (lida ao vivo da agenda).

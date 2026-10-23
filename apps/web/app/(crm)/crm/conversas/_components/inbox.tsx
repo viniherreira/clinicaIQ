@@ -12,6 +12,7 @@ import { announceUnread } from '@/components/crm-chat/unread';
 import type { QuickReplyOption } from '@/components/crm-chat/chat-composer';
 import { refreshInboxAction, type InboxSnapshot } from '../actions';
 import { ThreadSide, type LeadSideBasics } from './lead-side';
+import { StageChip } from '@/components/crm-stage-chip';
 
 const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
@@ -342,7 +343,7 @@ function ConversationList({
                   ) : c.patient ? (
                     <span className="text-[12px] text-muted-foreground">Paciente · sem negócio</span>
                   ) : null}
-                  {c.lead && <span className="shrink-0 text-[11px] text-muted-foreground">· {c.lead.stage}</span>}
+                  {c.lead && <StageChip name={c.lead.stage} color={c.lead.stageColor} small />}
                 </span>
                 <span className="mt-0.5 flex items-center gap-2">
                   <span className={`truncate text-xs ${lida ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -358,7 +359,9 @@ function ConversationList({
                 </span>
                 {(c.tags.length > 0 || (c.awaitingReply && !entrada)) && (
                   <span className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
-                    {c.awaitingReply && !entrada && <span className="rounded-[3px] px-1 py-0.5 text-amber-800 dark:text-amber-300">Sem resposta</span>}
+                    {c.awaitingReply && !entrada && (
+                      <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Sem resposta</span>
+                    )}
                     {c.tags.slice(0, 3).map((t) => (
                       <span key={t.id} className={`max-w-[110px] truncate rounded-[3px] px-1.5 py-0.5 font-medium ${colorClasses(t.color).chip}`}>
                         {t.name}
