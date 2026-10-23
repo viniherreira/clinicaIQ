@@ -184,7 +184,27 @@ describe('parseCloudWebhook', () => {
         statuses: [{ id: 'wamid.B', status: 'failed', recipient_id: '55', errors: [{ code: 131047, title: 'Re-engagement message' }] }],
       }),
     );
-    expect(ev).toEqual([{ kind: 'status', phoneNumberId: 'PN1', id: 'wamid.B', status: 'FAILED', recipient: '55', error: 'Re-engagement message' }]);
+    expect(ev).toEqual([
+      {
+        kind: 'status',
+        phoneNumberId: 'PN1',
+        id: 'wamid.B',
+        status: 'FAILED',
+        recipient: '55',
+        error: 'Passaram 24 horas desde a última mensagem da pessoa. Use um modelo aprovado.',
+      },
+    ]);
+  });
+
+  it.each([
+    [{ code: 131042, title: 'Business eligibility payment issue' }, 'forma de pagamento'],
+    [{ code: 131049, title: 'This message was not delivered to maintain healthy ecosystem engagement.' }, 'não cansar'],
+    [{ code: 999, title: 'Algo novo', error_data: { details: 'detalhe da Meta' } }, 'A Meta recusou: detalhe da Meta'],
+    [{ code: 999 }, 'erro 999'],
+  ])('falha de entrega traduzida (%o)', (erro, trecho) => {
+    const ev = parseCloudWebhook(envelope('messages', { statuses: [{ id: 'wamid.X', status: 'failed', recipient_id: '55', errors: [erro] }] }));
+    expect(ev[0]).toMatchObject({ kind: 'status', status: 'FAILED' });
+    expect((ev[0] as { error: string }).error).toContain(trecho);
   });
 
   it('eco da coexistência (escrito no celular da clínica)', () => {

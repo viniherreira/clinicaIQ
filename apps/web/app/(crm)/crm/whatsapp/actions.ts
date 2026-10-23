@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
 import * as admin from '@/crm/cloud-admin';
+import type { NewTemplateInput } from '@/lib/whatsapp-templates';
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -13,6 +14,8 @@ async function run(fn: (g: { tenantId: string; userId: string }) => Promise<Resu
   if (r.ok) {
     revalidatePath('/crm/whatsapp');
     revalidatePath('/crm/conversas');
+    revalidatePath('/crm/automacoes/modelos');
+    revalidatePath('/configuracoes');
   }
   return r;
 }
@@ -29,5 +32,5 @@ export const checkCloudAction = async () => run((g) => admin.checkCloud(g.tenant
 
 export const syncTemplatesAction = async () => run((g) => admin.syncTemplates(g.tenantId));
 
-export const createTemplateAction = async (input: { name: string; category: 'MARKETING' | 'UTILITY'; body: string; examples: string[] }) =>
+export const createTemplateAction = async (input: NewTemplateInput) =>
   run((g) => admin.createTemplate(g.tenantId, input));

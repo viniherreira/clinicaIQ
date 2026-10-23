@@ -42,6 +42,13 @@ import {
   type AgendaTemplateView,
 } from '@/lib/agenda-templates-sync';
 import { activeCloudAccount } from '@/lib/cloud-account';
+import {
+  createTemplate,
+  listTemplateRows,
+  syncTemplates,
+  type NewTemplateInput,
+  type TemplateRow,
+} from '@/lib/whatsapp-templates';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -1653,4 +1660,43 @@ export async function saveOnlineBookingSettings(input: OnlineBookingSettings): P
   });
   revalidatePath('/configuracoes');
   return { ok: true };
+}
+
+// ─── Modelos do WhatsApp ─────────────────────────────────────────────────────────
+
+/** Os modelos da API oficial da clínica (os da agenda e os livres), para a aba Modelos. */
+export async function getWhatsAppTemplates(): Promise<{ templates: TemplateRow[]; connected: boolean }> {
+  const { tenantId } = await requireOwner();
+  const [templates, conta] = await Promise.all([listTemplateRows(tenantId), activeCloudAccount(tenantId)]);
+  return { templates, connected: Boolean(conta) };
+}
+
+async function templateGuard(): Promise<{ ok: true; tenantId: string } | { ok: false; message: string }> {
+  const { tenantId } = await requireOwner();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'configuracoes'));
+  return bloqueio ? { ok: false, message: bloqueio } : { ok: true, tenantId };
+}
+
+function revalidateTemplates() {
+  revalidatePath('/configuracoes');
+  revalidatePath('/crm/automacoes/modelos');
+}
+
+/** Traz da Meta a situação de todos os modelos (aprovado, em análise, recusado). */
+export async function syncWhatsAppTemplates(): Promise<{ ok: true } | { ok: false; message: string }> {
+  const g = await templateGuard();
+  if (!g.ok) return g;
+  const r = await syncTemplates(g.tenantId);
+  if (!r.ok) return r;
+  revalidateTemplates();
+  return { ok: true };
+}
+
+/** Cria um modelo e manda para a Meta aprovar. */
+export async function createWhatsAppTemplate(input: NewTemplateInput): Promise<{ ok: true } | { ok: false; message: string }> {
+  const g = await templateGuard();
+  if (!g.ok) return g;
+  const r = await createTemplate(g.tenantId, input);
+  if (r.ok) revalidateTemplates();
+  return r;
 }

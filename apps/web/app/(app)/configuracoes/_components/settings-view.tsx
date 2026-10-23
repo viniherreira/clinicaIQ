@@ -28,6 +28,9 @@ import type {
   TeamMember,
 } from '../actions';
 import { MessagesPanel } from './messages-panel';
+import { WhatsAppTemplates } from '@/components/whatsapp-templates';
+import type { TemplateRow } from '@/lib/whatsapp-templates';
+import { createWhatsAppTemplate, syncWhatsAppTemplates } from '../actions';
 import { DocumentsPanel } from './documents-panel';
 import { LabelsPanel } from './labels-panel';
 import { OnlineBookingPanel } from './online-booking-panel';
@@ -71,6 +74,8 @@ interface Props {
   rules: { agenda: AgendaRules; paymentMethods: string[] };
   invites: PendingInvite[];
   messages: MessageSettings;
+  /** Modelos da API oficial (aba Modelos do WhatsApp). */
+  templates: { templates: TemplateRow[]; connected: boolean };
   documents: DocumentSettings;
   privacy: PrivacySummary | null;
   audit: AuditEntry[];
@@ -96,6 +101,7 @@ export function SettingsView({
   rules,
   invites,
   messages,
+  templates,
   documents,
   privacy,
   audit,
@@ -174,6 +180,23 @@ export function SettingsView({
       group: 'Comunicação',
       label: 'WhatsApp e mensagens',
       panel: <CommunicationPanel whatsapp={whatsapp} messages={messages} />,
+    },
+    {
+      id: 'modelos',
+      group: 'Comunicação',
+      label: 'Modelos do WhatsApp',
+      aliases: ['modelos-whatsapp'],
+      badge: templates.templates.filter((t) => t.status === 'PENDING').length || undefined,
+      panel: (
+        <WhatsAppTemplates
+          templates={templates.templates}
+          connected={templates.connected}
+          connectHref="/whatsapp"
+          agendaHref="#comunicacao"
+          onSync={syncWhatsAppTemplates}
+          onCreate={createWhatsAppTemplate}
+        />
+      ),
     },
     ...(podePlano ? [{ id: 'plano', group: 'Conta', label: 'Plano e cobrança', panel: billing }] : []),
     ...(podePrivacidade && privacy

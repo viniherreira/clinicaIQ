@@ -185,6 +185,39 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     expect((await prisma.whatsAppMessage.findUniqueOrThrow({ where: { id: linha.id } })).status).toBe('READ');
   });
 
+  it('a Meta aceitou e depois falhou: o motivo fica no aviso, em português', async () => {
+    const linha = await prisma.whatsAppMessage.findFirstOrThrow({ where: { tenantId: tenant.id, direction: 'OUTBOUND', externalId: { not: null } } });
+    await webhook({
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: waba,
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                metadata: { phone_number_id: pn },
+                statuses: [{ id: linha.externalId, status: 'failed', recipient_id: `55${telefone}`, errors: [{ code: 131042, title: 'Business eligibility payment issue' }] }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const depois = await prisma.whatsAppMessage.findUniqueOrThrow({ where: { id: linha.id } });
+    expect(depois.status).toBe('FAILED');
+    expect(depois.errorMessage).toMatch(/forma de pagamento/);
+  });
+
+  it('lista de modelos: os da agenda em uso primeiro, marcados', async () => {
+    const { listTemplateRows } = await import('./whatsapp-templates');
+    const rows = await listTemplateRows(tenant.id);
+    expect(rows.length).toBeGreaterThan(0);
+    const emUso = rows.filter((r) => r.inUse);
+    expect(emUso.every((r) => r.purpose && r.status === 'APPROVED')).toBe(true);
+    expect(rows.slice(0, emUso.length)).toEqual(emUso);
+  });
+
   it('texto novo vira versão nova; o mesmo texto não vai de novo; texto fora das regras nem sai', async () => {
     const meta = metaFalsa();
     vi.stubGlobal('fetch', meta.fetchFalso);
