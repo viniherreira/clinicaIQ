@@ -63,3 +63,22 @@ test('lembrete: escolher os dias e os botões, com a prévia de como chega', asy
   await expect(previa.getByRole('list', { name: 'Botões da mensagem' })).toContainText('Não vou poder');
   expect((await axe(page)).violations).toEqual([]);
 });
+
+test('aba Modelos do WhatsApp: avisos da agenda, modelos livres e o novo modelo com botões', async ({ page }) => {
+  await page.goto('/configuracoes#modelos');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: 'Modelos do WhatsApp' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Avisos da agenda' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Seus modelos' })).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
+
+  // Nada vai para a Meta aqui: só o formulário e a prévia.
+  await page.getByRole('button', { name: 'Novo modelo' }).click();
+  await page.getByLabel(/Texto: use/).fill('Oi {{1}}, quer marcar o seu retorno?');
+  await page.getByLabel('Exemplo para {{1}}').fill('Ana');
+  await page.getByRole('button', { name: 'Adicionar botão' }).click();
+  await page.getByRole('textbox', { name: 'Botão 1' }).fill('Quero marcar');
+  await expect(page.getByText('Oi Ana, quer marcar o seu retorno?')).toBeVisible();
+  await expect(page.getByText('Quero marcar', { exact: true })).toBeVisible();
+  expect((await axe(page)).violations).toEqual([]);
+});

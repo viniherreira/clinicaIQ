@@ -10,6 +10,7 @@ import {
   listInvites,
   getMessageSettings,
   getDocumentSettings,
+  getWhatsAppTemplates,
 } from './actions';
 import { Suspense } from 'react';
 import { SettingsView } from './_components/settings-view';
@@ -35,7 +36,7 @@ export default async function ConfiguracoesPage() {
 
   // As abas de administração nem são buscadas para quem não vai vê-las. Esconder
   // a aba mas mandar a lista da equipe junto no HTML seria esconder com a mão.
-  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents, units, rules, oficial] =
+  const [professionals, suggestedColor, businessHours, team, privacy, audit, invites, messages, session, documents, units, rules, oficial, modelos] =
     await Promise.all([
       listProfessionals(),
       suggestColor(),
@@ -53,6 +54,7 @@ export default async function ConfiguracoesPage() {
       listUnitsForSettings(),
       getClinicRules(),
       cloudAccountSummary(clinic.id),
+      getWhatsAppTemplates(),
     ]);
   const apiOficial = oficial?.active && oficial.status === 'CONNECTED';
 
@@ -69,6 +71,7 @@ export default async function ConfiguracoesPage() {
       audit={audit}
       invites={invites}
       messages={messages}
+      templates={modelos}
       documents={documents}
       podeEquipe={podeEquipe}
       podePlano={podePlano}

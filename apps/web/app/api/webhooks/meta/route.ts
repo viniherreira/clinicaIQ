@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       const { tenantId } = t;
 
       if (ev.kind === 'status') {
-        await applyMessageStatus(ev.id, ev.status.toLowerCase() as Lowercase<typeof ev.status>);
+        await applyMessageStatus(ev.id, ev.status.toLowerCase() as Lowercase<typeof ev.status>, ev.error);
         if (t.crm) await applyChatStatus(tenantId, ev.id, ev.status, ev.error);
         continue;
       }

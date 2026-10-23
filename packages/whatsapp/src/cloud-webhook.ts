@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { describeDeliveryError } from './cloud-api';
 
 /**
  * O webhook da API oficial, lido como eventos simples. Função pura, testada por
@@ -146,14 +147,13 @@ export function parseCloudWebhook(body: unknown): CloudEvent[] {
         for (const s of v.statuses ?? []) {
           const status = STATUS[s?.status];
           if (!status || !s.id) continue;
-          const e = s.errors?.[0];
           out.push({
             kind: 'status',
             phoneNumberId,
             id: String(s.id),
             status,
             recipient: String(s.recipient_id ?? ''),
-            error: e ? clean(e.error_data?.details) ?? clean(e.title) ?? `erro ${e.code}` : null,
+            error: describeDeliveryError(s.errors?.[0]),
           });
         }
       }

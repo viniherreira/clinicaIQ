@@ -41,6 +41,7 @@ export {
   DEFAULT_GRAPH_VERSION,
   countTemplateVariables,
   describeGraphError,
+  describeDeliveryError,
   exchangeSignupCode,
   renderTemplateBody,
 } from './cloud-api';

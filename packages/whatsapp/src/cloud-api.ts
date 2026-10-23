@@ -42,6 +42,38 @@ export class CloudApiError extends Error {
 
 const RATE_LIMIT = new Set([4, 80007, 130429, 131048, 131056]);
 
+/**
+ * Falhas que a Meta costuma mandar depois, no webhook de status: o envio foi
+ * aceito e a mensagem não chegou. Sem traduzir, a clínica só vê "falhou".
+ */
+const DELIVERY_FAILURE: Record<number, string> = {
+  131042:
+    'A Meta não cobrou a conversa: falta forma de pagamento na conta do WhatsApp da clínica (Meta Business › Pagamentos).',
+  131049: 'A Meta segurou a mensagem para não cansar o paciente. Tente de novo mais tarde.',
+  131050: 'O paciente pediu para não receber mensagens de marketing.',
+  130472: 'O número do paciente está num teste da Meta e não recebe esta mensagem agora.',
+  131021: 'O número do paciente é o mesmo da clínica.',
+  131026: 'Não foi possível entregar: o número pode não ter WhatsApp.',
+  131047: 'Passaram 24 horas desde a última mensagem da pessoa. Use um modelo aprovado.',
+  132000: 'O número de variáveis não bate com o modelo.',
+  132001: 'Modelo não encontrado ou ainda não aprovado na Meta.',
+  132012: 'Os dados da mensagem não batem com o modelo aprovado (variáveis ou botões).',
+  132015: 'Este modelo foi pausado pela Meta.',
+  132016: 'Este modelo foi desativado pela Meta.',
+  131031: 'A conta do WhatsApp da clínica está bloqueada na Meta.',
+};
+
+/** Erro de entrega do webhook de status, em português (null se a Meta não mandou erro). */
+export function describeDeliveryError(
+  e: { code?: number; title?: string; message?: string; error_data?: { details?: string } } | undefined,
+): string | null {
+  if (!e) return null;
+  const known = e.code !== undefined ? DELIVERY_FAILURE[e.code] : undefined;
+  if (known) return known;
+  const detail = e.error_data?.details?.trim() || e.title?.trim() || e.message?.trim();
+  return detail ? `A Meta recusou: ${detail}` : `A Meta recusou (erro ${e.code ?? 'sem código'}).`;
+}
+
 /** Códigos da Meta → mensagem e se vale tentar de novo. */
 export function describeGraphError(status: number, body: unknown): CloudApiError {
   const err = (body as { error?: { code?: number; message?: string; error_data?: { details?: string } } })?.error;

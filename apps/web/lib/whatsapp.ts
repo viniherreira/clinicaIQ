@@ -552,6 +552,12 @@ async function prepareCloudAppointment(
           params,
           modelo.buttons.map((b) => b.payload),
         );
+        // Com o CRM, o aviso aparece na conversa do paciente. Falhar aqui não desfaz o envio.
+        await import('@/crm/agenda-mirror')
+          .then(({ mirrorAgendaToCrm }) =>
+            mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId: r.id, buttons: modelo.buttons }),
+          )
+          .catch((e) => console.error('[agenda] aviso não foi para o CRM', e instanceof Error ? e.message : e));
         return { success: true, messageId: r.id };
       } catch (e) {
         return { success: false, error: e instanceof CloudApiError ? e.userMessage : 'send-failed' };
@@ -874,6 +880,8 @@ export async function optOutByPhone(fromPhone: string, tenantId: string): Promis
 export async function applyMessageStatus(
   externalId: string,
   status: 'sent' | 'delivered' | 'read' | 'failed',
+  /** Motivo da Meta quando falhou, para a clínica ver por que não chegou. */
+  error?: string | null,
 ): Promise<void> {
   const map: Record<string, { status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'; field?: 'deliveredAt' | 'readAt' }> = {
     sent: { status: 'SENT' },
@@ -889,6 +897,7 @@ export async function applyMessageStatus(
     data: {
       status: m.status,
       ...(m.field ? { [m.field]: new Date() } : {}),
+      ...(m.status === 'FAILED' && error ? { errorMessage: error } : {}),
     },
   });
 }

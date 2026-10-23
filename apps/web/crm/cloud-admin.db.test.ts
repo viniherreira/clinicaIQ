@@ -15,12 +15,18 @@ describe('modelos: regras antes de mandar para a Meta', async () => {
     [{ name: 'ok', body: 'Oi {{2}}, tudo bem?', examples: ['a', 'b'] }, /sem pular/],
     [{ name: 'ok', body: '{{1}}, tudo bem?', examples: ['Ana'] }, /começo nem no fim/],
     [{ name: 'ok', body: 'Oi {{1}}, tudo bem?', examples: [''] }, /exemplo/],
+    [{ name: 'dc_lembrete_9', body: 'Oi', examples: [] }, /avisos da agenda/],
+    [{ name: 'ok', body: 'Oi', examples: [], buttons: ['A', 'B', 'C', 'D'] }, /No máximo 3/],
+    [{ name: 'ok', body: 'Oi', examples: [], buttons: ['Sim', ' '] }, /botão vazio/],
+    [{ name: 'ok', body: 'Oi', examples: [], buttons: ['x'.repeat(26)] }, /25 letras/],
+    [{ name: 'ok', body: 'Oi', examples: [], buttons: ['Sim', 'sim'] }, /mesmo nome/],
   ])('%#', (input, erro) => {
     expect(templateProblem(input)).toMatch(erro);
   });
 
   it('modelo válido passa', () => {
     expect(templateProblem({ name: 'retomar_contato', body: 'Oi {{1}}, ficou alguma dúvida?', examples: ['Ana'] })).toBeNull();
+    expect(templateProblem({ name: 'retorno', body: 'Quer marcar o retorno?', examples: [], buttons: ['Quero marcar', 'Agora não'] })).toBeNull();
   });
 
   it('modelo vindo da Meta', () => {

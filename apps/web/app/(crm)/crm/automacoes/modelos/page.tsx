@@ -1,33 +1,31 @@
 import { requireCrm } from '@/crm/guard';
 import { activeCloudAccount } from '@/crm/cloud';
-import { TemplatesManager } from './_components/templates-manager';
+import { listTemplateRows } from '@/lib/whatsapp-templates';
+import { WhatsAppTemplates } from '@/components/whatsapp-templates';
+import { createTemplateAction, syncTemplatesAction } from '../../whatsapp/actions';
 
 export const metadata = { title: 'Modelos · DreamClin' };
 
 /**
  * Modelos de mensagem da API oficial. Fora das 24 horas depois da última
  * mensagem do contato, só modelo aprovado pela Meta pode ser enviado — é o que
- * as transmissões, as automações e a confirmação de consulta usam.
+ * as transmissões, as automações e os avisos da agenda usam. A mesma lista da
+ * gestão (Configurações › Modelos do WhatsApp).
  */
 export default async function ModelosPage() {
   const ctx = await requireCrm('crm_config');
-  const [cloud, templates] = await Promise.all([
-    activeCloudAccount(ctx.tenantId),
-    ctx.db.messageTemplate.findMany({
-      // Os avisos da agenda (purpose) são cuidados no painel de mensagens da gestão.
-      where: { purpose: null },
-      orderBy: [{ status: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, category: true, status: true, body: true, rejectedReason: true },
-    }),
-  ]);
+  const [cloud, templates] = await Promise.all([activeCloudAccount(ctx.tenantId), listTemplateRows(ctx.tenantId)]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <p className="mb-5 text-sm text-muted-foreground">
-        Escreva a mensagem, envie para a Meta aprovar e acompanhe aqui. Depois de aprovado, o modelo aparece nas transmissões e
-        nas automações por etapa.
-      </p>
-      <TemplatesManager templates={templates} connected={Boolean(cloud)} />
+      <WhatsAppTemplates
+        templates={templates}
+        connected={Boolean(cloud)}
+        connectHref="/crm/whatsapp"
+        agendaHref="/configuracoes#comunicacao"
+        onSync={syncTemplatesAction}
+        onCreate={createTemplateAction}
+      />
     </div>
   );
 }
