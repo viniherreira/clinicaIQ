@@ -23,6 +23,8 @@ test('lead → paciente → agendou → cancelou → reagendou → orçamento �
   await page.getByRole('button', { name: 'Agendar avaliação' }).click();
   await page.waitForURL(/converter\?depois=agendar/);
   await expect(page.getByLabel('Nome completo')).toHaveValue(lead.name);
+  // O telefone do lead chega inteiro, sem o 55 e sem perder os dois últimos dígitos.
+  await expect(page.getByLabel(/Telefone principal/)).toHaveValue(lead.phone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3'));
   await page.getByRole('checkbox', { name: /autoriza o armazenamento/ }).check();
   await page.getByRole('button', { name: 'Cadastrar paciente' }).click();
   await page.waitForURL(/\/agenda/);

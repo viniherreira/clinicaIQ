@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPatient, updatePatient } from '../actions';
 import type { PatientFormState } from '../actions';
+import { nationalPhone } from '@/lib/phone';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,9 @@ function maskCpf(v: string) {
 }
 
 function maskPhone(v: string) {
-  const d = v.replace(/\D/g, '').slice(0, 11);
+  // Colou com o 55 (+55 11 99999-9999)? Fica só DDD + número, sem cortar o fim.
+  const todos = v.replace(/\D/g, '');
+  const d = (todos.length > 11 && todos.startsWith('55') ? todos.slice(2) : todos).slice(0, 11);
   if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/, (_, a, b, c) => c ? `(${a}) ${b}-${c}` : b ? `(${a}) ${b}` : a ? `(${a}` : '');
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, (_, a, b, c) => c ? `(${a}) ${b}-${c}` : `(${a}) ${b}`);
 }
@@ -148,8 +151,9 @@ export function PatientForm({
   const [serverError, setServerError] = useState<string | null>(null);
 
   const [cpf, setCpf] = useState(patient?.cpf ?? '');
-  const [phone, setPhone] = useState(patient?.phone ? maskPhone(patient.phone) : '');
-  const [phone2, setPhone2] = useState(patient?.phone2 ? maskPhone(patient.phone2) : '');
+  // O telefone que vem pronto (do WhatsApp, do CRM) chega com 55: vira o número nacional.
+  const [phone, setPhone] = useState(patient?.phone ? maskPhone(nationalPhone(patient.phone)) : '');
+  const [phone2, setPhone2] = useState(patient?.phone2 ? maskPhone(nationalPhone(patient.phone2)) : '');
   const [cep, setCep] = useState(patient?.zipCode ?? '');
   const [birthDate, setBirthDate] = useState(patient?.birthDate ?? '');
 
