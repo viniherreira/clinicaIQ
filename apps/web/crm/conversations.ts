@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
-import { activeCloudAccount, windowOpen } from './cloud';
+import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
@@ -302,6 +302,10 @@ export interface ChatThread {
   windowOpen: boolean;
   /** Dá para mandar arquivo por este canal. */
   mediaOk: boolean;
+  /** O robô que está conversando agora (ou esperando a resposta da pessoa). */
+  bot: { id: string; name: string } | null;
+  /** Quando fecha a janela de 24 h (ISO), se aberta. */
+  windowEndsAt: string | null;
 }
 
 const THREAD_LIMIT = 200;
@@ -340,7 +344,10 @@ export async function loadThread(
       templateName: m.templateName,
       buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
     }));
-  const cloud = await activeCloudAccount(tenantId);
+  const [cloud, bot] = await Promise.all([
+    activeCloudAccount(tenantId),
+    conv.botFlowId ? db.chatbotFlow.findFirst({ where: { id: conv.botFlowId }, select: { id: true, name: true } }) : null,
+  ]);
   return {
     conversation: toSummary(conv, tenantId),
     messages,
@@ -349,6 +356,8 @@ export async function loadThread(
     windowOpen: windowOpen(conv.lastInboundAt),
     // Arquivo sai pela API oficial; sem canal nenhum (desenvolvimento), é simulado.
     mediaOk: Boolean(cloud) || (!process.env.WHATSAPP_GATEWAY_URL && process.env.NODE_ENV !== 'production'),
+    bot,
+    windowEndsAt: conv.lastInboundAt && windowOpen(conv.lastInboundAt) ? new Date(conv.lastInboundAt.getTime() + WINDOW_MS).toISOString() : null,
   };
 }
 
@@ -536,7 +545,8 @@ export async function simulateSent(db: TenantPrismaClient, chatMessageId: string
  */
 export async function acceptConversation(
   db: TenantPrismaClient,
-  actor: Actor & { userId: string },
+  /** `userId: null`: número novo aceito sozinho ao chegar (`crm/inbound.ts`). */
+  actor: Actor,
   conversationId: string,
   opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {

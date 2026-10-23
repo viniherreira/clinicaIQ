@@ -1,4 +1,4 @@
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import { parseCloudWebhook, verifyMetaSignature } from '@clinicaiq/whatsapp';
 import { accountByPhoneNumberId, accountByWabaId } from '@/lib/cloud-account';
 import { AGENDA_PAYLOADS as PAYLOADS } from '@/lib/agenda-options';
@@ -110,10 +110,14 @@ export async function POST(req: Request) {
       });
 
       if (ev.kind === 'message' && r.recorded) {
-        const conversationId = r.conversationId;
-        const messageId = r.messageId;
+        // Ligar a conversa, captação e robô aqui mesmo, antes de responder à Meta
+        // (como no gateway): com `after()`, em produção, não rodava — número novo
+        // ficava na Entrada e o robô não começava. Se demorar e a Meta reenviar,
+        // a mensagem já gravada não roda de novo (`recorded: false`).
         // Quem tocou Confirmar no lembrete não deve cair no menu do robô.
-        after(() => afterInbound(tenantId, conversationId, messageId, { skipBot: tocouBotaoDaAgenda }));
+        await afterInbound(tenantId, r.conversationId, r.messageId, { skipBot: tocouBotaoDaAgenda }).catch((e) =>
+          console.error('[meta webhook] depois da mensagem falhou', e instanceof Error ? e.message : e),
+        );
       }
     } catch (e) {
       console.error('[meta webhook] evento não processado', e instanceof Error ? e.message : e);
