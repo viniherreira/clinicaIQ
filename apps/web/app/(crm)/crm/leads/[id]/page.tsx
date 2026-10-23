@@ -7,7 +7,6 @@ import { loadCrmBasics } from '@/crm/page-data';
 import { conversationIdForLead, loadThread } from '@/crm/conversations';
 import { activeCloudAccount } from '@/crm/cloud';
 import { can } from '@/lib/permissions';
-import { LeadFeed } from './_components/lead-feed';
 import { LeadPanel } from './_components/lead-panel';
 import { ConvertActions } from './_components/convert-actions';
 import { LeadRightPane } from './_components/lead-chat';
@@ -17,7 +16,7 @@ export async function generateMetadata() {
   return { title: 'Lead · DreamClin' };
 }
 
-/** A ficha do lead, em duas metades: dados à esquerda; histórico e conversa à direita. */
+/** A ficha do lead, como no Kommo: dados à esquerda; conversa e histórico juntos à direita. */
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireCrm('crm');
   const { id } = await params;
@@ -55,9 +54,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {can(ctx.role, 'crm_config') && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
         </div>
         <LeadRightPane
-          feed={<LeadFeed lead={lead} team={basics.team} meId={ctx.userId} />}
-          leadId={lead.id}
-          leadName={lead.name}
+          lead={lead}
+          team={basics.team}
+          meId={ctx.userId}
           initialThread={thread}
           quickReplies={quickReplies}
           channel={cloud ? 'cloud' : 'gateway'}

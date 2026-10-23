@@ -13,11 +13,15 @@ describe('groupTasks', () => {
         row('venceu', '2026-10-08T14:00:00Z'), // 11:00 de hoje, já passou
         row('hoje', '2026-10-09T01:00:00Z'), // 22:00 de hoje em SP, mesmo sendo dia 9 em UTC
         row('amanha', '2026-10-09T13:00:00Z'),
+        row('semana', '2026-10-13T13:00:00Z'),
+        row('depois', '2026-10-20T13:00:00Z'),
       ],
       agora,
     );
     expect(g.atrasadas.map((t) => t.id)).toEqual(['venceu']);
     expect(g.hoje.map((t) => t.id)).toEqual(['hoje']);
-    expect(g.proximas.map((t) => t.id)).toEqual(['amanha']);
+    expect(g.amanha.map((t) => t.id)).toEqual(['amanha']);
+    expect(g.semana.map((t) => t.id)).toEqual(['semana']);
+    expect(g.depois.map((t) => t.id)).toEqual(['depois']);
   });
 });

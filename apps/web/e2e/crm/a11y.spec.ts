@@ -70,7 +70,7 @@ test('ficha do lead e modais sem violações', async ({ page }) => {
   expect((await axe(page)).violations).toEqual([]);
 });
 
-test('conversa aberta e aba Conversa da ficha sem violações', async ({ page }) => {
+test('conversa aberta e conversa na ficha sem violações', async ({ page }) => {
   const lead = await createLeadViaModal(page);
   await incomingMessage(lead.phone, 'Contato a11y', 'Oi, tudo bem?');
 
@@ -88,7 +88,7 @@ test('conversa aberta e aba Conversa da ficha sem violações', async ({ page })
   await page.getByRole('link', { name: lead.title, exact: true }).click();
   await page.waitForURL(/\/crm\/leads\/[^/]+$/);
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /Conversa/ }).click();
+  // A conversa já aparece na ficha, junto com o histórico (como no Kommo).
   await expect(page.getByText('Oi, tudo bem?')).toBeVisible();
   expect((await axe(page)).violations).toEqual([]);
 });

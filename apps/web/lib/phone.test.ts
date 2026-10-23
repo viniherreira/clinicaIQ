@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBrazilPhone } from './phone';
+import { nationalPhone, normalizeBrazilPhone } from './phone';
 
 describe('normalizeBrazilPhone', () => {
   it('adds the country code to local numbers', () => {
@@ -39,5 +39,18 @@ describe('normalizeBrazilPhone', () => {
       const once = normalizeBrazilPhone(raw);
       expect(normalizeBrazilPhone(once)).toBe(once);
     }
+  });
+});
+
+describe('nationalPhone', () => {
+  it.each([
+    ['5511969254417', '11969254417'], // como o WhatsApp entrega
+    ['+55 (11) 96925-4417', '11969254417'],
+    ['551188101531', '11988101531'], // celular antigo sem o 9 ganha o 9
+    ['(11) 96925-4417', '11969254417'], // já nacional
+    ['1133334444', '1133334444'], // fixo
+    ['55999998888', '55999998888'], // DDD 55 (RS), sem código do país
+  ])('%s → %s', (entrada, saida) => {
+    expect(nationalPhone(entrada)).toBe(saida);
   });
 });

@@ -48,3 +48,14 @@ export function chatKey(raw: string): string {
   const m = /^55(\d{2})([6-9]\d{7})$/.exec(digits);
   return m ? `55${m[1]}9${m[2]}` : digits;
 }
+
+/**
+ * O número como se escreve no Brasil, DDD + linha, sem o 55: é o que cabe nos
+ * campos com máscara "(11) 99999-9999". O WhatsApp entrega o número com o 55 (e
+ * às vezes celular antigo sem o 9); jogar isso direto na máscara cortava os dois
+ * últimos dígitos, e o aviso da agenda ia para outra pessoa.
+ */
+export function nationalPhone(raw: string): string {
+  const key = chatKey(raw);
+  return /^55\d{10,11}$/.test(key) ? key.slice(2) : raw.replace(/\D/g, '');
+}

@@ -64,8 +64,11 @@ export async function completeTask(
   db: TenantPrismaClient,
   actor: Actor,
   taskId: string,
+  /** O que aconteceu, como no Kommo ("Ligou, vai pensar"). Fica no histórico do lead. */
+  result?: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId } = actor;
+  const resultado = result?.trim().slice(0, 1000) || undefined;
   return db.$transaction(async (tx) => {
     const task = await tx.leadTask.findFirst({ where: { id: taskId, tenantId } });
     if (!task) return { ok: false as const, message: 'Tarefa não encontrada.' };
@@ -76,7 +79,13 @@ export async function completeTask(
       data: { completedAt: new Date(), completedById: actor.userId },
     });
     await tx.leadActivity.create({
-      data: { tenantId, leadId: task.leadId, type: 'TASK_COMPLETED', actorId: actor.userId, data: { taskId: task.id, text: task.text } },
+      data: {
+        tenantId,
+        leadId: task.leadId,
+        type: 'TASK_COMPLETED',
+        actorId: actor.userId,
+        data: { taskId: task.id, text: task.text, ...(resultado ? { result: resultado } : {}) },
+      },
     });
     return { ok: true as const };
   });

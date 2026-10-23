@@ -1,16 +1,14 @@
-import Link from 'next/link';
-import { Bot } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
 import { loadCrmBasics } from '@/crm/page-data';
 import { loadTasks, type TaskRow } from '@/crm/task-list';
-import { formatDue } from '@/crm/format';
-import { CompleteTaskButton } from './_components/complete-task-button';
+import { TaskList } from './_components/task-list';
 import { WhoFilter } from './_components/who-filter';
 
 export const metadata = { title: 'Tarefas · DreamClin' };
 
 /**
- * O dia da recepção: o que venceu, o que vence hoje e o que vem depois.
+ * O dia da recepção, como no Kommo: o que venceu, hoje, amanhã, o resto da
+ * semana e depois. Concluir pede o resultado (opcional), que vai para o lead.
  * Padrão: as tarefas de quem está logado.
  */
 export default async function TarefasPage({
@@ -22,7 +20,7 @@ export default async function TarefasPage({
   const sp = await searchParams;
   const who = typeof sp.de === 'string' && sp.de ? sp.de : 'me';
   const [basics, grupos] = await Promise.all([loadCrmBasics(ctx), loadTasks(ctx, who)]);
-  const total = grupos.atrasadas.length + grupos.hoje.length + grupos.proximas.length;
+  const total = Object.values(grupos).reduce((n, g) => n + g.length, 0);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
@@ -37,48 +35,27 @@ export default async function TarefasPage({
         </p>
       ) : (
         <>
-          <Grupo titulo="Atrasadas" tom="text-destructive" tarefas={grupos.atrasadas} />
-          <Grupo titulo="Hoje" tom="text-foreground" tarefas={grupos.hoje} />
-          <Grupo titulo="Próximas" tom="text-muted-foreground" tarefas={grupos.proximas} />
+          <Grupo id="atrasadas" titulo="Atrasadas" tom="text-destructive" tarefas={grupos.atrasadas} />
+          <Grupo id="hoje" titulo="Hoje" tom="text-foreground" tarefas={grupos.hoje} />
+          <Grupo id="amanha" titulo="Amanhã" tom="text-foreground" tarefas={grupos.amanha} />
+          <Grupo id="semana" titulo="Esta semana" tom="text-muted-foreground" tarefas={grupos.semana} />
+          <Grupo id="depois" titulo="Mais tarde" tom="text-muted-foreground" tarefas={grupos.depois} />
         </>
       )}
     </div>
   );
 }
 
-function Grupo({ titulo, tom, tarefas }: { titulo: string; tom: string; tarefas: TaskRow[] }) {
+function Grupo({ id: chave, titulo, tom, tarefas }: { id: string; titulo: string; tom: string; tarefas: TaskRow[] }) {
   if (tarefas.length === 0) return null;
-  const id = `grupo-${titulo.toLowerCase()}`;
+  const id = `grupo-${chave}`;
+  const atrasada = chave === 'atrasadas';
   return (
     <section aria-labelledby={id}>
       <h2 id={id} className={`mb-2 text-sm font-semibold ${tom}`}>
         {titulo} <span className="font-normal text-muted-foreground">({tarefas.length})</span>
       </h2>
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-        {tarefas.map((t) => (
-          <li key={t.id} className="flex items-center gap-3 px-4 py-3">
-            <CompleteTaskButton taskId={t.id} leadId={t.leadId} text={t.text} />
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 text-sm font-medium">
-                {t.automatic && (
-                  <>
-                    <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <span className="sr-only">Criada pela automação:</span>
-                  </>
-                )}
-                <span className="truncate">{t.text}</span>
-              </p>
-              <Link href={`/crm/leads/${t.leadId}`} className="text-xs text-primary hover:underline">
-                {t.leadLabel}
-              </Link>
-            </div>
-            <div className="shrink-0 text-right text-xs text-muted-foreground">
-              <p className={titulo === 'Atrasadas' ? 'font-medium text-destructive' : ''}>{formatDue(new Date(t.dueAt))}</p>
-              <p>{t.assignee}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <TaskList tarefas={tarefas} atrasada={atrasada} />
     </section>
   );
 }

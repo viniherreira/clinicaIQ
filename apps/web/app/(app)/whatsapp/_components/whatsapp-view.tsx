@@ -62,8 +62,10 @@ export function WhatsAppView({ data }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const connected = data.status === 'CONNECTED';
-  // Com a API oficial ligada, o QR code sai de cena: os avisos saem por ela.
+  // O WhatsApp é só pela API oficial. O cartão do QR code aparece apenas para
+  // quem ainda tem uma conexão antiga por QR ligada, para poder desligar.
   const oficial = Boolean(data.official.account?.active);
+  const legado = !oficial && connected;
 
   function onDisconnect() {
     if (!confirm('Desconectar o WhatsApp da clínica? As confirmações deixam de ser enviadas.')) return;
@@ -85,7 +87,7 @@ export function WhatsAppView({ data }: Props) {
 
       <OfficialCard official={data.official} />
 
-      {!oficial && !data.gatewayReady && (
+      {legado && !data.gatewayReady && (
         <div className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-amber-950/40">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
           <div>
@@ -101,8 +103,8 @@ export function WhatsAppView({ data }: Props) {
         </div>
       )}
 
-      {/* Connection card */}
-      {!oficial && (
+      {/* Conexão antiga por QR code (só enquanto estiver ligada) */}
+      {legado && (
       <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex gap-4">
@@ -246,11 +248,12 @@ export function WhatsAppView({ data }: Props) {
         )}
       </section>
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        A conexão usa o WhatsApp Web do próprio celular da clínica. Mantenha o aparelho ligado e com
-        internet; se ele ficar muito tempo offline, o WhatsApp encerra a sessão e será preciso ler o
-        QR code de novo.
-      </p>
+      {legado && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Esta conexão antiga usa o WhatsApp Web do celular da clínica. Conecte a API oficial acima e
+          desligue esta: é mais estável e sem risco de bloqueio.
+        </p>
+      )}
 
       <PairingModal open={pairing} onClose={() => setPairing(false)} />
     </div>

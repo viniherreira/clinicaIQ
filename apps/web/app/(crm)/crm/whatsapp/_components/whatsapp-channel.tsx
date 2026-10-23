@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, BadgeCheck, QrCode, RefreshCw, ShieldCheck, Unplug } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, RefreshCw, ShieldCheck, Unplug } from 'lucide-react';
 import {
   checkCloudAction,
   connectManualAction,
@@ -35,18 +35,18 @@ interface Template {
 }
 
 
+/**
+ * O canal das conversas do CRM: só a API oficial da Meta, a mesma conta da
+ * clínica (avisos da agenda e CRM no mesmo número).
+ */
 export function WhatsAppChannel({
   account,
-  qr,
   templates,
   signup,
-  canClinicWhatsapp,
 }: {
   account: Account | null;
-  qr: { connected: boolean; phone: string | null };
   templates: Template[];
   signup: MetaSignupConfig | null;
-  canClinicWhatsapp: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -86,7 +86,8 @@ export function WhatsAppChannel({
               <p role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
-                  A conexão parou de funcionar: {account.lastError ?? 'erro na Meta'}. Enquanto isso, as conversas voltam a passar pelo QR code.
+                  A conexão parou de funcionar: {account.lastError ?? 'erro na Meta'}. Enquanto isso, nenhuma mensagem sai nem chega. Teste a
+                  conexão ou conecte de novo.
                 </span>
               </p>
             )}
@@ -98,8 +99,8 @@ export function WhatsAppChannel({
                 type="button"
                 disabled={pending}
                 onClick={() => {
-                  if (window.confirm('Desconectar a API oficial? As conversas do CRM voltam a passar pelo QR code.')) {
-                    agir(disconnectCloudAction, 'API oficial desconectada. As conversas voltaram para o QR code.');
+                  if (window.confirm('Desconectar a API oficial? Conversas, robô e avisos da agenda param de sair até conectar de novo.')) {
+                    agir(disconnectCloudAction, 'API oficial desconectada.');
                   }
                 }}
                 className="btn-ghost btn-sm"
@@ -109,22 +110,10 @@ export function WhatsAppChannel({
             </div>
           </div>
         ) : (
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary-hover dark:text-sky-300" aria-hidden="true">
-              <QrCode className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">QR code (o WhatsApp do celular da clínica)</p>
-              <p className="text-sm text-muted-foreground">
-                {qr.connected ? `Conectado${qr.phone ? ` · +${qr.phone}` : ''}` : 'Não conectado'}
-              </p>
-            </div>
-            {canClinicWhatsapp && (
-              <Link href="/whatsapp" className="btn-outline btn-sm">
-                {qr.connected ? 'Ver conexão' : 'Conectar pelo QR code'}
-              </Link>
-            )}
-          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nenhum número conectado. Conecte o WhatsApp da clínica pela API oficial aqui embaixo: as conversas do CRM, o robô e os
+            avisos da agenda passam a sair por ele.
+          </p>
         )}
       </section>
 
