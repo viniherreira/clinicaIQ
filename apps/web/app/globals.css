@@ -225,6 +225,8 @@
     --rail-active: 219 55% 22%;
     /* Balão da clínica azul-claro, como no Kommo. */
     --bubble-out: 211 85% 93%;
+    /* Teal um tom mais escuro: passa de 4,5:1 sobre os selos tingidos do fundo frio. */
+    --link: 176 80% 21%;
   }
 
   /*

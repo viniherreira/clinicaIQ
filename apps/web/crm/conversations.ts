@@ -140,7 +140,7 @@ export interface ConversationSummary {
   unread: number;
   awaitingReply: boolean;
   status: 'INBOX' | 'ACTIVE' | 'DECLINED';
-  lead: { id: string; label: string; stage: string; assignee: string | null; open: boolean } | null;
+  lead: { id: string; label: string; stage: string; stageColor: string; assignee: string | null; open: boolean } | null;
   patient: { id: string; name: string } | null;
   /** As tags do lead, na ordem do nome (aparecem na lista, como no Kommo). */
   tags: { id: string; name: string; color: string }[];
@@ -155,7 +155,7 @@ const summaryInclude = {
       wonAt: true,
       lostAt: true,
       deletedAt: true,
-      stage: { select: { name: true } },
+      stage: { select: { name: true, color: true } },
       assignedTo: { select: { name: true } },
       tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
     },
@@ -185,6 +185,7 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
           id: lead.id,
           label: lead.title || lead.name,
           stage: lead.wonAt ? 'Fechou' : lead.lostAt ? 'Perdeu' : lead.stage.name,
+          stageColor: lead.wonAt ? 'green' : lead.lostAt ? 'red' : lead.stage.color,
           assignee: lead.assignedTo?.name ?? null,
           open: !lead.wonAt && !lead.lostAt,
         }

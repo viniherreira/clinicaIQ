@@ -33,6 +33,17 @@ for (const path of [
   });
 }
 
+// O CRM no tema claro (botão de tema do CRM): mesmas regras.
+for (const path of ['/crm', '/crm/conversas', '/crm/leads', '/crm/painel', '/crm/automacoes/modelos']) {
+  test(`${path} no tema claro sem violações`, async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('crmTheme', 'light'));
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveClass(/crm-light/);
+    expect((await axe(page)).violations).toEqual([]);
+  });
+}
+
 // Na agenda, só o que o CRM acrescentou (o seletor). O minicalendário da
 // agenda tem um problema de contraste anterior ao CRM, tratado à parte.
 test('/agenda: o seletor Clínica | CRM sem violações', async ({ page }) => {

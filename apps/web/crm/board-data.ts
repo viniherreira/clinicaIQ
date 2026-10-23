@@ -184,7 +184,7 @@ export async function loadLeadList(
 
   const rows = await ctx.db.lead.findMany({
     where: { ...leadWhere(ctx, f, now), ...situacao },
-    include: { ...leadInclude, stage: { select: { name: true, pipelineId: true } } },
+    include: { ...leadInclude, stage: { select: { name: true, color: true, pipelineId: true } } },
     // Desempate pela id: a mesma ordem em todas as páginas.
     orderBy: [...orderBy, { id: 'asc' }],
     skip: (Math.max(1, page) - 1) * LIST_PAGE_SIZE,
@@ -192,7 +192,12 @@ export async function loadLeadList(
   });
   const leads = await toBoardLeads(ctx, rows, now);
   const etapa = new Map(rows.map((r) => [r.id, r.stage]));
-  return leads.map((l) => ({ ...l, stageName: etapa.get(l.id)?.name ?? '', pipelineId: etapa.get(l.id)?.pipelineId ?? '' }));
+  return leads.map((l) => ({
+    ...l,
+    stageName: etapa.get(l.id)?.name ?? '',
+    stageColor: etapa.get(l.id)?.color ?? 'gray',
+    pipelineId: etapa.get(l.id)?.pipelineId ?? '',
+  }));
 }
 
 export function parseListParams(sp: Record<string, string | string[] | undefined>) {

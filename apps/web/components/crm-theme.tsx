@@ -56,7 +56,9 @@ export function CrmTheme() {
 export function CrmThemeToggle() {
   const [mode, setMode] = useState<CrmMode | null>(null);
 
-  useEffect(() => setMode(readMode()), []);
+  useEffect(() => {
+    setMode(readMode());
+  }, []);
 
   function toggle() {
     const next: CrmMode = mode === 'light' ? 'dark' : 'light';
