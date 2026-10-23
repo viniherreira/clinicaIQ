@@ -2,9 +2,11 @@
 
 import { Fragment, useEffect, useRef } from 'react';
 import {
-  AlertCircle, Bot, Check, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw, Smartphone, Sticker, User, Video,
+  AlertCircle, Bot, CalendarClock, Check, CircleDot, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw,
+  Smartphone, StickyNote, Sticker, Trophy, User, Video, XCircle,
 } from 'lucide-react';
 import type { ChatLine } from '@/crm/conversations';
+import type { TimelineEntry, TimelineKind } from '@/crm/timeline';
 import { chatDayLabel, chatTime, initials, sameClinicDay } from '@/crm/format';
 
 const MEDIA: Record<string, { icon: typeof ImageIcon; label: string }> = {
@@ -37,8 +39,21 @@ function whoOf(m: ChatLine, contact: string): { label: string; icon?: typeof Bot
   return { label: m.sentBy ?? 'Equipe' };
 }
 
+const EVENT_ICON: Record<TimelineKind, typeof CircleDot> = {
+  event: CircleDot,
+  note: StickyNote,
+  task: CalendarClock,
+  clinic: FileText,
+  won: Trophy,
+  lost: XCircle,
+};
+
+type Item = { kind: 'msg'; at: Date; m: ChatLine } | { kind: 'ev'; at: Date; e: TimelineEntry };
+
 /**
  * As mensagens de uma conversa, mais antigas em cima, com separador por dia.
+ * Na ficha do lead, o histórico vem junto (`events`), na ordem do tempo, como
+ * no Kommo: mudou de etapa, nota, tarefa e a conversa num lugar só.
  * Quem está lendo lá embaixo acompanha as novas; quem subiu para ler o
  * passado não é puxado de volta.
  */
@@ -48,21 +63,27 @@ export function ChatMessages({
   contactName,
   onRetry,
   retrying,
+  events,
 }: {
   messages: ChatLine[];
   truncated: boolean;
   contactName: string;
   onRetry?: (id: string) => void;
   retrying?: string | null;
+  events?: TimelineEntry[];
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const grudado = useRef(true);
   const ultimo = messages.at(-1)?.id;
+  const itens: Item[] = [
+    ...messages.map((m) => ({ kind: 'msg' as const, at: new Date(m.at), m })),
+    ...(events ?? []).map((e) => ({ kind: 'ev' as const, at: new Date(e.at), e })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
 
   useEffect(() => {
     const box = boxRef.current;
     if (box && grudado.current) box.scrollTop = box.scrollHeight;
-  }, [ultimo, messages.length]);
+  }, [ultimo, messages.length, events?.length]);
 
   return (
     <div
@@ -82,15 +103,31 @@ export function ChatMessages({
       {truncated && (
         <p className="mb-4 text-center text-xs text-muted-foreground">Mostrando as 200 mensagens mais recentes.</p>
       )}
-      {messages.length === 0 ? (
+      {itens.length === 0 ? (
         <p className="mt-10 text-center text-sm text-muted-foreground">
           Nenhuma mensagem ainda. O que for conversado a partir de agora aparece aqui.
         </p>
       ) : (
         <ol className="space-y-1.5">
-          {messages.map((m, i) => {
-            const at = new Date(m.at);
-            const novoDia = i === 0 || !sameClinicDay(new Date(messages[i - 1].at), at);
+          {itens.map((item, i) => {
+            const at = item.at;
+            const novoDia = i === 0 || !sameClinicDay(itens[i - 1].at, at);
+            const separador = novoDia && (
+              <li aria-hidden="true" className="flex justify-center py-2">
+                <span className="rounded-full bg-surface px-3 py-0.5 text-[11px] font-medium text-muted-foreground shadow-sm">
+                  {chatDayLabel(at)}
+                </span>
+              </li>
+            );
+            if (item.kind === 'ev') {
+              return (
+                <Fragment key={`ev-${item.e.id}`}>
+                  {separador}
+                  <EventLine e={item.e} at={at} />
+                </Fragment>
+              );
+            }
+            const m = item.m;
             const saida = m.direction === 'OUTBOUND';
             const quem = whoOf(m, contactName);
             const status = statusOf(m);
@@ -98,13 +135,7 @@ export function ChatMessages({
             const auto = m.origin === 'AUTOMATION' || m.origin === 'BOT' || m.origin === 'BROADCAST';
             return (
               <Fragment key={m.id}>
-                {novoDia && (
-                  <li aria-hidden="true" className="flex justify-center py-2">
-                    <span className="rounded-full bg-surface px-3 py-0.5 text-[11px] font-medium text-muted-foreground shadow-sm">
-                      {chatDayLabel(at)}
-                    </span>
-                  </li>
-                )}
+                {separador}
                 <li className={`flex items-end gap-2 ${saida ? 'flex-row-reverse' : ''}`}>
                   {/* Como no Kommo: quem falou ao lado do balão. */}
                   <span
@@ -180,6 +211,48 @@ export function ChatMessages({
         </ol>
       )}
     </div>
+  );
+}
+
+/**
+ * Um registro do histórico no meio da conversa: nota num cartão amarelo (como
+ * no Kommo), o resto numa linha centralizada com quem fez e a hora.
+ */
+function EventLine({ e, at }: { e: TimelineEntry; at: Date }) {
+  const Icon = e.who === 'Automação' ? Bot : EVENT_ICON[e.kind];
+  if (e.kind === 'note') {
+    return (
+      <li className="flex justify-center py-1">
+        <div className="w-full max-w-[85%] rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+          <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
+            <StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Nota de {e.who}</span>
+            <span aria-hidden="true">· {chatTime(at)}</span>
+            <span className="sr-only">, {chatDayLabel(at)} às {chatTime(at)}</span>
+          </p>
+          <p className="whitespace-pre-wrap break-words">{e.text}</p>
+        </div>
+      </li>
+    );
+  }
+  const tom =
+    e.kind === 'won'
+      ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
+      : e.kind === 'lost'
+        ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'
+        : 'bg-surface text-muted-foreground';
+  return (
+    <li className="flex justify-center py-1">
+      <p className={`inline-flex max-w-[90%] items-start gap-1.5 rounded-full px-3 py-1 text-xs shadow-sm ${tom}`}>
+        <Icon className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          <span className="font-medium text-foreground">{e.who}</span>
+          <span aria-hidden="true"> · {chatTime(at)} · </span>
+          <span className="sr-only">, {chatDayLabel(at)} às {chatTime(at)}: </span>
+          {e.text}
+        </span>
+      </p>
+    </li>
   );
 }
 

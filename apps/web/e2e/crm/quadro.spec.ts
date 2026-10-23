@@ -54,6 +54,8 @@ test('ficha: tarefa, nota e conclusão ficam no histórico', async ({ page }) =>
   await page.getByRole('link', { name: lead.title, exact: true }).click();
   await page.waitForURL(/\/crm\/leads\/[^/]+$/);
 
+  // Embaixo da ficha: Bate-papo, Nota ou Tarefa, como no Kommo.
+  await page.getByRole('tab', { name: 'Tarefa' }).click();
   await page.getByLabel('O que fazer').fill('Ligar para tirar dúvidas');
   await page.getByRole('button', { name: 'Agendar tarefa' }).click();
   await expect(page.getByRole('button', { name: 'Concluir tarefa: Ligar para tirar dúvidas' })).toBeVisible();

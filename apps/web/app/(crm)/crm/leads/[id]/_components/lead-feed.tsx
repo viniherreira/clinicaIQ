@@ -1,80 +1,16 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, CalendarClock, CheckCircle2, CircleDot, FileText, StickyNote, Trophy, XCircle } from 'lucide-react';
 import { formatDue } from '@/crm/format';
 import { instantToClinicLocal } from '@/crm/clock';
 import type { LeadDetail } from '@/crm/lead-detail';
-import type { TimelineKind } from '@/crm/timeline';
 import type { BoardPerson } from '@/crm/types';
 import { addNoteAction, createTaskAction } from '../actions';
 import { TaskItem } from '@/components/crm-task-item';
 
-const ICON: Record<TimelineKind, typeof CircleDot> = {
-  event: CircleDot,
-  note: StickyNote,
-  task: CalendarClock,
-  clinic: FileText,
-  won: Trophy,
-  lost: XCircle,
-};
-
-/**
- * A metade direita da ficha: o que precisa ser feito (tarefas pendentes), o
- * que já aconteceu (histórico, mais novo embaixo, como uma conversa) e a
- * caixa para registrar a próxima ação ou uma nota.
- */
-export function LeadFeed({ lead, team, meId }: { lead: LeadDetail; team: BoardPerson[]; meId: string }) {
-  const fimRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    fimRef.current?.scrollIntoView({ block: 'end' });
-  }, [lead.timeline.length]);
-
-  return (
-    <section aria-label="Tarefas e histórico" className="flex min-h-0 flex-1 flex-col">
-      <PendingTasks lead={lead} />
-
-      <div className="min-h-0 flex-1 overflow-y-auto bg-board px-5 py-4">
-        <h2 className="sr-only">Histórico</h2>
-        <ol className="space-y-3">
-          {lead.timeline.map((e) => {
-            const Icon = e.who === 'Automação' ? Bot : ICON[e.kind];
-            const nota = e.kind === 'note';
-            return (
-              <li key={e.id} className="flex gap-3">
-                <span
-                  className={[
-                    'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                    e.kind === 'won' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : '',
-                    e.kind === 'lost' ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : '',
-                    e.kind !== 'won' && e.kind !== 'lost' ? 'bg-surface text-muted-foreground shadow-sm' : '',
-                  ].join(' ')}
-                  aria-hidden="true"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{e.who}</span> · {formatDue(new Date(e.at))}
-                  </p>
-                  <p className={nota ? 'mt-1 whitespace-pre-wrap rounded-lg bg-amber-50 px-3 py-2 text-sm dark:bg-amber-950/40' : 'mt-0.5 text-sm'}>
-                    {e.text}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-        <div ref={fimRef} />
-      </div>
-
-      <Composer leadId={lead.id} team={team} meId={meId} assignedToId={lead.assignedToId} noTask={lead.task.kind === 'none'} />
-    </section>
-  );
-}
-
-function PendingTasks({ lead }: { lead: LeadDetail }) {
+/** O que precisa ser feito, no topo da ficha (concluir pede o resultado, como no Kommo). */
+export function PendingTasks({ lead }: { lead: LeadDetail }) {
   if (lead.pendingTasks.length === 0) return null;
   return (
     <div className="border-b border-border bg-surface-alt/40 px-5 py-3">
@@ -105,13 +41,19 @@ function amanha10h() {
   return `${local.slice(0, 10)}T10:00`;
 }
 
-function Composer({
+/**
+ * Registrar a próxima ação (tarefa) ou uma nota. Fica no seletor de baixo da
+ * ficha, ao lado do Bate-papo; o que for salvo aparece no meio da conversa.
+ */
+export function NoteTaskForm({
+  mode,
   leadId,
   team,
   meId,
   assignedToId,
   noTask,
 }: {
+  mode: 'tarefa' | 'nota';
   leadId: string;
   team: BoardPerson[];
   meId: string;
@@ -119,7 +61,7 @@ function Composer({
   noTask: boolean;
 }) {
   const router = useRouter();
-  const [aba, setAba] = useState<'tarefa' | 'nota'>('tarefa');
+  const tarefa = mode === 'tarefa';
   const [texto, setTexto] = useState('');
   const [quando, setQuando] = useState(amanha10h);
   const [quem, setQuem] = useState(assignedToId ?? meId);
@@ -128,70 +70,56 @@ function Composer({
   const [pending, start] = useTransition();
   const id = useId();
 
-  const abas = [
-    { key: 'tarefa' as const, label: 'Tarefa', icon: CheckCircle2 },
-    { key: 'nota' as const, label: 'Nota', icon: StickyNote },
-  ];
-
   return (
-    <div className="border-t border-border bg-surface p-4">
-      {noTask && aba === 'tarefa' && (
+    <div className="p-4 pt-2">
+      {noTask && tarefa && (
         <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">Este lead não tem próxima ação. Agende uma tarefa.</p>
       )}
-      <div role="tablist" aria-label="Registrar" className="mb-2 flex gap-4 text-sm">
-        {abas.map((a) => (
-          <button
-            key={a.key}
-            type="button"
-            role="tab"
-            id={`${id}-${a.key}`}
-            aria-selected={aba === a.key}
-            aria-controls={`${id}-painel`}
-            onClick={() => { setAba(a.key); setErro(''); }}
-            className={`inline-flex items-center gap-1.5 border-b-2 pb-1 focus-visible:outline-2 focus-visible:outline-ring ${aba === a.key ? 'border-primary font-medium text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-          >
-            <a.icon className="h-4 w-4" aria-hidden="true" /> {a.label}
-          </button>
-        ))}
-      </div>
-
       <form
-        id={`${id}-painel`}
-        role="tabpanel"
-        aria-labelledby={`${id}-${aba}`}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!texto.trim()) return setErro(aba === 'tarefa' ? 'Escreva o que precisa ser feito.' : 'Escreva a nota.');
+          if (!texto.trim()) return setErro(tarefa ? 'Escreva o que precisa ser feito.' : 'Escreva a nota.');
           start(async () => {
-            const r = aba === 'tarefa'
+            const r = tarefa
               ? await createTaskAction(leadId, { text: texto, due: quando, assignedToId: quem })
               : await addNoteAction(leadId, texto);
             if (!r.ok) return setErro(r.message);
-            setAviso(aba === 'tarefa' ? 'Tarefa agendada.' : 'Nota registrada.');
+            setAviso(tarefa ? 'Tarefa agendada.' : 'Nota registrada.');
             setTexto('');
             setQuando(amanha10h());
             router.refresh();
           });
         }}
       >
-        <label htmlFor={`${id}-texto`} className="sr-only">{aba === 'tarefa' ? 'O que fazer' : 'Nota'}</label>
+        <label htmlFor={`${id}-texto`} className="sr-only">
+          {tarefa ? 'O que fazer' : 'Nota'}
+        </label>
         <textarea
           id={`${id}-texto`}
           value={texto}
-          onChange={(e) => { setTexto(e.target.value); setErro(''); }}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setErro('');
+          }}
           rows={2}
-          maxLength={aba === 'tarefa' ? 300 : 2000}
-          placeholder={aba === 'tarefa' ? 'Ligar para confirmar a avaliação' : 'Escreva uma nota sobre o lead'}
+          maxLength={tarefa ? 300 : 2000}
+          placeholder={tarefa ? 'Ligar para confirmar a avaliação' : 'Escreva uma nota sobre o lead (só a equipe vê)'}
           aria-invalid={erro ? true : undefined}
           aria-describedby={erro ? `${id}-erro` : undefined}
           className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         />
-        {erro && <p id={`${id}-erro`} role="alert" className="mt-1 text-xs text-destructive">{erro}</p>}
+        {erro && (
+          <p id={`${id}-erro`} role="alert" className="mt-1 text-xs text-destructive">
+            {erro}
+          </p>
+        )}
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {aba === 'tarefa' && (
+          {tarefa && (
             <>
-              <label htmlFor={`${id}-quando`} className="sr-only">Quando</label>
+              <label htmlFor={`${id}-quando`} className="sr-only">
+                Quando
+              </label>
               <input
                 id={`${id}-quando`}
                 type="datetime-local"
@@ -199,7 +127,9 @@ function Composer({
                 onChange={(e) => setQuando(e.target.value)}
                 className="h-8 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
               />
-              <label htmlFor={`${id}-quem`} className="sr-only">Responsável pela tarefa</label>
+              <label htmlFor={`${id}-quem`} className="sr-only">
+                Responsável pela tarefa
+              </label>
               <select
                 id={`${id}-quem`}
                 value={quem}
@@ -207,18 +137,22 @@ function Composer({
                 className="h-8 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
               >
                 {team.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </>
           )}
           <span className="flex-1" />
           <button type="submit" disabled={pending} className="btn-primary btn-sm">
-            {pending ? 'Salvando…' : aba === 'tarefa' ? 'Agendar tarefa' : 'Salvar nota'}
+            {pending ? 'Salvando…' : tarefa ? 'Agendar tarefa' : 'Salvar nota'}
           </button>
         </div>
       </form>
-      <p role="status" aria-live="polite" className="sr-only">{aviso}</p>
+      <p role="status" aria-live="polite" className="sr-only">
+        {aviso}
+      </p>
     </div>
   );
 }

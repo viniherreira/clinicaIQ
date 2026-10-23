@@ -50,7 +50,7 @@ test('responder pela tela Conversas e ver na ficha do lead', async ({ page }) =>
   await conversa.getByRole('link', { name: new RegExp(lead.title) }).click();
   await page.waitForURL(/\/crm\/leads\/[^/]+$/);
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /Conversa/ }).click();
+  // Na ficha, a conversa aparece direto, no meio do histórico.
   await expect(page.getByText('Tem horário amanhã?')).toBeVisible();
   await expect(page.getByText(resposta)).toBeVisible();
 });

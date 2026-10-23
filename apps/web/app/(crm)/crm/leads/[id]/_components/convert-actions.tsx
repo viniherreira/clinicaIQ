@@ -27,10 +27,10 @@ export function ConvertActions({
     return (
       <div className="grid grid-cols-2 gap-2">
         <Link href={`/agenda?novo=1&paciente=${patient.id}`} className="btn-primary btn-sm inline-flex items-center justify-center gap-1.5">
-          <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" /> Agendar avaliação
+          <CalendarPlus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Agendar avaliação
         </Link>
         <Link href={`/orcamentos/novo?patientId=${patient.id}`} className="btn-outline btn-sm inline-flex items-center justify-center gap-1.5">
-          <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Novo orçamento
+          <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Novo orçamento
         </Link>
       </div>
     );
@@ -50,10 +50,10 @@ export function ConvertActions({
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <button type="button" disabled={pending} onClick={() => iniciar('agendar')} className="btn-primary btn-sm inline-flex items-center justify-center gap-1.5">
-          <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" /> Agendar avaliação
+          <CalendarPlus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Agendar avaliação
         </button>
         <button type="button" disabled={pending} onClick={() => iniciar('ficha')} className="btn-outline btn-sm inline-flex items-center justify-center gap-1.5">
-          <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> Converter em paciente
+          <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Converter em paciente
         </button>
       </div>
 
@@ -78,7 +78,7 @@ export function ConvertActions({
               }
               className="btn-primary btn-sm inline-flex items-center gap-1.5"
             >
-              <UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> Vincular a este paciente
+              <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Vincular a este paciente
             </button>
             <Link
               href={`/crm/leads/${leadId}/converter${achado.intent === 'agendar' ? '?depois=agendar' : ''}`}

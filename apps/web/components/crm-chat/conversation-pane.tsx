@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Briefcase, Check, Link2, Plus, Search, Stethoscope, X } from 'lucide-react';
+import { ArrowLeft, Briefcase, Check, Link2, MessageCircle, Plus, Search, Stethoscope, X } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
@@ -17,6 +17,8 @@ import {
 } from '@/app/(crm)/crm/conversas/actions';
 import { ChatComposer, type QuickReplyOption } from './chat-composer';
 import { ChatMessages } from './chat-messages';
+import { ComposerModes, type ComposerMode } from './composer-modes';
+import type { TimelineEntry } from '@/crm/timeline';
 import { TemplatePicker } from './template-picker';
 
 /**
@@ -32,6 +34,8 @@ export function ConversationPane({
   compact = false,
   canManage = false,
   headerAction,
+  events,
+  extraModes,
 }: {
   thread: ChatThread;
   quickReplies: QuickReplyOption[];
@@ -43,10 +47,17 @@ export function ConversationPane({
   canManage?: boolean;
   /** Botão extra no cabeçalho (nas Conversas: abrir o lead em tela pequena). */
   headerAction?: React.ReactNode;
+  /** Na ficha do lead: o histórico no meio das mensagens. */
+  events?: TimelineEntry[];
+  /** Na ficha do lead: Nota e Tarefa ao lado do Bate-papo, como no Kommo. */
+  extraModes?: ComposerMode[];
 }) {
   const c = thread.conversation;
   const [retrying, setRetrying] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
+  const composer = (
+    <PaneComposer thread={thread} quickReplies={quickReplies} canManage={canManage} onChanged={onChanged} onAnnounce={setAviso} />
+  );
 
   return (
     <section aria-label={`Conversa com ${c.name}`} className="flex min-h-0 flex-1 flex-col">
@@ -64,8 +75,38 @@ export function ConversationPane({
           setAviso(r.ok ? 'Mensagem na fila de novo.' : r.message);
           onChanged();
         }}
+        events={events}
       />
 
+      {extraModes ? (
+        <ComposerModes modes={[{ key: 'chat', label: 'Bate-papo', icon: MessageCircle, content: composer }, ...extraModes]} />
+      ) : (
+        composer
+      )}
+      <p role="status" aria-live="polite" className="sr-only">
+        {aviso}
+      </p>
+    </section>
+  );
+}
+
+function PaneComposer({
+  thread,
+  quickReplies,
+  canManage,
+  onChanged,
+  onAnnounce,
+}: {
+  thread: ChatThread;
+  quickReplies: QuickReplyOption[];
+  canManage: boolean;
+  onChanged: () => void;
+  onAnnounce: (s: string) => void;
+}) {
+  const c = thread.conversation;
+  const setAviso = onAnnounce;
+  return (
+    <>
       {thread.channel === 'cloud' && !thread.windowOpen && c.status !== 'DECLINED' ? (
         <TemplatePicker
           target={{ conversationId: c.id }}
@@ -105,10 +146,7 @@ export function ConversationPane({
         }
       />
       )}
-      <p role="status" aria-live="polite" className="sr-only">
-        {aviso}
-      </p>
-    </section>
+    </>
   );
 }
 
