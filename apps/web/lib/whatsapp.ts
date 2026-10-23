@@ -545,20 +545,27 @@ async function prepareCloudAppointment(
   const provider: WhatsAppProvider = {
     async sendMessage(p) {
       try {
-        const r = await cloudClient(account).sendTemplate(
-          p.to,
-          modelo.name,
-          modelo.language,
-          params,
-          modelo.buttons.map((b) => b.payload),
-        );
+        const api = cloudClient(account);
+        const crm = await import('@/crm/agenda-mirror');
+        // Paciente escreveu nas últimas 24 horas: sai como mensagem comum com os
+        // mesmos botões, que é grátis e não depende de cartão na Meta. Se a Meta
+        // disser que a janela fechou nesse meio-tempo, vai o modelo aprovado.
+        let r: { id: string } | null = null;
+        if (await crm.patientWindowOpen(m.tenantId, p.to, m.patientId).catch(() => false)) {
+          r = await api
+            .sendButtons(p.to, content, modelo.buttons.map((b) => ({ id: b.payload, title: b.text })))
+            .catch((e) => {
+              if (e instanceof CloudApiError && e.windowClosed) return null;
+              throw e;
+            });
+        }
+        r ??= await api.sendTemplate(p.to, modelo.name, modelo.language, params, modelo.buttons.map((b) => b.payload));
+        const externalId = r.id;
         // Com o CRM, o aviso aparece na conversa do paciente. Falhar aqui não desfaz o envio.
-        await import('@/crm/agenda-mirror')
-          .then(({ mirrorAgendaToCrm }) =>
-            mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId: r.id, buttons: modelo.buttons }),
-          )
+        await crm
+          .mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId, buttons: modelo.buttons })
           .catch((e) => console.error('[agenda] aviso não foi para o CRM', e instanceof Error ? e.message : e));
-        return { success: true, messageId: r.id };
+        return { success: true, messageId: externalId };
       } catch (e) {
         return { success: false, error: e instanceof CloudApiError ? e.userMessage : 'send-failed' };
       }

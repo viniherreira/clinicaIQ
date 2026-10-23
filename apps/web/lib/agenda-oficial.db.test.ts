@@ -285,11 +285,15 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     expect(lembretes.find((l) => l.appointmentId === semana.id)).toMatchObject({ reminderDays: 7, status: 'SENT' });
     expect(lembretes.find((l) => l.appointmentId === amanha.id)).toMatchObject({ reminderDays: 1, status: 'SENT' });
 
-    // Saiu pelo modelo com os botões escolhidos, na ordem dele.
+    // A paciente tocou em Confirmar há pouco (janela de 24 horas aberta): saiu
+    // como mensagem comum com os botões escolhidos, grátis, sem passar pelo modelo.
     const envio = meta.chamadas.find((c) => c.url.includes(`${pn}/messages`));
-    const template = envio?.body?.template as { name: string; components: { type: string; parameters: { payload?: string }[] }[] };
-    expect(template.name).toBe('dc_lembrete_3');
-    expect(template.components.slice(1).map((c) => c.parameters[0].payload)).toEqual(['confirm', 'cancel']);
+    expect(envio?.body?.type).toBe('interactive');
+    const acao = (envio?.body?.interactive as { action: { buttons: { reply: { id: string; title: string } }[] } }).action;
+    expect(acao.buttons.map((b) => b.reply)).toEqual([
+      { id: 'confirm', title: 'Vou sim' },
+      { id: 'cancel', title: 'Não vou poder' },
+    ]);
 
     // No dia seguinte (ou se o cron rodar de novo), não repete.
     expect((await sendDueReminders({ tenantId: tenant.id })).map((r) => r.sent)).toEqual([0, 0]);
