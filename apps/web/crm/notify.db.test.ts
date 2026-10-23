@@ -16,7 +16,8 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
   const { prisma, getTenantClient } = await import('@clinicaiq/db');
   const { ensureDefaultPipeline } = await import('./pipeline');
   const { createLead } = await import('./leads');
-  const { notifyCrm } = await import('./notify');
+  const { notifyCrm, notifyPatientCreated } = await import('./notify');
+  const { conversationHash, encryptPhone } = await import('./phone');
   const { TASK_REAGENDAR } = await import('./automation');
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -51,6 +52,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
 
   afterAll(async () => {
     const t = { tenantId: tenant.id };
+    await prisma.conversation.deleteMany({ where: t });
     await prisma.leadActivity.deleteMany({ where: t });
     await prisma.leadTask.deleteMany({ where: t });
     await prisma.lead.deleteMany({ where: t });
@@ -84,13 +86,13 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     expect((await etapa()).nome).toBe('Avaliação agendada');
   });
 
-  it('cancelou → volta para Em conversa com "Reagendar avaliação", sem duplicar a tarefa', async () => {
+  it('cancelou → Desmarcou com "Reagendar avaliação", sem duplicar a tarefa', async () => {
     await prisma.appointment.update({ where: { id: consulta.id }, data: { status: 'CANCELLED' } });
     const ev = { type: 'appointment.cancelled', patientId: paciente.id, appointmentId: consulta.id } as const;
     await notifyCrm(tenant.id, ev);
     await notifyCrm(tenant.id, ev);
 
-    expect((await etapa()).nome).toBe('Em conversa');
+    expect((await etapa()).nome).toBe('Desmarcou');
     const tarefas = await db.leadTask.findMany({ where: { leadId, completedAt: null } });
     expect(tarefas.map((t) => t.text)).toEqual([TASK_REAGENDAR]);
     expect(tarefas[0]).toMatchObject({ origin: 'AUTOMATION', assignedToId: dono.id });
@@ -138,6 +140,49 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     const eventos = await db.leadActivity.findMany({ where: { leadId, type: 'CLINIC_EVENT' } });
     expect(eventos.length).toBeGreaterThanOrEqual(5);
     expect(eventos.every((e) => e.actorId === null)).toBe(true);
+  });
+
+  it('lead do WhatsApp cadastrado como paciente na agenda: o lead e a conversa viram dele, e o funil anda', async () => {
+    // Chegou pelo WhatsApp: lead em Novo e conversa, sem ficha de paciente.
+    const doWhats = await createLead(db, { tenantId: tenant.id, userId: dono.id }, { name: 'Letícia', phone: '11969254417', source: 'WHATSAPP' });
+    if (!doWhats.ok) throw new Error(doWhats.message);
+    const conversa = await db.conversation.create({
+      data: { tenantId: tenant.id, phoneHash: conversationHash('5511969254417', tenant.id), phoneEncrypted: encryptPhone('5511969254417', tenant.id), leadId: doWhats.leadId, status: 'ACTIVE' },
+    });
+    // A recepção cadastra na agenda, com o telefone escrito do jeito dela.
+    const leticia = await prisma.patient.create({
+      data: { tenantId: tenant.id, controlNumber: 2, name: 'Letícia Oliveira', phoneEncrypted: encryptPhone('(11) 96925-4417', tenant.id), lgpdConsentAt: new Date() },
+    });
+    await notifyPatientCreated(tenant.id, leticia.id);
+    expect(await db.lead.findFirst({ where: { id: doWhats.leadId } })).toMatchObject({ patientId: leticia.id, name: 'Letícia Oliveira' });
+    expect(await db.conversation.findFirst({ where: { id: conversa.id } })).toMatchObject({ patientId: leticia.id, leadId: doWhats.leadId });
+
+    const marcada = await prisma.appointment.create({
+      data: { tenantId: tenant.id, patientId: leticia.id, professionalId: profissional.id, startTime: emDias(2), endTime: emDias(2.02) },
+    });
+    await notifyCrm(tenant.id, { type: 'appointment.created', patientId: leticia.id, appointmentId: marcada.id });
+    const estagio = async () => (await db.lead.findFirst({ where: { id: doWhats.leadId }, include: { stage: true } }))!.stage.name;
+    expect(await estagio()).toBe('Avaliação agendada');
+
+    await prisma.appointment.update({ where: { id: marcada.id }, data: { status: 'CANCELLED' } });
+    await notifyCrm(tenant.id, { type: 'appointment.cancelled', patientId: leticia.id, appointmentId: marcada.id });
+    expect(await estagio()).toBe('Desmarcou');
+    // Nenhum lead novo foi aberto para a mesma pessoa.
+    expect(await db.lead.count({ where: { patientId: leticia.id } })).toBe(1);
+  });
+
+  it('paciente cadastrado sem passar pelo aviso: ao agendar, o lead do mesmo número é achado', async () => {
+    const doWhats = await createLead(db, { tenantId: tenant.id, userId: dono.id }, { name: 'Bruno', phone: '11955554444', source: 'WHATSAPP' });
+    if (!doWhats.ok) throw new Error(doWhats.message);
+    const bruno = await prisma.patient.create({
+      data: { tenantId: tenant.id, controlNumber: 3, name: 'Bruno', phoneEncrypted: encryptPhone('11955554444', tenant.id), lgpdConsentAt: new Date() },
+    });
+    const marcada = await prisma.appointment.create({
+      data: { tenantId: tenant.id, patientId: bruno.id, professionalId: profissional.id, startTime: emDias(4), endTime: emDias(4.02) },
+    });
+    await notifyCrm(tenant.id, { type: 'appointment.created', patientId: bruno.id, appointmentId: marcada.id });
+    const l = await db.lead.findFirst({ where: { id: doWhats.leadId }, include: { stage: true } });
+    expect(l).toMatchObject({ patientId: bruno.id, stage: { name: 'Avaliação agendada' } });
   });
 
   it('com o CRM desligado, nada acontece', async () => {

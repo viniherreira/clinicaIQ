@@ -38,7 +38,7 @@ export async function waitAnnounced(page: Page, text: string | RegExp) {
   await expect(page.getByRole('status').filter({ hasText: text })).toBeAttached({ timeout: 30_000 });
 }
 
-const COLUNAS = ['Novo', 'Em conversa', 'Avaliação agendada', 'Em negociação'];
+const COLUNAS = ['Novo', 'Em conversa', 'Avaliação agendada', 'Desmarcou', 'Em negociação'];
 
 /** Em que coluna do quadro o lead está (ou "fora do quadro", se ganho/perdido). */
 export async function columnOf(page: Page, title: string): Promise<string> {

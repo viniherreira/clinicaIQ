@@ -42,7 +42,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
   it('subir e descer reordena as colunas', async () => {
     const retorno = (await db.pipelineStage.findFirst({ where: { name: 'Retorno' } }))!;
     await s.moveStage(db, tenant.id, retorno.id, -1);
-    expect(await colunas()).toEqual(['Novo', 'Em conversa', 'Avaliação agendada', 'Retorno', 'Em negociação']);
+    expect(await colunas()).toEqual(['Novo', 'Em conversa', 'Avaliação agendada', 'Desmarcou', 'Retorno', 'Em negociação']);
     await s.moveStage(db, tenant.id, (await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))!.id, -1);
     expect((await colunas())[0]).toBe('Novo');
   });

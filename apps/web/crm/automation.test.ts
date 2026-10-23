@@ -70,11 +70,28 @@ describe('avançar', () => {
 });
 
 describe('voltar no cancelamento e na falta', () => {
-  it('cancelou: volta para Em conversa e cria "Reagendar avaliação"', () => {
+  it('cancelou: vai para Desmarcou e cria "Reagendar avaliação"', () => {
     expect(planForEvent(ctx('Avaliação agendada'), ev.cancelou)).toEqual({
-      moveTo: 'Em conversa',
+      moveTo: 'Desmarcou',
       tasks: [{ text: TASK_REAGENDAR, inDays: 1 }],
     });
+  });
+
+  it('faltou: também vai para Desmarcou', () => {
+    expect(planForEvent(ctx('Avaliação agendada'), ev.faltou).moveTo).toBe('Desmarcou');
+  });
+
+  it('agendou de novo: sai de Desmarcou e volta para Avaliação agendada', () => {
+    expect(planForEvent(ctx('Desmarcou'), ev.agendou)).toEqual({
+      moveTo: 'Avaliação agendada',
+      tasks: [],
+      completes: [TASK_REAGENDAR, TASK_FALTOU],
+    });
+  });
+
+  it('funil sem Desmarcou: volta uma coluna, como antes', () => {
+    const antigo = stages.filter((s) => s.role !== 'CANCELLED');
+    expect(planForEvent({ ...ctx('Avaliação agendada'), stages: antigo }, ev.cancelou).moveTo).toBe('Em conversa');
   });
 
   it('faltou: mesma coisa, com o texto da falta', () => {

@@ -3,9 +3,11 @@
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient, encrypt, decrypt } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { writeBlocked } from '@/lib/access';
+import { notifyPatientCreated } from '@/crm/notify';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -344,6 +346,8 @@ export async function createPatient(
       entityId: patient.id,
     },
   });
+  // Já conversava pelo WhatsApp? O lead e a conversa do CRM passam a ser deste paciente.
+  after(() => notifyPatientCreated(tenantId, patient.id));
 
   revalidatePath('/pacientes');
   return { success: true, patientId: patient.id };
