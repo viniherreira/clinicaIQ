@@ -552,6 +552,12 @@ async function prepareCloudAppointment(
           params,
           modelo.buttons.map((b) => b.payload),
         );
+        // Com o CRM, o aviso aparece na conversa do paciente. Falhar aqui não desfaz o envio.
+        await import('@/crm/agenda-mirror')
+          .then(({ mirrorAgendaToCrm }) =>
+            mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId: r.id, buttons: modelo.buttons }),
+          )
+          .catch((e) => console.error('[agenda] aviso não foi para o CRM', e instanceof Error ? e.message : e));
         return { success: true, messageId: r.id };
       } catch (e) {
         return { success: false, error: e instanceof CloudApiError ? e.userMessage : 'send-failed' };

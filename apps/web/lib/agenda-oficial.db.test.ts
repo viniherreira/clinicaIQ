@@ -69,6 +69,9 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
   afterEach(() => vi.unstubAllGlobals());
   afterAll(async () => {
     const t = { tenantId: tenant.id };
+    await prisma.chatMessage.deleteMany({ where: t });
+    await prisma.conversation.deleteMany({ where: t });
+    await prisma.subscription.deleteMany({ where: t });
     await prisma.whatsAppMessage.deleteMany({ where: t });
     await prisma.appointment.deleteMany({ where: t });
     await prisma.patient.deleteMany({ where: t });
@@ -280,5 +283,34 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
       ],
     });
     expect((await prisma.appointment.findUniqueOrThrow({ where: { id: alvo! } })).status).toBe('CANCELLED');
+  });
+  it('com o CRM, o lembrete aparece na conversa do paciente, com os botões', async () => {
+    const meta = metaFalsa();
+    vi.stubGlobal('fetch', meta.fetchFalso);
+    await prisma.subscription.create({
+      data: { tenantId: tenant.id, tier: 'PROFISSIONAL', status: 'ACTIVE', currentPeriodEnd: new Date('2099-01-01'), crmEnabled: true },
+    });
+    const dia = format(addDays(parseISO(clinicToday()), 2), 'yyyy-MM-dd');
+    const outra = await prisma.appointment.create({
+      data: {
+        tenantId: tenant.id,
+        patientId: paciente.id,
+        professionalId: profissional.id,
+        startTime: new Date(`${dia}T10:00:00.000Z`),
+        endTime: new Date(`${dia}T10:30:00.000Z`),
+      },
+    });
+    expect((await dispatchAppointmentMessage(outra.id, 'reminder', { reminderDays: 2 })).success).toBe(true);
+
+    const msg = await prisma.chatMessage.findFirstOrThrow({ where: { tenantId: tenant.id, origin: 'AUTOMATION' } });
+    expect(msg).toMatchObject({ direction: 'OUTBOUND', status: 'SENT' });
+    expect(msg.externalId).toMatch(/^wamid\./);
+    expect(msg.buttons).toEqual([
+      { id: 'confirm', title: 'Vou sim' },
+      { id: 'cancel', title: 'Não vou poder' },
+    ]);
+    const conversa = await prisma.conversation.findUniqueOrThrow({ where: { id: msg.conversationId } });
+    // Paciente conhecido: a conversa já nasce ligada a ele, fora da Entrada, e sem "não lida".
+    expect(conversa).toMatchObject({ patientId: paciente.id, status: 'ACTIVE', unreadCount: 0 });
   });
 });

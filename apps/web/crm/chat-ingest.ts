@@ -35,13 +35,16 @@ export function previewText(kind: string, text: string | null): string {
 export interface IngestInput {
   externalId: string;
   direction: 'INBOUND' | 'OUTBOUND';
-  origin: 'CONTACT' | 'PHONE';
+  /** AUTOMATION: aviso da agenda que já saiu pela API oficial. */
+  origin: 'CONTACT' | 'PHONE' | 'AUTOMATION';
   phone: string;
   contactName?: string | null;
   kind: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'DOCUMENT' | 'STICKER' | 'LOCATION' | 'CONTACT' | 'OTHER';
   text: string | null;
   mediaRef?: string | null;
   mimeType?: string | null;
+  /** Botões que foram junto (aviso da agenda), para a conversa mostrar. */
+  buttons?: { id: string; title: string }[];
   at: Date;
 }
 
@@ -91,6 +94,7 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
         at: input.at,
         mediaRef: input.mediaRef ?? null,
         mimeType: input.mimeType ?? null,
+        ...(input.buttons?.length ? { buttons: input.buttons } : {}),
       },
     ],
     skipDuplicates: true,
@@ -112,8 +116,9 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
     }
     if (name && name !== conv.contactName) data.contactName = name;
     if (conv.status === 'DECLINED') data.status = 'INBOX';
-  } else if (newest) {
+  } else if (newest && input.origin === 'PHONE') {
     // Respondido pelo celular da clínica: alguém leu, e o robô sai da conversa.
+    // O aviso automático da agenda não conta como resposta de ninguém.
     data.unreadCount = 0;
     data.awaitingReply = false;
     Object.assign(data, { botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null });
