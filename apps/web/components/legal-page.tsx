@@ -27,6 +27,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
             '[&_h2]:mt-10 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground',
             '[&_h3]:mt-6 [&_h3]:font-semibold [&_h3]:text-foreground',
             '[&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-6',
+            '[&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:pl-6',
             '[&_a]:font-medium [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2',
           ].join(' ')}
         >

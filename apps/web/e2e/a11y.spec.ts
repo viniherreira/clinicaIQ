@@ -19,7 +19,7 @@ test.describe('acessibilidade — WCAG 2.1 AA', () => {
     expect(results.violations).toEqual([]);
   });
 
-  for (const path of ['/privacidade', '/termos']) {
+  for (const path of ['/privacidade', '/termos', '/ajuda/conectar-whatsapp']) {
     test(`${path} sem violações de acessibilidade`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
