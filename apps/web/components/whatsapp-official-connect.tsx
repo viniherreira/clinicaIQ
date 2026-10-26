@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { CircleHelp } from 'lucide-react';
 
 /**
  * Conectar a API oficial do WhatsApp: o cadastro incorporado da Meta (o botão
@@ -134,9 +135,21 @@ export function EmbeddedSignup({
           histórico recente vem junto.
         </span>
       </label>
-      <button type="button" onClick={() => void abrir()} disabled={estado !== 'parado'} className="btn-primary btn-md">
-        {estado === 'salvando' ? 'Conectando…' : estado === 'aberto' ? 'Continue na janela da Meta…' : 'Conectar com a Meta'}
-      </button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button type="button" onClick={() => void abrir()} disabled={estado !== 'parado'} className="btn-primary btn-md">
+          {estado === 'salvando' ? 'Conectando…' : estado === 'aberto' ? 'Continue na janela da Meta…' : 'Conectar com a Meta'}
+        </button>
+        <a
+          href="/ajuda/conectar-whatsapp"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <CircleHelp className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Como conectar: passo a passo
+          <span className="sr-only"> (abre em nova aba)</span>
+        </a>
+      </div>
     </div>
   );
 }

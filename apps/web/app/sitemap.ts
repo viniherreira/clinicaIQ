@@ -13,5 +13,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE}/sign-up`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${SITE}/privacidade`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${SITE}/termos`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE}/ajuda/conectar-whatsapp`, changeFrequency: 'monthly', priority: 0.4 },
   ];
 }

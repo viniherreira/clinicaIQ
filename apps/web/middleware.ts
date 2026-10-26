@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/orcamento/(.*)',
   '/privacidade',
   '/termos',
+  '/ajuda/(.*)', // passo a passo para clientes: o suporte manda o link antes do login
   '/sitemap.xml', // Google Search Console
   '/robots.txt',
   '/agendar/(.*)', // agendamento online: público, sem login
