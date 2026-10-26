@@ -38,6 +38,8 @@ test('responder pela tela Conversas e ver na ficha do lead', async ({ page }) =>
   const conversa = page.getByRole('region', { name: `Conversa com ${lead.name}` });
   await expect(conversa.getByText('Tem horário amanhã?')).toBeVisible();
   await expect(conversa.getByRole('link', { name: new RegExp(lead.title) })).toBeVisible();
+  // A página não rola: os textos de leitor de tela da lista comprida não podem esticá-la.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
 
   const resposta = `Tenho às 15h ${Date.now()}`;
   await conversa.getByRole('combobox', { name: 'Mensagem' }).fill(resposta);

@@ -9,18 +9,20 @@ import { approvedTemplatesAction, sendTemplateAction, type TemplateOption } from
 const preview = (body: string, values: string[]) => body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => values[Number(n) - 1] || `{{${n}}}`);
 
 /**
- * Fora da janela de 24 horas (API oficial), o lugar da caixa de texto: escolher
- * um modelo aprovado, preencher as variáveis e mandar.
+ * Fora da janela de 24 horas (API oficial): escolher um modelo aprovado,
+ * preencher as variáveis e mandar. Com `onCancel`, dá para voltar à caixa de texto.
  */
 export function TemplatePicker({
   target,
   contactName,
   onSent,
+  onCancel,
   canManage = false,
 }: {
   target: { conversationId: string } | { leadId: string };
   contactName: string | null;
   onSent: (conversationId: string) => void;
+  onCancel?: () => void;
   canManage?: boolean;
 }) {
   const id = useId();
@@ -36,6 +38,11 @@ export function TemplatePicker({
 
   const t = templates?.find((x) => x.id === escolhido) ?? null;
   const primeiroNome = (contactName ?? '').trim().split(/\s+/)[0] ?? '';
+  const voltar = onCancel && (
+    <button type="button" onClick={onCancel} className="btn-ghost btn-sm">
+      Voltar
+    </button>
+  );
 
   return (
     <div className="border-t border-border bg-surface p-3">
@@ -47,16 +54,19 @@ export function TemplatePicker({
       {templates === null ? (
         <p className="text-xs text-muted-foreground">Carregando modelos…</p>
       ) : templates.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Nenhum modelo aprovado ainda.{' '}
-          {canManage ? (
-            <Link href="/crm/whatsapp" className="font-medium text-primary underline underline-offset-2">
-              Criar um modelo
-            </Link>
-          ) : (
-            'Peça ao responsável pelo CRM para criar um.'
-          )}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="mr-auto text-xs text-muted-foreground">
+            Nenhum modelo aprovado ainda.{' '}
+            {canManage ? (
+              <Link href="/crm/automacoes/modelos" className="font-medium text-primary underline underline-offset-2">
+                Criar um modelo
+              </Link>
+            ) : (
+              'Peça ao responsável pelo CRM para criar um.'
+            )}
+          </p>
+          {voltar}
+        </div>
       ) : (
         <form
           className="space-y-2"
@@ -116,9 +126,12 @@ export function TemplatePicker({
               {erro}
             </p>
           )}
-          <button type="submit" disabled={!t || enviando} className="btn-primary btn-sm">
-            <SendHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> {enviando ? 'Enviando…' : 'Enviar modelo'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="submit" disabled={!t || enviando} className="btn-primary btn-sm">
+              <SendHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> {enviando ? 'Enviando…' : 'Enviar modelo'}
+            </button>
+            {voltar}
+          </div>
         </form>
       )}
     </div>

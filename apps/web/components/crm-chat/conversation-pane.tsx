@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bot, Briefcase, Check, Clock, Link2, MessageCircle, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Check, Clock, FileText, Link2, MessageCircle, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
@@ -121,7 +121,11 @@ export function ConversationPane({
   );
 }
 
-/** A caixa de escrever: modelo (janela fechada) ou mensagem, com o robô que está conversando. */
+/**
+ * A caixa de escrever, com o robô que está conversando. Fora da janela de 24 h
+ * (API oficial) ela continua igual, como no Kommo: ao enviar, o erro explica e
+ * oferece mandar um modelo aprovado.
+ */
 function PaneComposer({
   thread,
   quickReplies,
@@ -139,62 +143,83 @@ function PaneComposer({
 }) {
   const c = thread.conversation;
   const setAviso = onAnnounce;
+  const fechada = thread.channel === 'cloud' && !thread.windowOpen && c.status !== 'DECLINED';
+  // O envio voltou com erro com a janela fechada: oferecer o modelo.
+  const [pedirModelo, setPedirModelo] = useState(false);
+  const [modelo, setModelo] = useState(false);
+  const conferir = (r: { ok: true } | { ok: false; message: string }) => {
+    if (!r.ok && fechada) setPedirModelo(true);
+    return r;
+  };
+
+  const escolhendo = fechada && modelo;
+
   return (
     <>
-      {thread.channel === 'cloud' && !thread.windowOpen && c.status !== 'DECLINED' ? (
+      {escolhendo && (
         <TemplatePicker
           target={{ conversationId: c.id }}
           contactName={c.name === c.phoneMasked ? null : c.name}
           canManage={canManage}
+          onCancel={() => setModelo(false)}
           onSent={() => {
+            setModelo(false);
+            setPedirModelo(false);
             setAviso('Modelo enviado para a fila do WhatsApp.');
             onChanged();
           }}
         />
-      ) : (
-      <>
-      {thread.bot && c.status !== 'DECLINED' && (
-        <BotBanner
-          conversationId={c.id}
-          name={thread.bot.name}
-          onStopped={() => {
-            setAviso(`Robô ${thread.bot?.name ?? ''} parado. A conversa está com a equipe.`);
-            onChanged();
+      )}
+      {/* Escondida, não desmontada: ao voltar do modelo, o que foi escrito continua lá. */}
+      <div hidden={escolhendo}>
+        {thread.bot && c.status !== 'DECLINED' && (
+          <BotBanner
+            conversationId={c.id}
+            name={thread.bot.name}
+            onStopped={() => {
+              setAviso(`Robô ${thread.bot?.name ?? ''} parado. A conversa está com a equipe.`);
+              onChanged();
+            }}
+          />
+        )}
+        <ChatComposer
+          quickReplies={quickReplies}
+          canManage={canManage}
+          robots={robots}
+          // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
+          contactName={c.name === c.phoneMasked ? null : c.name}
+          disabled={c.status === 'DECLINED'}
+          disabledReason="Conversa recusada"
+          onSend={async (text) => {
+            const r = await sendChatAction(c.id, text);
+            if (r.ok) {
+              setAviso('Mensagem enviada para a fila do WhatsApp.');
+              onChanged();
+            }
+            return conferir(r);
           }}
-        />
-      )}
-      <ChatComposer
-        quickReplies={quickReplies}
-        canManage={canManage}
-        robots={robots}
-        // O nome do cadastro vence o do WhatsApp ("Mari"); sem nenhum, a resposta fica sem nome.
-        contactName={c.name === c.phoneMasked ? null : c.name}
-        disabled={c.status === 'DECLINED'}
-        disabledReason="Conversa recusada"
-        onSend={async (text) => {
-          const r = await sendChatAction(c.id, text);
-          if (r.ok) {
-            setAviso('Mensagem enviada para a fila do WhatsApp.');
-            onChanged();
-          }
-          return r;
-        }}
-        onSendMedia={
-          thread.mediaOk
-            ? async (form) => {
-                const r = await sendMediaAction(c.id, form);
-                if (r.ok) {
-                  setAviso('Arquivo enviado para a fila do WhatsApp.');
-                  onChanged();
+          onSendMedia={
+            thread.mediaOk
+              ? async (form) => {
+                  const r = await sendMediaAction(c.id, form);
+                  if (r.ok) {
+                    setAviso('Arquivo enviado para a fila do WhatsApp.');
+                    onChanged();
+                  }
+                  return conferir(r);
                 }
-                return r;
-              }
-            : undefined
-        }
-      />
-      {thread.channel === 'cloud' && thread.windowEndsAt && <SessionTimer endsAt={thread.windowEndsAt} />}
-      </>
-      )}
+              : undefined
+          }
+        />
+        {fechada && pedirModelo && (
+          <div className="flex justify-end bg-surface px-3 pb-2">
+            <button type="button" onClick={() => setModelo(true)} className="btn-outline btn-sm">
+              <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Enviar um modelo aprovado
+            </button>
+          </div>
+        )}
+        {thread.channel === 'cloud' && thread.windowEndsAt && <SessionTimer endsAt={thread.windowEndsAt} />}
+      </div>
     </>
   );
 }
