@@ -327,7 +327,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'su
   return (
     <div className="rounded-lg bg-surface-alt p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-0.5 text-xl font-semibold tracking-tight ${tone === 'success' ? 'text-success' : ''}`}>{value}</p>
+      <p className={`mt-0.5 text-xl font-semibold tracking-tight ${tone === 'success' ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{value}</p>
     </div>
   );
 }

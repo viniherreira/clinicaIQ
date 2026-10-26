@@ -81,8 +81,11 @@ export async function AppShell({
       ? { current: unidades.current.id, options: unidades.allowed.map((u) => ({ id: u.id, name: u.name, address: u.address })) }
       : null;
 
+  // `relative` + `overflow-clip`: os textos só para leitor de tela (sr-only, absolutos)
+  // dentro das listas longas não podem esticar a página — a tela de Conversas
+  // ficava com uma rolagem enorme e vazia embaixo.
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-clip bg-background">
       <AppSidebar
         clinicName={tenant.name}
         role={role}
