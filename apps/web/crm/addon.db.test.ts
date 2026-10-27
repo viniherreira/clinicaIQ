@@ -62,8 +62,9 @@ describe.skipIf(!process.env.DATABASE_URL)('CRM adicional (banco)', async () => 
     expect(await syncBillingValue(tenant.id, asaas)).toEqual({ sent: false, reason: 'unchanged' });
   });
 
-  it('profissional não ganha acesso; recepção ganha', async () => {
-    expect((await setCrmSeat(tenant.id, dono.id, dentista.id, true)).ok).toBe(false);
+  it('o CRM é da equipe toda: profissional e recepção ganham acesso', async () => {
+    expect(await setCrmSeat(tenant.id, dono.id, dentista.id, true)).toEqual({ ok: true });
+    expect(await setCrmSeat(tenant.id, dono.id, dentista.id, false)).toEqual({ ok: true });
     expect(await setCrmSeat(tenant.id, dono.id, recepcao.id, true)).toEqual({ ok: true });
   });
 

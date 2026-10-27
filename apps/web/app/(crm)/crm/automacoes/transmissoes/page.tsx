@@ -3,7 +3,6 @@ import { Megaphone, Plus } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
 import { broadcastStats } from '@/crm/broadcasts';
 import { formatDue } from '@/crm/format';
-import { can } from '@/lib/permissions';
 import { BROADCAST_STATUS, StatsGrid } from './_components/stats';
 
 export const metadata = { title: 'Transmissões · DreamClin' };
@@ -17,7 +16,7 @@ export default async function TransmissoesPage() {
     select: { id: true, name: true, status: true, scheduledAt: true, startedAt: true, createdAt: true, template: { select: { name: true } } },
   });
   const stats = await Promise.all(list.map((b) => broadcastStats(ctx.db, b.id)));
-  const pode = can(ctx.role, 'crm_config');
+  const pode = ctx.manager;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">

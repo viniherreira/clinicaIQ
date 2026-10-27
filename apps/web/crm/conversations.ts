@@ -5,6 +5,7 @@ import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
+import { conversationScope, type Viewer } from './scope-rules';
 
 /**
  * As conversas do WhatsApp no CRM. O gateway grava o que entra e sai da linha
@@ -97,7 +98,7 @@ export async function classifyConversation(
     ? await db.lead.findFirst({
         where: { phoneHash: { in: leadHashesForChat(phone, tenantId) }, ...OPEN_LEAD },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, patientId: true },
+        select: { id: true, patientId: true, assignedToId: true },
       })
     : null;
   const patientId = lead?.patientId ?? (phone ? await findPatientForChat(db, tenantId, phone) : null);
@@ -110,6 +111,8 @@ export async function classifyConversation(
       classifiedAt: now,
       leadId: lead?.id ?? null,
       patientId,
+      // A conversa fica com quem já atende o negócio.
+      ...(lead?.assignedToId ? { assignedToId: lead.assignedToId } : {}),
       ...(known && conv.status === 'INBOX' ? { status: 'ACTIVE' as const } : {}),
     },
   });
@@ -125,8 +128,8 @@ export async function classifyPending(db: TenantPrismaClient, tenantId: string):
 // ─── Listar ───────────────────────────────────────────────────────────────────
 
 /** `inbox` (a antiga Entrada) fica só para consulta interna: número novo já vira lead. */
-export type InboxTab = 'all' | 'mine' | 'unanswered' | 'inbox';
-export const INBOX_TABS: readonly InboxTab[] = ['all', 'mine', 'unanswered'];
+export type InboxTab = 'all' | 'mine' | 'unassigned' | 'unanswered' | 'inbox';
+export const INBOX_TABS: readonly InboxTab[] = ['all', 'mine', 'unassigned', 'unanswered'];
 
 export interface ConversationSummary {
   id: string;
@@ -145,6 +148,8 @@ export interface ConversationSummary {
   patient: { id: string; name: string } | null;
   /** As tags do lead, na ordem do nome (aparecem na lista, como no Kommo). */
   tags: { id: string; name: string; color: string }[];
+  /** Quem atende a conversa (`crm/assignment.ts`). */
+  assignedTo: { id: string; name: string } | null;
 }
 
 const summaryInclude = {
@@ -162,6 +167,7 @@ const summaryInclude = {
     },
   },
   patient: { select: { id: true, name: true } },
+  assignedTo: { select: { id: true, name: true } },
 } satisfies Prisma.ConversationInclude;
 
 type SummaryRow = Prisma.ConversationGetPayload<{ include: typeof summaryInclude }>;
@@ -193,20 +199,27 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
       : null,
     patient: r.patient,
     tags: (lead?.tags ?? []).map((t) => t.tag).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    assignedTo: r.assignedTo,
   };
 }
 
 export function conversationWhere(
-  ctx: { tenantId: string; userId: string },
+  ctx: { tenantId: string } & Viewer,
   tab: InboxTab,
   q: string,
   tagId: string | null = null,
 ): Prisma.ConversationWhereInput {
   const where: Prisma.ConversationWhereInput = { status: { not: 'DECLINED' } };
+  const and: Prisma.ConversationWhereInput[] = [];
+  // Atendente "só os dele": as suas e as sem responsável.
+  const escopo = conversationScope(ctx);
+  if (escopo) and.push(escopo);
   // Filtro por tag: só conversas ligadas a um lead com a tag.
-  if (tagId) where.AND = [{ lead: { deletedAt: null, tags: { some: { tagId } } } }];
+  if (tagId) and.push({ lead: { deletedAt: null, tags: { some: { tagId } } } });
+  if (and.length) where.AND = and;
   if (tab === 'inbox') where.status = 'INBOX';
-  if (tab === 'mine') where.lead = { assignedToId: ctx.userId };
+  if (tab === 'mine') where.assignedToId = ctx.userId;
+  if (tab === 'unassigned') where.assignedToId = null;
   if (tab === 'unanswered') where.awaitingReply = true;
 
   const term = q.trim().slice(0, 80);
@@ -226,7 +239,7 @@ export function conversationWhere(
 
 export async function listConversations(
   db: TenantPrismaClient,
-  ctx: { tenantId: string; userId: string },
+  ctx: { tenantId: string } & Viewer,
   tab: InboxTab,
   q = '',
   take = 60,
@@ -262,12 +275,19 @@ function previewAuthor(m: { direction: string; origin: string; name: string | nu
 }
 
 /** Os números das abas e do menu. */
-export async function inboxCounts(db: TenantPrismaClient): Promise<{ unread: number; inbox: number }> {
-  const [unread, inbox] = await Promise.all([
-    db.conversation.count({ where: { status: { not: 'DECLINED' }, unreadCount: { gt: 0 } } }),
-    db.conversation.count({ where: { status: 'INBOX' } }),
+export async function inboxCounts(
+  db: TenantPrismaClient,
+  viewer?: Viewer,
+): Promise<{ unread: number; inbox: number; mine: number; unassigned: number }> {
+  const escopo = viewer ? conversationScope(viewer) : null;
+  const base: Prisma.ConversationWhereInput = { status: { not: 'DECLINED' }, ...(escopo ? { AND: [escopo] } : {}) };
+  const [unread, inbox, mine, unassigned] = await Promise.all([
+    db.conversation.count({ where: { ...base, unreadCount: { gt: 0 } } }),
+    db.conversation.count({ where: { ...base, status: 'INBOX' } }),
+    viewer ? db.conversation.count({ where: { ...base, assignedToId: viewer.userId, unreadCount: { gt: 0 } } }) : 0,
+    db.conversation.count({ where: { ...base, assignedToId: null } }),
   ]);
-  return { unread, inbox };
+  return { unread, inbox, mine, unassigned };
 }
 
 // ─── Abrir ────────────────────────────────────────────────────────────────────
@@ -315,8 +335,11 @@ export async function loadThread(
   db: TenantPrismaClient,
   tenantId: string,
   conversationId: string,
+  /** Quem olha: o Atendente "só os dele" não abre conversa de outra pessoa. */
+  viewer?: Viewer,
 ): Promise<ChatThread | null> {
-  const conv = await db.conversation.findFirst({ where: { id: conversationId }, include: summaryInclude });
+  const escopo = viewer ? conversationScope(viewer) : null;
+  const conv = await db.conversation.findFirst({ where: { id: conversationId, ...(escopo ? { AND: [escopo] } : {}) }, include: summaryInclude });
   if (!conv) return null;
   const rows = await db.chatMessage.findMany({
     where: { conversationId },
@@ -646,11 +669,20 @@ export async function linkConversation(
   if (!conv) return { ok: false, message: 'Conversa não encontrada.' };
 
   if ('leadId' in target) {
-    const lead = await db.lead.findFirst({ where: { id: target.leadId, deletedAt: null }, select: { id: true, patientId: true } });
+    const lead = await db.lead.findFirst({
+      where: { id: target.leadId, deletedAt: null },
+      select: { id: true, patientId: true, assignedToId: true },
+    });
     if (!lead) return { ok: false, message: 'Lead não encontrado.' };
     await db.conversation.update({
       where: { id: conv.id, tenantId: conv.tenantId },
-      data: { leadId: lead.id, patientId: lead.patientId ?? undefined, status: 'ACTIVE', classifiedAt: new Date() },
+      data: {
+        leadId: lead.id,
+        patientId: lead.patientId ?? undefined,
+        status: 'ACTIVE',
+        classifiedAt: new Date(),
+        ...(lead.assignedToId ? { assignedToId: lead.assignedToId } : {}),
+      },
     });
     return { ok: true };
   }

@@ -12,7 +12,6 @@ import {
   tagCounts,
   type ListStatus,
 } from '@/crm/board-data';
-import { can } from '@/lib/permissions';
 import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
 import { COLUMNS_COOKIE, parseColumns } from '@/crm/list-columns';
@@ -80,7 +79,7 @@ export default async function LeadsPage({
         meId={ctx.userId}
         summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
         pipelines={basics.pipelines}
-        canConfig={can(ctx.role, 'crm_config')}
+        canConfig={ctx.manager}
         today={clinicToday()}
       />
 
@@ -111,7 +110,7 @@ export default async function LeadsPage({
         initialColumns={colunas}
         fields={basics.fields}
         pipelines={basics.pipelines}
-        bulk={{ team: basics.team, tags: basics.tags, lostReasons: basics.lostReasons, canDelete: can(ctx.role, 'crm_config') }}
+        bulk={{ team: basics.team, tags: basics.tags, lostReasons: basics.lostReasons, canDelete: ctx.manager }}
         showClosed={mostraFechado}
         order={order}
         sortHrefs={{

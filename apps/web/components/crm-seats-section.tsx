@@ -6,7 +6,7 @@ import { CRM_ELIGIBLE_ROLES } from '@/crm/billing';
 import { formatCents } from '@/crm/format';
 import { CrmSeatToggle } from './crm-addon-controls';
 
-const PAPEL: Record<string, string> = { OWNER: 'Proprietário', ADMIN: 'Administrador', RECEPTIONIST: 'Recepção' };
+const PAPEL: Record<string, string> = { OWNER: 'Proprietário', ADMIN: 'Administrador', RECEPTIONIST: 'Recepção', PROFESSIONAL: 'Profissional' };
 
 /**
  * "Acesso ao CRM" na aba Equipe: quem da equipe entra no CRM. O plano com CRM
@@ -33,7 +33,8 @@ export async function CrmSeatsSection() {
       <section aria-labelledby="crm-acesso" className="rounded-xl border border-border bg-surface p-4 text-sm shadow-card">
         <h2 id="crm-acesso" className="font-semibold">Acesso ao CRM</h2>
         <p className="mt-1 text-muted-foreground">
-          Incluído na cortesia: toda a equipe com perfil de dono, administração ou recepção entra no CRM. Profissionais não usam o CRM.
+          Incluído na cortesia: toda a equipe entra no CRM. O cargo de cada um e a distribuição de leads ficam em{' '}
+          <Link href="/crm/equipe" className="text-primary hover:underline">CRM › Equipe e distribuição</Link>.
         </p>
       </section>
     );
@@ -55,7 +56,8 @@ export async function CrmSeatsSection() {
     <section aria-labelledby="crm-acesso" className="rounded-xl border border-border bg-surface p-4 shadow-card">
       <h2 id="crm-acesso" className="text-sm font-semibold">Acesso ao CRM</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Quem tem a chave ligada entra no CRM{a.status === 'paid' ? ' e conta na mensalidade' : ''}. Profissionais não usam o CRM.
+        Quem tem a chave ligada entra no CRM{a.status === 'paid' ? ' e conta na mensalidade' : ''}. Cargos e distribuição de leads ficam em{' '}
+        <Link href="/crm/equipe" className="text-primary hover:underline">CRM › Equipe e distribuição</Link>.
       </p>
       <ul className="mt-3 divide-y divide-border">
         {pessoas.map((p) => (

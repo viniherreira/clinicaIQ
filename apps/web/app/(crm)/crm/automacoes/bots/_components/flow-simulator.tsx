@@ -34,7 +34,7 @@ export function FlowSimulator({ doc, refs, onActive, onClose }: { doc: FlowDoc; 
       case 'untag':
         return `Tag “${nome(refs.tags, e.tagId)}” sai do lead`;
       case 'assign':
-        return `Responsável: ${nome(refs.team, e.userId)}`;
+        return e.userId === 'distribute' ? 'Responsável: a vez de alguém da equipe' : `Responsável: ${nome(refs.team, e.userId)}`;
       case 'setField':
         return `${e.field === 'name' ? 'Nome' : e.field === 'email' ? 'E-mail' : e.field === 'note' ? 'Anotação' : nome(refs.fields, e.field.slice(6))}: ${e.value}`;
       case 'task':

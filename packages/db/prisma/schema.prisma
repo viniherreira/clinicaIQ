@@ -19,6 +19,18 @@ enum Role {
   PROFESSIONAL
 }
 
+/// Cargo no CRM, à parte do perfil na clínica (como os papéis do Kommo).
+/// Nulo no usuário = o padrão do perfil: dono e administrador são Gestor; o
+/// resto, Atendente. O dono é sempre Gestor — ver `lib/crm-roles.ts`.
+enum CrmRole {
+  /// Vê tudo e configura o CRM: funis, robôs, modelos, WhatsApp, equipe e distribuição.
+  MANAGER
+  /// Atende e move os negócios de todos; não mexe nas configurações.
+  AGENT
+  /// Vê só os negócios e conversas de que é responsável (e os ainda sem responsável).
+  AGENT_OWN
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -188,6 +200,14 @@ model User {
   role    Role     @default(RECEPTIONIST)
   /// Tem acesso ao CRM e conta na cobrança do adicional (R$ por usuário).
   crmSeat Boolean  @default(false)
+  /// Cargo no CRM. Nulo = o padrão do perfil (`lib/crm-roles.ts`).
+  crmRole CrmRole?
+  /// Entra na distribuição automática de leads e conversas.
+  crmReceivesLeads  Boolean   @default(true)
+  /// Disponível para receber agora (o "online" do Kommo). Ausente fica fora do rodízio.
+  crmAvailable      Boolean   @default(true)
+  /// Último lead ou conversa recebido pela distribuição: o rodízio dá para quem recebeu há mais tempo.
+  crmLastAssignedAt DateTime?
   /// Unidades em que a pessoa trabalha (agenda). Vazio = todas.
   unitIds String[] @default([])
   /// Bandeira operacional: é ela que todas as consultas filtram.
@@ -208,6 +228,7 @@ model User {
   assignedLeads    Lead[]        @relation("LeadAssignee")
   assignedTasks    LeadTask[]    @relation("LeadTaskAssignee")
   chatMessagesSent ChatMessage[]
+  assignedConversations Conversation[] @relation("ConversationAssignee")
 
   @@index([tenantId])
   @@index([tenantId, deactivatedAt])
@@ -1359,6 +1380,9 @@ model Conversation {
   status       ConversationStatus @default(INBOX)
   leadId       String?
   patientId    String?
+  /// Quem atende esta conversa. Anda junto com o responsável do negócio aberto
+  /// (`crm/assignment.ts`); conversa de paciente sem negócio também tem o seu.
+  assignedToId String?
   /// Quando o app já tentou ligar a lead ou paciente. Nulo = falta tentar.
   classifiedAt DateTime?
 
@@ -1386,6 +1410,7 @@ model Conversation {
   tenant              Tenant               @relation(fields: [tenantId], references: [id])
   lead                Lead?                @relation(fields: [leadId], references: [id])
   patient             Patient?             @relation(fields: [patientId], references: [id])
+  assignedTo          User?                @relation("ConversationAssignee", fields: [assignedToId], references: [id])
   botFlow             ChatbotFlow?         @relation(fields: [botFlowId], references: [id], onDelete: SetNull)
   messages            ChatMessage[]
   broadcastRecipients BroadcastRecipient[]
@@ -1394,6 +1419,7 @@ model Conversation {
   @@index([tenantId, lastMessageAt(sort: Desc)])
   @@index([tenantId, status, lastMessageAt(sort: Desc)])
   @@index([tenantId, leadId])
+  @@index([tenantId, assignedToId])
   @@index([botWakeAt])
   @@map("conversations")
 }

@@ -73,14 +73,9 @@ describe('can', () => {
 });
 
 describe('can — CRM', () => {
-  it('a recepção capta; dono e admin também arrumam o funil', () => {
-    expect(PAPEIS.filter((r) => can(r, 'crm'))).toEqual(['OWNER', 'ADMIN', 'RECEPTIONIST']);
+  it('a equipe toda entra no CRM; o padrão de quem configura é dono e admin', () => {
+    expect(PAPEIS.filter((r) => can(r, 'crm'))).toEqual(['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL']);
     expect(PAPEIS.filter((r) => can(r, 'crm_config'))).toEqual(['OWNER', 'ADMIN']);
-  });
-
-  it('o profissional não entra no CRM nesta versão', () => {
-    expect(can('PROFESSIONAL', 'crm')).toBe(false);
-    expect(can('PROFESSIONAL', 'crm_config')).toBe(false);
   });
 
   it('papel desconhecido não entra no CRM', () => {

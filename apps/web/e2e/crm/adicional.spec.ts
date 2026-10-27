@@ -23,6 +23,6 @@ test('Equipe: na cortesia, toda a equipe com perfil de CRM tem acesso', async ({
   await page.goto('/configuracoes#equipe');
   await page.waitForLoadState('networkidle');
   const secao = page.getByRole('region', { name: 'Acesso ao CRM' });
-  await expect(secao).toContainText('toda a equipe com perfil de dono, administração ou recepção');
+  await expect(secao).toContainText('toda a equipe entra no CRM');
   await expect(secao.getByRole('switch')).toHaveCount(0);
 });

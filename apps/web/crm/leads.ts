@@ -281,6 +281,9 @@ export async function createLead(
         status: 'ACTIVE',
         classifiedAt: new Date(),
         ...(lead.patientId ? { patientId: lead.patientId } : {}),
+        // Quem criou o negócio passa a atender a conversa; sem ninguém (lead
+        // automático), a conversa fica com quem já a atendia.
+        ...(lead.assignedToId ? { assignedToId: lead.assignedToId } : {}),
       },
     });
     return { ok: true as const, leadId: lead.id };
@@ -320,8 +323,10 @@ export async function updateLead(
 
     if (patch.assignedToId !== undefined && patch.assignedToId !== lead.assignedToId) {
       await tx.leadActivity.create({
-        data: { tenantId, leadId, type: 'ASSIGNED', actorId: actor.userId, data: { to: patch.assignedToId } },
+        data: { tenantId, leadId, type: 'ASSIGNED', actorId: actor.userId, data: { from: lead.assignedToId, to: patch.assignedToId } },
       });
+      // A conversa do negócio muda de mãos junto (`crm/assignment.ts`).
+      await tx.conversation.updateMany({ where: { tenantId, leadId }, data: { assignedToId: patch.assignedToId } });
     }
     return { ok: true as const };
   });

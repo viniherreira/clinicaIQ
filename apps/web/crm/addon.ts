@@ -226,7 +226,7 @@ export async function setCrmSeat(tenantId: string, actorId: string, targetUserId
   });
   if (!alvo) return { ok: false, message: 'Pessoa não encontrada na equipe.' };
   if (on && !isEligible(alvo.role)) {
-    return { ok: false, message: 'O perfil Profissional não tem acesso ao CRM. Troque o perfil para Recepção ou Administrador.' };
+    return { ok: false, message: 'Esse perfil não tem acesso ao CRM.' };
   }
   if (alvo.crmSeat === on) return { ok: true };
 

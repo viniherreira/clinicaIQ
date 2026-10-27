@@ -2,11 +2,12 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bot, Briefcase, Clock, FileText, Link2, MessageCircle, Plus, Search, Square, Stethoscope } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Clock, FileText, Hand, Link2, MessageCircle, Plus, Search, Square, Stethoscope, UserRound } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
   acceptConversationAction,
+  assignConversationAction,
   botOptionsAction,
   linkConversationAction,
   retryChatAction,
@@ -38,8 +39,14 @@ export function ConversationPane({
   headerAction,
   events,
   extraModes,
+  team,
+  meId,
 }: {
   thread: ChatThread;
+  /** A equipe, para transferir a conversa (nas Conversas). Sem ela, o cabeçalho só mostra quem atende. */
+  team?: { id: string; name: string }[];
+  /** Quem está usando, para o "Assumir". */
+  meId?: string;
   quickReplies: QuickReplyOption[];
   /** Algo mudou (mensagem enviada, aceita, ligada): busque de novo. */
   onChanged: () => void;
@@ -91,7 +98,9 @@ export function ConversationPane({
 
   return (
     <section aria-label={`Conversa com ${c.name}`} className="flex min-h-0 flex-1 flex-col">
-      {!compact && <PaneHeader thread={thread} onChanged={onChanged} onBack={onBack} onAnnounce={setAviso} action={headerAction} />}
+      {!compact && (
+        <PaneHeader thread={thread} onChanged={onChanged} onBack={onBack} onAnnounce={setAviso} action={headerAction} team={team} meId={meId} />
+      )}
 
       <ChatMessages
         messages={thread.messages}
@@ -229,12 +238,16 @@ function PaneHeader({
   onBack,
   onAnnounce,
   action,
+  team,
+  meId,
 }: {
   thread: ChatThread;
   onChanged: () => void;
   onBack?: () => void;
   onAnnounce: (s: string) => void;
   action?: React.ReactNode;
+  team?: { id: string; name: string }[];
+  meId?: string;
 }) {
   const c = thread.conversation;
   const [pending, start] = useTransition();
@@ -283,6 +296,16 @@ function PaneHeader({
         <Links thread={thread} />
       </div>
 
+      {c.status !== 'DECLINED' && (
+        <Assignee
+          thread={thread}
+          team={team}
+          meId={meId}
+          pending={pending}
+          onAssign={(userId, ok) => run(() => assignConversationAction(c.id, userId), ok)}
+        />
+      )}
+
       {semNegocio && (
         // Contato sem card e que não é paciente (a antiga Entrada, ou quem foi
         // arquivado e voltou). Paciente não ganha aviso: a conversa fica na ficha.
@@ -309,6 +332,65 @@ function PaneHeader({
         </p>
       )}
     </header>
+  );
+}
+
+/**
+ * Quem atende a conversa, como o "responsável" do chat no Kommo: sem ninguém,
+ * o botão Assumir; com alguém, a troca pela lista da equipe.
+ */
+function Assignee({
+  thread,
+  team,
+  meId,
+  pending,
+  onAssign,
+}: {
+  thread: ChatThread;
+  team?: { id: string; name: string }[];
+  meId?: string;
+  pending: boolean;
+  onAssign: (userId: string | null, ok: string) => void;
+}) {
+  const id = useId();
+  const atual = thread.conversation.assignedTo;
+  const nome = (uid: string | null) => (uid ? (team?.find((p) => p.id === uid)?.name ?? 'alguém da equipe') : '');
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+      {team?.length ? (
+        <>
+          <label htmlFor={`${id}-resp`} className="text-muted-foreground">
+            Atende:
+          </label>
+          <select
+            id={`${id}-resp`}
+            value={atual?.id ?? ''}
+            disabled={pending}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              onAssign(v, v ? `Conversa com ${nome(v)}.` : 'Conversa sem responsável.');
+            }}
+            className="h-7 max-w-[12rem] rounded-md border border-border bg-surface-alt px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <option value="">Sem responsável</option>
+            {atual && !team.some((p) => p.id === atual.id) && <option value={atual.id}>{atual.name}</option>}
+            {team.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id === meId ? `${p.name} (você)` : p.name}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : (
+        <span className="text-muted-foreground">Atende: {atual?.name ?? 'sem responsável'}</span>
+      )}
+      {!atual && meId && (
+        <button type="button" disabled={pending} onClick={() => onAssign(meId, 'Conversa assumida por você.')} className="btn-primary h-7 px-2.5 text-xs">
+          <Hand className="h-3.5 w-3.5" aria-hidden="true" /> Assumir
+        </button>
+      )}
+    </div>
   );
 }
 

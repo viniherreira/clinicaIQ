@@ -1,5 +1,6 @@
 import { decrypt, getTenantClient } from '@clinicaiq/db';
 import { runBotOnInbound } from './bot';
+import { distributeConversation } from './assignment';
 import { applyCapture } from './capture';
 import { acceptConversation, classifyConversation } from './conversations';
 
@@ -8,7 +9,8 @@ import { acceptConversation, classifyConversation } from './conversations';
  * do gateway de QR (aviso em /api/whatsapp/conversation) ou da API oficial
  * (webhook da Meta): ligar a conversa, registrar o pedido de sair, a captação
  * (palavras da primeira mensagem viram lead com tag), o lead automático do
- * número novo (em Novo, sem Aceitar) e deixar o robô responder.
+ * número novo (em Novo, sem Aceitar), dar um responsável (distribuição) e
+ * deixar o robô responder.
  */
 
 export const OPT_OUT = /^\s*(sair|parar|descadastrar|remover|stop)\b/i;
@@ -77,6 +79,14 @@ export async function afterInbound(
     } catch (e) {
       console.error('[crm] lead automático falhou', e instanceof Error ? e.message : e);
     }
+  }
+
+  // Alguém da equipe para atender: o responsável que já atendia, senão a
+  // distribuição (rodízio ou menos ocupado), se a clínica ligou.
+  try {
+    await distributeConversation(tenantId, conversationId);
+  } catch (e) {
+    console.error('[crm] distribuição falhou', e instanceof Error ? e.message : e);
   }
 
   // Resposta pelos botões de um aviso da agenda: a agenda já tratou, o robô fica quieto.

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@clinicaiq/db';
 import { guardCrmAction } from '@/crm/guard';
+import { guardLead } from '@/crm/scope';
 import { addNote, linkPatient, setTags, updateLead } from '@/crm/leads';
 import { setLeadFields } from '@/crm/lead-fields';
 import { findPatientByPhone } from '@/crm/duplicates';
@@ -35,7 +36,7 @@ const patchSchema = z.object({
 
 /** Campos personalizados da ficha: { [fieldId]: valor } (vazio apaga). Vai para o histórico. */
 export async function setLeadFieldsAction(leadId: string, values: Record<string, unknown>): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   if (!values || typeof values !== 'object' || Object.keys(values).length > 50) return { ok: false, message: 'Dados inválidos.' };
   const r = await setLeadFields(g.db, g, leadId, values);
@@ -44,7 +45,7 @@ export async function setLeadFieldsAction(leadId: string, values: Record<string,
 }
 
 export async function updateLeadAction(leadId: string, input: z.input<typeof patchSchema>): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const parsed = patchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
@@ -67,7 +68,7 @@ export async function updateLeadAction(leadId: string, input: z.input<typeof pat
 }
 
 export async function setLeadTagsAction(leadId: string, tagIds: string[]): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const r = await setTags(g.db, g, leadId, tagIds.slice(0, 30));
   if (r.ok) refresh(leadId);
@@ -93,7 +94,7 @@ export async function createTagAction(name: string): Promise<Result<{ tag: Board
 }
 
 export async function addNoteAction(leadId: string, text: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const t = text.trim();
   if (!t) return { ok: false, message: 'Escreva a nota.' };
@@ -106,7 +107,7 @@ export async function createTaskAction(
   leadId: string,
   input: { text: string; due: string; assignedToId?: string | null },
 ): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const dueAt = clinicLocalToInstant(input.due);
   if (!dueAt) return { ok: false, message: 'Escolha a data e a hora.' };
@@ -116,7 +117,7 @@ export async function createTaskAction(
 }
 
 export async function completeTaskAction(taskId: string, leadId: string, result?: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const r = await completeTask(g.db, g, taskId, typeof result === 'string' ? result : undefined);
   if (r.ok) {
@@ -131,7 +132,7 @@ export async function completeTaskAction(taskId: string, leadId: string, result?
  * clínica: telefone é dado pessoal (LGPD), e ver o número completo é um acesso.
  */
 export async function revealPhoneAction(leadId: string): Promise<Result<{ phone: string }>> {
-  const g = await guardCrmAction('crm', { write: false });
+  const g = await guardLead('crm', leadId, { write: false });
   if (!g.ok) return g;
   const lead = await g.db.lead.findFirst({ where: { id: leadId, deletedAt: null }, select: { id: true, phoneEncrypted: true } });
   if (!lead) return { ok: false, message: 'Lead não encontrado.' };
@@ -153,7 +154,7 @@ const destinoDepois = (leadId: string, patientId: string, intent: ConvertIntent)
 export async function findPatientMatchAction(
   leadId: string,
 ): Promise<Result<{ match: { id: string; name: string; controlNumber: number } | null }>> {
-  const g = await guardCrmAction('crm', { write: false });
+  const g = await guardLead('crm', leadId, { write: false });
   if (!g.ok) return g;
   const lead = await g.db.lead.findFirst({ where: { id: leadId, deletedAt: null }, select: { phoneEncrypted: true } });
   if (!lead) return { ok: false, message: 'Lead não encontrado.' };
@@ -167,7 +168,7 @@ export async function linkExistingPatientAction(
   patientId: string,
   intent: ConvertIntent,
 ): Promise<Result<{ href: string }>> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const r = await linkPatient(g.db, g, leadId, patientId, 'linked');
   if (!r.ok) return r;
@@ -182,7 +183,7 @@ export async function linkExistingPatientAction(
  * depois pela própria ficha do lead.
  */
 export async function linkAfterCreateAction(leadId: string, intent: ConvertIntent, patientId: string): Promise<string> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return `/pacientes/${patientId}`;
   const r = await linkPatient(g.db, g, leadId, patientId, 'converted');
   if (!r.ok) return `/pacientes/${patientId}`;
@@ -195,7 +196,7 @@ export async function linkAfterCreateAction(leadId: string, intent: ConvertInten
  * administração; pede a palavra APAGAR, porque não tem volta.
  */
 export async function eraseLeadDataAction(leadId: string, confirmacao: string): Promise<Result<{ leads: number; conversations: number }>> {
-  const g = await guardCrmAction('crm_config');
+  const g = await guardLead('crm_config', leadId);
   if (!g.ok) return g;
   if (confirmacao.trim().toUpperCase() !== 'APAGAR') return { ok: false, message: 'Digite APAGAR para confirmar.' };
   const r = await eraseLeadPersonalData(g.db, g, leadId);

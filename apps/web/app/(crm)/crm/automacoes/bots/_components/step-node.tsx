@@ -60,7 +60,7 @@ function Resumo({ step: s, refs, numberOf }: Pick<StepNodeData, 'step' | 'refs' 
                     : a.type === 'createLead'
                       ? 'Cria o lead'
                       : a.type === 'assign'
-                        ? `Para ${nome(refs.team, a.userId)}`
+                        ? a.userId === 'distribute' ? 'Distribui pela equipe' : `Para ${nome(refs.team, a.userId)}`
                         : a.type === 'setField'
                           ? `Campo ${a.field === 'name' ? 'nome' : a.field === 'email' ? 'e-mail' : a.field === 'note' ? 'anotação' : nome(refs.fields, a.field.slice(6))}`
                           : a.type === 'task'

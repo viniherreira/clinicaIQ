@@ -12,6 +12,7 @@ import { CrmThemeToggle } from './crm-theme';
 import { Logo, LogoMark } from './logo';
 import { UserMenu } from './user-menu';
 import { UnitSwitcher, type UnitChoice } from './unit-switcher';
+import { AvailabilityToggle } from './crm-availability';
 
 export function AppHeader({
   clinicName,
@@ -25,7 +26,13 @@ export function AppHeader({
   showSwitcher = false,
   units = null,
   crmOnly = false,
+  crmManager,
+  crmAvailable,
 }: {
+  /** É Gestor no CRM: o menu do celular mostra o mesmo que a lateral. */
+  crmManager?: boolean;
+  /** No CRM: se a pessoa está disponível para receber leads (a chave do topo). */
+  crmAvailable?: boolean;
   clinicName: string;
   /** Quem está logado agora — não a clínica, não o dono. */
   userName: string;
@@ -47,7 +54,7 @@ export function AppHeader({
   const buscaId = useId();
   const [busca, setBusca] = useState('');
   // O menu do celular precisa esconder exatamente o mesmo que a lateral.
-  const itens = navFor(role, space, crmOnly);
+  const itens = navFor(role, space, crmOnly, crmManager);
   const ativo = activeHref(itens, pathname);
   const atual = itens.find((i) => i.href === ativo);
   // A busca rápida de paciente, como a do topo do Clínica nas Nuvens: Enter abre a lista filtrada.
@@ -109,6 +116,7 @@ export function AppHeader({
           </form>
         )}
 
+        {crmAvailable !== undefined && <AvailabilityToggle initial={crmAvailable} />}
         {/* O CRM guarda o tema dele, à parte do resto (components/crm-theme.tsx). */}
         {space === 'crm' ? <CrmThemeToggle /> : <ThemeToggle />}
         <div className="mx-1 h-6 w-px bg-border" aria-hidden="true" />

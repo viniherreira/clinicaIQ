@@ -49,6 +49,13 @@ const SOURCE: Record<string, string> = {
   WHATSAPP: 'WhatsApp', INDICACAO: 'Indicação', INSTAGRAM: 'Instagram', SITE: 'Site', MANUAL: 'cadastro manual', OUTRO: 'outra origem',
 };
 
+/** Como o responsável mudou (`crm/assignment.ts`). */
+const VIA_LABEL: Record<string, string> = {
+  distribution: 'Distribuído para',
+  transfer: 'Transferido para',
+  take: 'Assumido por',
+};
+
 export function toTimeline(activities: readonly ActivityLike[], names: TimelineNames): TimelineEntry[] {
   return activities.map((a) => {
     const d = (a.data ?? {}) as Record<string, string | undefined>;
@@ -81,7 +88,13 @@ export function toTimeline(activities: readonly ActivityLike[], names: TimelineN
       case 'TAG_REMOVED':
         return { ...base, kind: 'event', text: `Tag retirada: ${names.tags.get(d.tagId ?? '') ?? 'removida'}` };
       case 'ASSIGNED':
-        return { ...base, kind: 'event', text: d.to ? `Responsável: ${names.people.get(d.to) ?? 'alguém da equipe'}` : 'Ficou sem responsável' };
+        return {
+          ...base,
+          kind: 'event',
+          text: d.to
+            ? `${VIA_LABEL[String(d.via)] ?? 'Responsável'}: ${names.people.get(d.to) ?? 'alguém da equipe'}`
+            : 'Ficou sem responsável',
+        };
       case 'TASK_CREATED':
         return { ...base, kind: 'task', text: `Tarefa: ${d.text ?? ''}`, taskId: d.taskId };
       case 'TASK_COMPLETED':

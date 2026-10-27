@@ -1,4 +1,5 @@
 import type { ChatbotTrigger, Prisma, TenantPrismaClient } from '@clinicaiq/db';
+import { DISTRIBUTE } from './distribution-rules';
 import { isTargeted, normalize, parseSteps, stepsProblem, type BotSteps } from './bot-engine';
 import { flowProblem, isFlowDoc, type FlowDoc } from './flow-engine';
 import { readFlow } from './flow-legacy';
@@ -97,7 +98,7 @@ function refsOf(steps: BotSteps) {
       for (const a of o.actions ?? []) {
         if (a.type === 'tag') tags.add(a.tagId);
         if (a.type === 'stage' || (a.type === 'createLead' && a.stageId)) stages.add(a.type === 'stage' ? a.stageId : a.stageId!);
-        if (a.type === 'assign') users.add(a.userId);
+        if (a.type === 'assign' && a.userId !== DISTRIBUTE) users.add(a.userId);
       }
     }
   }
@@ -117,7 +118,7 @@ function refsOfFlow(doc: FlowDoc) {
         if (a.type === 'tag' || a.type === 'untag') tags.add(a.tagId);
         if (a.type === 'stage') stages.add(a.stageId);
         if (a.type === 'createLead' && a.stageId) stages.add(a.stageId);
-        if (a.type === 'assign') users.add(a.userId);
+        if (a.type === 'assign' && a.userId !== DISTRIBUTE) users.add(a.userId);
         if (a.type === 'setField' && a.field.startsWith('field:')) fields.add(a.field.slice(6));
       }
     }

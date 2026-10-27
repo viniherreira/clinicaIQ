@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { parseFieldInput } from '@/crm/custom-fields';
 import { setLeadFields } from '@/crm/lead-fields';
 import { guardCrmAction } from '@/crm/guard';
+import { guardLead } from '@/crm/scope';
 import { createLead, moveLead, OPEN_LEAD, softDeleteLead } from '@/crm/leads';
 import { countLeads, effectiveStatus, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
 import { hasPeriod } from '@/crm/period';
@@ -113,10 +114,10 @@ const moveSchema = z.object({
 });
 
 export async function moveLeadAction(input: z.input<typeof moveSchema>): Promise<ActionResult> {
-  const g = await guardCrmAction('crm');
-  if (!g.ok) return g;
   const parsed = moveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Movimento inválido.' };
+  const g = await guardLead('crm', parsed.data.leadId);
+  if (!g.ok) return g;
 
   const r = await moveLead(g.db, g, parsed.data.leadId, parsed.data);
   if (r.ok) {

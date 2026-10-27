@@ -31,8 +31,8 @@ export default async function ConversasPage({
 
   const [list, counts, thread, quickReplies, line, cloud, basics] = await Promise.all([
     listConversations(ctx.db, ctx, tab, q, 60, tagId),
-    inboxCounts(ctx.db),
-    selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId) : Promise.resolve(null),
+    inboxCounts(ctx.db, ctx),
+    selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId, ctx) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
     ctx.db.whatsAppSession.findFirst({ select: { status: true } }),
     activeCloudAccount(ctx.tenantId),
@@ -56,7 +56,8 @@ export default async function ConversasPage({
       // Na API oficial não há linha de QR para cair.
       lineDown={!cloud && line?.status !== 'CONNECTED'}
       canConfigWhatsapp={can(ctx.role, 'configuracoes')}
-      canManage={can(ctx.role, 'crm_config')}
+      canManage={ctx.manager}
+      meId={ctx.userId}
       basics={{
         pipelines: basics.pipelines,
         tags: basics.tags,

@@ -7,7 +7,6 @@ import { effectiveStatus, parseFilters, parseListParams } from '@/crm/board-data
 import { bulkSummary, resolveTargets, runBulk, type BulkAction } from '@/crm/bulk';
 import { clinicLocalToInstant } from '@/crm/clock';
 import { guardCrmAction } from '@/crm/guard';
-import { can } from '@/lib/permissions';
 
 /**
  * Ações em massa da lista de leads. Os leads vêm marcados na tela (ids) ou
@@ -50,7 +49,7 @@ export async function bulkLeadsAction(
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
   const { target, action: a } = parsed.data;
-  if (a.type === 'delete' && !can(g.role, 'crm_config')) return { ok: false, message: 'Só o dono ou um administrador pode excluir leads.' };
+  if (a.type === 'delete' && !g.manager) return { ok: false, message: 'Só quem é Gestor no CRM pode excluir leads.' };
 
   let action: BulkAction;
   if (a.type === 'task') {

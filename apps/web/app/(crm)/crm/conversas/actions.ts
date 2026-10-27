@@ -3,6 +3,7 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
+import { guardConversation, guardLead } from '@/crm/scope';
 import { dispatchChat } from '@/crm/chat-dispatch';
 import {
   INBOX_TABS,
@@ -22,6 +23,7 @@ import {
   type InboxTab,
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
+import { assignConversation } from '@/crm/assignment';
 import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
 import { checkChatMedia } from '@/crm/media-rules';
 import { nudgeTick } from '@/crm/tick-nudge';
@@ -34,7 +36,7 @@ type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
 export interface InboxSnapshot {
   list: ConversationSummary[];
-  counts: { unread: number; inbox: number };
+  counts: Awaited<ReturnType<typeof inboxCounts>>;
   thread: ChatThread | null;
 }
 
@@ -56,8 +58,8 @@ export async function refreshInboxAction(input: {
   nudgeTick();
   const [list, counts, thread] = await Promise.all([
     listConversations(g.db, g, asTab(input.tab), input.q, 60, input.tagId || null),
-    inboxCounts(g.db),
-    input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId) : Promise.resolve(null),
+    inboxCounts(g.db, g),
+    input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId, g) : Promise.resolve(null),
   ]);
   if (thread && thread.conversation.unread > 0) {
     await markRead(g.db, thread.conversation.id);
@@ -70,14 +72,14 @@ export async function refreshInboxAction(input: {
 
 /** Os dados do lead da conversa aberta, para o painel à direita (como no Kommo). */
 export async function leadDetailAction(leadId: string): Promise<Result<{ lead: LeadDetail | null }>> {
-  const g = await guardCrmAction('crm', { write: false });
+  const g = await guardLead('crm', leadId, { write: false });
   if (!g.ok) return g;
   return { ok: true, lead: await loadLeadDetail(g, leadId) };
 }
 
 /** Só a conversa (a aba Conversa da ficha do lead). */
 export async function loadThreadAction(conversationId: string): Promise<Result<{ thread: ChatThread | null }>> {
-  const g = await guardCrmAction('crm', { write: false });
+  const g = await guardConversation('crm', conversationId, { write: false });
   if (!g.ok) return g;
   const thread = await loadThread(g.db, g.tenantId, conversationId);
   if (thread && thread.conversation.unread > 0) {
@@ -88,7 +90,7 @@ export async function loadThreadAction(conversationId: string): Promise<Result<{
 }
 
 export async function sendChatAction(conversationId: string, text: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const cloud = await activeCloudAccount(g.tenantId);
   const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
@@ -103,7 +105,7 @@ export async function sendChatAction(conversationId: string, text: string): Prom
  * só pela API oficial (e simulado no desenvolvimento): o gateway de QR não manda arquivo.
  */
 export async function sendMediaAction(conversationId: string, form: FormData): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const file = form.get('arquivo');
   if (!(file instanceof File)) return { ok: false, message: 'Escolha um arquivo.' };
@@ -145,7 +147,7 @@ export async function retryChatAction(chatMessageId: string): Promise<Result> {
 
 /** Escrever a um lead que ainda não tem conversa: cria a conversa e manda. */
 export async function startLeadChatAction(leadId: string, text: string): Promise<Result<{ conversationId: string }>> {
-  const g = await guardCrmAction('crm');
+  const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
   const conv = await ensureConversationForLead(g.db, g.tenantId, leadId);
   if (!conv.ok) return conv;
@@ -160,7 +162,7 @@ export async function acceptConversationAction(
   conversationId: string,
   opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
 ): Promise<Result<{ leadId: string }>> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const r = await acceptConversation(g.db, g, conversationId, {
     name: typeof opts.name === 'string' ? opts.name.slice(0, 120) : undefined,
@@ -172,8 +174,23 @@ export async function acceptConversationAction(
   return r;
 }
 
+/**
+ * Quem atende a conversa: assumir (para si), transferir para alguém ou deixar
+ * sem responsável. Com negócio aberto, o negócio vai junto (`crm/assignment.ts`).
+ */
+export async function assignConversationAction(conversationId: string, userId: string | null): Promise<Result> {
+  const g = await guardConversation('crm', conversationId);
+  if (!g.ok) return g;
+  if (userId !== null && typeof userId !== 'string') return { ok: false, message: 'Escolha a pessoa.' };
+  const antes = await g.db.conversation.findFirst({ where: { id: conversationId }, select: { assignedToId: true } });
+  const via = userId === g.userId && !antes?.assignedToId ? 'take' : 'transfer';
+  const r = await assignConversation(g.db, g, conversationId, userId, via);
+  if (r.ok) revalidatePath('/crm');
+  return r;
+}
+
 export async function declineConversationAction(conversationId: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const r = await declineConversation(g.db, conversationId);
   if (r.ok) revalidatePath('/crm');
@@ -181,7 +198,7 @@ export async function declineConversationAction(conversationId: string): Promise
 }
 
 export async function notALeadAction(conversationId: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const r = await notALead(g.db, g, conversationId);
   if (r.ok) revalidatePath('/crm');
@@ -192,7 +209,7 @@ export async function linkConversationAction(
   conversationId: string,
   target: { leadId: string } | { patientId: string },
 ): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const r = await linkConversation(g.db, conversationId, target);
   if (r.ok) revalidatePath('/crm');
@@ -261,7 +278,7 @@ export async function sendTemplateAction(
   templateId: string,
   params: string[],
 ): Promise<Result<{ conversationId: string }>> {
-  const g = await guardCrmAction('crm');
+  const g = 'conversationId' in target ? await guardConversation('crm', target.conversationId) : await guardLead('crm', target.leadId);
   if (!g.ok) return g;
   const t = await g.db.messageTemplate.findFirst({ where: { id: templateId, status: 'APPROVED' } });
   if (!t) return { ok: false, message: 'Modelo não encontrado ou ainda não aprovado.' };
@@ -305,7 +322,7 @@ export async function botOptionsAction(): Promise<Result<{ bots: BotOption[] }>>
  * o robô manda texto livre, e fora dela a Meta recusa.
  */
 export async function startBotAction(conversationId: string, flowId: string): Promise<Result<{ name: string }>> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const [conv, flow, cloud] = await Promise.all([
     g.db.conversation.findFirst({ where: { id: conversationId }, select: { id: true, status: true, leadId: true, lastInboundAt: true } }),
@@ -330,7 +347,7 @@ export async function startBotAction(conversationId: string, flowId: string): Pr
 
 /** Tira o robô da conversa: a equipe assume. */
 export async function stopBotAction(conversationId: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   await stopBotOnConversation(g.db, conversationId);
   return { ok: true };

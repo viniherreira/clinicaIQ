@@ -6,7 +6,6 @@ import { loadLeadDetail } from '@/crm/lead-detail';
 import { loadCrmBasics } from '@/crm/page-data';
 import { conversationIdForLead, loadThread } from '@/crm/conversations';
 import { activeCloudAccount } from '@/crm/cloud';
-import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
 import { LeadPanel } from './_components/lead-panel';
 import { ConvertActions } from './_components/convert-actions';
@@ -54,7 +53,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             // Só com a agenda: na clínica só com o CRM não há agenda nem ficha de paciente.
             actions={modules.clinic ? <ConvertActions key="converter" leadId={lead.id} patient={lead.patient} /> : undefined}
           />
-          {can(ctx.role, 'crm_config') && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
+          {ctx.manager && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
         </div>
         <LeadRightPane
           lead={lead}
@@ -63,7 +62,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           initialThread={thread}
           quickReplies={quickReplies}
           channel={cloud ? 'cloud' : 'gateway'}
-          canManage={can(ctx.role, 'crm_config')}
+          canManage={ctx.manager}
         />
       </div>
     </div>

@@ -11,19 +11,23 @@ import { clinicDay, hasPeriod, periodWhere } from './period';
 
 export { parseFilters } from './filters';
 import { anyFieldWhere, formatFieldValue, readFieldValues } from './custom-fields';
+import { leadScope } from './scope-rules';
 
 /**
  * O filtro inteiro, resolvido no banco. `now` decide "hoje" (para os atalhos
  * do período) e "atrasada" (para as tarefas).
  */
 export function leadWhere(
-  ctx: Pick<CrmContext, 'tenantId' | 'userId'>,
+  ctx: Pick<CrmContext, 'tenantId' | 'userId'> & { ownOnly?: boolean },
   f: BoardFilters,
   now: Date = new Date(),
 ): Prisma.LeadWhereInput {
   const where: Prisma.LeadWhereInput = { deletedAt: null };
   // Período, tarefa e busca usam OR/some por dentro; juntos, cada um no seu AND.
   const and: Prisma.LeadWhereInput[] = [];
+  // Atendente "só os dele": os seus e os sem responsável, qualquer que seja o filtro.
+  const escopo = leadScope(ctx);
+  if (escopo) and.push(escopo);
   if (f.resp === 'me') where.assignedToId = ctx.userId;
   else if (f.resp !== 'all') where.assignedToId = f.resp;
   if (f.tags.length) where.tags = { some: { tagId: { in: f.tags } } };

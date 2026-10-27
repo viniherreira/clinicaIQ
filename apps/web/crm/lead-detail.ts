@@ -1,4 +1,5 @@
 import 'server-only';
+import { leadScope } from './scope-rules';
 
 import type { CrmContext } from './guard';
 import { liveInfoForLeads } from './live';
@@ -37,7 +38,8 @@ export interface LeadDetail {
 
 export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date = new Date()): Promise<LeadDetail | null> {
   const lead = await ctx.db.lead.findFirst({
-    where: { id: leadId, deletedAt: null },
+    // Atendente "só os dele" não abre negócio de outra pessoa.
+    where: { id: leadId, deletedAt: null, ...(leadScope(ctx) ?? {}) },
     include: {
       tags: { include: { tag: true } },
       patient: { select: { id: true, name: true, controlNumber: true } },

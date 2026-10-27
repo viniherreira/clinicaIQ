@@ -4,7 +4,6 @@ import { ChevronLeft } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
 import { broadcastStats } from '@/crm/broadcasts';
 import { formatDue } from '@/crm/format';
-import { can } from '@/lib/permissions';
 import { BROADCAST_STATUS, StatsGrid } from '../_components/stats';
 import { AutoRefresh, CancelBroadcast } from '../_components/detail-controls';
 
@@ -66,7 +65,7 @@ export default async function TransmissaoPage({ params }: { params: Promise<{ id
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-xl font-semibold tracking-tight">{b.name}</h2>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.cls}`}>{st.label}</span>
-        {ativa && can(ctx.role, 'crm_config') && <CancelBroadcast id={b.id} />}
+        {ativa && ctx.manager && <CancelBroadcast id={b.id} />}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         {b.status === 'SCHEDULED' && b.scheduledAt ? `Agendada para ${formatDue(b.scheduledAt)}` : `Começou ${formatDue(b.startedAt ?? b.createdAt)}`}

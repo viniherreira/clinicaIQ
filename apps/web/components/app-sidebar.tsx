@@ -5,6 +5,7 @@ import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
   MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap,
+  UsersRound,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -57,13 +58,23 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
   { href: '/crm/automacoes', label: 'Automações', icon: Zap, capability: 'crm' },
+  { href: '/crm/equipe', label: 'Equipe e distribuição', short: 'Equipe', icon: UsersRound, capability: 'crm_config' },
   { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
   { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm_config' },
 ];
 
-export function navFor(role: string | null | undefined, space: Space = 'clinic', crmOnly = false) {
+/**
+ * O menu de quem está logado. No CRM, o que é de configurar (`crm_config`) sai
+ * do cargo no CRM (`crmManager`), não do perfil da clínica; sem ele informado,
+ * vale o padrão do perfil.
+ */
+export function navFor(role: string | null | undefined, space: Space = 'clinic', crmOnly = false, crmManager?: boolean) {
   const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV.filter((item) => !crmOnly || item.href === '/configuracoes');
-  return nav.filter((item) => !item.capability || can(role, item.capability));
+  return nav.filter((item) => {
+    if (!item.capability) return true;
+    if (item.capability === 'crm_config' && crmManager !== undefined) return can(role, 'crm') && crmManager;
+    return can(role, item.capability);
+  });
 }
 
 /**
@@ -83,8 +94,11 @@ export function AppSidebar({
   showSwitcher = false,
   counts = {},
   crmOnly = false,
+  crmManager,
 }: {
   clinicName: string;
+  /** É Gestor no CRM (mostra Equipe, WhatsApp e Configurações do CRM). */
+  crmManager?: boolean;
   role: string;
   space?: Space;
   /** A clínica tem os dois módulos e a pessoa alcança o CRM. */
@@ -95,7 +109,7 @@ export function AppSidebar({
   counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
-  const itens = navFor(role, space, crmOnly);
+  const itens = navFor(role, space, crmOnly, crmManager);
   const unread = useLiveUnread(counts['/crm/conversas'] ?? 0);
   const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
   const ativo = activeHref(itens, pathname);

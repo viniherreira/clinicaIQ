@@ -14,6 +14,7 @@ let crmEnabled = true;
 let bloqueio: string | null = null;
 let assento = true;
 let cortesia = false;
+let cargo: string | null = null;
 
 vi.mock('@/lib/guard', () => ({ currentAccess: async () => acesso }));
 vi.mock('@/lib/access', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/lib/access', () => ({
 }));
 vi.mock('@clinicaiq/db', () => ({
   getTenantClient: (tenantId: string) => ({ tenantId }),
-  prisma: { user: { findUnique: async () => ({ crmSeat: assento }) } },
+  prisma: { user: { findUnique: async () => ({ crmSeat: assento, crmRole: cargo }) } },
 }));
 
 const { requireCrm, guardCrmAction, CRM_NOT_CONTRACTED_PATH, CRM_NOT_CONTRACTED_MESSAGE } = await import('./guard');
@@ -33,6 +34,7 @@ beforeEach(() => {
   bloqueio = null;
   assento = true;
   cortesia = false;
+  cargo = null;
 });
 
 describe('cortesia', () => {
@@ -42,10 +44,11 @@ describe('cortesia', () => {
     await expect(requireCrm('crm')).resolves.toMatchObject({ tenantId: 't1' });
     expect(await guardCrmAction('crm')).toMatchObject({ ok: true });
   });
-  it('o perfil continua valendo', async () => {
+  it('o cargo continua valendo: Atendente não configura', async () => {
     cortesia = true;
     acesso = { tenantId: 't1', userId: 'u1', role: 'PROFESSIONAL' };
-    await expect(requireCrm('crm')).rejects.toThrow('redirect:/sem-acesso');
+    await expect(requireCrm('crm')).resolves.toMatchObject({ crmRole: 'AGENT', manager: false });
+    await expect(requireCrm('crm_config')).rejects.toThrow('redirect:/sem-acesso');
   });
 });
 
@@ -61,10 +64,22 @@ describe('requireCrm (páginas)', () => {
     await expect(requireCrm('crm')).rejects.toThrow(`redirect:${CRM_NOT_CONTRACTED_PATH}`);
   });
 
-  it('papel sem a capacidade vai para "sem acesso"', async () => {
+  it('cargo sem a capacidade vai para "sem acesso"', async () => {
     await expect(requireCrm('crm_config')).rejects.toThrow('redirect:/sem-acesso?modulo=crm_config');
-    acesso = { tenantId: 't1', userId: 'u1', role: 'PROFESSIONAL' };
+    acesso = { tenantId: 't1', userId: 'u1', role: 'SUPERUSUARIO' };
     await expect(requireCrm('crm')).rejects.toThrow('redirect:/sem-acesso?modulo=crm');
+  });
+
+  it('o cargo no CRM decide a configuração, não o perfil da clínica', async () => {
+    cargo = 'MANAGER';
+    await expect(requireCrm('crm_config')).resolves.toMatchObject({ manager: true });
+    acesso = { tenantId: 't1', userId: 'u1', role: 'ADMIN' };
+    cargo = 'AGENT_OWN';
+    expect(await guardCrmAction('crm_config')).toMatchObject({ ok: false });
+    expect(await guardCrmAction('crm')).toMatchObject({ ok: true, ownOnly: true });
+    // O dono é sempre Gestor.
+    acesso = { tenantId: 't1', userId: 'u1', role: 'OWNER' };
+    expect(await guardCrmAction('crm_config')).toMatchObject({ ok: true, manager: true, ownOnly: false });
   });
 
   it('sem acesso pessoal ao CRM (chave desligada na Equipe), não entra', async () => {
