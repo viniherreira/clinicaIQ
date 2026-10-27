@@ -186,6 +186,23 @@ const HEARTBEAT_STALE_MS = 3 * 60 * 1000;
  * that, so the UI can warn instead of quietly dropping messages.
  */
 export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealth> {
+  // Com a API oficial ligada, é ela que manda as mensagens: a sessão antiga do
+  // QR (e o gateway) não importam mais. Sem isto, uma sessão de QR esquecida em
+  // erro fazia a agenda avisar "não foi possível falar com o serviço" com o
+  // número conectado e funcionando pela Meta.
+  const oficial = await prisma.whatsAppCloudAccount.findUnique({
+    where: { tenantId },
+    select: { active: true, status: true, lastError: true },
+  });
+  if (oficial?.active) {
+    if (oficial.status === 'CONNECTED') return { paired: true, connected: true, problem: null };
+    return {
+      paired: true,
+      connected: false,
+      problem: `A conexão com o WhatsApp oficial parou${oficial.lastError ? ` (${oficial.lastError})` : ''}. As confirmações estão pausadas.`,
+    };
+  }
+
   const [session, heartbeat] = await Promise.all([
     prisma.whatsAppSession.findUnique({
       where: { tenantId },
