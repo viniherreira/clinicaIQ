@@ -14,6 +14,7 @@ import {
   listConversations,
   loadThread,
   markRead,
+  notALead,
   retryChatMessage,
   writeChatMessage,
   type ChatThread,
@@ -175,6 +176,14 @@ export async function declineConversationAction(conversationId: string): Promise
   const g = await guardCrmAction('crm');
   if (!g.ok) return g;
   const r = await declineConversation(g.db, conversationId);
+  if (r.ok) revalidatePath('/crm');
+  return r;
+}
+
+export async function notALeadAction(conversationId: string): Promise<Result> {
+  const g = await guardCrmAction('crm');
+  if (!g.ok) return g;
+  const r = await notALead(g.db, g, conversationId);
   if (r.ok) revalidatePath('/crm');
   return r;
 }

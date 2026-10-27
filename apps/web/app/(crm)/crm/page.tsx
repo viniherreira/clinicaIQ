@@ -6,7 +6,7 @@ import { OPEN_LEAD } from '@/crm/leads';
 import { hasPeriod } from '@/crm/period';
 import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
-import { classifyPending, listConversations } from '@/crm/conversations';
+import { classifyPending } from '@/crm/conversations';
 import { can } from '@/lib/permissions';
 import { Board } from './_components/board';
 import { CrmToolbar } from './_components/toolbar';
@@ -40,10 +40,9 @@ export default async function FunilPage({
   const editando = sp.editar === '1' && canConfig;
 
   await classifyPending(ctx.db, ctx.tenantId);
-  const [leads, total, inbox, counts, porEtapa] = await Promise.all([
+  const [leads, total, counts, porEtapa] = await Promise.all([
     editando ? Promise.resolve([]) : loadBoardLeads(ctx, filters),
     editando ? Promise.resolve(0) : countLeads(ctx, filters, OPEN_LEAD),
-    editando ? Promise.resolve([]) : listConversations(ctx.db, ctx, 'inbox', '', 30),
     tagCounts(ctx),
     editando
       ? ctx.db.lead.groupBy({
@@ -96,8 +95,6 @@ export default async function FunilPage({
         closedStages={funil.closed}
         lostReasons={basics.lostReasons}
         canDelete={canConfig}
-        // A Entrada (números novos do WhatsApp) aparece no funil principal.
-        inbox={basics.pipelines[0]?.id === funil.id ? inbox : []}
       />
     </div>
   );

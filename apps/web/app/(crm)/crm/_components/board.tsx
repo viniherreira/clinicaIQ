@@ -8,11 +8,9 @@ import {
 } from '@dnd-kit/core';
 import { Check, Trash2, X } from 'lucide-react';
 import type { BoardLead, BoardStage, LostReasonOption } from '@/crm/types';
-import type { ConversationSummary } from '@/crm/conversations';
 import { deleteLeadAction, moveLeadAction } from '../actions';
 import { BoardNavigator } from './board-navigator';
 import { Column } from './column';
-import { InboxColumn } from './inbox-column';
 import { LeadCard, type MoveTarget } from './lead-card';
 import { LostReasonModal } from './lost-reason-modal';
 import { boardKeyboardCoordinates } from './keyboard-coordinates';
@@ -32,15 +30,12 @@ export function Board({
   closedStages,
   lostReasons,
   canDelete,
-  inbox = [],
 }: {
   stages: BoardStage[];
   leads: BoardLead[];
   closedStages: { won: string; lost: string };
   lostReasons: LostReasonOption[];
   canDelete: boolean;
-  /** Números novos no WhatsApp: a coluna Entrada, só quando há alguém. */
-  inbox?: ConversationSummary[];
 }) {
   const router = useRouter();
   const [leads, setLeads] = useState(initial);
@@ -193,11 +188,6 @@ export function Board({
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
         <div ref={quadro} className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto bg-board px-4 pb-4 pt-4 sm:px-5" role="list" aria-label="Etapas do funil">
-          {inbox.length > 0 && (
-            <div role="listitem" className="flex">
-              <InboxColumn entries={inbox} onAnnounce={anunciar} />
-            </div>
-          )}
           {stages.map((s) => (
             <div role="listitem" key={s.id} className="flex">
               <Column
@@ -217,7 +207,6 @@ export function Board({
           <BoardNavigator
             target={quadro}
             columns={[
-              ...(inbox.length > 0 ? [{ id: 'entrada', name: 'Entrada', color: 'amber', count: inbox.length }] : []),
               ...stages.map((s) => ({ id: s.id, name: s.name, color: s.color, count: porEtapa.get(s.id)?.length ?? 0 })),
             ]}
           />

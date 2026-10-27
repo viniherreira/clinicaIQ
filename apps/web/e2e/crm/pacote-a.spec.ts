@@ -163,7 +163,7 @@ test('importar planilha do Kommo: colunas reconhecidas, prévia, importação e 
   }
 });
 
-test('Conversas: Criar lead da Entrada com etapa e tag, tag na lista, filtro por tag e gaveta em tela pequena', async ({ page }) => {
+test('Conversas: abrir negócio com um clique, etapa e tag no painel, tag na lista, filtro por tag e gaveta em tela pequena', async ({ page }) => {
   test.setTimeout(120_000);
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: E2E_TENANT_SLUG } });
   const nome = uniqueName('Contato Kommo');
@@ -171,21 +171,21 @@ test('Conversas: Criar lead da Entrada com etapa e tag, tag na lista, filtro por
   const tag = await prisma.leadTag.create({ data: { tenantId: tenant.id, name: nomeTag, color: 'violet' } });
   try {
     await incomingMessage(uniquePhone(), nome, 'Vi o anúncio do implante');
-    await page.goto('/crm/conversas?aba=inbox');
+    await page.goto('/crm/conversas');
     await page.waitForLoadState('networkidle');
     await page.getByRole('list', { name: 'Lista de conversas' }).getByRole('button', { name: new RegExp(nome) }).click();
 
     const contato = page.getByRole('complementary', { name: 'Contato da conversa' });
-    const form = contato.getByRole('form', { name: 'Criar lead' });
-    await form.getByLabel('Etapa').selectOption({ label: 'Em conversa' });
-    await form.getByRole('button', { name: nomeTag }).click();
-    await expect(form.getByRole('button', { name: nomeTag })).toHaveAttribute('aria-pressed', 'true');
     expect((await axe(page)).violations).toEqual([]);
-    await form.getByRole('button', { name: 'Criar lead' }).click();
+    await contato.getByRole('button', { name: 'Abrir negócio' }).click();
 
-    // O painel vira o do lead, já na etapa escolhida e com a tag.
+    // O painel vira o do lead: etapa e tag se acertam ali mesmo.
     const lado = page.getByRole('complementary', { name: 'Dados do lead' });
     await expect(lado).toBeVisible({ timeout: 20_000 });
+    await lado.getByLabel('Etapa').selectOption({ label: 'Em conversa' });
+    await lado.getByRole('button', { name: 'Adicionar tag' }).click();
+    await lado.getByLabel('Buscar ou criar tag').fill(nomeTag);
+    await lado.getByRole('button', { name: nomeTag, exact: true }).click();
     await expect(lado.getByRole('list', { name: 'Tags' })).toContainText(nomeTag);
     await expect.poll(async () => {
       const l = await prisma.lead.findFirst({ where: { tenantId: tenant.id, name: nome }, include: { stage: true, tags: true } });
@@ -229,7 +229,7 @@ test('funil: o mapa do canto leva às etapas da direita', async ({ page }) => {
   expect(await quadro.evaluate((el) => el.scrollLeft)).toBe(0);
   await mapa.getByRole('button', { name: 'Ver as etapas à direita' }).click();
   await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
-  // A primeira coluna (Entrada, se houver, ou Novo) leva de volta ao começo.
+  // A primeira coluna leva de volta ao começo.
   await mapa.getByRole('button', { name: /^Ir para / }).first().click();
   await expect.poll(() => quadro.evaluate((el) => el.scrollLeft)).toBeLessThan(40);
 });

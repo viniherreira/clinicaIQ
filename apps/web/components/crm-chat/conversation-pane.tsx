@@ -2,13 +2,12 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bot, Briefcase, Check, Clock, FileText, Link2, MessageCircle, Plus, Search, Square, Stethoscope, X } from 'lucide-react';
+import { ArrowLeft, Bot, Briefcase, Clock, FileText, Link2, MessageCircle, Plus, Search, Square, Stethoscope } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import { initials } from '@/crm/format';
 import {
   acceptConversationAction,
   botOptionsAction,
-  declineConversationAction,
   linkConversationAction,
   retryChatAction,
   searchLinkTargetsAction,
@@ -241,8 +240,7 @@ function PaneHeader({
   const [pending, start] = useTransition();
   const [erro, setErro] = useState('');
   const [ligando, setLigando] = useState(false);
-  const entrada = c.status === 'INBOX';
-  const semNegocio = c.status === 'ACTIVE' && !c.lead?.open;
+  const semNegocio = c.status !== 'DECLINED' && !c.lead?.open && !c.patient;
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>, ok: string) =>
     start(async () => {
@@ -264,7 +262,7 @@ function PaneHeader({
         )}
         <span
           aria-hidden="true"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${entrada ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' : 'bg-primary/10 text-primary-hover dark:text-sky-300'}`}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-hover dark:text-sky-300"
         >
           {initials(c.name)}
         </span>
@@ -285,36 +283,23 @@ function PaneHeader({
         <Links thread={thread} />
       </div>
 
-      {(entrada || semNegocio) && (
-        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 ${entrada ? 'bg-amber-50 dark:bg-amber-950/40' : 'bg-surface-alt'}`}>
-          <p className="mr-auto text-sm">
-            {entrada ? 'Número novo: crie o lead ou ligue a quem já está no sistema.' : 'Sem negócio aberto com esta pessoa.'}
-          </p>
+      {semNegocio && (
+        // Contato sem card e que não é paciente (a antiga Entrada, ou quem foi
+        // arquivado e voltou). Paciente não ganha aviso: a conversa fica na ficha.
+        // Na tela larga, o painel ao lado (`action`) já mostra o mesmo botão.
+        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface-alt px-3 py-2 ${action ? 'xl:hidden' : ''}`}>
+          <p className="mr-auto text-sm">Sem negócio aberto com este contato.</p>
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => acceptConversationAction(c.id), entrada ? 'Aceito. O lead foi criado em Novo.' : 'Negócio criado em Novo.')}
-            // Na tela de Conversas larga, o "Criar lead" (com funil, etapa e tags) fica no painel ao lado.
-            className={`btn-primary btn-sm ${entrada && action ? 'xl:hidden' : ''}`}
+            onClick={() => run(() => acceptConversationAction(c.id), 'Negócio aberto em Novo.')}
+            className="btn-primary btn-sm"
           >
-            {entrada ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
-            {entrada ? 'Aceitar' : 'Criar negócio'}
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Abrir negócio
           </button>
-          {entrada && (
-            <>
-              <button type="button" disabled={pending} onClick={() => setLigando((v) => !v)} aria-expanded={ligando} className="btn-outline btn-sm">
-                <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Ligar a…
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => run(() => declineConversationAction(c.id), 'Conversa recusada.')}
-                className={`btn-ghost btn-sm ${action ? 'xl:hidden' : ''}`}
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" /> Recusar
-              </button>
-            </>
-          )}
+          <button type="button" disabled={pending} onClick={() => setLigando((v) => !v)} aria-expanded={ligando} className="btn-outline btn-sm">
+            <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Ligar a…
+          </button>
         </div>
       )}
       {ligando && <LinkPicker onPick={(t) => run(() => linkConversationAction(c.id, t.kind === 'lead' ? { leadId: t.id } : { patientId: t.id }), `Ligada a ${t.label}.`)} />}

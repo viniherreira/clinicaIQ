@@ -1,6 +1,6 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
-import { CRM_COLORS, NEW_PIPELINE_STAGES } from './defaults';
-import { canDeleteStage, isClosedStage, mainPipeline } from './pipeline';
+import { AGENDA_ROLE_LABEL, CRM_COLORS, NEW_PIPELINE_STAGES, type AgendaRole } from './defaults';
+import { boardStages, canDeleteStage, isAgendaRole, isClosedStage, mainPipeline } from './pipeline';
 import { MAX_QUICK_REPLY, normalizeShortcut } from './quick-replies';
 
 /**
@@ -53,8 +53,9 @@ export async function renamePipeline(db: TenantPrismaClient, pipelineId: string,
 
 /**
  * Apaga um funil levando todos os leads para outro: os ganhos para o "Fechou"
- * de lá, os perdidos para o "Perdeu" e os abertos para a entrada. O principal
- * não se apaga — é onde entra o lead novo e o que a agenda move.
+ * de lá, os perdidos para o "Perdeu" e os abertos para a entrada (ou, num funil
+ * sem entrada como Agendados, para a primeira coluna). Não se apagam o
+ * principal, onde entra o lead novo, nem um funil com etapa que a agenda move.
  */
 export async function deletePipeline(
   db: TenantPrismaClient,
@@ -74,8 +75,15 @@ export async function deletePipeline(
       tx.pipelineStage.findMany({ where: { tenantId, pipelineId: funil.id } }),
       tx.pipelineStage.findMany({ where: { tenantId, pipelineId: destino.id } }),
     ]);
+    const daAgenda = daqui.find((s) => isAgendaRole(s.role));
+    if (daAgenda && isAgendaRole(daAgenda.role)) {
+      return {
+        ok: false as const,
+        message: `"${daAgenda.name}" recebe quem ${AGENDA_ROLE_LABEL[daAgenda.role].toLowerCase()}. Escolha outra etapa para isso em "Agenda e orçamentos" antes de apagar o funil.`,
+      };
+    }
     const papel = (role: 'NEW' | 'WON' | 'LOST') => dela.find((s) => s.role === role);
-    const entrada = papel('NEW');
+    const entrada = papel('NEW') ?? boardStages(dela)[0];
     if (!entrada || !papel('WON') || !papel('LOST')) return { ok: false as const, message: 'O funil de destino está incompleto.' };
 
     for (const s of daqui) {
@@ -95,6 +103,35 @@ export async function deletePipeline(
     }
     await tx.pipelineStage.deleteMany({ where: { tenantId, pipelineId: funil.id } });
     await tx.pipeline.deleteMany({ where: { id: funil.id, tenantId } });
+    return ok;
+  });
+}
+
+// ─── Agenda e orçamentos ─────────────────────────────────────────────────────
+
+/**
+ * Escolhe a etapa que recebe um evento da agenda ou dos orçamentos, em qualquer
+ * funil. O papel é um por clínica: sai da etapa de antes, que volta a poder ser
+ * apagada. `null` desliga o evento — a agenda deixa de mover o card nele.
+ */
+export async function setAgendaStage(
+  db: TenantPrismaClient,
+  tenantId: string,
+  role: AgendaRole,
+  stageId: string | null,
+): Promise<Result> {
+  if (!isAgendaRole(role)) return { ok: false, message: 'Evento inválido.' };
+  return db.$transaction(async (tx) => {
+    const stage = stageId ? await tx.pipelineStage.findFirst({ where: { id: stageId, tenantId } }) : null;
+    if (stageId && !stage) return { ok: false as const, message: 'Etapa não encontrada.' };
+    if (stage?.role === role) return ok;
+    if (stage && isClosedStage(stage)) return { ok: false as const, message: 'Escolha uma etapa aberta do funil.' };
+    if (stage?.role) {
+      const outro = isAgendaRole(stage.role) ? `já recebe quem ${AGENDA_ROLE_LABEL[stage.role].toLowerCase()}` : 'é a entrada do funil';
+      return { ok: false as const, message: `"${stage.name}" ${outro}. Escolha outra etapa.` };
+    }
+    await tx.pipelineStage.updateMany({ where: { tenantId, role }, data: { role: null } });
+    if (stage) await tx.pipelineStage.updateMany({ where: { id: stage.id, tenantId }, data: { role } });
     return ok;
   });
 }

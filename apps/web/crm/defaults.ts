@@ -16,8 +16,9 @@ export interface DefaultStage {
 }
 
 /**
- * O funil com que toda clínica começa. O caminho de uma clínica: o contato
- * chega, conversa, agenda a avaliação, recebe o orçamento e fecha.
+ * O funil único das clínicas que entraram no CRM antes dos dois funis
+ * (`DEFAULT_PIPELINES`). Continua valendo: ele tem todos os papéis da agenda, e
+ * a automação acha cada papel em qualquer funil.
  *
  * Os papéis (`role`) são o que a automação procura — a clínica pode renomear
  * qualquer etapa. "Em conversa" não tem papel: só a recepção move para lá.
@@ -36,13 +37,65 @@ export const DEFAULT_STAGES: readonly DefaultStage[] = [
   { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
 ];
 
-/** Nome do primeiro funil de toda clínica. */
+/** Nome do funil único das clínicas antigas. */
 export const MAIN_PIPELINE_NAME = 'Funil principal';
+
+export interface DefaultPipeline {
+  name: string;
+  order: number;
+  stages: readonly DefaultStage[];
+}
+
+/**
+ * Os funis com que toda clínica nova começa, como os times comerciais das
+ * clínicas trabalham: a recepção conversa e agenda na Captação; agendou, o card
+ * passa sozinho para Agendados, onde a avaliação, o orçamento e o fechamento
+ * andam com a agenda. Spec: docs/specs/2026-10-26-planos-teste-e-funis-design.md.
+ */
+export const DEFAULT_PIPELINES: readonly DefaultPipeline[] = [
+  {
+    name: 'Captação',
+    order: 10,
+    stages: [
+      { name: 'Novo', color: 'gray', order: 10, role: 'NEW' },
+      { name: 'Em conversa', color: 'blue', order: 20, role: null },
+      { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
+      { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
+    ],
+  },
+  {
+    name: 'Agendados',
+    order: 20,
+    stages: [
+      { name: 'Avaliação agendada', color: 'teal', order: 10, role: 'SCHEDULED' },
+      { name: 'Desmarcou ou faltou', color: 'orange', order: 20, role: 'CANCELLED' },
+      { name: 'Compareceu', color: 'violet', order: 30, role: 'ATTENDED' },
+      { name: 'Em negociação', color: 'amber', order: 40, role: 'NEGOTIATION' },
+      { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
+      { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
+    ],
+  },
+];
+
+/**
+ * Os papéis que a agenda e os orçamentos usam. Cada um existe no máximo uma
+ * vez na clínica (não por funil): é o destino do evento, em qualquer funil.
+ */
+export const AGENDA_ROLES = ['SCHEDULED', 'CANCELLED', 'ATTENDED', 'NEGOTIATION'] as const;
+export type AgendaRole = (typeof AGENDA_ROLES)[number];
+
+/** Como cada papel da agenda aparece na tela de configurações. */
+export const AGENDA_ROLE_LABEL: Record<AgendaRole, string> = {
+  SCHEDULED: 'Agendou a avaliação',
+  CANCELLED: 'Desmarcou ou faltou',
+  ATTENDED: 'Compareceu',
+  NEGOTIATION: 'Recebeu orçamento',
+};
 
 /**
  * As etapas com que nasce um funil criado pela clínica. Só entrada, ganho e
- * perda têm papel: "Avaliação agendada" e "Em negociação" com papel ficam no
- * funil principal, que é o que a agenda e os orçamentos movem.
+ * perda têm papel: os papéis da agenda são um por clínica e já estão em
+ * Agendados (ou no funil principal das clínicas antigas).
  */
 export const NEW_PIPELINE_STAGES: readonly DefaultStage[] = [
   { name: 'Novo', color: 'gray', order: 10, role: 'NEW' },

@@ -69,7 +69,8 @@ export async function afterInbound(
 
   // Número novo cai sozinho no funil, em Novo, como no Kommo: ninguém precisa
   // tocar em Aceitar. A captação pode já ter criado (com tags e funil); aí nada muda.
-  if (novo) {
+  // Vale também para a conversa que ficou na antiga Entrada e voltou a escrever.
+  if (conv?.status === 'INBOX') {
     try {
       const ainda = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
       if (ainda?.status === 'INBOX') await acceptConversation(db, { tenantId, userId: null }, conversationId);

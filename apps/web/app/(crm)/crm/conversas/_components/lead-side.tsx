@@ -1,17 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Plus, Stethoscope, X } from 'lucide-react';
+import { Archive, Ban, ExternalLink, Plus, Stethoscope } from 'lucide-react';
 import type { ChatThread } from '@/crm/conversations';
 import type { LeadDetail } from '@/crm/lead-detail';
-import { colorClasses } from '@/crm/colors';
 import { initials } from '@/crm/format';
 import type { BoardPerson, BoardPipeline, BoardTag, LostReasonOption } from '@/crm/types';
 import { LeadPanel } from '../../leads/[id]/_components/lead-panel';
 import { ConvertActions } from '../../leads/[id]/_components/convert-actions';
 import type { FieldDef } from '@/crm/custom-fields';
-import { acceptConversationAction, declineConversationAction, leadDetailAction } from '../actions';
+import { acceptConversationAction, declineConversationAction, leadDetailAction, notALeadAction } from '../actions';
 
 export interface LeadSideBasics {
   pipelines: BoardPipeline[];
@@ -24,20 +23,30 @@ export interface LeadSideBasics {
 
 /**
  * O que fica ao lado da conversa, como no Kommo: o lead (etapa, tags,
- * responsável, campos) ou, sem lead, o contato com "Criar lead". Em tela
+ * responsável, campos) ou, sem lead, o contato com "Abrir negócio". Em tela
  * média para cima é uma coluna; nas menores, abre por cima pelo botão "Lead".
  */
 export function ThreadSide({ thread, basics, onChanged }: { thread: ChatThread; basics: LeadSideBasics; onChanged: () => void }) {
   const lead = thread.conversation.lead;
   return lead ? (
-    <LeadSide key={lead.id} leadId={lead.id} basics={basics} onChanged={onChanged} />
+    <LeadSide key={lead.id} leadId={lead.id} conversationId={thread.conversation.id} basics={basics} onChanged={onChanged} />
   ) : (
-    <ContactSide key={thread.conversation.id} thread={thread} basics={basics} onChanged={onChanged} />
+    <ContactSide key={thread.conversation.id} thread={thread} onChanged={onChanged} />
   );
 }
 
 /** O mesmo painel da ficha do lead. */
-function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics: LeadSideBasics; onChanged: () => void }) {
+function LeadSide({
+  leadId,
+  conversationId,
+  basics,
+  onChanged,
+}: {
+  leadId: string;
+  conversationId: string;
+  basics: LeadSideBasics;
+  onChanged: () => void;
+}) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [erro, setErro] = useState('');
 
@@ -72,6 +81,7 @@ function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics: LeadS
           <Link href={`/crm/leads/${lead.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Abrir a ficha completa
           </Link>
+          {!lead.wonAt && !lead.lostAt && <NotALead conversationId={conversationId} onDone={onChanged} />}
         </div>
       }
     />
@@ -80,38 +90,70 @@ function LeadSide({ leadId, basics, onChanged }: { leadId: string; basics: LeadS
   );
 }
 
-const ctl =
-  'mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+/**
+ * Spam, fornecedor, número errado: o card criado sozinho sai do funil e a
+ * conversa é arquivada. Pede confirmação: some com as anotações do card.
+ */
+function NotALead({ conversationId, onDone }: { conversationId: string; onDone: () => void }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [pending, start] = useTransition();
+  const [erro, setErro] = useState('');
+  if (!confirmando) {
+    return (
+      <button type="button" onClick={() => setConfirmando(true)} className="btn-ghost btn-sm inline-flex w-full items-center justify-center gap-1.5 text-muted-foreground">
+        <Ban className="h-3.5 w-3.5" aria-hidden="true" /> Não é lead
+      </button>
+    );
+  }
+  return (
+    <div role="alertdialog" aria-label="Não é lead" className="space-y-2 rounded-lg border border-border bg-surface-alt p-3 text-sm">
+      <p>O card sai do funil e a conversa é arquivada. Se a pessoa escrever de novo, a conversa volta, sem card.</p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await notALeadAction(conversationId);
+              if (!r.ok) return setErro(r.message);
+              onDone();
+            })
+          }
+          className="btn-primary btn-sm"
+        >
+          {pending ? 'Arquivando…' : 'Arquivar'}
+        </button>
+        <button type="button" disabled={pending} onClick={() => setConfirmando(false)} className="btn-ghost btn-sm">
+          Voltar
+        </button>
+      </div>
+      {erro && (
+        <p role="alert" className="text-xs text-destructive">
+          {erro}
+        </p>
+      )}
+    </div>
+  );
+}
 
-/** Conversa sem lead (Entrada ou paciente sem negócio): quem é e "Criar lead" com funil, etapa e tags. */
-function ContactSide({ thread, basics, onChanged }: { thread: ChatThread; basics: LeadSideBasics; onChanged: () => void }) {
-  const id = useId();
+/**
+ * Conversa sem negócio aberto: quem é, e um clique para abrir o negócio — sem
+ * formulário. Paciente da clínica não vira lead sozinho (a conversa fica na
+ * ficha dele); "Abrir negócio" é para quando ele quer um tratamento novo.
+ */
+function ContactSide({ thread, onChanged }: { thread: ChatThread; onChanged: () => void }) {
   const c = thread.conversation;
-  const entrada = c.status === 'INBOX';
-  const recusada = c.status === 'DECLINED';
-  const [nome, setNome] = useState(c.patient?.name ?? c.contactName ?? '');
-  const [funilId, setFunilId] = useState(basics.pipelines[0]?.id ?? '');
-  const funil = basics.pipelines.find((p) => p.id === funilId);
-  const [etapaId, setEtapaId] = useState(funil?.columns[0]?.id ?? '');
-  const [tags, setTags] = useState<string[]>([]);
+  const arquivada = c.status === 'DECLINED';
   const [pending, start] = useTransition();
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
 
-  const criar = () =>
+  const rodar = (fn: () => Promise<{ ok: boolean; message?: string }>, ok: string) =>
     start(async () => {
       setErro('');
-      const r = await acceptConversationAction(c.id, { name: nome, pipelineId: funilId || null, stageId: etapaId || null, tagIds: tags });
-      if (!r.ok) return setErro(r.message);
-      setAviso(`Lead criado em ${funil?.columns.find((s) => s.id === etapaId)?.name ?? 'Novo'}.`);
-      onChanged();
-    });
-  const recusar = () =>
-    start(async () => {
-      setErro('');
-      const r = await declineConversationAction(c.id);
-      if (!r.ok) return setErro(r.message);
-      setAviso('Conversa recusada.');
+      const r = await fn();
+      if (!r.ok) return setErro(r.message ?? 'Não foi possível.');
+      setAviso(ok);
       onChanged();
     });
 
@@ -120,7 +162,7 @@ function ContactSide({ thread, basics, onChanged }: { thread: ChatThread; basics
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-hover dark:text-sky-300"
         >
           {initials(c.name)}
         </span>
@@ -129,93 +171,43 @@ function ContactSide({ thread, basics, onChanged }: { thread: ChatThread; basics
           <p className="truncate text-xs text-muted-foreground">{c.phoneMasked}</p>
         </div>
       </div>
-      {c.patient && (
-        <Link href={`/pacientes/${c.patient.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
-          <Stethoscope className="h-3.5 w-3.5" aria-hidden="true" /> Ficha do paciente
-        </Link>
-      )}
 
-      {recusada ? (
-        <p className="rounded-lg bg-surface-alt p-3 text-sm text-muted-foreground">Conversa recusada. Ela não aparece mais na lista.</p>
+      {arquivada ? (
+        <p className="rounded-lg bg-surface-alt p-3 text-sm text-muted-foreground">
+          Conversa arquivada. Se a pessoa escrever de novo, ela volta para a lista.
+        </p>
       ) : (
-        <form
-          aria-labelledby={`${id}-titulo`}
-          className="space-y-3 rounded-xl border border-border p-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            criar();
-          }}
-        >
-          <h2 id={`${id}-titulo`} className="text-sm font-semibold">
-            {entrada ? 'Criar lead' : 'Criar negócio'}
-          </h2>
-          <div>
-            <label htmlFor={`${id}-nome`} className="block text-xs font-medium text-muted-foreground">
-              Nome
-            </label>
-            <input id={`${id}-nome`} value={nome} onChange={(e) => setNome(e.target.value)} maxLength={120} className={ctl} placeholder="Contato do WhatsApp" />
-          </div>
-          {basics.pipelines.length > 1 && (
-            <div>
-              <label htmlFor={`${id}-funil`} className="block text-xs font-medium text-muted-foreground">
-                Funil
-              </label>
-              <select
-                id={`${id}-funil`}
-                value={funilId}
-                onChange={(e) => {
-                  setFunilId(e.target.value);
-                  setEtapaId(basics.pipelines.find((p) => p.id === e.target.value)?.columns[0]?.id ?? '');
-                }}
-                className={ctl}
-              >
-                {basics.pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="space-y-2 rounded-xl border border-border p-4">
+          <p className="text-sm">
+            {c.patient ? (
+              <>
+                <strong className="font-semibold">Paciente da clínica.</strong> A conversa fica ligada à ficha dele, fora do funil.
+              </>
+            ) : (
+              'Sem negócio aberto com este contato.'
+            )}
+          </p>
+          {c.patient && (
+            <Link href={`/pacientes/${c.patient.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
+              <Stethoscope className="h-3.5 w-3.5" aria-hidden="true" /> Ficha do paciente
+            </Link>
           )}
-          <div>
-            <label htmlFor={`${id}-etapa`} className="block text-xs font-medium text-muted-foreground">
-              Etapa
-            </label>
-            <select id={`${id}-etapa`} value={etapaId} onChange={(e) => setEtapaId(e.target.value)} className={ctl}>
-              {funil?.columns.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          {basics.tags.length > 0 && (
-            <fieldset>
-              <legend className="text-xs font-medium text-muted-foreground">Tags</legend>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {basics.tags.map((t) => {
-                  const on = tags.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setTags(on ? tags.filter((x) => x !== t.id) : [...tags, t.id])}
-                      className={`rounded-[4px] px-2 py-0.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${on ? colorClasses(t.color).chip : 'border border-border text-muted-foreground hover:text-foreground'}`}
-                    >
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-          )}
-          <button type="submit" disabled={pending || !etapaId} className="btn-primary btn-sm inline-flex w-full items-center justify-center gap-1.5">
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {entrada ? 'Criar lead' : 'Criar negócio'}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => rodar(() => acceptConversationAction(c.id), 'Negócio aberto em Novo.')}
+            className={`${c.patient ? 'btn-ghost' : 'btn-primary'} btn-sm inline-flex w-full items-center justify-center gap-1.5`}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {c.patient ? 'Abrir negócio (tratamento novo)' : 'Abrir negócio'}
           </button>
-          {entrada && (
-            <button type="button" disabled={pending} onClick={recusar} className="btn-ghost btn-sm inline-flex w-full items-center justify-center gap-1.5">
-              <X className="h-3.5 w-3.5" aria-hidden="true" /> Recusar
+          {!c.patient && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => rodar(() => declineConversationAction(c.id), 'Conversa arquivada.')}
+              className="btn-ghost btn-sm inline-flex w-full items-center justify-center gap-1.5"
+            >
+              <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Arquivar conversa
             </button>
           )}
           {erro && (
@@ -223,7 +215,7 @@ function ContactSide({ thread, basics, onChanged }: { thread: ChatThread; basics
               {erro}
             </p>
           )}
-        </form>
+        </div>
       )}
       <p role="status" aria-live="polite" className="sr-only">
         {aviso}

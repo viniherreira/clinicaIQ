@@ -3,7 +3,7 @@ import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinica
 import { chatKey } from '@/lib/phone';
 import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
-import { createLead, OPEN_LEAD, setTags, type Actor } from './leads';
+import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 
 /**
@@ -124,8 +124,9 @@ export async function classifyPending(db: TenantPrismaClient, tenantId: string):
 
 // ─── Listar ───────────────────────────────────────────────────────────────────
 
+/** `inbox` (a antiga Entrada) fica só para consulta interna: número novo já vira lead. */
 export type InboxTab = 'all' | 'mine' | 'unanswered' | 'inbox';
-export const INBOX_TABS: readonly InboxTab[] = ['all', 'mine', 'unanswered', 'inbox'];
+export const INBOX_TABS: readonly InboxTab[] = ['all', 'mine', 'unanswered'];
 
 export interface ConversationSummary {
   id: string;
@@ -588,16 +589,52 @@ export async function acceptConversation(
   return r;
 }
 
+/**
+ * Arquivar uma conversa sem negócio aberto (spam, engano). Some da lista; se a
+ * pessoa escrever de novo, volta sem lead (`chat-ingest.ts`).
+ */
 export async function declineConversation(
   db: TenantPrismaClient,
   conversationId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { count } = await db.conversation.updateMany({
-    where: { id: conversationId, status: 'INBOX' },
+  const conv = await db.conversation.findFirst({
+    where: { id: conversationId, status: { not: 'DECLINED' } },
+    select: { id: true, lead: { select: { ...OPEN_LEAD_SELECT } } },
+  });
+  if (!conv) return { ok: false, message: 'Esta conversa já foi arquivada.' };
+  if (conv.lead && isOpen(conv.lead)) return { ok: false, message: 'Esta conversa tem um negócio aberto. Use "Não é lead" no negócio.' };
+  await db.conversation.updateMany({
+    where: { id: conversationId },
     data: { status: 'DECLINED', unreadCount: 0, awaitingReply: false },
   });
-  return count ? { ok: true } : { ok: false, message: 'Esta conversa já saiu da Entrada.' };
+  return { ok: true };
 }
+
+/**
+ * "Não é lead": o card criado sozinho para um número que não é cliente (spam,
+ * fornecedor, engano). Tira o lead do funil e arquiva a conversa.
+ */
+export async function notALead(
+  db: TenantPrismaClient,
+  actor: Actor,
+  conversationId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const conv = await db.conversation.findFirst({
+    where: { id: conversationId },
+    select: { id: true, leadId: true, lead: { select: { ...OPEN_LEAD_SELECT } } },
+  });
+  if (!conv?.leadId || !conv.lead || !isOpen(conv.lead)) return { ok: false, message: 'Esta conversa não tem negócio aberto.' };
+  const r = await softDeleteLead(db, actor, conv.leadId);
+  if (!r.ok) return r;
+  await db.conversation.updateMany({
+    where: { id: conv.id },
+    data: { leadId: null, status: 'DECLINED', unreadCount: 0, awaitingReply: false },
+  });
+  return { ok: true };
+}
+
+const OPEN_LEAD_SELECT = { wonAt: true, lostAt: true, deletedAt: true } as const;
+const isOpen = (l: { wonAt: Date | null; lostAt: Date | null; deletedAt: Date | null }) => !l.wonAt && !l.lostAt && !l.deletedAt;
 
 /** Ligar a um lead ou paciente que já existe (a pessoa escreveu de outro número). */
 export async function linkConversation(

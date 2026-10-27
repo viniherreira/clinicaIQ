@@ -2,7 +2,7 @@ import { deflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
 import { uniqueName } from '../support/helpers';
 import { incomingMessage } from './chat';
-import { columnOf, createLeadViaModal, uniquePhone, waitAnnounced } from './helpers';
+import { columnOf, createLeadViaModal, uniquePhone } from './helpers';
 
 /**
  * As conversas do WhatsApp no CRM. O gateway não roda nos testes: a mensagem
@@ -10,18 +10,24 @@ import { columnOf, createLeadViaModal, uniquePhone, waitAnnounced } from './help
  * como enviada (sem gateway, o app simula).
  */
 
-test('número novo cai na Entrada do funil; aceitar vira lead em Novo', async ({ page }) => {
+test('contato sem card: sem Entrada nem formulário, "Abrir negócio" cria o lead em Novo com um clique', async ({ page }) => {
+  // No app, número novo já vira lead sozinho ao chegar (crm/inbound.ts). Aqui a
+  // mensagem é gravada direto no banco, sem esse passo: sobra o contato sem card.
   const nome = uniqueName('Contato E2E');
   await incomingMessage(uniquePhone(), nome, 'Oi! Quanto custa o clareamento?');
 
+  await page.goto('/crm/conversas');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('group', { name: 'Filtrar conversas' }).getByRole('button', { name: 'Entrada' })).toHaveCount(0);
+  await page.getByRole('list', { name: 'Lista de conversas' }).getByRole('button', { name: new RegExp(nome) }).click();
+
+  const contato = page.getByRole('complementary', { name: 'Contato da conversa' });
+  await expect(contato.getByRole('form')).toHaveCount(0);
+  await contato.getByRole('button', { name: 'Abrir negócio' }).click();
+  await expect(page.getByRole('complementary', { name: 'Dados do lead' })).toBeVisible({ timeout: 20_000 });
+
   await page.goto('/crm');
   await page.waitForLoadState('networkidle');
-  const entrada = page.getByRole('region', { name: /Entrada/ });
-  await expect(entrada.getByRole('link', { name: nome })).toBeVisible();
-  await expect(entrada).toContainText('Oi! Quanto custa o clareamento?');
-
-  await entrada.getByRole('button', { name: `Aceitar ${nome}` }).click();
-  await waitAnnounced(page, `${nome} aceito em Novo.`);
   await expect.poll(() => columnOf(page, nome), { timeout: 20_000 }).toBe('Novo');
 });
 

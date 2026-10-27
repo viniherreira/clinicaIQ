@@ -17,7 +17,8 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
   const tenant = await prisma.tenant.create({ data: { clerkOrgId: `cfg_${suffix}`, name: 'Cfg', slug: `cfg-${suffix}` } });
   const db = getTenantClient(tenant.id);
   await ensureDefaultPipeline(db, tenant.id);
-  const colunas = async () => boardStages(await db.pipelineStage.findMany()).map((x) => x.name);
+  // As colunas da Captação, o funil principal (onde entra a etapa sem funil).
+  const colunas = async () => boardStages(await db.pipelineStage.findMany({ where: { pipeline: { name: 'Captação' } } })).map((x) => x.name);
 
   afterAll(async () => {
     const t = { tenantId: tenant.id };
@@ -42,7 +43,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
   it('subir e descer reordena as colunas', async () => {
     const retorno = (await db.pipelineStage.findFirst({ where: { name: 'Retorno' } }))!;
     await s.moveStage(db, tenant.id, retorno.id, -1);
-    expect(await colunas()).toEqual(['Novo', 'Em conversa', 'Avaliação agendada', 'Desmarcou', 'Retorno', 'Em negociação']);
+    expect(await colunas()).toEqual(['Novo', 'Retorno', 'Em conversa']);
     await s.moveStage(db, tenant.id, (await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))!.id, -1);
     expect((await colunas())[0]).toBe('Novo');
   });
@@ -86,7 +87,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
 
   it('excluir funil leva os leads: abertos para a entrada, ganhos para o Fechou', async () => {
     const funil = (await db.pipeline.findFirst({ where: { name: 'Harmonização' } }))!;
-    const principal = (await db.pipeline.findFirst({ where: { name: 'Funil principal' } }))!;
+    const principal = (await db.pipeline.findFirst({ where: { name: 'Captação' } }))!;
     const retorno = (await db.pipelineStage.findFirst({ where: { pipelineId: funil.id, name: 'Retorno' } }))!;
     const fechou = (await db.pipelineStage.findFirst({ where: { pipelineId: funil.id, role: 'WON' } }))!;
     const ator = { tenantId: tenant.id, userId: null };
@@ -101,7 +102,34 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     const papel = (id: string) => destino.find((x) => x.id === id)?.role;
     expect(papel((await db.lead.findFirst({ where: { id: aberto.leadId } }))!.stageId)).toBe('NEW');
     expect(papel((await db.lead.findFirst({ where: { id: ganho.leadId } }))!.stageId)).toBe('WON');
-    expect(await db.pipeline.count()).toBe(1);
+    expect(await db.pipeline.count()).toBe(2);
+  });
+
+  it('Agenda e orçamentos: o papel muda de etapa (até de funil); funil com papel não se apaga', async () => {
+    const agendados = (await db.pipeline.findFirst({ where: { name: 'Agendados' } }))!;
+    const captacao = (await db.pipeline.findFirst({ where: { name: 'Captação' } }))!;
+    const apagar = await s.deletePipeline(db, tenant.id, agendados.id, captacao.id);
+    expect(apagar.ok).toBe(false);
+    if (!apagar.ok) expect(apagar.message).toContain('Agenda e orçamentos');
+
+    const conversa = (await db.pipelineStage.findFirst({ where: { pipelineId: captacao.id, name: 'Em conversa' } }))!;
+    const avaliacao = (await db.pipelineStage.findFirst({ where: { role: 'SCHEDULED' } }))!;
+    expect(await s.setAgendaStage(db, tenant.id, 'SCHEDULED', conversa.id)).toEqual({ ok: true });
+    expect(await db.pipelineStage.count({ where: { role: 'SCHEDULED' } })).toBe(1);
+    expect((await db.pipelineStage.findFirst({ where: { id: conversa.id } }))?.role).toBe('SCHEDULED');
+    expect((await db.pipelineStage.findFirst({ where: { id: avaliacao.id } }))?.role).toBeNull();
+
+    // Etapa com outro papel, entrada ou ganho não recebe.
+    const novo = (await db.pipelineStage.findFirst({ where: { pipelineId: captacao.id, role: 'NEW' } }))!;
+    const compareceu = (await db.pipelineStage.findFirst({ where: { role: 'ATTENDED' } }))!;
+    expect((await s.setAgendaStage(db, tenant.id, 'SCHEDULED', novo.id)).ok).toBe(false);
+    expect((await s.setAgendaStage(db, tenant.id, 'SCHEDULED', compareceu.id)).ok).toBe(false);
+
+    // Desligar e voltar.
+    expect(await s.setAgendaStage(db, tenant.id, 'SCHEDULED', null)).toEqual({ ok: true });
+    expect(await db.pipelineStage.count({ where: { role: 'SCHEDULED' } })).toBe(0);
+    expect(await s.setAgendaStage(db, tenant.id, 'SCHEDULED', avaliacao.id)).toEqual({ ok: true });
+    expect((await db.pipelineStage.findFirst({ where: { id: avaliacao.id } }))?.role).toBe('SCHEDULED');
   });
 
   it('motivo de perda se desativa, não se apaga', async () => {

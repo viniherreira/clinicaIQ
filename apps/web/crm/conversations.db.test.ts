@@ -124,6 +124,31 @@ describe.skipIf(!process.env.DATABASE_URL)('conversas (banco)', async () => {
     expect(await get(id)).toMatchObject({ leadId: lead.leadId, status: 'ACTIVE' });
   });
 
+  it('"Não é lead" tira o card e arquiva; se escrever de novo, volta sem card', async () => {
+    const id = await chegou('5511987651015', 'Fornecedor');
+    await c.classifyConversation(db, tenant.id, id);
+    const r = await c.acceptConversation(db, actor, id);
+    if (!r.ok) throw new Error(r.message);
+    // Com negócio aberto, arquivar direto não vale: é pelo "Não é lead".
+    expect((await c.declineConversation(db, id)).ok).toBe(false);
+    expect(await c.notALead(db, actor, id)).toEqual({ ok: true });
+    expect(await get(id)).toMatchObject({ status: 'DECLINED', leadId: null, unreadCount: 0 });
+    expect((await prisma.lead.findUnique({ where: { id: r.leadId } }))?.deletedAt).not.toBeNull();
+
+    const { ingestChat } = await import('./chat-ingest');
+    await ingestChat(tenant.id, {
+      externalId: `IN${suffix}volta`,
+      direction: 'INBOUND',
+      origin: 'CONTACT',
+      phone: '5511987651015',
+      contactName: 'Fornecedor',
+      kind: 'TEXT',
+      text: 'Bom dia',
+      at: new Date(),
+    });
+    expect(await get(id)).toMatchObject({ status: 'ACTIVE', leadId: null });
+  });
+
   it('abas: Entrada, Sem resposta, Minhas e busca por nome', async () => {
     const minha = await createLead(db, { tenantId: tenant.id, userId: outra.id }, { name: 'Fabiana', phone: '11 98765-1007' });
     if (!minha.ok) throw new Error(minha.message);

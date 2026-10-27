@@ -1,0 +1,33 @@
+-- Funis Captação → Agendados (docs/specs/2026-10-26-planos-teste-e-funis-design.md).
+--
+-- Parte 1 (só acrescenta; roda antes do merge): o papel "Compareceu".
+ALTER TYPE "StageRole" ADD VALUE IF NOT EXISTS 'ATTENDED' AFTER 'CANCELLED';
+
+-- Parte 2 (MUDA dados; só com o "pode" do dono): separa o "Funil principal"
+-- das clínicas antigas em Captação + Agendados. As etapas da agenda (Avaliação
+-- agendada, Desmarcou, Em negociação) mudam de funil levando os cards e as
+-- automações delas; nasce "Compareceu" e o Fechou/Perdeu de Agendados. Nada
+-- é apagado. Rodar depois da parte 1, noutra transação.
+--
+-- WITH principal AS (
+--   SELECT p.id, p."tenantId", p."order" FROM pipelines p
+--   WHERE p.name = 'Funil principal'
+--     AND EXISTS (SELECT 1 FROM pipeline_stages s WHERE s."pipelineId" = p.id AND s.role = 'SCHEDULED')
+-- ), novo AS (
+--   INSERT INTO pipelines (id, "tenantId", name, "order", "createdAt", "updatedAt")
+--   SELECT 'pipagd' || substr(md5(id), 1, 19), "tenantId", 'Agendados', "order" + 10, now(), now() FROM principal
+--   RETURNING id, "tenantId"
+-- ), movidas AS (
+--   UPDATE pipeline_stages s SET "pipelineId" = n.id, "updatedAt" = now(),
+--     name = CASE WHEN s.role = 'CANCELLED' AND s.name = 'Desmarcou' THEN 'Desmarcou ou faltou' ELSE s.name END,
+--     "order" = CASE s.role WHEN 'SCHEDULED' THEN 10 WHEN 'CANCELLED' THEN 20 ELSE 40 END
+--   FROM principal p JOIN novo n ON n."tenantId" = p."tenantId"
+--   WHERE s."pipelineId" = p.id AND s.role IN ('SCHEDULED', 'CANCELLED', 'NEGOTIATION')
+--   RETURNING s.id
+-- )
+-- INSERT INTO pipeline_stages (id, "tenantId", "pipelineId", name, color, "order", role, "createdAt", "updatedAt")
+-- SELECT 'stg' || x.k || substr(md5(n.id), 1, 18), n."tenantId", n.id, x.name, x.color, x.ord, x.role::"StageRole", now(), now()
+-- FROM novo n CROSS JOIN (VALUES ('att', 'Compareceu', 'violet', 30, 'ATTENDED'), ('won', 'Fechou', 'green', 1000, 'WON'), ('lst', 'Perdeu', 'red', 1001, 'LOST')) AS x(k, name, color, ord, role);
+--
+-- UPDATE pipelines SET name = 'Captação', "updatedAt" = now() WHERE name = 'Funil principal'
+--   AND "tenantId" IN (SELECT "tenantId" FROM pipelines WHERE name = 'Agendados');

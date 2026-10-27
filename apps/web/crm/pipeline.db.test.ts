@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { DEFAULT_LOST_REASONS, DEFAULT_STAGES } from './defaults';
+import { DEFAULT_LOST_REASONS, DEFAULT_PIPELINES } from './defaults';
+
+const ETAPAS = DEFAULT_PIPELINES.reduce((n, p) => n + p.stages.length, 0);
 
 /**
  * `ensureDefaultPipeline` contra o banco de desenvolvimento. Pulado onde não
@@ -27,18 +29,18 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
     await prisma.$disconnect();
   });
 
-  it('duas aberturas ao mesmo tempo criam o funil uma vez só', async () => {
+  it('duas aberturas ao mesmo tempo criam os funis uma vez só', async () => {
     await Promise.all([ensureDefaultPipeline(db, tenant.id), ensureDefaultPipeline(db, tenant.id)]);
-    expect(await db.pipelineStage.count()).toBe(DEFAULT_STAGES.length);
-    expect(await db.pipeline.count()).toBe(1);
+    expect(await db.pipelineStage.count()).toBe(ETAPAS);
+    expect((await db.pipeline.findMany({ orderBy: { order: 'asc' } })).map((p) => p.name)).toEqual(['Captação', 'Agendados']);
     expect(await db.lostReason.count()).toBe(DEFAULT_LOST_REASONS.length);
   });
 
   it('rodar de novo não muda nada, nem desfaz o que a clínica renomeou', async () => {
     await db.pipelineStage.updateMany({ where: { role: 'NEW' }, data: { name: 'Chegou agora' } });
     await ensureDefaultPipeline(db, tenant.id);
-    expect(await db.pipelineStage.count()).toBe(DEFAULT_STAGES.length);
-    expect(await db.pipeline.count()).toBe(1);
+    expect(await db.pipelineStage.count()).toBe(ETAPAS);
+    expect(await db.pipeline.count()).toBe(2);
     expect((await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))?.name).toBe('Chegou agora');
   });
 });

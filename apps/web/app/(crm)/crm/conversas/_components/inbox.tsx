@@ -18,7 +18,6 @@ const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
   { key: 'mine', label: 'Minhas' },
   { key: 'unanswered', label: 'Sem resposta' },
-  { key: 'inbox', label: 'Entrada' },
 ];
 
 /** De quanto em quanto tempo a tela pergunta se chegou algo, enquanto visível. */
@@ -172,11 +171,6 @@ export function Inbox({
                   className="segmented-item flex-1 whitespace-nowrap px-2"
                 >
                   {t.label}
-                  {t.key === 'inbox' && snap.counts.inbox > 0 && (
-                    <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
-                      {snap.counts.inbox}
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
@@ -298,9 +292,7 @@ function ConversationList({
       <p className="p-6 text-center text-sm text-muted-foreground">
         {q || filtered
           ? 'Nenhuma conversa encontrada.'
-          : tab === 'inbox'
-            ? 'Ninguém novo na Entrada.'
-            : tab === 'unanswered'
+          : tab === 'unanswered'
               ? 'Nenhuma conversa esperando resposta.'
               : tab === 'mine'
                 ? 'Nenhuma conversa de leads seus.'
@@ -312,7 +304,6 @@ function ConversationList({
     <ul className="min-h-0 flex-1 overflow-y-auto" aria-label="Lista de conversas">
       {items.map((c) => {
         const ativa = c.id === selectedId;
-        const entrada = c.status === 'INBOX';
         const lida = c.unread === 0;
         return (
           <li key={c.id} className="border-b border-border/70">
@@ -324,7 +315,7 @@ function ConversationList({
             >
               <span
                 aria-hidden="true"
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${entrada ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' : 'bg-primary/10 text-primary-hover dark:text-sky-300'}`}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-hover dark:text-sky-300"
               >
                 {initials(c.name)}
               </span>
@@ -338,11 +329,11 @@ function ConversationList({
                 <span className="mt-0.5 flex items-center gap-1.5 text-[13px]">
                   {c.lead ? (
                     <span className="truncate font-medium text-foreground/90">{c.lead.label}</span>
-                  ) : entrada ? (
-                    <span className="rounded-[3px] bg-amber-100 px-1.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Entrada · sem lead</span>
                   ) : c.patient ? (
                     <span className="text-[12px] text-muted-foreground">Paciente · sem negócio</span>
-                  ) : null}
+                  ) : (
+                    <span className="text-[12px] text-muted-foreground">Sem negócio</span>
+                  )}
                   {c.lead && <StageChip name={c.lead.stage} color={c.lead.stageColor} small />}
                 </span>
                 <span className="mt-0.5 flex items-center gap-2">
@@ -357,9 +348,9 @@ function ConversationList({
                     </span>
                   )}
                 </span>
-                {(c.tags.length > 0 || (c.awaitingReply && !entrada)) && (
+                {(c.tags.length > 0 || c.awaitingReply) && (
                   <span className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
-                    {c.awaitingReply && !entrada && (
+                    {c.awaitingReply && (
                       <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Sem resposta</span>
                     )}
                     {c.tags.slice(0, 3).map((t) => (

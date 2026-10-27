@@ -6,7 +6,7 @@ import {
   progressIndex,
   type StageLike,
 } from './pipeline';
-import { DEFAULT_STAGES } from './defaults';
+import { AGENDA_ROLES, DEFAULT_PIPELINES, DEFAULT_STAGES } from './defaults';
 
 const padrao: StageLike[] = DEFAULT_STAGES.map((s, i) => ({ id: `s${i}`, name: s.name, order: s.order, role: s.role }));
 const id = (name: string) => padrao.find((s) => s.name === name)!.id;
@@ -16,6 +16,16 @@ describe('funil padrão', () => {
     const papeis = DEFAULT_STAGES.map((s) => s.role).filter(Boolean);
     expect(new Set(papeis).size).toBe(papeis.length);
     expect(papeis.sort()).toEqual(['CANCELLED', 'LOST', 'NEGOTIATION', 'NEW', 'SCHEDULED', 'WON']);
+  });
+
+  it('Captação e Agendados: os papéis da agenda uma vez na clínica; ganho e perda em cada funil', () => {
+    const todos = DEFAULT_PIPELINES.flatMap((p) => p.stages.map((s) => s.role));
+    for (const r of AGENDA_ROLES) expect(todos.filter((x) => x === r)).toHaveLength(1);
+    for (const p of DEFAULT_PIPELINES) {
+      expect(p.stages.filter((s) => s.role === 'WON')).toHaveLength(1);
+      expect(p.stages.filter((s) => s.role === 'LOST')).toHaveLength(1);
+    }
+    expect(DEFAULT_PIPELINES[0].stages.find((s) => s.role === 'NEW')).toBeTruthy();
   });
 });
 

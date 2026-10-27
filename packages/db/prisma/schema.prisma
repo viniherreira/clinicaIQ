@@ -1021,6 +1021,8 @@ enum StageRole {
   SCHEDULED
   /// Desmarcou ou faltou na avaliação: a agenda move para cá.
   CANCELLED
+  /// Compareceu à avaliação: a agenda move para cá.
+  ATTENDED
   NEGOTIATION
   WON
   LOST

@@ -5,15 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { COLOR_LABEL, colorClasses } from '@/crm/colors';
-import { CRM_COLORS } from '@/crm/defaults';
+import { AGENDA_ROLES, AGENDA_ROLE_LABEL, CRM_COLORS, type AgendaRole } from '@/crm/defaults';
 import { normalizeShortcut } from '@/crm/quick-replies';
 import type { FieldDef } from '@/crm/custom-fields';
 import { FieldsTab } from './fields-tab';
 import {
-  deleteQuickReplyAction, deleteTagAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
+  deleteQuickReplyAction, deleteTagAction, setAgendaStageAction, toggleLostReasonAction, upsertLostReasonAction, upsertQuickReplyAction, upsertTagAction,
 } from '../actions';
 
-type PipelineRow = { id: string; name: string; stages: number; leads: number };
+type StageRow = { id: string; name: string; role: string | null };
+type PipelineRow = { id: string; name: string; stages: number; leads: number; stageList: StageRow[] };
 type Tag = { id: string; name: string; color: string; leads: number };
 type Reason = { id: string; name: string; active: boolean };
 type QuickReply = { id: string; title: string; body: string };
@@ -33,9 +34,12 @@ export function CrmSettings({
   reasons,
   quickReplies,
   fields,
+  agenda = true,
   initialTab = 'funis',
 }: {
   pipelines: PipelineRow[];
+  /** A clínica tem a agenda (não é só o CRM): mostra "Agenda e orçamentos". */
+  agenda?: boolean;
   tags: Tag[];
   fields: FieldDef[];
   reasons: Reason[];
@@ -83,7 +87,12 @@ export function CrmSettings({
       </div>
 
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} className="pt-5">
-        {aba === 'funis' && <Funis pipelines={pipelines} />}
+        {aba === 'funis' && (
+          <>
+            <Funis pipelines={pipelines} />
+            {agenda && <AgendaEtapas pipelines={pipelines} pending={pending} agir={agir} />}
+          </>
+        )}
         {aba === 'tags' && <Tags tags={tags} pending={pending} agir={agir} />}
         {aba === 'campos' && <FieldsTab fields={fields} pending={pending} agir={agir} />}
         {aba === 'motivos' && <Motivos reasons={reasons} pending={pending} agir={agir} />}
@@ -154,6 +163,69 @@ function Funis({ pipelines }: { pipelines: PipelineRow[] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+const AGENDA_HINT: Record<AgendaRole, string> = {
+  SCHEDULED: 'Marcou a avaliação na agenda.',
+  CANCELLED: 'Desmarcou ou faltou e não tem outro horário marcado.',
+  ATTENDED: 'Marcado como compareceu na agenda.',
+  NEGOTIATION: 'Um orçamento foi criado para o paciente.',
+};
+
+/**
+ * Para onde a agenda e os orçamentos levam o card. A etapa pode ser de outro
+ * funil: é assim que quem agenda sai da Captação e entra em Agendados.
+ */
+function AgendaEtapas({ pipelines, pending, agir }: { pipelines: PipelineRow[]; pending: boolean; agir: Agir }) {
+  const id = useId();
+  const atual = (role: AgendaRole) => pipelines.flatMap((p) => p.stageList).find((s) => s.role === role)?.id ?? '';
+  return (
+    <section aria-labelledby={`${id}-titulo`} className="mt-8 rounded-xl border border-border bg-surface p-4 sm:p-5">
+      <h2 id={`${id}-titulo`} className="text-base font-semibold">Agenda e orçamentos</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        O que acontece na agenda move o card sozinho, como uma passagem de bastão. Escolha a etapa de cada evento; ela pode ser de
+        outro funil. Fechou é sempre o do funil em que o card está, e perder nunca é automático.
+      </p>
+      <ul className="mt-4 space-y-3">
+        {AGENDA_ROLES.map((role) => (
+          <li key={role} className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)] sm:items-center sm:gap-4">
+            <div>
+              <label htmlFor={`${id}-${role}`} className="text-sm font-medium">
+                {AGENDA_ROLE_LABEL[role]}
+              </label>
+              <p className="text-xs text-muted-foreground">{AGENDA_HINT[role]}</p>
+            </div>
+            <select
+              id={`${id}-${role}`}
+              value={atual(role)}
+              disabled={pending}
+              onChange={(e) =>
+                agir(
+                  () => setAgendaStageAction(role, e.target.value || null),
+                  e.target.value ? 'Etapa da agenda salva.' : 'A agenda não move mais o card nesse evento.',
+                )
+              }
+              className={inputCls}
+            >
+              <option value="">Não mover o card</option>
+              {pipelines.map((p) => (
+                <optgroup key={p.id} label={p.name}>
+                  {p.stageList
+                    .filter((s) => s.role !== 'NEW' && s.role !== 'WON' && s.role !== 'LOST')
+                    .map((s) => (
+                      <option key={s.id} value={s.id} disabled={s.role !== null && s.role !== role}>
+                        {s.name}
+                        {s.role !== null && s.role !== role ? ` (já usada: ${AGENDA_ROLE_LABEL[s.role as AgendaRole].toLowerCase()})` : ''}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
