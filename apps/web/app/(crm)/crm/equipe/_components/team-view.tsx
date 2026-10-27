@@ -316,7 +316,9 @@ function Distribution({
   const [s, setS] = useState(initial);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  useEffect(() => setS(initial), [initial]);
+  useEffect(() => {
+    setS(initial);
+  }, [initial]);
   const mudou = s.enabled !== initial.enabled || s.mode !== initial.mode || s.onlyAvailable !== initial.onlyAvailable;
   const recebem = members.filter((m) => m.receivesLeads);
   const agora = recebem.filter((m) => !s.onlyAvailable || m.available);
@@ -361,6 +363,7 @@ function Distribution({
           {(Object.keys(DISTRIBUTION_MODE_INFO) as DistributionMode[]).map((k) => (
             <label
               key={k}
+              aria-label={DISTRIBUTION_MODE_INFO[k].label}
               className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 ${
                 s.mode === k ? 'border-primary/60 bg-primary/5' : 'border-border hover:bg-surface-alt/60'
               }`}

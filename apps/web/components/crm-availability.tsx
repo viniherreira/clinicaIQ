@@ -13,7 +13,9 @@ export function AvailabilityToggle({ initial }: { initial: boolean }) {
   const [on, setOn] = useState(initial);
   const [pending, start] = useTransition();
   const [erro, setErro] = useState('');
-  useEffect(() => setOn(initial), [initial]);
+  useEffect(() => {
+    setOn(initial);
+  }, [initial]);
 
   return (
     <div className="flex items-center">
