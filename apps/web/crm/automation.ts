@@ -1,4 +1,5 @@
-import { fallbackStageAfterCancel, progressIndex, stageByRole, type StageLike } from './pipeline';
+import type { AgendaRole } from './defaults';
+import { fallbackStageAfterCancel, pipelineOf, progressIndex, stageByRole, type StageLike } from './pipeline';
 
 /**
  * A integração automática do funil com a agenda e os orçamentos.
@@ -7,12 +8,15 @@ import { fallbackStageAfterCancel, progressIndex, stageByRole, type StageLike } 
  * e grava é `notify.ts`. As regras estão na spec
  * (docs/specs/2026-10-07-crm-etapa1-leads-funil-design.md):
  *
- * 1. Avançar só para frente: se a recepção já pôs o card mais adiante, a
- *    automação não o puxa para trás.
- * 2. Voltar só no cancelamento ou falta, e só a partir de "Avaliação agendada":
+ * 1. Cada evento tem uma etapa de destino — a do papel, em qualquer funil da
+ *    clínica (docs/specs/2026-10-26-planos-teste-e-funis-design.md). Num
+ *    outro funil, o card muda de funil: é a Captação passando para Agendados.
+ * 2. No mesmo funil, avançar só para frente: se a recepção já pôs o card mais
+ *    adiante, a automação não o puxa para trás.
+ * 3. Voltar só no cancelamento ou falta, e só a partir de "Avaliação agendada":
  *    vai para "Desmarcou" (ou, no funil sem ela, uma coluna antes).
- * 3. Perder nunca é automático.
- * 4. Lead ganho ou perdido não é mexido, exceto quando o orçamento que o ganhou
+ * 4. Perder nunca é automático.
+ * 5. Lead ganho ou perdido não é mexido, exceto quando o orçamento que o ganhou
  *    é reaberto.
  */
 
@@ -36,6 +40,7 @@ export interface LeadSnapshot {
 }
 
 export interface AutomationContext {
+  /** Todas as etapas da clínica, de todos os funis. */
   stages: readonly StageLike[];
   lead: LeadSnapshot;
   /** O paciente tem outro agendamento futuro, sem contar o deste evento. */
@@ -86,16 +91,22 @@ const NADA: AutomationPlan = { tasks: [] };
 
 const aberto = (lead: LeadSnapshot) => !lead.wonAt && !lead.lostAt;
 
-/** Avança para a etapa do papel, se ela estiver à frente da atual. */
-function avancar(ctx: AutomationContext, role: 'SCHEDULED' | 'NEGOTIATION' | 'WON'): string | undefined {
+/**
+ * Avança para a etapa do papel. Noutro funil, vai (é a passagem de funil); no
+ * mesmo, só se ela estiver à frente da atual.
+ */
+function avancar(ctx: AutomationContext, role: AgendaRole): string | undefined {
   const destino = stageByRole(ctx.stages, role);
   if (!destino) return undefined;
-  const atual = progressIndex(ctx.stages, ctx.lead.stageId);
-  return progressIndex(ctx.stages, destino.id) > atual ? destino.id : undefined;
+  const atual = ctx.stages.find((s) => s.id === ctx.lead.stageId);
+  if (atual?.pipelineId !== undefined && destino.pipelineId !== atual.pipelineId) return destino.id;
+  const funil = pipelineOf(ctx.stages, ctx.lead.stageId);
+  return progressIndex(funil, destino.id) > progressIndex(funil, ctx.lead.stageId) ? destino.id : undefined;
 }
 
 export function planForEvent(ctx: AutomationContext, event: ClinicEvent): AutomationPlan {
   const { lead } = ctx;
+  const atual = ctx.stages.find((s) => s.id === lead.stageId);
 
   if (event.type === 'quote.reopened') {
     if (!lead.wonAt || !ctx.wonByThisQuote) return NADA;
@@ -107,7 +118,6 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
   switch (event.type) {
     case 'appointment.created': {
       // De "Desmarcou" volta para "Avaliação agendada", mesmo estando à frente no quadro.
-      const atual = ctx.stages.find((s) => s.id === lead.stageId);
       const moveTo = atual?.role === 'CANCELLED' ? stageByRole(ctx.stages, 'SCHEDULED')?.id : avancar(ctx, 'SCHEDULED');
       return { moveTo, tasks: [], completes: [TASK_REAGENDAR, TASK_FALTOU] };
     }
@@ -118,23 +128,30 @@ export function planForEvent(ctx: AutomationContext, event: ClinicEvent): Automa
 
     case 'appointment.cancelled':
     case 'appointment.missed': {
-      const agendado = stageByRole(ctx.stages, 'SCHEDULED');
-      if (!agendado || lead.stageId !== agendado.id || ctx.hasFutureAppointment) return NADA;
+      if (atual?.role !== 'SCHEDULED' || ctx.hasFutureAppointment) return NADA;
       return {
-        moveTo: fallbackStageAfterCancel(ctx.stages)?.id,
+        moveTo: (stageByRole(ctx.stages, 'CANCELLED') ?? fallbackStageAfterCancel(pipelineOf(ctx.stages, lead.stageId)))?.id,
         tasks: [{ text: event.type === 'appointment.missed' ? TASK_FALTOU : TASK_REAGENDAR, inDays: 1 }],
       };
     }
 
-    case 'appointment.attended':
-      return ctx.hasOpenQuote ? NADA : { tasks: [{ text: TASK_ENVIAR_ORCAMENTO, inDays: 1 }] };
+    case 'appointment.attended': {
+      // Veio, mesmo depois de ter desmarcado: "Compareceu".
+      const moveTo = atual?.role === 'CANCELLED' ? stageByRole(ctx.stages, 'ATTENDED')?.id : avancar(ctx, 'ATTENDED');
+      return {
+        moveTo,
+        tasks: ctx.hasOpenQuote ? [] : [{ text: TASK_ENVIAR_ORCAMENTO, inDays: 1 }],
+        completes: [TASK_REAGENDAR, TASK_FALTOU],
+      };
+    }
 
     case 'quote.created':
       return { moveTo: avancar(ctx, 'NEGOTIATION'), tasks: [], completes: [TASK_ENVIAR_ORCAMENTO, TASK_RETOMAR] };
 
     case 'quote.accepted':
       return {
-        moveTo: stageByRole(ctx.stages, 'WON')?.id,
+        // O "Fechou" do funil em que o card está.
+        moveTo: stageByRole(pipelineOf(ctx.stages, lead.stageId), 'WON')?.id,
         wonValueCents: ctx.quoteTotalCents,
         tasks: [],
         completes: [TASK_REAGENDAR, TASK_FALTOU, TASK_ENVIAR_ORCAMENTO, TASK_RETOMAR],

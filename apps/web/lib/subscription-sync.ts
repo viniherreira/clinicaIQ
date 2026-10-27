@@ -53,7 +53,7 @@ export async function reconcileSubscriptions(now: Date = new Date()): Promise<Re
       console.error('[crm] valor da assinatura não sincronizado', sub.tenantId, e instanceof Error ? e.message : e),
     );
 
-    const access = resolveAccess(sub, now);
+    const access = resolveAccess({ ...sub, billingLinked: Boolean(sub.asaasSubscriptionId) }, now);
     if (access.status === sub.status) continue;
 
     await prisma.subscription.update({

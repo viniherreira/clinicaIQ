@@ -10,7 +10,7 @@ import {
   type ClinicEvent,
 } from './automation';
 import { clinicDateAt, clinicLocalToInstant, clinicNowWall, instantToClinicLocal } from './clock';
-import { DEFAULT_STAGES } from './defaults';
+import { DEFAULT_PIPELINES, DEFAULT_STAGES } from './defaults';
 import type { StageLike } from './pipeline';
 
 const stages: StageLike[] = DEFAULT_STAGES.map((s, i) => ({ id: s.name, name: s.name, order: s.order, role: s.role }));
@@ -110,8 +110,9 @@ describe('voltar no cancelamento e na falta', () => {
 
 describe('tarefas automáticas', () => {
   it('compareceu sem orçamento em aberto: "Enviar orçamento"', () => {
-    expect(planForEvent(ctx('Avaliação agendada'), ev.compareceu)).toEqual({ tasks: [{ text: TASK_ENVIAR_ORCAMENTO, inDays: 1 }] });
-    expect(planForEvent(ctx('Avaliação agendada', { hasOpenQuote: true }), ev.compareceu)).toEqual({ tasks: [] });
+    const veio = { tasks: [{ text: TASK_ENVIAR_ORCAMENTO, inDays: 1 }], completes: [TASK_REAGENDAR, TASK_FALTOU] };
+    expect(planForEvent(ctx('Avaliação agendada'), ev.compareceu)).toEqual(veio);
+    expect(planForEvent(ctx('Avaliação agendada', { hasOpenQuote: true }), ev.compareceu)).toEqual({ ...veio, tasks: [] });
   });
 
   it('recusado ou excluído sem outro em aberto: "Retomar negociação", sem perder o lead', () => {
@@ -121,6 +122,52 @@ describe('tarefas automáticas', () => {
       expect(plano.moveTo).toBeUndefined();
     }
     expect(planForEvent(ctx('Em negociação', { hasOpenQuote: true }), ev.recusou)).toEqual({ tasks: [] });
+  });
+});
+
+describe('dois funis: Captação → Agendados', () => {
+  // Ids "Funil/Etapa": os dois funis têm "Fechou" e "Perdeu".
+  const dois: StageLike[] = DEFAULT_PIPELINES.flatMap((p) =>
+    p.stages.map((s) => ({ id: `${p.name}/${s.name}`, name: s.name, order: s.order, role: s.role, pipelineId: p.name })),
+  );
+  const em = (stageId: string, over: Partial<AutomationContext> = {}, lead: Partial<AutomationContext['lead']> = {}) =>
+    ctx(stageId, { stages: dois, ...over }, lead);
+
+  it('agendou na Captação: passa para Agendados', () => {
+    expect(planForEvent(em('Captação/Novo'), ev.agendou).moveTo).toBe('Agendados/Avaliação agendada');
+    expect(planForEvent(em('Captação/Em conversa'), ev.agendou).moveTo).toBe('Agendados/Avaliação agendada');
+  });
+
+  it('orçamento direto da Captação: vai para Agendados › Em negociação', () => {
+    expect(planForEvent(em('Captação/Em conversa'), ev.orcou).moveTo).toBe('Agendados/Em negociação');
+  });
+
+  it('dentro de Agendados, só para frente', () => {
+    expect(planForEvent(em('Agendados/Em negociação'), ev.agendou).moveTo).toBeUndefined();
+    expect(planForEvent(em('Agendados/Compareceu'), ev.agendou).moveTo).toBeUndefined();
+    expect(planForEvent(em('Agendados/Avaliação agendada'), ev.orcou).moveTo).toBe('Agendados/Em negociação');
+  });
+
+  it('desmarcou e faltou: "Desmarcou ou faltou"; agendou de novo volta', () => {
+    expect(planForEvent(em('Agendados/Avaliação agendada'), ev.cancelou).moveTo).toBe('Agendados/Desmarcou ou faltou');
+    expect(planForEvent(em('Agendados/Avaliação agendada'), ev.faltou).moveTo).toBe('Agendados/Desmarcou ou faltou');
+    expect(planForEvent(em('Agendados/Desmarcou ou faltou'), ev.agendou).moveTo).toBe('Agendados/Avaliação agendada');
+  });
+
+  it('compareceu: vai para Compareceu, até de quem tinha desmarcado', () => {
+    expect(planForEvent(em('Agendados/Avaliação agendada'), ev.compareceu).moveTo).toBe('Agendados/Compareceu');
+    expect(planForEvent(em('Agendados/Desmarcou ou faltou'), ev.compareceu).moveTo).toBe('Agendados/Compareceu');
+    expect(planForEvent(em('Agendados/Em negociação'), ev.compareceu).moveTo).toBeUndefined();
+  });
+
+  it('aprovou: o Fechou do funil em que o card está', () => {
+    expect(planForEvent(em('Agendados/Em negociação'), ev.aprovou).moveTo).toBe('Agendados/Fechou');
+    expect(planForEvent(em('Captação/Em conversa'), ev.aprovou).moveTo).toBe('Captação/Fechou');
+  });
+
+  it('o card de um funil da clínica sem etapas da agenda também passa para Agendados', () => {
+    const comOutro = [...dois, { id: 'Implantes/Novo', name: 'Novo', order: 10, role: 'NEW' as const, pipelineId: 'Implantes' }];
+    expect(planForEvent(em('Implantes/Novo', { stages: comOutro }), ev.agendou).moveTo).toBe('Agendados/Avaliação agendada');
   });
 });
 

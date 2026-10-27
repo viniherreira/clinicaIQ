@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { KanbanSquare } from 'lucide-react';
+import { prisma } from '@clinicaiq/db';
 import { currentAccess } from '@/lib/guard';
 import { loadCrmAddon } from '@/crm/addon';
 import { crmOfferText, formatCents, usersLabel } from '@/crm/format';
@@ -10,19 +11,29 @@ const dataBR = (iso: string) =>
   new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date(iso));
 
 /**
- * O CRM na aba Plano: o adicional, quanto custa, em que situação está e o
- * botão de ligar ou desligar. O total do mês mostra plano + CRM.
+ * O CRM na aba Plano, para quem já assina a Agenda: experimentar 14 dias
+ * grátis, quanto soma, em que situação está e o botão de ligar ou desligar. O
+ * total do mês mostra plano + CRM.
+ *
+ * Não aparece para a clínica só com o CRM (o CRM é o plano dela) nem no teste
+ * grátis da clínica, em que acrescentar o CRM é escolher o Completo nos planos.
  */
 export async function CrmAddonCard() {
   const acesso = await currentAccess();
   if (!acesso) return null;
+  const sub = await prisma.subscription.findUnique({
+    where: { tenantId: acesso.tenantId },
+    select: { clinicEnabled: true, status: true, asaasSubscriptionId: true, complimentary: true },
+  });
+  if (!sub || !sub.clinicEnabled) return null;
+  if (sub.status === 'TRIALING' && !sub.asaasSubscriptionId && !sub.complimentary) return null;
   const a = await loadCrmAddon(acesso.tenantId);
   const oferta = crmOfferText(a);
   const usuarios = usersLabel(a.seats);
 
   const situacao =
     a.status === 'off'
-      ? `Desligado. ${oferta}, somado à mensalidade.`
+      ? `Desligado. Com o CRM, o plano vira o Completo: ${oferta}, somado à mensalidade.`
       : a.status === 'trial'
         ? `Em teste grátis até ${dataBR(a.trialEndsAt!)}. Depois, ${oferta} (hoje: ${usuarios} = ${formatCents(a.crmMonthlyCents)}/mês).`
         : a.status === 'complimentary'
@@ -36,7 +47,7 @@ export async function CrmAddonCard() {
           <KanbanSquare className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="crm-adicional" className="text-base font-semibold">CRM · adicional</h2>
+          <h2 id="crm-adicional" className="text-base font-semibold">CRM</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Funil de captação com tarefas, que anda sozinho com a agenda e os orçamentos.
           </p>

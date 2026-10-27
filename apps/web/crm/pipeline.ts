@@ -1,5 +1,5 @@
 import type { StageRole, TenantPrismaClient } from '@clinicaiq/db';
-import { DEFAULT_LOST_REASONS, DEFAULT_STAGES, MAIN_PIPELINE_NAME } from './defaults';
+import { AGENDA_ROLES, AGENDA_ROLE_LABEL, DEFAULT_LOST_REASONS, DEFAULT_PIPELINES, type AgendaRole } from './defaults';
 
 /** O mínimo de uma etapa que as regras precisam. */
 export interface StageLike {
@@ -7,6 +7,18 @@ export interface StageLike {
   name: string;
   order: number;
   role: StageRole | null;
+  /** Sem ele, todas as etapas contam como do mesmo funil. */
+  pipelineId?: string;
+}
+
+export const isAgendaRole = (role: StageRole | null): role is AgendaRole =>
+  role !== null && (AGENDA_ROLES as readonly string[]).includes(role);
+
+/** As etapas do mesmo funil que `stageId`. */
+export function pipelineOf<T extends StageLike>(stages: readonly T[], stageId: string): T[] {
+  const stage = stages.find((s) => s.id === stageId);
+  if (!stage || stage.pipelineId === undefined) return [...stages];
+  return stages.filter((s) => s.pipelineId === stage.pipelineId);
 }
 
 const CLOSED: readonly StageRole[] = ['WON', 'LOST'];
@@ -68,10 +80,10 @@ export function canDeleteStage(
   leadCount: number,
   target?: StageLike | null,
 ): DeleteCheck {
-  if (stage.role === 'SCHEDULED' || stage.role === 'CANCELLED' || stage.role === 'NEGOTIATION') {
+  if (isAgendaRole(stage.role)) {
     return {
       ok: false,
-      message: `"${stage.name}" é usada pela integração com a agenda e os orçamentos. Dá para renomear, mas não apagar.`,
+      message: `"${stage.name}" recebe quem ${AGENDA_ROLE_LABEL[stage.role].toLowerCase()}, pela agenda e pelos orçamentos. Escolha outra etapa para isso em "Agenda e orçamentos" e então apague.`,
     };
   }
   if (stage.role) {
@@ -97,7 +109,8 @@ export function mainPipeline<T extends { order: number; createdAt: Date }>(pipel
 }
 
 /**
- * Cria o funil padrão e os motivos de perda da clínica, se faltarem.
+ * Cria os funis padrão (Captação e Agendados) e os motivos de perda da
+ * clínica, se faltarem.
  *
  * Idempotente: pode rodar a cada abertura do CRM. Duas abas abrindo o CRM pela
  * primeira vez ao mesmo tempo não duplicam nada — o lock de transação por
@@ -111,17 +124,19 @@ export async function ensureDefaultPipeline(db: TenantPrismaClient, tenantId: st
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`crm-pipeline:${tenantId}`}))`;
 
     if ((await tx.pipeline.count({ where: { tenantId } })) === 0) {
-      const funil = await tx.pipeline.create({ data: { tenantId, name: MAIN_PIPELINE_NAME, order: 10 } });
-      await tx.pipelineStage.createMany({
-        data: DEFAULT_STAGES.map((s) => ({
-          tenantId,
-          pipelineId: funil.id,
-          name: s.name,
-          color: s.color,
-          order: s.order,
-          role: s.role,
-        })),
-      });
+      for (const p of DEFAULT_PIPELINES) {
+        const funil = await tx.pipeline.create({ data: { tenantId, name: p.name, order: p.order } });
+        await tx.pipelineStage.createMany({
+          data: p.stages.map((s) => ({
+            tenantId,
+            pipelineId: funil.id,
+            name: s.name,
+            color: s.color,
+            order: s.order,
+            role: s.role,
+          })),
+        });
+      }
     }
     if ((await tx.lostReason.count({ where: { tenantId } })) === 0) {
       await tx.lostReason.createMany({

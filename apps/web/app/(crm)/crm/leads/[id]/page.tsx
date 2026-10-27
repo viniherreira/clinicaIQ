@@ -7,6 +7,7 @@ import { loadCrmBasics } from '@/crm/page-data';
 import { conversationIdForLead, loadThread } from '@/crm/conversations';
 import { activeCloudAccount } from '@/crm/cloud';
 import { can } from '@/lib/permissions';
+import { getTenantModules } from '@/lib/access';
 import { LeadPanel } from './_components/lead-panel';
 import { ConvertActions } from './_components/convert-actions';
 import { LeadRightPane } from './_components/lead-chat';
@@ -19,6 +20,7 @@ export async function generateMetadata() {
 /** A ficha do lead, como no Kommo: dados à esquerda; conversa e histórico juntos à direita. */
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireCrm('crm');
+  const modules = await getTenantModules(ctx.tenantId);
   const { id } = await params;
   const [lead, basics, conversationId, quickReplies] = await Promise.all([
     loadLeadDetail(ctx, id),
@@ -49,7 +51,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             procedures={basics.procedures}
             lostReasons={basics.lostReasons}
             fields={basics.fields}
-            actions={<ConvertActions key="converter" leadId={lead.id} patient={lead.patient} />}
+            // Só com a agenda: na clínica só com o CRM não há agenda nem ficha de paciente.
+            actions={modules.clinic ? <ConvertActions key="converter" leadId={lead.id} patient={lead.patient} /> : undefined}
           />
           {can(ctx.role, 'crm_config') && <EraseLeadData leadId={lead.id} leadName={lead.name} />}
         </div>

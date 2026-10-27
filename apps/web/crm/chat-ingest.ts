@@ -115,7 +115,10 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
       data.awaitingReply = true;
     }
     if (name && name !== conv.contactName) data.contactName = name;
-    if (conv.status === 'DECLINED') data.status = 'INBOX';
+    // Arquivada ("Não é lead") e escreveu de novo: volta para a lista, sem lead —
+    // a equipe vê e abre o negócio se for o caso. Virar lead sozinha de novo
+    // faria o spam voltar ao funil a cada mensagem.
+    if (conv.status === 'DECLINED') data.status = 'ACTIVE';
   } else if (newest && input.origin === 'PHONE') {
     // Respondido pelo celular da clínica: alguém leu, e o robô sai da conversa.
     // O aviso automático da agenda não conta como resposta de ninguém.

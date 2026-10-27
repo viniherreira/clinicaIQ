@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
 import { DoorClosed } from 'lucide-react';
-import { CreateClinicForm } from './create-clinic-form';
+import { CreateClinicForm, type TrialPlan } from './create-clinic-form';
+import type { Product, Tier } from '@/lib/products';
 
 /**
  * Fim de linha para quem foi removido de uma clínica.
@@ -13,11 +14,21 @@ import { CreateClinicForm } from './create-clinic-form';
  * e quando, é o mínimo — a pessoa quase sempre vai perguntar isso para alguém, e
  * é melhor que ela já saiba a resposta.
  */
-export function AcessoEncerrado({ clinica, em }: { clinica: string; em: Date | string | null }) {
+export function AcessoEncerrado({
+  clinica,
+  em,
+  plans,
+  initial,
+}: {
+  clinica: string;
+  em: Date | string | null;
+  plans: TrialPlan[];
+  initial: { product: Product; tier: Tier };
+}) {
   const { signOut } = useClerk();
   const [abrindoPropria, setAbrindoPropria] = useState(false);
 
-  if (abrindoPropria) return <CreateClinicForm />;
+  if (abrindoPropria) return <CreateClinicForm plans={plans} initial={initial} />;
 
   const data = em ? new Date(em).toLocaleDateString('pt-BR') : null;
 

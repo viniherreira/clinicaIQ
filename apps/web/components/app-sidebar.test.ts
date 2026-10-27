@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { activeHref, navFor, CLINIC_NAV, CRM_NAV } from './app-sidebar';
+import { clinicHomeFor } from './module-switcher';
 
 /**
  * O que cada perfil enxerga no menu.
@@ -107,5 +108,14 @@ describe('activeHref', () => {
     expect(activeHref(CLINIC_NAV, '/pacientes/123/editar')).toBe('/pacientes');
     expect(activeHref(CLINIC_NAV, '/dashboard')).toBe('/dashboard');
     expect(activeHref(CLINIC_NAV, '/crm-indisponivel')).toBeUndefined();
+  });
+});
+
+describe('clínica só com o CRM', () => {
+  it('do lado da clínica só sobram as Configurações; o CRM fica inteiro', () => {
+    expect(navFor('OWNER', 'clinic', true).map((i) => i.href)).toEqual(['/configuracoes']);
+    expect(navFor('OWNER', 'crm', true).map((i) => i.href)).toEqual(navFor('OWNER', 'crm').map((i) => i.href));
+    expect(clinicHomeFor(true)).toBe('/configuracoes');
+    expect(clinicHomeFor(false)).toBe('/dashboard');
   });
 });

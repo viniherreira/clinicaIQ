@@ -1,9 +1,9 @@
-import { CalendarDays, FileText, ShieldCheck, Sparkles } from 'lucide-react';
+import { CalendarDays, KanbanSquare, ShieldCheck, Sparkles } from 'lucide-react';
 import { Logo } from '@/components/logo';
 
 const FEATURES = [
-  { icon: CalendarDays, title: 'Agenda inteligente', desc: 'Visual, por profissional, com confirmação via WhatsApp.' },
-  { icon: FileText, title: 'Orçamentos que fecham', desc: 'PDF profissional e link para o paciente aceitar online.' },
+  { icon: CalendarDays, title: 'Agenda e prontuário', desc: 'Por profissional, com confirmação no WhatsApp oficial e orçamentos por link.' },
+  { icon: KanbanSquare, title: 'CRM que anda sozinho', desc: 'Quem chama vira lead; agendou, o card passa de funil.' },
   { icon: ShieldCheck, title: 'Seguro e LGPD', desc: 'CPF e telefone criptografados de ponta a ponta.' },
 ];
 
@@ -21,13 +21,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <div className="relative max-w-md">
           <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Gestão clínica moderna
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> 14 dias grátis, sem cartão
           </div>
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white xl:text-4xl">
-            A sua clínica inteira, em um só lugar.
+            Do primeiro “oi” no WhatsApp ao tratamento fechado.
           </h1>
           <p className="mt-3 text-white/80">
-            Agenda, pacientes, procedimentos e orçamentos, com acessibilidade e segurança de verdade.
+            Agenda, prontuário, orçamentos e CRM num só sistema, com acessibilidade e segurança de verdade.
           </p>
 
           <ul className="mt-8 space-y-4">

@@ -35,7 +35,7 @@ export async function AppShell({
   children,
 }: {
   space: Space;
-  guard?: (ctx: { role: string; crm: boolean; seat: boolean }) => void;
+  guard?: (ctx: { role: string; crm: boolean; seat: boolean; clinic: boolean }) => void;
   children: React.ReactNode;
 }) {
   const { userId } = await auth();
@@ -61,7 +61,8 @@ export async function AppShell({
 
   const role = me?.role ?? '';
   const seat = Boolean(me?.crmSeat) || modules.crmWholeTeam;
-  guard?.({ role, crm: modules.crm, seat });
+  guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
+  const crmOnly = !modules.clinic;
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
@@ -92,6 +93,7 @@ export async function AppShell({
         space={space}
         showSwitcher={showSwitcher}
         counts={{ '/crm/conversas': unread }}
+        crmOnly={crmOnly}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
@@ -105,6 +107,7 @@ export async function AppShell({
           space={space}
           showSwitcher={showSwitcher}
           units={units}
+          crmOnly={crmOnly}
         />
         <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto bg-canvas">

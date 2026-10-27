@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
-import type { Space } from './module-switcher';
+import { clinicHomeFor, type Space } from './module-switcher';
 import { can, type Capability } from '@/lib/permissions';
 
 /**
@@ -61,8 +61,8 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm_config' },
 ];
 
-export function navFor(role: string | null | undefined, space: Space = 'clinic') {
-  const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV;
+export function navFor(role: string | null | undefined, space: Space = 'clinic', crmOnly = false) {
+  const nav = space === 'crm' ? CRM_NAV : CLINIC_NAV.filter((item) => !crmOnly || item.href === '/configuracoes');
   return nav.filter((item) => !item.capability || can(role, item.capability));
 }
 
@@ -82,23 +82,28 @@ export function AppSidebar({
   space = 'clinic',
   showSwitcher = false,
   counts = {},
+  crmOnly = false,
 }: {
   clinicName: string;
   role: string;
   space?: Space;
   /** A clínica tem os dois módulos e a pessoa alcança o CRM. */
   showSwitcher?: boolean;
+  /** A clínica contratou só o CRM: do lado da clínica, só Configurações. */
+  crmOnly?: boolean;
   /** Números ao lado de um item (conversas não lidas), por endereço. */
   counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
-  const itens = navFor(role, space);
+  const itens = navFor(role, space, crmOnly);
   const unread = useLiveUnread(counts['/crm/conversas'] ?? 0);
   const contagem: Record<string, number> = { ...counts, '/crm/conversas': unread };
   const ativo = activeHref(itens, pathname);
 
   if (space === 'crm') {
-    return <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} />;
+    return (
+      <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} />
+    );
   }
-  return <ClinicSidebar items={itens} active={ativo} clinicName={clinicName} showSwitcher={showSwitcher} />;
+  return <ClinicSidebar items={itens} active={ativo} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} />;
 }

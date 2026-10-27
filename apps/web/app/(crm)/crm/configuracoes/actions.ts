@@ -5,6 +5,7 @@ import { guardCrmAction } from '@/crm/guard';
 import * as s from '@/crm/settings';
 import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
 import type { AutomationAction } from '@clinicaiq/db';
+import type { AgendaRole } from '@/crm/defaults';
 import { deleteBot, toggleBot } from '@/crm/bot-admin';
 import { moveField, saveField, type FieldInput } from '@/crm/lead-fields';
 import { deleteCaptureRule, saveCaptureRule, toggleCaptureRule, type CaptureRuleInput } from '@/crm/capture';
@@ -30,6 +31,7 @@ export const deletePipelineAction = async (id: string, targetId: string) => run(
 export const updateStageAction = async (id: string, patch: { name?: string; color?: string }) => run((g) => s.updateStage(g.db, id, patch));
 export const moveStageAction = async (id: string, direction: -1 | 1) => run((g) => s.moveStage(g.db, g.tenantId, id, direction === -1 ? -1 : 1));
 export const deleteStageAction = async (id: string, targetId: string | null) => run((g) => s.deleteStage(g.db, g.tenantId, id, targetId));
+export const setAgendaStageAction = async (role: AgendaRole, stageId: string | null) => run((g) => s.setAgendaStage(g.db, g.tenantId, role, stageId));
 
 export const upsertTagAction = async (input: { id?: string; name: string; color: string }) => run((g) => s.upsertTag(g.db, g.tenantId, input));
 export const deleteTagAction = async (id: string) => run((g) => s.deleteTag(g.db, g.tenantId, id));

@@ -3,26 +3,29 @@ import { redirect } from 'next/navigation';
 import { LandingPage } from './landing';
 
 export const metadata: Metadata = {
-  title: 'DreamClin | Gestão inteligente para clínicas odontológicas e estéticas',
+  title: 'DreamClin | Agenda e CRM com WhatsApp oficial para clínicas odontológicas e de estética',
   description:
-    'Agenda por profissional, confirmação automática pelo WhatsApp, orçamentos com link e PDF, ficha clínica com odontograma e financeiro claro. Sistema de gestão para clínicas: 14 dias grátis, sem cartão.',
+    'Agenda, prontuário com odontograma, orçamentos e CRM no WhatsApp oficial da Meta, num só sistema para clínicas. O funil anda sozinho quando a recepção agenda. Planos Agenda, CRM e Completo: 14 dias grátis, sem cartão.',
   keywords: [
     'sistema para clínica odontológica',
+    'CRM para clínica',
+    'CRM odontológico',
     'software para dentista',
     'gestão de clínica estética',
     'agenda para clínica',
+    'WhatsApp API oficial para clínica',
     'confirmação de consulta WhatsApp',
     'orçamento odontológico',
     'odontograma digital',
   ],
   openGraph: {
-    title: 'DreamClin | Gestão inteligente para clínicas',
+    title: 'DreamClin | Agenda e CRM para clínicas, com WhatsApp oficial',
     description:
-      'Agenda, WhatsApp automático, orçamentos, odontograma e financeiro em um só lugar. Teste grátis por 14 dias.',
+      'Do primeiro "oi" no WhatsApp ao tratamento fechado: agenda, prontuário, orçamentos e CRM integrados. Teste grátis por 14 dias.',
     locale: 'pt_BR',
     type: 'website',
     siteName: 'DreamClin',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DreamClin: gestão inteligente para clínicas' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DreamClin: agenda e CRM para clínicas' }],
   },
   twitter: {
     card: 'summary_large_image',

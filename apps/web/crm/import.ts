@@ -10,6 +10,10 @@ import { mainPipeline } from './pipeline';
 import { phoneHash } from './phone';
 import { createPipeline, createStage } from './settings';
 
+/** A primeira coluna aberta de um funil: a entrada de quem não tem "Novo" (Agendados). */
+const primeiraColuna = <T extends { role: string | null; order: number }>(etapas: readonly T[]): T | undefined =>
+  [...etapas].filter((e) => e.role !== 'WON' && e.role !== 'LOST').sort((a, b) => a.order - b.order)[0];
+
 /**
  * Grava a importação de planilha (regras puras em `import-map.ts`). O
  * navegador manda os leads em lotes de 200; cada lote resolve funil, etapa,
@@ -180,7 +184,8 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
         }
       }
     }
-    return doFunil().find((e) => e.role === 'NEW');
+    // Funil sem entrada (Agendados): a primeira coluna.
+    return doFunil().find((e) => e.role === 'NEW') ?? primeiraColuna(doFunil());
   }
 
   async function motivoDe(nome: string | null) {
@@ -306,7 +311,8 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
         }
       }
 
-      const entrada = etapas.find((e) => e.pipelineId === funil.id && e.role === 'NEW');
+      const doFunilDele = etapas.filter((e) => e.pipelineId === funil.id);
+      const entrada = doFunilDele.find((e) => e.role === 'NEW') ?? primeiraColuna(doFunilDele);
       const criado = await createLead(db, actor, {
         name: rec.name,
         phone: rec.phone,

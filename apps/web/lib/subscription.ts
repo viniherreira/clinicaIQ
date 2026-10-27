@@ -43,6 +43,12 @@ export interface SubscriptionSnapshot {
   cancelledAt: Date | null;
   /** Cortesia concedida por nós: acesso completo, nenhuma data importa. */
   complimentary?: boolean;
+  /**
+   * A clínica já assinou (há assinatura no Asaas). No fim do teste, quem
+   * assinou entra na tolerância da fatura; quem não assinou fica em só leitura
+   * até escolher um plano. Sem a informação, vale a tolerância, como antes.
+   */
+  billingLinked?: boolean;
 }
 
 export interface Access {
@@ -57,6 +63,8 @@ export interface Access {
   inGrace: boolean;
   /** Cortesia: a tela de cobrança não oferece plano, pagamento nem cancelamento. */
   complimentary: boolean;
+  /** O teste grátis acabou sem a clínica escolher um plano. */
+  trialEnded: boolean;
 }
 
 /** Rounds up: half a day left still reads as "1 dia". */
@@ -92,6 +100,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       warning: null,
       inGrace: false,
       complimentary: true,
+      trialEnded: false,
     };
   }
 
@@ -110,6 +119,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
         warning: `Assinatura cancelada. Você continua com acesso completo até ${diaBR(snapshot.currentPeriodEnd)}, e não haverá nova cobrança.`,
         inGrace: false,
         complimentary: false,
+        trialEnded: false,
       };
     }
     return {
@@ -119,6 +129,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       warning: 'Assinatura encerrada. Seus dados seguem disponíveis para consulta.',
       inGrace: false,
       complimentary: false,
+      trialEnded: false,
     };
   }
 
@@ -129,16 +140,31 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
         level: 'full',
         status: 'TRIALING',
         daysLeft: left,
-        // Silent until the end is close enough to matter.
+        // Calado até o fim chegar perto — e calado para quem já assinou: a
+        // primeira cobrança dela vence no fim do teste, não há o que escolher.
         warning:
-          left <= 5
-            ? `Seu teste termina em ${left} ${plural(left, 'dia', 'dias')}. Escolha um plano para não perder o acesso.`
+          left <= 5 && !snapshot.billingLinked
+            ? `Seu teste grátis termina em ${left} ${plural(left, 'dia', 'dias')}. Escolha um plano para continuar sem interrupção.`
             : null,
         inGrace: false,
         complimentary: false,
+        trialEnded: false,
       };
     }
-    // Trial ran out: same treatment as an unpaid invoice, grace included.
+    // Acabou sem assinar: só leitura na hora, sem "pagamento em atraso" — ela
+    // nunca assinou nada. Os dados ficam, e escolher um plano devolve tudo.
+    if (snapshot.billingLinked === false) {
+      return {
+        level: 'readonly',
+        status: 'SUSPENDED',
+        daysLeft: null,
+        warning: 'Seu teste grátis terminou. Escolha um plano para voltar a usar. Seus dados estão guardados.',
+        inGrace: false,
+        complimentary: false,
+        trialEnded: true,
+      };
+    }
+    // Assinou no teste: a primeira fatura venceu no fim dele, com a tolerância de sempre.
   }
 
   const due = snapshot.status === 'TRIALING' ? (snapshot.trialEndsAt ?? snapshot.currentPeriodEnd) : snapshot.currentPeriodEnd;
@@ -151,6 +177,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       warning: null,
       inGrace: false,
       complimentary: false,
+      trialEnded: false,
     };
   }
 
@@ -168,6 +195,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
       warning: `Pagamento em atraso. O acesso será limitado em ${left} ${plural(left, 'dia', 'dias')}.`,
       inGrace: true,
       complimentary: false,
+      trialEnded: false,
     };
   }
 
@@ -178,6 +206,7 @@ export function resolveAccess(snapshot: SubscriptionSnapshot, now: Date = new Da
     warning: 'Acesso limitado por falta de pagamento. Regularize para voltar a usar o sistema.',
     inGrace: false,
     complimentary: false,
+    trialEnded: false,
   };
 }
 
@@ -189,6 +218,7 @@ export const NO_SUBSCRIPTION: Access = {
   warning: 'Nenhum plano ativo. Escolha um plano para usar o sistema.',
   inGrace: false,
   complimentary: false,
+  trialEnded: false,
 };
 
 export const canWrite = (access: Access): boolean => access.level === 'full';

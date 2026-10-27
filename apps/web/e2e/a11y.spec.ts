@@ -28,6 +28,15 @@ test.describe('acessibilidade — WCAG 2.1 AA', () => {
     });
   }
 
+  test('landing page não rola para o lado no celular nem no tablet', async ({ page }) => {
+    for (const width of [390, 820]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+    }
+  });
+
   test('landing page é navegável e tem um só h1', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);

@@ -3,6 +3,7 @@ import { INBOX_TABS, classifyPending, inboxCounts, listConversations, loadThread
 import { activeCloudAccount } from '@/crm/cloud';
 import { loadCrmBasics } from '@/crm/page-data';
 import { can } from '@/lib/permissions';
+import { getTenantModules } from '@/lib/access';
 import { Inbox } from './_components/inbox';
 
 export const metadata = { title: 'Conversas · DreamClin' };
@@ -17,6 +18,7 @@ export default async function ConversasPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ctx = await requireCrm('crm');
+  const modules = await getTenantModules(ctx.tenantId);
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : '');
   const tab: InboxTab = (INBOX_TABS as readonly string[]).includes(one('aba')) ? (one('aba') as InboxTab) : 'all';
@@ -62,6 +64,7 @@ export default async function ConversasPage({
         procedures: basics.procedures,
         lostReasons: basics.lostReasons,
         fields: basics.fields,
+        agenda: modules.clinic,
       }}
     />
   );

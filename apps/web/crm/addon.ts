@@ -10,6 +10,7 @@ import {
   subscriptionValueCents,
   trialAvailable,
 } from './billing';
+import type { Modules } from '@/lib/products';
 
 /**
  * O CRM como adicional pago: ligar (com teste de 14 dias na primeira vez),
@@ -29,9 +30,28 @@ const PLAN_PRICE = {
   crmSeatPriceCents: true,
   crmPackagePriceCents: true,
   crmIncludedSeats: true,
+  crmOnlyPriceCents: true,
 } as const;
 
-type PlanPrice = { name: string; monthlyPriceCents: number; crmSeatPriceCents: number; crmPackagePriceCents: number; crmIncludedSeats: number };
+type PlanPrice = {
+  name: string;
+  monthlyPriceCents: number;
+  crmSeatPriceCents: number;
+  crmPackagePriceCents: number;
+  crmIncludedSeats: number;
+  crmOnlyPriceCents: number;
+};
+
+/** O valor do mês para estes módulos: a agenda (com ou sem o pacote do CRM) ou só o CRM. */
+function valueFor(plan: PlanPrice, clinicEnabled: boolean, status: ReturnType<typeof crmStatus>, seats: number) {
+  return subscriptionValueCents({
+    planPriceCents: plan.monthlyPriceCents,
+    ...crmPriceOf(plan),
+    seats,
+    status,
+    ...(clinicEnabled ? {} : { crmOnlyPriceCents: plan.crmOnlyPriceCents }),
+  });
+}
 
 /** O que `syncBillingValue` precisa do Asaas — injetável para teste. */
 export interface BillingGateway {
@@ -62,6 +82,7 @@ export async function syncBillingValue(
     where: { tenantId },
     select: {
       id: true,
+      clinicEnabled: true,
       crmEnabled: true,
       crmTrialEndsAt: true,
       complimentary: true,
@@ -83,38 +104,45 @@ export async function syncBillingValue(
   const users = await prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } });
   const status = crmStatus(sub, now);
   const seats = seatsCharged(users);
-  const valueCents = subscriptionValueCents({ planPriceCents: sub.plan.monthlyPriceCents, ...crmPriceOf(sub.plan), seats, status });
+  const valueCents = valueFor(sub.plan, sub.clinicEnabled, status, seats);
   if (sub.billedValueCents === valueCents) return { sent: false, reason: 'unchanged' };
 
   const gw = gateway ?? (await defaultGateway());
   if (!gw.configured()) return { sent: false, reason: 'not-configured' };
 
-  await gw.updateValue(sub.asaasSubscriptionId, valueCents, sub.plan.name, subscriptionDescription(sub.plan.name, status, seats));
+  await gw.updateValue(
+    sub.asaasSubscriptionId,
+    valueCents,
+    sub.plan.name,
+    subscriptionDescription(sub.plan.name, status, seats, !sub.clinicEnabled),
+  );
   await prisma.subscription.update({ where: { id: sub.id }, data: { billedValueCents: valueCents } });
   return { sent: true, valueCents };
 }
 
 /**
- * Valor e descrição da mensalidade (plano + CRM) para um plano — o atual, ou
- * outro que a clínica está escolhendo. Usado pela troca de plano.
+ * Valor e descrição da mensalidade para um plano e um produto — os atuais, ou
+ * os que a clínica está escolhendo (`modules`). Usado pela troca de plano.
  */
 export async function billingFor(
   tenantId: string,
   plan: PlanPrice,
+  modules?: Modules,
   now: Date = new Date(),
 ): Promise<{ valueCents: number; description: string }> {
   const [sub, users] = await Promise.all([
     prisma.subscription.findUnique({
       where: { tenantId },
-      select: { crmEnabled: true, crmTrialEndsAt: true, complimentary: true },
+      select: { clinicEnabled: true, crmEnabled: true, crmTrialEndsAt: true, complimentary: true },
     }),
     prisma.user.findMany({ where: { tenantId }, select: { active: true, crmSeat: true, role: true } }),
   ]);
-  const status = crmStatus(sub, now);
+  const alvo = modules ?? { clinicEnabled: sub?.clinicEnabled ?? true, crmEnabled: Boolean(sub?.crmEnabled) };
+  const status = crmStatus(sub ? { ...sub, crmEnabled: alvo.crmEnabled } : null, now);
   const seats = seatsCharged(users);
   return {
-    valueCents: subscriptionValueCents({ planPriceCents: plan.monthlyPriceCents, ...crmPriceOf(plan), seats, status }),
-    description: subscriptionDescription(plan.name, status, seats),
+    valueCents: valueFor(plan, alvo.clinicEnabled, status, seats),
+    description: subscriptionDescription(plan.name, status, seats, !alvo.clinicEnabled),
   };
 }
 
@@ -128,14 +156,26 @@ export async function turnOnCrm(
   tenantId: string,
   userId: string,
   now: Date = new Date(),
-): Promise<{ ok: true; mode: 'trial' | 'paid' | 'complimentary' } | { ok: false; message: string }> {
+): Promise<{ ok: true; mode: 'trial' | 'paid' | 'complimentary' | 'in-trial' } | { ok: false; message: string }> {
   const sub = await prisma.subscription.findUnique({
     where: { tenantId },
-    select: { id: true, crmEnabled: true, crmTrialEndsAt: true, complimentary: true },
+    select: {
+      id: true,
+      crmEnabled: true,
+      crmTrialEndsAt: true,
+      complimentary: true,
+      status: true,
+      trialEndsAt: true,
+      asaasSubscriptionId: true,
+    },
   });
   if (!sub) return { ok: false, message: 'A clínica ainda não tem um plano. Escolha um plano primeiro.' };
 
-  const comTeste = !sub.complimentary && trialAvailable(sub);
+  // Ainda no teste grátis da clínica, sem assinar: o CRM entra nele (o plano
+  // vira o Completo) e os 14 dias do CRM ficam guardados para depois.
+  const noTesteDaClinica =
+    sub.status === 'TRIALING' && Boolean(sub.trialEndsAt && sub.trialEndsAt > now) && !sub.asaasSubscriptionId;
+  const comTeste = !sub.complimentary && !noTesteDaClinica && trialAvailable(sub);
   const quem = await prisma.user.findFirst({ where: { id: userId, tenantId, active: true }, select: { role: true } });
 
   await prisma.$transaction([
@@ -159,7 +199,7 @@ export async function turnOnCrm(
       },
     }),
   ]);
-  return { ok: true, mode: sub.complimentary ? 'complimentary' : comTeste ? 'trial' : 'paid' };
+  return { ok: true, mode: sub.complimentary ? 'complimentary' : noTesteDaClinica ? 'in-trial' : comTeste ? 'trial' : 'paid' };
 }
 
 /** Desliga o CRM: sai da cobrança, os dados ficam guardados para religar. */

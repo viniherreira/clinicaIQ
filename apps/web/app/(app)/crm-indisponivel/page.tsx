@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { KanbanSquare, Lock } from 'lucide-react';
 import { prisma } from '@clinicaiq/db';
 import { currentAccess } from '@/lib/guard';
+import { getTenantModules } from '@/lib/access';
 import { can } from '@/lib/permissions';
 import { loadCrmAddon } from '@/crm/addon';
 import { crmOfferText } from '@/crm/format';
@@ -18,6 +19,8 @@ export default async function CrmIndisponivelPage() {
   const acesso = await currentAccess();
   const addon = acesso ? await loadCrmAddon(acesso.tenantId) : null;
   const ligado = addon && addon.status !== 'off';
+  // Clínica só com o CRM não tem "início" na agenda: volta para as Configurações.
+  const inicio = acesso && !(await getTenantModules(acesso.tenantId)).clinic ? '/configuracoes' : '/dashboard';
 
   if (acesso && ligado) {
     const eu = await prisma.user.findUnique({ where: { id: acesso.userId }, select: { crmSeat: true } });
@@ -34,7 +37,7 @@ export default async function CrmIndisponivelPage() {
             {can(acesso.role, 'equipe') && (
               <Link href="/configuracoes#equipe" className="btn-primary btn-md inline-flex">Abrir a Equipe</Link>
             )}
-            <Link href="/dashboard" className="btn-outline btn-md inline-flex">Voltar para o início</Link>
+            <Link href={inicio} className="btn-outline btn-md inline-flex">Voltar para o início</Link>
           </div>
         </Cartao>
       );

@@ -89,7 +89,11 @@ interface Props {
   podeEquipe: boolean;
   podePlano: boolean;
   podePrivacidade: boolean;
+  /** A clínica tem a agenda. Só com o CRM, sobram dados, aparência, equipe, plano e privacidade. */
+  agenda?: boolean;
 }
+
+const SO_CRM = ['clinica', 'aparencia', 'equipe', 'plano', 'privacidade'];
 
 export function SettingsView({
   clinic,
@@ -111,11 +115,12 @@ export function SettingsView({
   podeEquipe,
   podePlano,
   podePrivacidade,
+  agenda = true,
 }: Props) {
   const unidadesAtivas = units.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name }));
   // Os grupos e as seções do menu lateral, na ordem do dia a dia da clínica.
   // Equipe, Plano e Privacidade só para quem alcança (e só esses recebem os dados).
-  const sections: SettingsSection[] = [
+  const todas: SettingsSection[] = [
     { id: 'clinica', group: 'Clínica', label: 'Dados da clínica', panel: <ClinicSection clinic={clinic} /> },
     {
       id: 'unidades',
@@ -203,6 +208,7 @@ export function SettingsView({
       ? [{ id: 'privacidade', group: 'Conta', label: 'Privacidade e LGPD', panel: <PrivacyPanel summary={privacy} audit={audit} /> }]
       : []),
   ];
+  const sections = agenda ? todas : todas.filter((s) => SO_CRM.includes(s.id));
 
   return (
     <div className="mx-auto max-w-6xl p-6 lg:p-8">

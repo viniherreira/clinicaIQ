@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronRight, Menu, Search, X } from 'lucide-react';
 import { can } from '@/lib/permissions';
 import { activeHref, navFor } from './app-sidebar';
-import { ModuleSwitcher, type Space } from './module-switcher';
+import { clinicHomeFor, ModuleSwitcher, type Space } from './module-switcher';
 import { ThemeToggle } from './theme-toggle';
 import { CrmThemeToggle } from './crm-theme';
 import { Logo, LogoMark } from './logo';
@@ -24,6 +24,7 @@ export function AppHeader({
   space = 'clinic',
   showSwitcher = false,
   units = null,
+  crmOnly = false,
 }: {
   clinicName: string;
   /** Quem está logado agora — não a clínica, não o dono. */
@@ -37,6 +38,8 @@ export function AppHeader({
   showSwitcher?: boolean;
   /** Mais de uma unidade que a pessoa vê: o seletor de unidade. */
   units?: UnitChoice | null;
+  /** A clínica contratou só o CRM. */
+  crmOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -44,11 +47,11 @@ export function AppHeader({
   const buscaId = useId();
   const [busca, setBusca] = useState('');
   // O menu do celular precisa esconder exatamente o mesmo que a lateral.
-  const itens = navFor(role, space);
+  const itens = navFor(role, space, crmOnly);
   const ativo = activeHref(itens, pathname);
   const atual = itens.find((i) => i.href === ativo);
   // A busca rápida de paciente, como a do topo do Clínica nas Nuvens: Enter abre a lista filtrada.
-  const buscaPaciente = space === 'clinic' && can(role, 'pacientes');
+  const buscaPaciente = space === 'clinic' && !crmOnly && can(role, 'pacientes');
 
   return (
     <>
@@ -135,7 +138,7 @@ export function AppHeader({
             </div>
             {showSwitcher && (
               <div className="px-3">
-                <ModuleSwitcher space={space} onNavigate={() => setOpen(false)} />
+                <ModuleSwitcher space={space} onNavigate={() => setOpen(false)} clinicHome={clinicHomeFor(crmOnly)} />
               </div>
             )}
             <ul className="flex-1 space-y-1 overflow-y-auto p-3">

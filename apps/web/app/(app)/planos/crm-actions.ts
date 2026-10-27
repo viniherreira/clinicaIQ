@@ -45,6 +45,8 @@ export async function turnOnCrmAction(): Promise<Result> {
     message:
       r.mode === 'trial'
         ? 'CRM ligado: 14 dias grátis. Você já tem acesso.'
+        : r.mode === 'in-trial'
+          ? 'CRM ligado no seu teste grátis: o plano passa a ser o Completo.'
         : r.mode === 'complimentary'
           ? 'CRM ligado, incluído na cortesia.'
           : 'CRM ligado. O valor do CRM entra na mensalidade.',

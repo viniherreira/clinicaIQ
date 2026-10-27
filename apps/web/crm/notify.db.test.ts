@@ -84,6 +84,9 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     });
     await notifyCrm(tenant.id, { type: 'appointment.created', patientId: paciente.id, appointmentId: consulta.id });
     expect((await etapa()).nome).toBe('Avaliação agendada');
+    // Saiu da Captação e entrou em Agendados.
+    const l = await db.lead.findFirst({ where: { id: leadId }, select: { stage: { select: { pipeline: { select: { name: true } } } } } });
+    expect(l?.stage.pipeline.name).toBe('Agendados');
   });
 
   it('cancelou → Desmarcou com "Reagendar avaliação", sem duplicar a tarefa', async () => {
@@ -92,7 +95,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
     await notifyCrm(tenant.id, ev);
     await notifyCrm(tenant.id, ev);
 
-    expect((await etapa()).nome).toBe('Desmarcou');
+    expect((await etapa()).nome).toBe('Desmarcou ou faltou');
     const tarefas = await db.leadTask.findMany({ where: { leadId, completedAt: null } });
     expect(tarefas.map((t) => t.text)).toEqual([TASK_REAGENDAR]);
     expect(tarefas[0]).toMatchObject({ origin: 'AUTOMATION', assignedToId: dono.id });
@@ -166,7 +169,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
 
     await prisma.appointment.update({ where: { id: marcada.id }, data: { status: 'CANCELLED' } });
     await notifyCrm(tenant.id, { type: 'appointment.cancelled', patientId: leticia.id, appointmentId: marcada.id });
-    expect(await estagio()).toBe('Desmarcou');
+    expect(await estagio()).toBe('Desmarcou ou faltou');
     // Nenhum lead novo foi aberto para a mesma pessoa.
     expect(await db.lead.count({ where: { patientId: leticia.id } })).toBe(1);
   });
