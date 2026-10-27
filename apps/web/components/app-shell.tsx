@@ -7,6 +7,8 @@ import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
 import { getTenantAccess, getTenantModules } from '@/lib/access';
 import { can } from '@/lib/permissions';
+import { effectiveCrmRole, isCrmManager, seesOnlyOwn } from '@/lib/crm-roles';
+import { conversationScope } from '@/crm/scope-rules';
 import { getUnitContext } from '@/lib/units';
 
 /** Os mesmos rótulos da tela de Equipe — o perfil precisa se chamar igual nos
@@ -51,7 +53,7 @@ export async function AppShell({
   // Clerk: assim o nome no topo e o que a pessoa consegue fazer nunca divergem.
   const me = await prisma.user.findFirst({
     where: { clerkUserId: userId, tenantId: tenant.id, active: true },
-    select: { id: true, name: true, email: true, role: true, crmSeat: true },
+    select: { id: true, name: true, email: true, role: true, crmSeat: true, crmRole: true, crmAvailable: true },
   });
 
   const [access, modules] = await Promise.all([
@@ -66,12 +68,22 @@ export async function AppShell({
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
+  const crmRole = effectiveCrmRole(role, me?.crmRole);
+  const crmManager = isCrmManager(crmRole);
 
   // Conversas não lidas, no menu do CRM.
   const unread =
     space === 'crm' && showSwitcher
       ? await prisma.conversation
-          .count({ where: { tenantId: tenant.id, status: { not: 'DECLINED' }, unreadCount: { gt: 0 } } })
+          .count({
+            where: {
+              tenantId: tenant.id,
+              status: { not: 'DECLINED' },
+              unreadCount: { gt: 0 },
+              // Atendente "só os dele" conta as suas e as sem responsável.
+              ...(me && seesOnlyOwn(crmRole) ? conversationScope({ userId: me.id, ownOnly: true }) : {}),
+            },
+          })
           .catch(() => 0)
       : 0;
 
@@ -94,6 +106,7 @@ export async function AppShell({
         showSwitcher={showSwitcher}
         counts={{ '/crm/conversas': unread }}
         crmOnly={crmOnly}
+        crmManager={crmManager}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
@@ -108,6 +121,8 @@ export async function AppShell({
           showSwitcher={showSwitcher}
           units={units}
           crmOnly={crmOnly}
+          crmManager={crmManager}
+          crmAvailable={space === 'crm' && showSwitcher ? (me?.crmAvailable ?? true) : undefined}
         />
         <SubscriptionBanner access={access} />
         <main id="main-content" className="flex-1 overflow-auto bg-canvas">

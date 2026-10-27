@@ -51,7 +51,8 @@ export async function loadTasks(ctx: CrmContext, who: 'me' | 'all' | string, now
     where: {
       completedAt: null,
       lead: { deletedAt: null, wonAt: null, lostAt: null },
-      ...(who === 'all' ? {} : { assignedToId: who === 'me' ? ctx.userId : who }),
+      // Atendente "só os dele": só as tarefas dele, qualquer que seja o filtro.
+      ...(who === 'all' && !ctx.ownOnly ? {} : { assignedToId: who === 'me' || ctx.ownOnly ? ctx.userId : who }),
     },
     orderBy: { dueAt: 'asc' },
     take: 500,

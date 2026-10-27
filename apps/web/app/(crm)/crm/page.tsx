@@ -7,7 +7,6 @@ import { hasPeriod } from '@/crm/period';
 import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
 import { classifyPending } from '@/crm/conversations';
-import { can } from '@/lib/permissions';
 import { Board } from './_components/board';
 import { CrmToolbar } from './_components/toolbar';
 import { PipelineEditor } from './_components/pipeline-editor';
@@ -29,7 +28,7 @@ export default async function FunilPage({
     if (!q.get('situacao')) q.set('situacao', 'todos');
     redirect(`/crm/leads?${q.toString()}`);
   }
-  const canConfig = can(ctx.role, 'crm_config');
+  const canConfig = ctx.manager;
   // O funil da URL; sem ela, o último aberto; sem nada, o principal.
   const lembrado = (await cookies()).get('crm-funil')?.value;
   const basics = await loadCrmBasics(ctx, { pipelineId: typeof sp.funil === 'string' ? sp.funil : lembrado });

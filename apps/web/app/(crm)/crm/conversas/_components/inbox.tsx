@@ -17,6 +17,7 @@ import { StageChip } from '@/components/crm-stage-chip';
 const TABS: { key: InboxTab; label: string }[] = [
   { key: 'all', label: 'Todas' },
   { key: 'mine', label: 'Minhas' },
+  { key: 'unassigned', label: 'Sem dono' },
   { key: 'unanswered', label: 'Sem resposta' },
 ];
 
@@ -34,7 +35,10 @@ export function Inbox({
   canConfigWhatsapp,
   canManage,
   basics,
+  meId,
 }: {
+  /** Quem está usando (para o "Assumir"). */
+  meId: string;
   initial: InboxSnapshot;
   initialTab: InboxTab;
   initialQ: string;
@@ -215,6 +219,8 @@ export function Inbox({
               onChanged={() => void refresh()}
               onBack={() => setSelectedId(null)}
               canManage={canManage}
+              team={basics.team}
+              meId={meId}
               headerAction={
                 <button
                   type="button"
@@ -295,7 +301,9 @@ function ConversationList({
           : tab === 'unanswered'
               ? 'Nenhuma conversa esperando resposta.'
               : tab === 'mine'
-                ? 'Nenhuma conversa de leads seus.'
+                ? 'Nenhuma conversa com você.'
+                : tab === 'unassigned'
+                  ? 'Toda conversa tem alguém atendendo.'
                 : 'Ainda não há conversas. Elas aparecem aqui assim que alguém escrever para o WhatsApp da clínica.'}
       </p>
     );
@@ -348,8 +356,14 @@ function ConversationList({
                     </span>
                   )}
                 </span>
-                {(c.tags.length > 0 || c.awaitingReply) && (
+                {(c.tags.length > 0 || c.awaitingReply || c.assignedTo) && (
                   <span className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
+                    {c.assignedTo && (
+                      <span className="max-w-[110px] truncate rounded-[3px] bg-surface-alt px-1.5 py-0.5 text-muted-foreground">
+                        <span className="sr-only">Atende: </span>
+                        {c.assignedTo.name.split(' ')[0]}
+                      </span>
+                    )}
                     {c.awaitingReply && (
                       <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">Sem resposta</span>
                     )}

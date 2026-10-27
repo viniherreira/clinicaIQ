@@ -1,4 +1,5 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
+import { leadScope } from './scope-rules';
 import { leadWhere, statusWhere, type ListStatus } from './board-data';
 import type { CrmContext } from './guard';
 import { setLeadFields } from './lead-fields';
@@ -40,7 +41,7 @@ export async function resolveTargets(ctx: CrmContext, target: BulkTarget): Promi
   if ('ids' in target) {
     const ids = [...new Set(target.ids.filter((x) => typeof x === 'string'))].slice(0, MAX_BULK);
     if (!ids.length) return [];
-    const rows = await ctx.db.lead.findMany({ where: { id: { in: ids }, deletedAt: null }, select: { id: true } });
+    const rows = await ctx.db.lead.findMany({ where: { id: { in: ids }, deletedAt: null, ...(leadScope(ctx) ?? {}) }, select: { id: true } });
     return rows.map((r) => r.id);
   }
   const rows = await ctx.db.lead.findMany({

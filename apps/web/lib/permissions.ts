@@ -62,9 +62,11 @@ const DIA_A_DIA: readonly Capability[] = [
 ];
 
 /**
- * O CRM é trabalho de quem capta: a recepção move os leads, o dono e o admin
- * também arrumam o funil. O profissional fica de fora nesta primeira versão —
- * quem atende na cadeira não toca a captação.
+ * O CRM é da equipe toda: recepção, profissionais, administração e o dono
+ * atendem o WhatsApp e movem os negócios. Quem configura o CRM não sai daqui:
+ * sai do cargo no CRM (`lib/crm-roles.ts`, Gestor), que a guarda consulta no
+ * lugar de `crm_config`. O `crm_config` abaixo é só o padrão de quem ainda não
+ * tem cargo escolhido.
  *
  * O papel é só metade da porta: a clínica também precisa ter o módulo
  * contratado (`Subscription.crmEnabled`), conferido em `crm/guard.ts`.
@@ -76,7 +78,7 @@ const GRANTS: Record<Role, readonly Capability[]> = {
   OWNER: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
   ADMIN: [...DIA_A_DIA, ...ADMIN_ONLY, ...CRM_ADMIN],
   RECEPTIONIST: [...DIA_A_DIA, ...CRM],
-  PROFESSIONAL: DIA_A_DIA,
+  PROFESSIONAL: [...DIA_A_DIA, ...CRM],
 };
 
 /**
@@ -90,6 +92,9 @@ export function isRole(value: unknown): value is Role {
 }
 
 export function can(role: string | null | undefined, capability: Capability): boolean {
+  // Papel que não reconhecemos não entra no CRM: o menor privilégio cobre a
+  // rotina da clínica, não as conversas de toda a equipe.
+  if (!isRole(role) && (capability === 'crm' || capability === 'crm_config')) return false;
   const papel = isRole(role) ? role : LEAST_PRIVILEGE;
   return GRANTS[papel].includes(capability);
 }

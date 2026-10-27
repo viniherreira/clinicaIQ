@@ -1,4 +1,6 @@
 import { getTenantClient, prisma, type AutomationAction, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
+import { assignLead, pickAssignee } from './assignment';
+import { DISTRIBUTE } from './distribution-rules';
 import { renderTemplateBody } from '@clinicaiq/whatsapp';
 import { activeCloudAccount, windowOpen } from './cloud';
 import { ensureConversationForLead, writeChatMessage } from './conversations';
@@ -69,7 +71,7 @@ export async function saveAutomation(
 
   // O que a automação aponta precisa ser desta clínica.
   if (input.action === 'ADD_TAG' && !(await db.leadTag.findFirst({ where: { id: cfg.tagId } }))) return { ok: false, message: 'Tag não encontrada.' };
-  if (input.action === 'ASSIGN_USER' && !(await db.user.findFirst({ where: { id: cfg.userId, active: true } }))) {
+  if (input.action === 'ASSIGN_USER' && cfg.userId !== DISTRIBUTE && !(await db.user.findFirst({ where: { id: cfg.userId, active: true } }))) {
     return { ok: false, message: 'Pessoa não encontrada.' };
   }
   if (input.action === 'CREATE_TASK' && cfg.assignTo !== 'responsible' && !(await db.user.findFirst({ where: { id: cfg.assignTo, active: true } }))) {
@@ -177,15 +179,12 @@ async function execute(
       return { status: 'DONE' };
     }
     case 'ASSIGN_USER': {
-      const userId = String(cfg.userId ?? '');
-      const user = await db.user.findFirst({ where: { id: userId, active: true }, select: { id: true } });
-      if (!user) return { status: 'FAILED', error: 'Essa pessoa não está mais na equipe.' };
-      if (lead.assignedToId === userId) return { status: 'DONE' };
-      await db.lead.updateMany({ where: { id: lead.id }, data: { assignedToId: userId } });
-      await db.leadActivity.create({
-        data: { tenantId, leadId: lead.id, type: 'ASSIGNED', actorId: null, data: { from: lead.assignedToId, to: userId } },
-      });
-      return { status: 'DONE' };
+      // "Distribuir pela equipe": a vez de alguém, pelas regras da distribuição.
+      const distribuir = cfg.userId === DISTRIBUTE;
+      const userId = distribuir ? await pickAssignee(tenantId) : String(cfg.userId ?? '');
+      if (!userId) return { status: 'FAILED', error: 'Ninguém da equipe está recebendo leads.' };
+      const r = await assignLead(db, { tenantId, userId: null }, lead.id, userId, distribuir ? 'distribution' : 'automation');
+      return r.ok ? { status: 'DONE' } : { status: 'FAILED', error: r.message };
     }
   }
 }

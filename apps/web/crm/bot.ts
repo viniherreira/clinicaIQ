@@ -1,4 +1,6 @@
 import { decrypt, getTenantClient, prisma, type TenantPrismaClient } from '@clinicaiq/db';
+import { assignLead, pickAssignee } from './assignment';
+import { DISTRIBUTE } from './distribution-rules';
 import { BOT_IDLE_MS, DEFAULT_HOURS, fitsAudience, isOpenAt, pickBot, shouldStart } from './bot-engine';
 import { START_PENDING } from './bot-queue';
 import { dispatchChat } from './chat-dispatch';
@@ -288,8 +290,9 @@ async function act(db: TenantPrismaClient, tenantId: string, conv: Conv, a: Flow
       await moveLead(db, { tenantId, userId: null }, leadId, { stageId: a.stageId, origin: { event: 'bot' } });
       return;
     case 'assign': {
-      const user = await db.user.findFirst({ where: { id: a.userId, active: true }, select: { id: true } });
-      if (user) await db.lead.updateMany({ where: { id: leadId }, data: { assignedToId: user.id } });
+      // "Distribuir pela equipe": a vez de alguém, pelas regras da distribuição.
+      const quem = a.userId === DISTRIBUTE ? await pickAssignee(tenantId) : a.userId;
+      if (quem) await assignLead(db, { tenantId, userId: null }, leadId, quem, a.userId === DISTRIBUTE ? 'distribution' : 'automation');
       return;
     }
     case 'setField': {

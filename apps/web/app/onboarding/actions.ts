@@ -3,6 +3,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
+import { syncBillingValue } from '@/crm/addon';
 import { trialEndFrom } from '@/lib/subscription';
 import { DEFAULT_CHOICE, modulesOf, parseProduct, parseTier, productAvailable } from '@/lib/products';
 import { redirect } from 'next/navigation';
@@ -102,6 +103,11 @@ async function acceptPendingInvite(
     select: { id: true },
   });
 
+  // O CRM é da equipe toda: quem entra numa clínica com o CRM ligado já entra
+  // nele também (a tela de Equipe desliga, se a clínica não quiser pagar a mais).
+  const crm = await prisma.subscription.findUnique({ where: { tenantId: convite.tenantId }, select: { crmEnabled: true } });
+  const crmSeat = Boolean(crm?.crmEnabled);
+
   await prisma.$transaction([
     anterior
       ? prisma.user.update({
@@ -110,6 +116,7 @@ async function acceptPendingInvite(
             clerkUserId,
             name: nome,
             role: convite.role,
+            crmSeat,
             active: true,
             deactivatedAt: null,
             deactivatedById: null,
@@ -123,6 +130,7 @@ async function acceptPendingInvite(
             name: nome,
             email: convite.email,
             role: convite.role,
+            crmSeat,
           },
         }),
     prisma.invitation.update({
@@ -142,6 +150,12 @@ async function acceptPendingInvite(
   await clerk.users.updateUserMetadata(clerkUserId, {
     publicMetadata: { tenantId: convite.tenantId, onboardingComplete: true },
   });
+  // Mais uma pessoa no CRM pode mudar a mensalidade (usuários além dos incluídos).
+  if (crmSeat) {
+    await syncBillingValue(convite.tenantId).catch((error) =>
+      console.error('[onboarding] valor da assinatura não sincronizado', convite.tenantId, error instanceof Error ? error.message : error),
+    );
+  }
 
   return convite.tenantId;
 }

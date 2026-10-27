@@ -48,25 +48,27 @@ export async function loadDashboard(
 ): Promise<DashboardData> {
   const from = periodStart(period, now);
   const noPeriodo = { gte: from, lte: now };
+  // Atendente "só os dele": o painel mostra os números dele.
+  const meu = ctx.ownOnly ? { assignedToId: ctx.userId } : {};
 
   const [abertos, novos, ganhos, perdidos, atrasadas, semResposta, mensagens] = await Promise.all([
-    ctx.db.lead.findMany({ where: OPEN_LEAD, select: { stageId: true, estimatedValueCents: true, assignedToId: true } }),
-    ctx.db.lead.findMany({ where: { deletedAt: null, createdAt: noPeriodo }, select: { source: true } }),
+    ctx.db.lead.findMany({ where: { ...OPEN_LEAD, ...meu }, select: { stageId: true, estimatedValueCents: true, assignedToId: true } }),
+    ctx.db.lead.findMany({ where: { deletedAt: null, createdAt: noPeriodo, ...meu }, select: { source: true } }),
     ctx.db.lead.findMany({
-      where: { deletedAt: null, wonAt: noPeriodo },
+      where: { deletedAt: null, wonAt: noPeriodo, ...meu },
       select: { estimatedValueCents: true, assignedToId: true },
     }),
     ctx.db.lead.findMany({
-      where: { deletedAt: null, lostAt: noPeriodo },
+      where: { deletedAt: null, lostAt: noPeriodo, ...meu },
       select: { lostReason: { select: { name: true } } },
     }),
     ctx.db.leadTask.findMany({
-      where: { completedAt: null, dueAt: { lt: now }, lead: OPEN_LEAD },
+      where: { completedAt: null, dueAt: { lt: now }, lead: OPEN_LEAD, ...meu },
       select: { assignedToId: true },
     }),
-    ctx.db.conversation.count({ where: { status: { not: 'DECLINED' }, awaitingReply: true } }),
+    ctx.db.conversation.count({ where: { status: { not: 'DECLINED' }, awaitingReply: true, ...meu } }),
     ctx.db.chatMessage.findMany({
-      where: { at: noPeriodo },
+      where: { at: noPeriodo, ...(ctx.ownOnly ? { conversation: meu } : {}) },
       select: { conversationId: true, direction: true, origin: true, at: true },
       orderBy: { at: 'desc' },
       take: RESPONSE_SAMPLE,

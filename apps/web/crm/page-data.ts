@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { CrmContext } from './guard';
+import { crmMemberIds } from './assignment';
 import { listFieldDefs } from './lead-fields';
 import { boardStages, ensureDefaultPipeline, mainPipeline, stageByRole } from './pipeline';
 import type { BoardPerson, BoardPipeline, BoardStage, BoardTag, LostReasonOption } from './types';
@@ -18,7 +19,7 @@ export { pipelineOfStage, stageOptions } from './pipeline-options';
 export async function loadCrmBasics(ctx: CrmContext, opts: { pipelineId?: string | null } = {}) {
   await ensureDefaultPipeline(ctx.db, ctx.tenantId);
 
-  const [pipelines, stages, tags, reasons, team, procedures, fields] = await Promise.all([
+  const [pipelines, stages, tags, reasons, team, procedures, fields, membros] = await Promise.all([
     ctx.db.pipeline.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
     ctx.db.pipelineStage.findMany({ orderBy: { order: 'asc' } }),
     ctx.db.leadTag.findMany({ orderBy: { name: 'asc' } }),
@@ -30,6 +31,7 @@ export async function loadCrmBasics(ctx: CrmContext, opts: { pipelineId?: string
       select: { id: true, name: true },
     }),
     listFieldDefs(ctx.db, { activeOnly: true }),
+    crmMemberIds(ctx.tenantId),
   ]);
 
   const toStage = (s: (typeof stages)[number]): BoardStage => ({
@@ -61,7 +63,8 @@ export async function loadCrmBasics(ctx: CrmContext, opts: { pipelineId?: string
     closedStages: current.closed,
     tags: tags.map((t): BoardTag => ({ id: t.id, name: t.name, color: t.color })),
     lostReasons: reasons.map((r): LostReasonOption => ({ id: r.id, name: r.name })),
-    team: team as BoardPerson[],
+    // Quem usa o CRM: é para essas pessoas que dá para passar um negócio.
+    team: team.filter((p) => membros.has(p.id)) as BoardPerson[],
     procedures,
     /** Campos personalizados ativos, na ordem (ficha, card, filtros, Novo lead). */
     fields,

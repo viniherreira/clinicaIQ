@@ -1,5 +1,4 @@
 import { requireCrm } from '@/crm/guard';
-import { can } from '@/lib/permissions';
 import { AutomacoesNav } from './_components/automacoes-nav';
 
 /**
@@ -9,7 +8,7 @@ import { AutomacoesNav } from './_components/automacoes-nav';
  */
 export default async function AutomacoesLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireCrm('crm');
-  const config = can(ctx.role, 'crm_config');
+  const config = ctx.manager;
   return (
     <div className="flex min-h-full flex-col">
       <div className="border-b border-border bg-surface px-4 pt-3 sm:px-6">

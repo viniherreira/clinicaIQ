@@ -88,8 +88,14 @@ describe('navFor — espaço do CRM', () => {
     expect(crm('ADMIN')).toContain('/crm/configuracoes');
   });
 
-  it('o profissional não vê nada do CRM', () => {
-    expect(crm('PROFESSIONAL')).toEqual([]);
+  it('o profissional usa o CRM, mas sem as configurações', () => {
+    expect(crm('PROFESSIONAL')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes']);
+  });
+
+  it('as configurações do CRM seguem o cargo no CRM, não o perfil', () => {
+    const itens = (role: string, gestor: boolean) => navFor(role, 'crm', false, gestor).map((i) => i.href);
+    expect(itens('RECEPTIONIST', true)).toContain('/crm/equipe');
+    expect(itens('ADMIN', false)).not.toContain('/crm/configuracoes');
   });
 
   it('todo item do CRM declara a permissão que exige', () => {

@@ -657,6 +657,7 @@ function ActionForm({ step, refs, onChange }: { step: ActionStep; refs: FlowRefs
                 </label>
                 <select id={`${base}-us`} value={a.userId} onChange={(e) => set(i, { ...a, userId: e.target.value })} className={`${inputCls} h-8 text-xs`}>
                   <option value="">Escolha a pessoa</option>
+                  <option value="distribute">Distribuir pela equipe (rodízio)</option>
                   {refs.team.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}

@@ -49,8 +49,9 @@ describe('seatsCharged', () => {
         { active: true, crmSeat: false, role: 'RECEPTIONIST' },
         { active: false, crmSeat: true, role: 'ADMIN' },
         { active: true, crmSeat: true, role: 'PROFESSIONAL' },
+        { active: true, crmSeat: true, role: 'DESCONHECIDO' },
       ]),
-    ).toBe(2);
+    ).toBe(3);
   });
 });
 

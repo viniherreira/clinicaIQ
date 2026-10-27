@@ -31,8 +31,8 @@ export function crmStatus(sub: CrmSubscriptionState | null, now: Date = new Date
 /** O teste só existe uma vez por clínica. */
 export const trialAvailable = (sub: Pick<CrmSubscriptionState, 'crmTrialEndsAt'> | null) => !sub?.crmTrialEndsAt;
 
-/** Perfis que podem ter acesso ao CRM (e, portanto, contar na cobrança). */
-export const CRM_ELIGIBLE_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST'] as const;
+/** Perfis que podem ter acesso ao CRM (e, portanto, contar na cobrança): hoje, todos. */
+export const CRM_ELIGIBLE_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST', 'PROFESSIONAL'] as const;
 
 export interface SeatUser {
   active: boolean;

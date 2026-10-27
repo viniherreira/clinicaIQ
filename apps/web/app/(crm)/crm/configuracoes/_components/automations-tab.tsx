@@ -52,7 +52,7 @@ function describe(a: AutomationRow, tags: Option[], team: Option[], templates: T
     case 'ADD_TAG':
       return `Põe a tag ${nome(tags, c.tagId)}`;
     case 'ASSIGN_USER':
-      return `Passa o lead para ${nome(team, c.userId)}`;
+      return c.userId === 'distribute' ? 'Distribui o lead pela equipe' : `Passa o lead para ${nome(team, c.userId)}`;
   }
 }
 
@@ -302,6 +302,7 @@ function NewAutomation({
         <div>
           <label htmlFor={`${id}-pessoa`} className="block text-xs font-medium text-muted-foreground">Novo responsável</label>
           <select id={`${id}-pessoa`} value={userId} onChange={(e) => setUserId(e.target.value)} className={`${inputCls} mt-1`}>
+            <option value="distribute">Distribuir pela equipe (a vez de alguém)</option>
             {team.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
