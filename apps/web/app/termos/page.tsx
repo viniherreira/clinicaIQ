@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 /**
  * Termos de Uso. Texto de partida, escrito a partir de como o serviço funciona
- * (planos, adicional do CRM, WhatsApp); precisa da revisão de um advogado.
+ * (planos Agenda, CRM e Completo, teste grátis, WhatsApp); precisa da revisão de um advogado.
  */
 export default function TermosPage() {
   const b = COMPANY.brand;
   return (
-    <LegalPage title="Termos de Uso" updated="12 de outubro de 2026">
+    <LegalPage title="Termos de Uso" updated="26 de outubro de 2026">
       <p>
         Estes termos valem para quem contrata e usa o {b}
         {companyLine() ? <>, serviço de {companyLine()}</> : null}. Ao criar uma conta, a clínica concorda com eles e com a{' '}
@@ -24,8 +24,9 @@ export default function TermosPage() {
 
       <h2>1. O serviço</h2>
       <p>
-        O {b} é um sistema online para clínicas odontológicas e estéticas: agenda, pacientes, orçamentos, financeiro, confirmações
-        pelo WhatsApp e, como adicional, um CRM de captação com funil de leads e conversas do WhatsApp.
+        O {b} é um sistema online para clínicas odontológicas e estéticas, vendido em três produtos: a Agenda (agenda, pacientes,
+        orçamentos, financeiro e confirmações pelo WhatsApp), o CRM (captação com funil de leads, conversas do WhatsApp, robô e
+        transmissões) e o Completo, com os dois integrados.
       </p>
 
       <h2>2. Conta e acesso</h2>
@@ -35,10 +36,19 @@ export default function TermosPage() {
         <li>Guarde a sua senha em segredo e avise a gente se perceber algum uso indevido.</li>
       </ul>
 
-      <h2>3. Planos, adicional do CRM e cobrança</h2>
+      <h2>3. Planos, teste grátis e cobrança</h2>
       <ul>
         <li>Os planos são mensais, com os preços mostrados no site e dentro do sistema. A cobrança é feita pelo Asaas.</li>
-        <li>O CRM é um adicional cobrado por pessoa da equipe com acesso, com teste grátis de 14 dias na primeira ativação.</li>
+        <li>
+          A conta nova tem 14 dias de teste grátis, sem cartão, no plano escolhido. Assinando durante o teste, a primeira cobrança
+          vence no fim dele. Sem assinatura, nada é cobrado e, ao fim do teste, o acesso fica restrito à consulta dos dados até a
+          clínica escolher um plano.
+        </li>
+        <li>
+          Os planos com CRM incluem um número de pessoas com acesso; cada pessoa a mais é cobrada à parte. Quem assina a Agenda e
+          acrescenta o CRM tem 14 dias grátis do CRM na primeira ativação.
+        </li>
+        <li>A troca de plano vale na hora e o valor novo entra na próxima fatura, sem cobrança proporcional.</li>
         <li>Mudanças de preço são avisadas com antecedência e valem a partir do ciclo seguinte.</li>
         <li>Sem pagamento, o acesso pode ficar restrito à consulta dos dados até a regularização.</li>
         <li>

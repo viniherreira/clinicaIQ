@@ -103,3 +103,39 @@ export const DEFAULT_CHOICE: { product: Product; tier: Tier } = { product: 'COMP
 export function signUpHref(product: Product, tier: Tier): string {
   return `/sign-up?plano=${productSlug(product)}&tamanho=${tierSlug(tier)}`;
 }
+
+const brl0 = (cents: number) =>
+  (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+
+/** O que a vitrine (site e tela de Plano) precisa de um tamanho. */
+export interface PlanShowcase extends PlanPrices {
+  description: string;
+  maxProfessionals: number | null;
+  campaignsEnabled: boolean;
+  advancedReports: boolean;
+}
+
+/** O que um tamanho inclui em cada produto: profissionais na agenda, usuários no CRM. */
+export function planFeatures(plan: PlanShowcase, product: Product): string[] {
+  const profs =
+    plan.maxProfessionals === null
+      ? 'Profissionais ilimitados'
+      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`;
+  const users = `${plan.crmIncludedSeats} ${plan.crmIncludedSeats === 1 ? 'usuário' : 'usuários'} no CRM (${brl0(plan.crmSeatPriceCents)} cada a mais)`;
+  const extras = [plan.campaignsEnabled ? 'Campanhas em massa' : null, plan.advancedReports ? 'Relatórios completos' : null];
+  const lista =
+    product === 'AGENDA'
+      ? [profs, 'Agenda, pacientes e prontuário', 'Orçamentos com link e PDF', 'Confirmação e lembretes no WhatsApp oficial', ...extras]
+      : product === 'CRM'
+        ? [users, 'Funis de captação em quadro', 'Conversas do WhatsApp oficial com a equipe', 'Robô de atendimento e transmissões']
+        : [profs, users, 'Tudo da Agenda e do CRM', 'Funil que anda sozinho com a agenda e os orçamentos', ...extras];
+  return lista.filter((f): f is string => f !== null);
+}
+
+/** A frase do tamanho. No CRM conta pessoas atendendo, não profissionais. */
+export function tierPitch(plan: PlanShowcase, product: Product): string {
+  if (product !== 'CRM') return plan.description;
+  return plan.crmIncludedSeats === 1
+    ? 'Para quem atende o WhatsApp da clínica sozinho.'
+    : `Para equipes de até ${plan.crmIncludedSeats} pessoas atendendo no CRM.`;
+}

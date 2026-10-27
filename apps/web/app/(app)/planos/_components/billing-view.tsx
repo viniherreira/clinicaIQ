@@ -17,9 +17,9 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { cancelPlan, choosePlan, saveDocument, switchTrialPlan, type BillingData, type PlanOption } from '../actions';
+import { cancelPlan, choosePlan, saveDocument, switchTrialPlan, type BillingData } from '../actions';
 import type { BillingMethod } from '@/lib/asaas';
-import { bundleSavingsCents, productAvailable, productPriceCents, PRODUCT_INFO, PRODUCTS, type Product } from '@/lib/products';
+import { bundleSavingsCents, planFeatures, productAvailable, productPriceCents, PRODUCT_INFO, PRODUCTS, tierPitch, type Product } from '@/lib/products';
 import { formatDocument, onlyDigits } from '@/lib/document';
 import { clinicToday } from '@/lib/tz';
 
@@ -242,29 +242,6 @@ function Cortesia({ data, embutido }: { data: BillingData; embutido: boolean }) 
     </div>
   );
 }
-
-/** O que um tamanho inclui em cada produto: profissionais na agenda, usuários no CRM. */
-function features(plan: PlanOption, product: Product): string[] {
-  const profs =
-    plan.maxProfessionals === null
-      ? 'Profissionais ilimitados'
-      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`;
-  const users = `${plan.crmIncludedSeats} ${plan.crmIncludedSeats === 1 ? 'usuário' : 'usuários'} no CRM (${brl(plan.crmSeatPriceCents)} cada a mais)`;
-  const extras = [plan.campaignsEnabled ? 'Campanhas em massa' : null, plan.advancedReports ? 'Relatórios completos' : null];
-  const lista =
-    product === 'AGENDA'
-      ? [profs, 'Agenda, pacientes e prontuário', 'Orçamentos com link e PDF', 'Confirmação e lembretes no WhatsApp oficial', ...extras]
-      : product === 'CRM'
-        ? [users, 'Funis de captação em quadro', 'Conversas do WhatsApp oficial com a equipe', 'Robô de atendimento e transmissões']
-        : [profs, users, 'Tudo da Agenda e do CRM', 'Funil que anda sozinho com a agenda e os orçamentos', ...extras];
-  return lista.filter((f): f is string => f !== null);
-}
-
-/** A descrição do tamanho no produto CRM: conta pessoas no CRM, não profissionais. */
-const paraQuemCrm = (plan: PlanOption) =>
-  plan.crmIncludedSeats === 1
-    ? 'Para quem atende o WhatsApp da clínica sozinho.'
-    : `Para equipes de até ${plan.crmIncludedSeats} pessoas atendendo no CRM.`;
 
 /** O que muda nos módulos ao trocar de produto, dito antes de confirmar. */
 function mudancaDeModulos(de: Product, para: Product): string | null {
@@ -699,7 +676,7 @@ export function BillingView({
                       {PRODUCT_INFO[produto].name} {plan.name}
                     </h3>
                     <p className="mt-1.5 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">
-                      {produto === 'CRM' ? paraQuemCrm(plan) : plan.description}
+                      {tierPitch(plan, produto)}
                     </p>
 
                     <p className="mt-5 flex flex-wrap items-baseline gap-x-1">
@@ -718,7 +695,7 @@ export function BillingView({
                     </p>
 
                     <ul className="mt-6 flex-1 space-y-2.5">
-                      {features(plan, produto).map((f) => (
+                      {planFeatures(plan, produto).map((f) => (
                         <li key={f} className="flex gap-2.5 text-sm">
                           <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                           <span className="leading-snug">{f}</span>

@@ -1,29 +1,40 @@
 /**
  * DreamClin marketing landing page (rendered at `/` for signed-out visitors).
  *
- * Design direction: clean professional health-SaaS with warmth and color. The
- * hero pairs a real photo (Pexels, free commercial license) of a smiling
- * professional inside a circle mask with floating dashboard cards and status
- * pills, over soft blobs. Feature icons and personas use the brand teal and
- * navy plus a few supporting pastels, so the page reads hand-designed rather
- * than monochrome.
- * Font: Inter, the brand typeface. Features use an editorial numbered list
- * with hairline dividers instead of cards. Motion: staggered fade-in-up on load and a gentle float on the mockups, CSS-only.
+ * Direção: SaaS de saúde profissional, limpo e confiante, no azul-petróleo e
+ * marinho da marca, com a fonte do manual (Inter). O produto é o herói: em vez
+ * de foto de banco de imagens, uma janela do sistema com o funil, e os cartões
+ * flutuando mostram a promessa (o WhatsApp vira lead; agendou, o card anda).
  *
- * Copy is intentionally honest: no invented testimonials or user counts. The
- * trial length comes from TRIAL_DAYS, the same number the signup grants.
+ * A página vende três produtos — Agenda, CRM e Completo — e conta a história
+ * que só o Completo entrega: do primeiro "oi" no WhatsApp ao tratamento
+ * fechado, com o funil andando sozinho pela agenda.
+ * Spec: docs/specs/2026-10-26-planos-teste-e-funis-design.md
+ *
+ * Texto honesto: nada de depoimento ou número inventado. Os nomes na janela do
+ * sistema são ilustração. Prazo do teste e preços vêm do código e do banco, os
+ * mesmos que o cadastro e a cobrança usam. Movimento: fade-in-up escalonado e
+ * flutuação leve, só CSS (e desligado em prefers-reduced-motion).
  */
 import Link from 'next/link';
-import { Pricing } from './pricing-section';
-import Image from 'next/image';
 import {
-  ArrowRight, ArrowDown, CalendarDays, MessageCircle, FileText, Smile,
-  BarChart3, Accessibility, ShieldCheck, Lock, Check, Sparkles, Clock,
-  Users, Heart, PlusCircle, TrendingUp, BadgeCheck, KanbanSquare, Bot, Inbox,
+  Accessibility, ArrowRight, BadgeCheck, Bot, CalendarCheck, CalendarDays, Check, FileText,
+  Globe, Heart, Inbox, KanbanSquare, ListChecks, Lock, Megaphone, MessageCircle, ShieldCheck, Smile,
+  Sparkles, Stethoscope, Trophy, Wallet,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { companyLine, salesWhatsAppUrl } from '@/lib/company';
 import { TRIAL_DAYS } from '@/lib/subscription';
+import { DEFAULT_CHOICE, productPriceCents, PRODUCT_INFO, signUpHref, type Product } from '@/lib/products';
+import { loadPublicPlans, Pricing, type PublicPlan } from './pricing-section';
+
+const TESTAR = signUpHref(DEFAULT_CHOICE.product, DEFAULT_CHOICE.tier);
+
+const brl = (cents: number) =>
+  (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+
+const navLink =
+  'whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
@@ -35,18 +46,18 @@ function Header() {
           <Logo size="md" />
         </Link>
 
-        <nav aria-label="Menu da página" className="hidden items-center gap-1 md:flex">
-          <a href="#recursos" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Recursos</a>
-          <a href="#whatsapp-oficial" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">WhatsApp oficial</a>
-          <a href="#diferenciais" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Diferenciais</a>
-          <a href="#planos" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Planos</a>
-          <a href="#perguntas" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Perguntas</a>
+        <nav aria-label="Menu da página" className="hidden items-center gap-1 lg:flex">
+          <a href="#produtos" className={navLink}>Produtos</a>
+          <a href="#como-funciona" className={navLink}>Como funciona</a>
+          <a href="#recursos" className={navLink}>Recursos</a>
+          <a href="#planos" className={navLink}>Preços</a>
+          <a href="#perguntas" className={navLink}>Perguntas</a>
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/sign-in" className="btn-outline btn-md !rounded-full max-sm:hidden">Entrar</Link>
-          <Link href="/sign-up" className="btn-primary btn-md !rounded-full shadow-md shadow-primary/25">
-            Começar grátis
+          <Link href="/sign-in" className="btn-ghost btn-md !rounded-full max-sm:hidden">Entrar</Link>
+          <Link href={TESTAR} className="btn-primary btn-md !rounded-full shadow-md shadow-primary/25">
+            Testar grátis
           </Link>
         </div>
       </div>
@@ -54,249 +65,167 @@ function Header() {
   );
 }
 
-// ─── Hero visual (real photo in a circle + floating dashboard cards) ─────────
+// ─── Hero ────────────────────────────────────────────────────────────────────
 
-function CardArrow() {
-  return (
-    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-alt text-muted-foreground" aria-hidden="true">
-      <ArrowRight className="h-3 w-3" />
-    </span>
-  );
-}
-
-function FinanceCard() {
-  return (
-    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-bold">Resumo financeiro</p>
-        <CardArrow />
-      </div>
-      <div className="flex items-center justify-between rounded-xl bg-primary/10 px-3 py-2.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
-          <PlusCircle className="h-4 w-4" aria-hidden="true" />
-          Total a receber
-        </span>
-        <span className="text-xs font-bold text-primary">R$ 12.400</span>
-      </div>
-      <div className="mt-2.5 space-y-1.5 px-1">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="h-2 w-2 rounded-[3px] bg-amber-400" aria-hidden="true" /> À vencer
-          </span>
-          <span className="font-semibold tabular-nums">R$ 8.150</span>
-        </div>
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="h-2 w-2 rounded-[3px] bg-rose-400" aria-hidden="true" /> Vencidas
-          </span>
-          <span className="font-semibold tabular-nums">R$ 4.250</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const BARS = [
-  { h: 55, c: 'bg-emerald-600' },
-  { h: 30, c: 'bg-slate-800 dark:bg-slate-300' },
-  { h: 72, c: 'bg-amber-400' },
-  { h: 62, c: 'bg-rose-400' },
-  { h: 84, c: 'bg-teal-500' },
-  { h: 48, c: 'bg-emerald-400' },
-  { h: 66, c: 'bg-blue-700' },
-  { h: 90, c: 'bg-amber-500' },
-  { h: 58, c: 'bg-emerald-600' },
-  { h: 74, c: 'bg-teal-400' },
+const LEADS: { coluna: string; cor: string; cards: { nome: string; meta: string; tag?: string; valor?: string }[] }[] = [
+  {
+    coluna: 'Novo',
+    cor: 'bg-slate-400',
+    cards: [
+      { nome: 'Mariana Lopes', meta: 'WhatsApp · agora', tag: 'Clareamento' },
+      { nome: 'Rafael Souza', meta: 'Instagram · 12 min', tag: 'Implante' },
+    ],
+  },
+  {
+    coluna: 'Avaliação agendada',
+    cor: 'bg-teal-500',
+    cards: [
+      { nome: 'Juliana Prado', meta: 'Qui 14:30 · Dra. Paula', tag: 'Ortodontia' },
+      { nome: 'Carlos Mendes', meta: 'Sex 09:00 · Dr. André' },
+    ],
+  },
+  {
+    coluna: 'Em negociação',
+    cor: 'bg-amber-500',
+    cards: [
+      { nome: 'Beatriz Lima', meta: 'Orçamento visualizado', valor: 'R$ 6.500' },
+      { nome: 'Pedro Alves', meta: 'Retomar na sexta', valor: 'R$ 2.900' },
+    ],
+  },
 ];
 
-function AppointmentsCard() {
+/** A janela do sistema, ilustrativa: o funil com cards e as duas pontas da promessa. */
+function ProductShowcase() {
   return (
-    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-bold">Agendamentos</p>
-        <CardArrow />
-      </div>
-      <div className="mb-2 flex items-end justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400" aria-hidden="true">
-          <CalendarDays className="h-4 w-4" />
-        </span>
-        <span className="text-3xl font-bold leading-none">450</span>
-      </div>
-      <div className="flex h-20 items-end gap-1.5" role="presentation">
-        {BARS.map((b, i) => (
-          <span key={i} className={`flex-1 rounded-t ${b.c}`} style={{ height: `${b.h}%` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
+    <div className="relative">
+      <p className="sr-only">
+        Ilustração do DreamClin: o funil do CRM com os contatos que chegaram pelo WhatsApp, os que agendaram a avaliação e os
+        que estão negociando o orçamento.
+      </p>
+      <div aria-hidden="true" className="relative sm:pt-24">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-primary/10">
+          <div className="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+            <span className="ml-3 flex-1 truncate rounded-md bg-surface-alt px-2.5 py-1 text-[11px] text-muted-foreground">
+              dreamclin.com/crm
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5 bg-board p-3 sm:p-4">
+            {LEADS.map((c) => (
+              <div key={c.coluna} className="min-w-0">
+                <p className="mb-2 flex items-center gap-1.5 truncate text-[10px] font-bold uppercase tracking-wide text-heading sm:text-[11px]">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.cor}`} />
+                  {c.coluna}
+                </p>
+                <div className="space-y-2">
+                  {c.cards.map((card) => (
+                    <div key={card.nome} className="rounded-lg border border-border bg-surface p-2 shadow-sm sm:p-2.5">
+                      <p className="truncate text-[11px] font-semibold sm:text-xs">{card.nome}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-[11px]">{card.meta}</p>
+                      {(card.tag || card.valor) && (
+                        <p className="mt-1.5 flex items-center justify-between gap-1">
+                          {card.tag && (
+                            <span className="truncate rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary-hover dark:text-sky-300 sm:text-[10px]">
+                              {card.tag}
+                            </span>
+                          )}
+                          {card.valor && <span className="ml-auto text-[10px] font-bold tabular-nums sm:text-[11px]">{card.valor}</span>}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-function AttendanceCard() {
-  return (
-    <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-card">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-bold">Atendimentos</p>
-        <CardArrow />
-      </div>
-      <div className="flex items-center gap-3">
-        <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90" aria-hidden="true">
-          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" className="stroke-blue-200 dark:stroke-blue-900" />
-          <circle cx="32" cy="32" r="26" fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray="118 163" className="stroke-primary" />
-        </svg>
-        <div className="flex-1 space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span>Total</span><span className="tabular-nums">1.500</span>
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-[3px] bg-primary" aria-hidden="true" /> Particular
+        {/* Entrou pelo WhatsApp: virou lead sozinho. */}
+        <div className="animate-float absolute -left-4 top-0 z-10 hidden w-60 rounded-xl border border-border bg-surface p-3 shadow-xl sm:block lg:-left-10">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · agora
+          </p>
+          <p className="mt-1.5 rounded-lg rounded-tl-sm bg-surface-alt px-2.5 py-1.5 text-xs">Oi! Quanto fica o clareamento?</p>
+          <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary-hover dark:text-sky-300">
+            <ArrowRight className="h-3 w-3" /> Virou lead em Captação › Novo
+          </p>
+        </div>
+
+        {/* Agendou na agenda: o card passou de funil. */}
+        <div className="animate-float-slow absolute -bottom-10 -right-4 z-10 hidden w-64 rounded-xl border border-border bg-surface p-3 shadow-xl sm:block lg:-right-8">
+          <p className="flex items-center gap-2 text-xs font-semibold">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300">
+              <CalendarCheck className="h-4 w-4" />
             </span>
-            <span className="font-semibold tabular-nums text-foreground">1.400</span>
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-[3px] bg-blue-400" aria-hidden="true" /> Convênios
-            </span>
-            <span className="font-semibold tabular-nums text-foreground">100</span>
-          </div>
+            Avaliação marcada · qui, 14:30
+          </p>
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+            O card foi sozinho para <strong className="font-semibold text-foreground">Agendados</strong> e a confirmação saiu no
+            WhatsApp.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function WhatsPill() {
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-surface py-2 pl-2 pr-4 shadow-card-hover">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400" aria-hidden="true">
-        <MessageCircle className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-xs font-semibold">Paciente confirmou<span className="text-muted-foreground"> · WhatsApp</span></span>
-    </div>
-  );
-}
-
-function RevenuePill() {
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-surface py-2 pl-2 pr-4 shadow-card-hover">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400" aria-hidden="true">
-        <TrendingUp className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-xs font-semibold">R$ 4.820<span className="text-muted-foreground"> recebidos hoje</span></span>
-    </div>
-  );
-}
-
-function HeroVisual() {
-  return (
-    <div className="relative mx-auto w-fit" aria-hidden="true">
-      {/* soft color blobs */}
-      <div className="absolute -left-10 -top-8 h-40 w-40 rounded-full bg-brand-mint/50 blur-2xl dark:bg-brand-mint/10" />
-      <div className="absolute -bottom-10 -right-8 h-44 w-44 rounded-full bg-blue-200/50 blur-2xl dark:bg-blue-400/10" />
-      {/* decorative ring */}
-      <div className="absolute -inset-5 rounded-full border border-primary/15 sm:-inset-7" />
-
-      {/* photo */}
-      <div className="relative h-72 w-72 overflow-hidden rounded-full border-8 border-surface shadow-2xl sm:h-80 sm:w-80 lg:h-[400px] lg:w-[400px]">
-        <Image
-          src="/hero-professional.jpg"
-          alt=""
-          fill
-          priority
-          sizes="(min-width: 1024px) 400px, 320px"
-          className="object-cover object-top"
-        />
-      </div>
-
-      {/* pills anchored to the circle */}
-      <div className="absolute -top-3 right-0 animate-float-slow lg:-right-6"><WhatsPill /></div>
-      <div className="absolute -bottom-3 left-0 animate-float lg:-left-8"><RevenuePill /></div>
-    </div>
-  );
-}
-
-// ─── Hero ─────────────────────────────────────────────────────────────────────
-
 function Hero() {
-  const bullets = [
-    'Menos faltas com confirmação e lembretes no WhatsApp oficial, com botões',
-    'Mais orçamentos aceitos com link de aprovação online e PDF',
-    'Agenda, prontuário com odontograma e financeiro em um só lugar',
-  ];
+  const provas = ['Sem cartão de crédito', 'Cancele quando quiser', 'Sem taxa de instalação'];
   return (
     <section
       className="relative overflow-hidden"
       style={{
         backgroundImage:
-          'radial-gradient(ellipse 80% 60% at 70% -10%, hsl(var(--primary) / 0.08), transparent), radial-gradient(ellipse 50% 40% at 5% 105%, hsl(38 92% 55% / 0.07), transparent), radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
+          'radial-gradient(ellipse 80% 60% at 75% -10%, hsl(var(--primary) / 0.10), transparent), radial-gradient(ellipse 50% 40% at 0% 100%, hsl(38 92% 55% / 0.06), transparent), radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
         backgroundSize: 'auto, auto, 28px 28px',
       }}
     >
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:pb-28 lg:pt-20">
         <div>
-          <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
+          <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary-hover dark:text-sky-300">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            {TRIAL_DAYS} dias grátis, sem cartão
+            Agenda + CRM com WhatsApp oficial · {TRIAL_DAYS} dias grátis
           </p>
 
           <h1
-            className="animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]"
+            className="animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-5xl lg:text-[3.5rem]"
             style={{ animationDelay: '80ms' }}
           >
-            <span className="text-primary">Gestão inteligente</span> para sua clínica, do agendamento ao pagamento
+            Do primeiro <span className="text-primary">“oi” no WhatsApp</span> ao tratamento fechado
           </h1>
 
           <p className="animate-fade-in-up mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg" style={{ animationDelay: '160ms' }}>
-            Agenda por profissional, confirmação automática pela API oficial do WhatsApp,
-            orçamentos com link e PDF, ficha clínica com odontograma, financeiro e um CRM
-            para não perder nenhum interessado. Feito para clínicas odontológicas e
-            estéticas no Brasil.
+            O sistema para clínicas odontológicas e de estética que junta agenda, prontuário, orçamentos e um CRM no WhatsApp
+            oficial da Meta. Quem chama vira lead sozinho; quando a recepção agenda, o funil anda junto.
           </p>
 
-          <ul className="animate-fade-in-up mt-6 space-y-2.5" style={{ animationDelay: '240ms' }}>
-            {bullets.map((b) => (
-              <li key={b} className="flex items-start gap-2.5 text-sm sm:text-[15px]">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
-                </span>
-                {b}
-              </li>
-            ))}
-          </ul>
-
-          <div className="animate-fade-in-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '320ms' }}>
+          <div className="animate-fade-in-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '240ms' }}>
             <Link
-              href="/sign-up"
+              href={TESTAR}
               className="btn-primary !h-12 !rounded-full px-7 !text-base shadow-lg shadow-primary/30 transition-transform hover:scale-[1.03]"
             >
-              Criar conta grátis
+              Testar grátis por {TRIAL_DAYS} dias
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <a href="#recursos" className="btn-ghost !h-12 !rounded-full px-5 !text-base">
-              Conhecer os recursos
-              <ArrowDown className="h-4 w-4" aria-hidden="true" />
+            <a href="#planos" className="btn-outline !h-12 !rounded-full px-6 !text-base">
+              Ver planos e preços
             </a>
           </div>
 
-          <p className="animate-fade-in-up mt-4 text-xs text-muted-foreground" style={{ animationDelay: '400ms' }}>
-            {TRIAL_DAYS} dias grátis · Sem cartão de crédito · Pronto em 5 minutos
-          </p>
+          <ul className="animate-fade-in-up mt-5 flex flex-wrap gap-x-5 gap-y-2" style={{ animationDelay: '320ms' }}>
+            {provas.map((p) => (
+              <li key={p} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} aria-hidden="true" />
+                {p}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="animate-fade-in-up py-4" style={{ animationDelay: '280ms' }}>
-          <HeroVisual />
-        </div>
-      </div>
-
-      {/* Dashboard preview: clean grid, no overlaps */}
-      <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:pb-20">
-        <p className="mb-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          O painel da sua clínica
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="animate-fade-in-up" style={{ animationDelay: '360ms' }}><AppointmentsCard /></div>
-          <div className="animate-fade-in-up" style={{ animationDelay: '420ms' }}><FinanceCard /></div>
-          <div className="animate-fade-in-up max-lg:hidden" style={{ animationDelay: '480ms' }}><AttendanceCard /></div>
+        <div className="animate-fade-in-up px-2 sm:px-6 lg:px-0" style={{ animationDelay: '200ms' }}>
+          <ProductShowcase />
         </div>
       </div>
     </section>
@@ -307,7 +236,7 @@ function Hero() {
 
 function TrustStrip() {
   const items = [
-    { icon: BadgeCheck, label: 'API oficial do WhatsApp', color: 'text-emerald-600 dark:text-emerald-400' },
+    { icon: BadgeCheck, label: 'API oficial do WhatsApp (Meta)', color: 'text-emerald-600 dark:text-emerald-400' },
     { icon: ShieldCheck, label: 'LGPD por padrão', color: 'text-emerald-600 dark:text-emerald-400' },
     { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-blue-800 dark:text-blue-400' },
     { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-teal-700 dark:text-teal-400' },
@@ -327,86 +256,248 @@ function TrustStrip() {
   );
 }
 
-// ─── Features ────────────────────────────────────────────────────────────────
+// ─── Produtos ────────────────────────────────────────────────────────────────
 
-function Features() {
-  const features = [
-    {
-      icon: CalendarDays,
-      title: 'Agenda inteligente',
-      text: 'Visão por dia ou semana com os profissionais lado a lado. Bloqueio de horário, expediente visível na grade e aviso de conflito na hora de marcar.',
-      chip: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400',
-    },
-    {
-      icon: MessageCircle,
-      title: 'WhatsApp oficial e automático',
-      text: 'Pela API oficial da Meta, no número da clínica: confirmação assim que o horário é marcado e lembretes nos dias que você escolher, com botões para o paciente responder. A recepção não digita nada.',
-      chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
-    },
-    {
-      icon: FileText,
-      title: 'Orçamentos que fecham',
-      text: 'Monte o orçamento em minutos, envie por link ou PDF com a sua marca e acompanhe o status: visualizado, aceito, pago. Com registro de pagamento parcial.',
-      chip: 'bg-blue-100 text-blue-800 dark:bg-blue-700/15 dark:text-blue-400',
-    },
-    {
-      icon: Smile,
-      title: 'Ficha clínica completa',
-      text: 'Histórico de atendimentos, odontograma interativo dente a dente e a situação financeira do paciente reunidos em uma única tela.',
-      chip: 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400',
-    },
-    {
-      icon: BarChart3,
-      title: 'Financeiro sem planilha',
-      text: 'Indicadores do dia, atendimentos da semana e conversão de orçamentos direto no dashboard. Nada de exportar relatório para saber como está o mês.',
-      chip: 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
-    },
-    {
-      icon: Accessibility,
-      title: 'Acessibilidade levada a sério',
-      text: 'Navegação por teclado, compatibilidade com leitores de tela, alto contraste e modo escuro. Toda a equipe consegue usar o sistema.',
-      chip: 'bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
-    },
-  ];
+const ICONE: Record<Product, typeof CalendarDays> = { COMPLETO: Trophy, AGENDA: CalendarDays, CRM: KanbanSquare };
+
+function Products({ plans }: { plans: PublicPlan[] }) {
+  // "A partir de": o menor preço do produto entre os tamanhos à venda.
+  const aPartir = (p: Product) => {
+    const precos = plans.map((plan) => productPriceCents(plan, p)).filter((v) => v > 0);
+    return precos.length ? Math.min(...precos) : null;
+  };
+  const ordem: Product[] = ['AGENDA', 'COMPLETO', 'CRM'];
   return (
-    <section id="recursos" className="scroll-mt-20 py-16 lg:py-24">
+    <section id="produtos" aria-labelledby="produtos-titulo" className="scroll-mt-20 py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            O que sua clínica ganha com o DreamClin
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Produtos</p>
+          <h2 id="produtos-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            Um sistema, do jeito que a sua clínica precisa
           </h2>
           <p className="mt-3 text-base text-muted-foreground">
-            Cada módulo foi desenhado para o trabalho real de uma clínica: a recepção
-            agenda em segundos, o profissional encontra o prontuário e quem gerencia
-            acompanha o dinheiro.
+            Comece pela rotina, pela captação ou pelos dois juntos. Dá para trocar de plano a qualquer momento, sem perder nada.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-x-14 sm:grid-cols-2">
-          {features.map(({ icon: Icon, title, text, chip }, i) => (
-            <div key={title} className="flex gap-5 border-t border-border py-8 sm:py-9">
-              <span className="font-mono text-sm font-medium tabular-nums text-muted-foreground" aria-hidden="true">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <div>
-                <h3 className="flex items-center gap-3 text-lg font-bold tracking-tight">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
-                    <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        <ul className="mt-12 grid items-stretch gap-6 lg:grid-cols-3">
+          {ordem.map((p) => {
+            const Icon = ICONE[p];
+            const destaque = p === 'COMPLETO';
+            const preco = aPartir(p);
+            return (
+              <li key={p} className={destaque ? 'lg:-my-3' : undefined}>
+                <article
+                  aria-labelledby={`produto-${p}`}
+                  className={`relative flex h-full flex-col rounded-3xl p-7 ${
+                    destaque
+                      ? 'bg-brand-gradient text-white shadow-xl shadow-primary/20'
+                      : 'border border-border bg-surface shadow-card'
+                  }`}
+                >
+                  {destaque && (
+                    <span className="absolute right-6 top-6 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
+                      Mais completo
+                    </span>
+                  )}
+                  <span
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+                      destaque ? 'bg-white/15 text-white' : 'bg-primary/10 text-primary-hover dark:text-sky-300'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  {title}
-                </h3>
-                <p className="mt-2.5 max-w-md text-sm leading-relaxed text-muted-foreground">{text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <h3 id={`produto-${p}`} className={`mt-5 text-2xl font-bold tracking-tight ${destaque ? 'text-white' : ''}`}>
+                    {PRODUCT_INFO[p].name}
+                  </h3>
+                  <p className={`mt-2 text-sm leading-relaxed ${destaque ? 'text-white/85' : 'text-muted-foreground'}`}>
+                    {PRODUCT_INFO[p].tagline}
+                  </p>
+                  <ul className="mt-6 flex-1 space-y-2.5">
+                    {PRODUCT_INFO[p].includes.map((f) => (
+                      <li key={f} className="flex gap-2.5 text-sm">
+                        <Check
+                          className={`mt-0.5 h-4 w-4 shrink-0 ${destaque ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`}
+                          aria-hidden="true"
+                        />
+                        <span className="leading-snug">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {preco !== null && (
+                    <p className={`mt-6 text-sm ${destaque ? 'text-white/85' : 'text-muted-foreground'}`}>
+                      a partir de{' '}
+                      <span className={`text-2xl font-bold tabular-nums ${destaque ? 'text-white' : 'text-foreground'}`}>{brl(preco)}</span>
+                      /mês
+                    </p>
+                  )}
+                  <a
+                    href={`#planos-${p.toLowerCase()}`}
+                    className={`mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                      destaque
+                        ? 'bg-white text-teal-800 hover:bg-white/90 focus-visible:outline-white'
+                        : 'border border-border hover:border-primary/50 hover:text-primary-hover focus-visible:outline-ring'
+                    }`}
+                  >
+                    Ver planos do {PRODUCT_INFO[p].name}
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
 }
 
-// ─── WhatsApp oficial + CRM ──────────────────────────────────────────────────
+// ─── Como funciona: o funil que anda sozinho ─────────────────────────────────
+
+function Journey() {
+  const passos = [
+    {
+      icon: MessageCircle,
+      modulo: 'CRM',
+      titulo: 'Chamou no WhatsApp',
+      texto: 'Quem escreve para o número da clínica vira um card em Captação, com a conversa junto. Ninguém precisa cadastrar.',
+    },
+    {
+      icon: CalendarCheck,
+      modulo: 'Agenda',
+      titulo: 'Agendou a avaliação',
+      texto: 'A recepção marca na agenda e o card passa sozinho para Agendados. A confirmação e os lembretes saem pelo WhatsApp.',
+    },
+    {
+      icon: Stethoscope,
+      modulo: 'Agenda',
+      titulo: 'Veio e recebeu o orçamento',
+      texto: 'Marcou que compareceu, o card anda. Criou o orçamento, ele vai para Em negociação, com tarefa para quem cuida.',
+    },
+    {
+      icon: Trophy,
+      modulo: 'CRM',
+      titulo: 'Aprovou e fechou',
+      texto: 'Aprovado pelo link, o card fecha com o valor do tratamento, e o painel mostra quanto o funil trouxe no mês.',
+    },
+  ];
+  return (
+    <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="scroll-mt-20 border-y border-border bg-surface py-16 lg:py-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Como funciona</p>
+          <h2 id="como-funciona-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            O funil que anda sozinho com a agenda
+          </h2>
+          <p className="mt-3 text-base text-muted-foreground">
+            No Completo, a agenda e o CRM conversam. A recepção trabalha onde já trabalha, e o funil se atualiza sem ninguém
+            arrastar card.
+          </p>
+        </div>
+
+        <ol className="relative mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <span aria-hidden="true" className="absolute left-0 right-0 top-6 hidden h-px bg-gradient-to-r from-primary/0 via-primary/40 to-primary/0 lg:block" />
+          {passos.map(({ icon: Icon, modulo, titulo, texto }, i) => (
+            <li key={titulo} className="relative">
+              <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-lg shadow-primary/25">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="mt-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="tabular-nums">Passo {i + 1}</span>
+                <span aria-hidden="true">·</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 normal-case tracking-normal text-primary-hover dark:text-sky-300">{modulo}</span>
+              </p>
+              <h3 className="mt-2 text-lg font-bold tracking-tight">{titulo}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{texto}</p>
+            </li>
+          ))}
+        </ol>
+
+        <p className="mt-10 rounded-2xl border border-border bg-background px-5 py-4 text-sm leading-relaxed text-muted-foreground">
+          <strong className="font-semibold text-foreground">Desmarcou ou faltou?</strong> O card vai para “Desmarcou ou faltou” com a
+          tarefa de reagendar, e volta sozinho quando marcar de novo. Perder um negócio nunca é automático: quem decide é a
+          equipe.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ─── Recursos ────────────────────────────────────────────────────────────────
+
+function Features() {
+  const grupos = [
+    {
+      produto: 'Agenda',
+      titulo: 'Para a rotina da clínica',
+      itens: [
+        { icon: CalendarDays, t: 'Agenda por profissional', d: 'Dia, semana e mês, com expediente na grade, aviso de conflito e sala de espera.' },
+        { icon: Globe, t: 'Agendamento online', d: 'Um link para o paciente marcar sozinho nos horários livres que você liberar.' },
+        { icon: FileText, t: 'Orçamentos que fecham', d: 'Monte em minutos, envie por link ou PDF com a sua marca e veja quando foi aceito.' },
+        { icon: Smile, t: 'Prontuário com odontograma', d: 'Histórico, odontograma dente a dente e a situação financeira numa tela só.' },
+        { icon: Wallet, t: 'Financeiro sem planilha', d: 'Recebimentos, parcelas e indicadores do mês direto no painel.' },
+      ],
+    },
+    {
+      produto: 'CRM',
+      titulo: 'Para captar pacientes',
+      itens: [
+        { icon: KanbanSquare, t: 'Funis em quadro', d: 'Vários funis, etapas que você edita, filtros por tag, origem e responsável.' },
+        { icon: Inbox, t: 'Conversas da equipe', d: 'O WhatsApp da clínica no computador, com toda a recepção no mesmo número.' },
+        { icon: Bot, t: 'Robô de atendimento', d: 'Responde na hora com botões, pergunta o que importa e chama a equipe.' },
+        { icon: Megaphone, t: 'Transmissões', d: 'Mensagens para uma tag, etapa ou funil, só para quem aceitou receber.' },
+        { icon: ListChecks, t: 'Tarefas e painel de vendas', d: 'Ninguém fica sem retorno, e você vê de onde vêm e para onde vão os leads.' },
+      ],
+    },
+  ];
+  return (
+    <section id="recursos" aria-labelledby="recursos-titulo" className="scroll-mt-20 py-16 lg:py-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
+          <h2 id="recursos-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            Tudo o que a clínica usa no dia a dia
+          </h2>
+          <p className="mt-3 text-base text-muted-foreground">
+            Desenhado para o trabalho real: a recepção agenda em segundos, o profissional acha o prontuário e quem gerencia vê o
+            dinheiro e a captação.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 lg:grid-cols-2">
+          {grupos.map((g) => (
+            <section key={g.produto} aria-labelledby={`recursos-${g.produto}`} className="rounded-3xl border border-border bg-surface p-6 shadow-card sm:p-8">
+              <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-hover dark:text-sky-300">{g.produto}</p>
+              <h3 id={`recursos-${g.produto}`} className="mt-3 text-xl font-bold tracking-tight">
+                {g.titulo}
+              </h3>
+              <ul className="mt-6 divide-y divide-border">
+                {g.itens.map(({ icon: Icon, t, d }) => (
+                  <li key={t} className="flex gap-4 py-4 first:pt-0 last:pb-0">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-alt text-primary-hover dark:text-sky-300">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className="block font-semibold">{t}</span>
+                      <span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">{d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+
+        <p className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Accessibility className="h-4 w-4 text-primary" aria-hidden="true" />
+          Navegação por teclado, leitor de tela, alto contraste e modo escuro em todas as telas.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ─── WhatsApp oficial ────────────────────────────────────────────────────────
 
 /** A mensagem como o paciente vê, com os botões. Ilustração: nada aqui é clicável. */
 function WhatsAppMock() {
@@ -448,143 +539,37 @@ function WhatsAppOficial() {
   const pontos = [
     'Mensagens saem do número da clínica, com o nome dela, sem QR code nem celular ligado',
     'Confirmação na hora em que marca e lembretes 1 semana, 3 dias, 1 dia antes ou no dia: você escolhe',
-    'Botões Confirmar, Reagendar e Cancelar, com os nomes que você quiser: a resposta cai sozinha na agenda',
-    'O texto é seu: a gente manda para a Meta aprovar e avisa quando liberar',
-  ];
-  const crm = [
-    { icon: KanbanSquare, title: 'Funil de captação', text: 'Cada interessado num cartão, andando sozinho quando marca, falta ou aprova o orçamento.' },
-    { icon: Inbox, title: 'Conversas da equipe', text: 'O WhatsApp da clínica no computador, com toda a recepção respondendo no mesmo número.' },
-    { icon: Bot, title: 'Robô e transmissões', text: 'Atendimento automático com botões e mensagens em massa para quem aceitou receber.' },
+    'Botões Confirmar, Reagendar e Cancelar: a resposta cai sozinha na agenda',
+    'O celular continua funcionando no WhatsApp Business, junto com o sistema',
   ];
   return (
     <section id="whatsapp-oficial" aria-labelledby="whatsapp-oficial-titulo" className="scroll-mt-20 border-t border-border py-16 lg:py-24">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
         <div>
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
             <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> API oficial do WhatsApp (Meta)
           </p>
           <h2 id="whatsapp-oficial-titulo" className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
             O WhatsApp da sua clínica, do jeito oficial
           </h2>
           <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-            O DreamClin conecta o número da clínica direto na Meta. É o mesmo caminho que as grandes
-            empresas usam: mais estável, sem gambiarra e sem o risco de um aparelho desconectado deixar
-            paciente sem aviso.
+            O DreamClin conecta o número da clínica direto na Meta, o mesmo caminho que as grandes empresas usam: estável, sem
+            gambiarra e sem o risco de um aparelho desconectado deixar paciente sem aviso. Conectar leva poucos minutos.
           </p>
           <ul className="mt-6 space-y-3">
             {pontos.map((p) => (
-              <li key={p} className="flex items-start gap-2.5 text-sm sm:text-[15px]">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                  <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
-                </span>
-                {p}
+              <li key={p} className="flex gap-3 text-sm sm:text-[15px]">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                <span className="leading-snug">{p}</span>
               </li>
             ))}
           </ul>
+          <Link href="/ajuda/conectar-whatsapp" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-link underline underline-offset-2">
+            Veja o passo a passo para conectar
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </div>
         <WhatsAppMock />
-      </div>
-
-      <div className="mx-auto mt-16 max-w-6xl px-4 sm:px-6">
-        <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-xl">
-              <p className="text-sm font-semibold uppercase tracking-wider text-primary">CRM opcional</p>
-              <h3 className="mt-1 text-2xl font-bold tracking-tight">Quer captar mais? Ligue o CRM no mesmo número</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Para quem ainda não virou paciente: do primeiro &quot;oi&quot; no WhatsApp ao orçamento aprovado.
-                Escolha o plano com CRM agora ou ligue depois, com 14 dias grátis.
-              </p>
-            </div>
-            <a href="#planos" className="btn-outline btn-md">
-              Ver os planos com CRM
-              <ArrowDown className="h-4 w-4" aria-hidden="true" />
-            </a>
-          </div>
-          <ul className="mt-6 grid gap-4 sm:grid-cols-3">
-            {crm.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="rounded-xl border border-border bg-background p-4">
-                <p className="flex items-center gap-2 font-semibold">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  {title}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Differentiators (personas) ──────────────────────────────────────────────
-
-function Differentiators() {
-  const personas = [
-    {
-      icon: Clock,
-      who: 'Para a recepção',
-      title: 'Agendar deixa de ser malabarismo',
-      points: ['Busca de paciente instantânea', 'Conflito de horário avisado na hora', 'Confirmação vai sozinha pelo WhatsApp'],
-      chip: 'bg-blue-100 text-blue-800 dark:bg-blue-700/15 dark:text-blue-400',
-      accent: 'text-blue-800 dark:text-blue-400',
-    },
-    {
-      icon: Smile,
-      who: 'Para o profissional',
-      title: 'O prontuário na ponta dos dedos',
-      points: ['Odontograma interativo por dente', 'Histórico completo de atendimentos', 'Agenda do dia com um olhar'],
-      chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
-      accent: 'text-emerald-700 dark:text-emerald-400',
-    },
-    {
-      icon: Users,
-      who: 'Para quem gerencia',
-      title: 'O dinheiro deixa de ser mistério',
-      points: ['Conversão de orçamentos em tempo real', 'Pagamentos e saldo por paciente', 'Dados protegidos conforme a LGPD'],
-      chip: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400',
-      accent: 'text-teal-700 dark:text-teal-400',
-    },
-  ];
-  return (
-    <section id="diferenciais" className="scroll-mt-20 border-y border-border bg-surface py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Diferenciais</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Um sistema, três pessoas felizes
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Sistemas de clínica costumam servir bem só uma pessoa. O DreamClin foi
-            desenhado para a recepção, para o profissional e para quem gerencia,
-            tudo ao mesmo tempo.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {personas.map(({ icon: Icon, who, title, points, chip, accent }) => (
-            <article key={who} className="rounded-2xl border border-border bg-background p-6 shadow-card">
-              <p className={`flex items-center gap-2.5 text-xs font-semibold uppercase tracking-wider ${accent}`}>
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${chip}`}>
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                </span>
-                {who}
-              </p>
-              <h3 className="mt-4 text-xl font-bold tracking-tight">{title}</h3>
-              <ul className="mt-4 space-y-2.5">
-                {points.map((p) => (
-                  <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden="true" />
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -595,53 +580,60 @@ function Differentiators() {
 function FAQ() {
   const faqs = [
     {
-      q: 'Quanto custa o DreamClin?',
-      a: `Os primeiros ${TRIAL_DAYS} dias são grátis e sem cartão. Depois, você escolhe um dos planos acima, com ou sem o CRM, e paga por PIX, boleto ou cartão. Sem fidelidade e sem taxa de instalação.`,
-    },
-    {
-      q: 'O WhatsApp é oficial mesmo?',
-      a: 'É. O DreamClin usa a API oficial do WhatsApp, da Meta, no número da sua clínica. Nada de QR code ou celular ligado. As mensagens de aviso passam pela aprovação da Meta, e o uso do WhatsApp é cobrado pela Meta direto da clínica, conforme a tabela dela.',
-    },
-    {
-      q: 'Preciso do CRM?',
-      a: 'Não. A gestão da clínica (agenda, prontuário, orçamentos, financeiro e os avisos no WhatsApp) funciona sozinha. O CRM é para captar: acompanhar quem chamou no WhatsApp até virar paciente. Dá para ligar depois, com 14 dias grátis.',
+      q: 'Como funciona o teste grátis?',
+      a: `Você escolhe o plano, cria a conta e usa tudo por ${TRIAL_DAYS} dias, sem cartão. Durante o teste dá para trocar de plano à vontade. Se assinar antes do fim, a primeira cobrança só vence quando o teste acaba.`,
     },
     {
       q: 'O que acontece quando o teste acaba?',
-      a: 'Você escolhe um plano e segue usando, sem perder nada do que cadastrou. Se não escolher, seus dados continuam guardados e disponíveis para consulta; só fica bloqueado criar e alterar até assinar.',
+      a: 'Se você assinou, segue usando sem interrupção. Se não, nada é cobrado: a conta fica só para consulta, com tudo guardado, até você escolher um plano. Avisamos dentro do sistema nos últimos dias do teste.',
     },
     {
-      q: 'Preciso instalar alguma coisa?',
-      a: 'Não. O DreamClin roda direto no navegador, no computador da recepção, no tablet do consultório e no celular. Basta criar a conta e entrar.',
+      q: 'Qual a diferença entre Agenda, CRM e Completo?',
+      a: 'A Agenda é a rotina da clínica: agenda, pacientes, prontuário, orçamentos, financeiro e os avisos no WhatsApp. O CRM é a captação: funis, conversas do WhatsApp com a equipe, robô e transmissões. O Completo junta os dois, integrados, e sai mais barato que comprar separado.',
     },
     {
-      q: 'Como funciona a confirmação pelo WhatsApp?',
-      a: 'Ao criar um agendamento, o paciente recebe automaticamente uma mensagem de confirmação no WhatsApp. Antes da consulta saem os lembretes (1 semana, 3 dias, 1 dia antes ou no dia: a clínica escolhe), com botões para o paciente confirmar. Tudo sem a recepção digitar nada.',
+      q: 'Posso contratar só o CRM e continuar com meu sistema de agenda?',
+      a: 'Pode. O CRM funciona sozinho, com funis, WhatsApp oficial, robô e transmissões; as etapas você move no quadro. A parte de o card andar sozinho quando agenda, falta ou aprova o orçamento é do Completo, porque depende da agenda do DreamClin.',
+    },
+    {
+      q: 'Posso trocar de plano depois?',
+      a: 'Quando quiser, pela tela de Plano. Subir de plano ou acrescentar o CRM vale na hora; o valor novo entra na próxima fatura, sem cobrança proporcional. Ao trocar de produto, nada é apagado: leads, conversas e pacientes ficam guardados.',
+    },
+    {
+      q: 'Tem fidelidade ou multa para cancelar?',
+      a: 'Não. Você cancela pela própria tela de Plano e continua com acesso até o fim do mês já pago. Também não há taxa de instalação.',
+    },
+    {
+      q: 'O WhatsApp é oficial mesmo? Quanto custa?',
+      a: 'É a API oficial do WhatsApp, da Meta, no número da sua clínica, sem QR code nem celular ligado. As conversas são cobradas pela Meta direto da clínica, conforme a tabela dela; responder quem escreveu nas últimas 24 horas não tem custo.',
     },
     {
       q: 'Meus dados e os dos pacientes estão seguros?',
-      a: 'Sim. Dados sensíveis como CPF e telefone são criptografados (AES-256) e o sistema segue a LGPD desde a arquitetura. Cada clínica só acessa os próprios dados.',
+      a: 'Sim. CPF e telefone são criptografados (AES-256), o sistema segue a LGPD desde a arquitetura, faz backup diário e cada clínica só acessa os próprios dados.',
     },
     {
-      q: 'Funciona bem no celular?',
-      a: 'Funciona. A agenda, os pacientes e os orçamentos foram desenhados também para telas pequenas. A recepção consegue confirmar um horário do celular sem sofrimento.',
+      q: 'Consigo trazer meus pacientes e leads de outro sistema?',
+      a: 'Sim. Os leads entram por planilha no próprio CRM, com funil, etapa, tags e responsável. Para os pacientes, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
     },
     {
-      q: 'Consigo trazer meus pacientes de outro sistema?',
-      a: 'Sim. O cadastro de pacientes é rápido e, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
+      q: 'Preciso instalar alguma coisa?',
+      a: 'Não. O DreamClin roda no navegador, no computador da recepção, no tablet do consultório e no celular.',
     },
   ];
   return (
-    <section id="perguntas" className="scroll-mt-20 py-16 lg:py-24">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <div className="text-center">
+    <section id="perguntas" aria-labelledby="perguntas-titulo" className="scroll-mt-20 py-16 lg:py-24">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.6fr]">
+        <div>
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Perguntas frequentes</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 id="perguntas-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             Ficou alguma dúvida?
           </h2>
+          <p className="mt-3 text-base text-muted-foreground">
+            Teste, planos, troca e cancelamento: tudo aqui. Se faltar alguma coisa, fale com a gente.
+          </p>
         </div>
 
-        <div className="mt-10 space-y-3">
+        <div className="space-y-3">
           {faqs.map(({ q, a }) => (
             <details
               key={q}
@@ -674,19 +666,19 @@ function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full border border-white/10" />
 
         <h2 id="cta-final" className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Pronto para simplificar a rotina da sua clínica?
+          Nenhum paciente perdido no WhatsApp. Nenhuma cadeira vazia por falta.
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
-          Crie sua conta, cadastre a equipe e faça o primeiro agendamento em menos
-          de 5 minutos. {TRIAL_DAYS} dias grátis, sem cartão e sem fidelidade.
+          Crie a conta, conecte o WhatsApp e faça o primeiro agendamento ainda hoje. {TRIAL_DAYS} dias grátis, sem cartão e sem
+          fidelidade.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {/* O degradê não muda com o tema, então o teal do botão também não. */}
           <Link
-            href="/sign-up"
-            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-teal-700 shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            href={TESTAR}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-teal-800 shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            Começar agora, é grátis
+            Testar grátis por {TRIAL_DAYS} dias
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
           {whatsapp ? (
@@ -697,8 +689,8 @@ function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
               className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
-              Tirar dúvidas no WhatsApp
-              <span className="sr-only"> (abre em nova aba)</span>
+              Falar com a gente
+              <span className="sr-only"> no WhatsApp (abre em nova aba)</span>
             </a>
           ) : (
             <Link
@@ -738,33 +730,42 @@ function WhatsAppFloat({ href }: { href: string }) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 
+const footLink = 'rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+
 function Footer({ whatsapp }: { whatsapp: string | null }) {
   return (
     <footer className="border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
             <Logo size="md" />
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Gestão inteligente para clínicas odontológicas e estéticas.
-            Agenda, WhatsApp, orçamentos, prontuário e financeiro em um só lugar.
+            Agenda, prontuário, orçamentos e CRM com WhatsApp oficial para clínicas odontológicas e de estética.
           </p>
         </div>
 
-        <nav aria-label="Links do produto">
-          <p className="text-sm font-semibold">Produto</p>
+        <nav aria-label="Produtos">
+          <p className="text-sm font-semibold">Produtos</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><a href="#recursos" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Recursos</a></li>
-            <li><a href="#whatsapp-oficial" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">WhatsApp oficial</a></li>
-            <li><a href="#diferenciais" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Diferenciais</a></li>
-          <li><a href="#planos" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Planos</a></li>
-            <li><a href="#perguntas" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Perguntas frequentes</a></li>
-            <li><Link href="/sign-up" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Criar conta</Link></li>
-            <li><Link href="/sign-in" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Entrar</Link></li>
+            <li><a href="#planos-completo" className={footLink}>Completo</a></li>
+            <li><a href="#planos-agenda" className={footLink}>Agenda</a></li>
+            <li><a href="#planos-crm" className={footLink}>CRM</a></li>
+            <li><a href="#como-funciona" className={footLink}>Como funciona</a></li>
+            <li><a href="#planos" className={footLink}>Preços</a></li>
+          </ul>
+        </nav>
+
+        <nav aria-label="Ajuda">
+          <p className="text-sm font-semibold">Ajuda</p>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <li><a href="#perguntas" className={footLink}>Perguntas frequentes</a></li>
+            <li><Link href="/ajuda/conectar-whatsapp" className={footLink}>Como conectar o WhatsApp</Link></li>
+            <li><Link href={TESTAR} className={footLink}>Criar conta</Link></li>
+            <li><Link href="/sign-in" className={footLink}>Entrar</Link></li>
             {whatsapp && (
               <li>
-                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={footLink}>
                   Fale com a gente no WhatsApp<span className="sr-only"> (abre em nova aba)</span>
                 </a>
               </li>
@@ -788,8 +789,8 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
             © {new Date().getFullYear()} DreamClin{companyLine() ? ` · ${companyLine()}` : ''}. Todos os direitos reservados.
           </p>
           <nav aria-label="Páginas legais" className="flex items-center gap-4">
-            <Link href="/privacidade" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Privacidade</Link>
-            <Link href="/termos" className="rounded hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Termos de uso</Link>
+            <Link href="/privacidade" className={footLink}>Privacidade</Link>
+            <Link href="/termos" className={footLink}>Termos de uso</Link>
             <span>Feito no Brasil 🇧🇷</span>
           </nav>
         </div>
@@ -800,18 +801,20 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export function LandingPage() {
+export async function LandingPage() {
   const whatsapp = salesWhatsAppUrl();
+  const plans = await loadPublicPlans();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main id="main-content">
         <Hero />
         <TrustStrip />
+        <Products plans={plans} />
+        <Journey />
         <Features />
         <WhatsAppOficial />
-        <Differentiators />
-        <Pricing />
+        <Pricing plans={plans} />
         <FAQ />
         <FinalCTA whatsapp={whatsapp} />
       </main>
