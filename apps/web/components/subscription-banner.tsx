@@ -33,7 +33,7 @@ export function SubscriptionBanner({ access }: { access: Access }) {
           blocked ? 'bg-destructive text-destructive-foreground no-underline hover:opacity-90' : ''
         }`}
       >
-        {blocked ? 'Regularizar agora' : 'Ver planos'}
+        {access.trialEnded ? 'Escolher um plano' : blocked ? 'Regularizar agora' : 'Ver planos'}
       </Link>
     </div>
   );

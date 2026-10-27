@@ -101,7 +101,7 @@ export async function seedE2EClinic() {
   const farFuture = new Date('2099-12-31T00:00:00Z');
   await prisma.subscription.upsert({
     where: { tenantId: tenant.id },
-    update: { complimentary: true, status: 'ACTIVE', currentPeriodEnd: farFuture, crmEnabled: true },
+    update: { complimentary: true, status: 'ACTIVE', currentPeriodEnd: farFuture, crmEnabled: true, clinicEnabled: true },
     create: {
       crmEnabled: true,
       tenantId: tenant.id,

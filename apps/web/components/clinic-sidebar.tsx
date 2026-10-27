@@ -33,11 +33,13 @@ export function ClinicSidebar({
   active,
   clinicName,
   showSwitcher,
+  clinicHome,
 }: {
   items: ClinicNavItem[];
   active: string | undefined;
   clinicName: string;
   showSwitcher: boolean;
+  clinicHome?: string;
 }) {
   const router = useRouter();
   const buscaId = useId();
@@ -144,7 +146,7 @@ export function ClinicSidebar({
               className="h-9 w-full rounded-lg border border-border bg-surface-alt/60 pl-8 pr-2 text-sm placeholder:text-muted-foreground focus:bg-surface focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
             />
           </div>
-          {showSwitcher && <ModuleSwitcher space="clinic" />}
+          {showSwitcher && <ModuleSwitcher space="clinic" clinicHome={clinicHome} />}
         </div>
       )}
 

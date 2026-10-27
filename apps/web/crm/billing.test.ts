@@ -82,6 +82,21 @@ describe('subscriptionValueCents', () => {
   });
 });
 
+describe('só o CRM, sem a agenda', () => {
+  const base = { planPriceCents: 23_900, packagePriceCents: 12_000, includedSeats: 3, seatPriceCents: 3_900, crmOnlyPriceCents: 21_900 };
+
+  it('cobra o CRM sozinho, sem o plano da agenda, até no teste do CRM', () => {
+    expect(subscriptionValueCents({ ...base, seats: 2, status: 'paid' })).toBe(21_900);
+    expect(subscriptionValueCents({ ...base, seats: 2, status: 'trial' })).toBe(21_900);
+    expect(subscriptionValueCents({ ...base, seats: 4, status: 'paid' })).toBe(25_800);
+    expect(subscriptionValueCents({ ...base, seats: 4, status: 'complimentary' })).toBe(0);
+  });
+
+  it('a fatura diz CRM', () => {
+    expect(subscriptionDescription('Profissional', 'paid', 2, true)).toBe('DreamClin: CRM Profissional (2 usuários)');
+  });
+});
+
 describe('subscriptionDescription', () => {
   it('a fatura diz o que está sendo cobrado', () => {
     expect(subscriptionDescription('Profissional', 'paid', 2)).toBe('DreamClin: plano Profissional + CRM (2 usuários)');

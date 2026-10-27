@@ -19,6 +19,8 @@ export interface LeadSideBasics {
   procedures: { id: string; name: string }[];
   lostReasons: LostReasonOption[];
   fields?: FieldDef[];
+  /** A clínica tem a agenda: mostra "Agendar avaliação" e "Converter em paciente". */
+  agenda?: boolean;
 }
 
 /**
@@ -77,7 +79,7 @@ function LeadSide({
       actions={
         // Agendar daqui leva o telefone do WhatsApp para a ficha: sem digitar, sem número trocado.
         <div className="space-y-2">
-          <ConvertActions leadId={lead.id} patient={lead.patient} />
+          {basics.agenda !== false && <ConvertActions leadId={lead.id} patient={lead.patient} />}
           <Link href={`/crm/leads/${lead.id}`} className="btn-outline btn-sm inline-flex w-full items-center justify-center gap-1.5">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Abrir a ficha completa
           </Link>

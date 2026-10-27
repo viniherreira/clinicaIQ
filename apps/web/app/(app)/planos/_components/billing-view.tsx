@@ -17,8 +17,9 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { cancelPlan, choosePlan, saveDocument, type BillingData, type PlanOption } from '../actions';
+import { cancelPlan, choosePlan, saveDocument, switchTrialPlan, type BillingData, type PlanOption } from '../actions';
 import type { BillingMethod } from '@/lib/asaas';
+import { bundleSavingsCents, productAvailable, productPriceCents, PRODUCT_INFO, PRODUCTS, type Product } from '@/lib/products';
 import { formatDocument, onlyDigits } from '@/lib/document';
 import { clinicToday } from '@/lib/tz';
 
@@ -36,6 +37,12 @@ const brl = (cents: number) =>
  */
 const diaDe = (iso: string) => iso.slice(0, 10);
 const date = (iso: string) => diaDe(iso).split('-').reverse().join('/');
+/** O fim do teste é um instante (cadastro + 14 dias), não um dia de parede: vai no fuso da clínica. */
+const dataSP = (iso: string) =>
+  new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
+/** Preço de vitrine, sem centavos: cabe no cartão estreito. */
+const brlInteiro = (cents: number) =>
+  (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
 const CHARGE_STATUS: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'Em aberto', cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' },
@@ -81,26 +88,41 @@ function ResumoAssinatura({ data }: { data: BillingData }) {
     .filter((c) => c.status === 'PAID' && c.paidAt)
     .sort((a, b) => (a.paidAt! < b.paidAt! ? 1 : -1))[0];
 
-  const atrasada = data.access.status === 'PAST_DUE' || data.access.level === 'readonly';
+  const atrasada = data.access.status === 'PAST_DUE' || (data.access.level === 'readonly' && !data.access.trialEnded);
   const emTeste = data.access.status === 'TRIALING';
 
   const itens: { rotulo: string; valor: React.ReactNode }[] = [];
 
   itens.push({
-    rotulo: 'Plano',
+    rotulo: emTeste ? 'Plano do teste' : 'Plano',
     valor: plano ? (
       <>
-        {plano.name}
-        <span className="text-muted-foreground"> · {brl(plano.monthlyPriceCents)}/mês</span>
+        {PRODUCT_INFO[data.product].name} {plano.name}
+        <span className="text-muted-foreground"> · {brl(productPriceCents(plano, data.product))}/mês</span>
       </>
     ) : (
       <span className="text-muted-foreground">Nenhum</span>
     ),
   });
 
-  if (data.currentPeriodEnd) {
+  if ((emTeste || data.access.trialEnded) && data.trialEndsAt) {
     itens.push({
-      rotulo: emTeste ? 'Avaliação termina em' : atrasada ? 'Venceu em' : 'Pago até',
+      rotulo: 'Teste grátis até',
+      valor: (
+        <>
+          <span className="tabular-nums">{dataSP(data.trialEndsAt)}</span>
+          {data.access.daysLeft !== null && emTeste && (
+            <span className="text-muted-foreground">
+              {' '}
+              · {data.access.daysLeft === 1 ? 'falta 1 dia' : `faltam ${data.access.daysLeft} dias`}
+            </span>
+          )}
+        </>
+      ),
+    });
+  } else if (data.currentPeriodEnd) {
+    itens.push({
+      rotulo: atrasada ? 'Venceu em' : 'Pago até',
       valor: (
         <>
           <span className={`tabular-nums ${atrasada ? 'text-destructive' : ''}`}>
@@ -139,17 +161,19 @@ function ResumoAssinatura({ data }: { data: BillingData }) {
     });
   }
 
-  itens.push({
-    rotulo: 'Profissionais ativos',
-    valor: (
-      <>
-        <span className="tabular-nums">{data.professionalsInUse}</span>
-        {plano?.maxProfessionals != null && (
-          <span className="text-muted-foreground"> de {plano.maxProfessionals} no plano</span>
-        )}
-      </>
-    ),
-  });
+  if (data.product !== 'CRM') {
+    itens.push({
+      rotulo: 'Profissionais ativos',
+      valor: (
+        <>
+          <span className="tabular-nums">{data.professionalsInUse}</span>
+          {plano?.maxProfessionals != null && (
+            <span className="text-muted-foreground"> de {plano.maxProfessionals} no plano</span>
+          )}
+        </>
+      ),
+    });
+  }
 
   if (data.document) {
     itens.push({ rotulo: 'CPF/CNPJ na cobrança', valor: data.document });
@@ -219,17 +243,37 @@ function Cortesia({ data, embutido }: { data: BillingData; embutido: boolean }) 
   );
 }
 
-function features(plan: PlanOption): string[] {
-  return [
+/** O que um tamanho inclui em cada produto: profissionais na agenda, usuários no CRM. */
+function features(plan: PlanOption, product: Product): string[] {
+  const profs =
     plan.maxProfessionals === null
       ? 'Profissionais ilimitados'
-      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`,
-    'Agenda, pacientes e prontuário',
-    'Orçamentos em PDF',
-    plan.whatsappEnabled ? 'WhatsApp oficial, com confirmação e lembretes' : null,
-    plan.campaignsEnabled ? 'Campanhas em massa' : null,
-    plan.advancedReports ? 'Relatórios completos' : null,
-  ].filter((f): f is string => f !== null);
+      : `${plan.maxProfessionals} ${plan.maxProfessionals > 1 ? 'profissionais' : 'profissional'}`;
+  const users = `${plan.crmIncludedSeats} ${plan.crmIncludedSeats === 1 ? 'usuário' : 'usuários'} no CRM (${brl(plan.crmSeatPriceCents)} cada a mais)`;
+  const extras = [plan.campaignsEnabled ? 'Campanhas em massa' : null, plan.advancedReports ? 'Relatórios completos' : null];
+  const lista =
+    product === 'AGENDA'
+      ? [profs, 'Agenda, pacientes e prontuário', 'Orçamentos com link e PDF', 'Confirmação e lembretes no WhatsApp oficial', ...extras]
+      : product === 'CRM'
+        ? [users, 'Funis de captação em quadro', 'Conversas do WhatsApp oficial com a equipe', 'Robô de atendimento e transmissões']
+        : [profs, users, 'Tudo da Agenda e do CRM', 'Funil que anda sozinho com a agenda e os orçamentos', ...extras];
+  return lista.filter((f): f is string => f !== null);
+}
+
+/** A descrição do tamanho no produto CRM: conta pessoas no CRM, não profissionais. */
+const paraQuemCrm = (plan: PlanOption) =>
+  plan.crmIncludedSeats === 1
+    ? 'Para quem atende o WhatsApp da clínica sozinho.'
+    : `Para equipes de até ${plan.crmIncludedSeats} pessoas atendendo no CRM.`;
+
+/** O que muda nos módulos ao trocar de produto, dito antes de confirmar. */
+function mudancaDeModulos(de: Product, para: Product): string | null {
+  if (de === para) return null;
+  const sai = de !== 'AGENDA' && para === 'AGENDA' ? 'O CRM sai agora; os leads e as conversas ficam guardados para quando voltar.'
+    : de !== 'CRM' && para === 'CRM' ? 'A agenda sai agora; pacientes, agendamentos e orçamentos ficam guardados para quando voltar.'
+      : null;
+  const entra = para === 'COMPLETO' ? 'Agenda e CRM ficam ligados e integrados na hora.' : null;
+  return [sai, entra].filter(Boolean).join(' ') || null;
 }
 
 export function BillingView({
@@ -250,6 +294,9 @@ export function BillingView({
   const [docSaved, setDocSaved] = useState(false);
   const [method, setMethod] = useState<BillingMethod>('PIX');
   const [qr, setQr] = useState<string | null>(null);
+  // O produto em exibição nos cartões, e o plano escolhido esperando confirmação.
+  const [produto, setProduto] = useState<Product>(data.product);
+  const [escolha, setEscolha] = useState<{ tier: string; product: Product } | null>(null);
 
   const openCharge = data.charges.find((c) => c.status === 'PENDING' || c.status === 'OVERDUE');
   const needsDocument = !data.document;
@@ -273,11 +320,11 @@ export function BillingView({
     };
   }, [openCharge?.pixPayload]);
 
-  function pick(tier: string) {
+  function pick(tier: string, product: Product) {
     setError(null);
     setChoosing(tier);
     startTransition(async () => {
-      const res = await choosePlan(tier, method);
+      const res = await choosePlan(tier, method, product);
       setChoosing(null);
       if (!res.ok) {
         setError(res.error ?? 'Não foi possível trocar de plano.');
@@ -286,8 +333,22 @@ export function BillingView({
         }
         return;
       }
+      setEscolha(null);
       router.refresh();
       if (res.invoiceUrl) window.open(res.invoiceUrl, '_blank', 'noopener');
+    });
+  }
+
+  /** No teste, sem assinar: só troca o plano do teste. */
+  function trocarTeste(tier: string, product: Product) {
+    setError(null);
+    setChoosing(tier);
+    startTransition(async () => {
+      const res = await switchTrialPlan(tier, product);
+      setChoosing(null);
+      if (!res.ok) return setError(res.error ?? 'Não foi possível trocar o plano do teste.');
+      setEscolha(null);
+      router.refresh();
     });
   }
 
@@ -376,8 +437,10 @@ export function BillingView({
             <div>
               <h2 id="situacao" className="font-semibold">
                 {data.access.status === 'TRIALING'
-                  ? 'Avaliação gratuita'
-                  : data.access.status === 'ACTIVE'
+                  ? 'Teste grátis'
+                  : data.access.trialEnded
+                    ? 'Teste grátis encerrado'
+                    : data.access.status === 'ACTIVE'
                     ? 'Assinatura em dia'
                     : data.access.status === 'PAST_DUE'
                       ? 'Pagamento em atraso'
@@ -559,151 +622,248 @@ export function BillingView({
       )}
 
       {/* Planos */}
-      <section aria-labelledby="planos">
-        <h2 id="planos" className="sr-only">
-          Planos disponíveis
-        </h2>
+      <section aria-labelledby="planos" className="space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="max-w-xl">
+            <h2 id="planos" className="text-lg font-semibold">
+              {data.trialOpen ? 'Escolha o plano para depois do teste' : 'Planos'}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">{PRODUCT_INFO[produto].tagline}</p>
+          </div>
+          <div role="radiogroup" aria-label="Produto" className="inline-flex rounded-full border border-border bg-surface p-1 shadow-sm">
+            {PRODUCTS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                role="radio"
+                aria-checked={produto === p}
+                onClick={() => {
+                  setProduto(p);
+                  setEscolha(null);
+                }}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                  produto === p ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {PRODUCT_INFO[p].name}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {!openCharge && (
-          <fieldset className="mb-6">
-            <legend className="text-sm font-medium">Como você prefere pagar?</legend>
-            <div className="mt-2.5 inline-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de pagamento">
-              {(
-                [
-                  { id: 'PIX', label: 'PIX', icon: QrCode, hint: 'liberação imediata' },
-                  { id: 'BOLETO', label: 'Boleto', icon: Barcode, hint: 'compensa em 1 dia útil' },
-                  { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard, hint: 'renova sozinho' },
-                ] as const
-              ).map(({ id, label, icon: Icon, hint }) => {
-                const on = method === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => setMethod(id)}
-                    className={`flex items-center gap-2.5 rounded-xl border px-4 py-2.5 text-left transition-colors ${
-                      on
-                        ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary/30'
-                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+        <ul className="grid items-start gap-5 lg:grid-cols-3">
+          {data.plans
+            .filter((plan) => productAvailable(plan, produto))
+            .map((plan, index) => {
+              const busy = pending && choosing === plan.tier;
+              const atual = plan.current && produto === data.product;
+              const tooSmall =
+                produto !== 'CRM' && plan.maxProfessionals !== null && data.professionalsInUse > plan.maxProfessionals;
+              // O do meio é o que serve à maioria das clínicas — destacá-lo poupa
+              // a decisão de quem não quer comparar tabela.
+              const featured = index === 1 && !atual;
+              const economia = produto === 'COMPLETO' ? bundleSavingsCents(plan) : 0;
+              const escolhido = escolha?.tier === plan.tier && escolha.product === produto;
+              // Assinado e em dia: o plano atual não tem o que fazer. No teste (ou
+              // sem assinatura), o atual é justamente o que se assina.
+              const travado = atual && data.renewsAutomatically;
+
+              return (
+                <li key={plan.tier} className={featured ? 'lg:-mt-3' : undefined}>
+                  <article
+                    className={`relative flex h-full flex-col rounded-2xl border bg-surface p-6 transition-shadow hover:shadow-md ${
+                      atual || escolhido
+                        ? 'border-primary ring-2 ring-primary/20'
+                        : featured
+                          ? 'border-primary/50 shadow-sm'
+                          : 'border-border'
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${on ? 'text-primary' : ''}`} aria-hidden="true" />
-                    <span>
-                      <span className="block text-sm font-medium">{label}</span>
-                      <span className="block text-xs text-muted-foreground">{hint}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-        )}
-        <ul className="grid items-start gap-5 lg:grid-cols-3">
-          {data.plans.map((plan, index) => {
-            const busy = pending && choosing === plan.tier;
-            const tooSmall =
-              plan.maxProfessionals !== null && data.professionalsInUse > plan.maxProfessionals;
-            // O do meio é o que serve à maioria das clínicas — destacá-lo poupa
-            // a decisão de quem não quer comparar tabela.
-            const featured = index === 1 && !plan.current;
+                    {(atual || featured) && (
+                      <span
+                        className={`absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+                          atual ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary ring-1 ring-primary/30'
+                        }`}
+                      >
+                        {atual ? (
+                          data.trialOpen ? 'No seu teste' : 'Plano atual'
+                        ) : (
+                          <>
+                            <Sparkles className="h-3 w-3" aria-hidden="true" /> Mais escolhido
+                          </>
+                        )}
+                      </span>
+                    )}
 
-            return (
-              <li key={plan.tier} className={featured ? 'lg:-mt-3' : undefined}>
-                <article
-                  className={`relative flex h-full flex-col rounded-2xl border bg-surface p-6 transition-shadow hover:shadow-md ${
-                    plan.current
-                      ? 'border-primary ring-2 ring-primary/20'
-                      : featured
-                        ? 'border-primary/50 shadow-sm'
-                        : 'border-border'
-                  }`}
-                >
-                  {(plan.current || featured) && (
-                    <span
-                      className={`absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-                        plan.current
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-primary/10 text-primary ring-1 ring-primary/30'
-                      }`}
+                    <h3 className="mt-2 text-lg font-semibold">
+                      {PRODUCT_INFO[produto].name} {plan.name}
+                    </h3>
+                    <p className="mt-1.5 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">
+                      {produto === 'CRM' ? paraQuemCrm(plan) : plan.description}
+                    </p>
+
+                    <p className="mt-5 flex flex-wrap items-baseline gap-x-1">
+                      <span className="text-4xl font-semibold tracking-tight tabular-nums">
+                        {brlInteiro(productPriceCents(plan, produto))}
+                      </span>
+                      <span className="text-sm text-muted-foreground">/mês</span>
+                    </p>
+                    <p className="mt-1.5 min-h-[1.25rem] text-sm text-muted-foreground">
+                      {economia > 0 ? (
+                        <>
+                          Economiza <span className="font-medium text-emerald-700 dark:text-emerald-400">{brlInteiro(economia)}/mês</span> frente a
+                          Agenda + CRM separados
+                        </>
+                      ) : null}
+                    </p>
+
+                    <ul className="mt-6 flex-1 space-y-2.5">
+                      {features(plan, produto).map((f) => (
+                        <li key={f} className="flex gap-2.5 text-sm">
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                          <span className="leading-snug">{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setEscolha({ tier: plan.tier, product: produto });
+                        // A confirmação aparece logo abaixo da grade.
+                        setTimeout(() => document.getElementById('confirmar-plano')?.focus(), 0);
+                      }}
+                      disabled={travado || pending || tooSmall || (!data.gatewayReady && !data.trialOpen)}
+                      aria-pressed={escolhido}
+                      title={
+                        tooSmall
+                          ? `Você tem ${data.professionalsInUse} profissionais ativos; este plano permite ${plan.maxProfessionals}.`
+                          : undefined
+                      }
+                      className={`${(atual && !travado) || (featured && !travado) ? 'btn-primary' : 'btn-outline'} btn-md mt-7 w-full justify-center`}
                     >
-                      {plan.current ? (
-                        'Plano atual'
+                      {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                      {travado ? (
+                        'Seu plano'
+                      ) : tooSmall ? (
+                        'Não comporta sua equipe'
+                      ) : atual ? (
+                        <>
+                          Assinar este plano
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </>
                       ) : (
                         <>
-                          <Sparkles className="h-3 w-3" aria-hidden="true" /> Mais escolhido
+                          {data.renewsAutomatically ? 'Trocar para este' : 'Escolher este'}
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
                         </>
                       )}
-                    </span>
-                  )}
-
-                  <h3 className="mt-2 text-lg font-semibold">{plan.name}</h3>
-                  <p className="mt-1.5 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">
-                    {plan.description}
-                  </p>
-
-                  <p className="mt-5 flex items-baseline gap-1">
-                    <span className="text-4xl font-semibold tracking-tight tabular-nums">
-                      {brl(plan.monthlyPriceCents)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/mês</span>
-                  </p>
-                  {plan.crmPackagePriceCents > 0 && (
-                    <p className="mt-1.5 text-sm text-muted-foreground">
-                      Com CRM:{' '}
-                      <span className="font-medium text-foreground tabular-nums">
-                        {brl(plan.monthlyPriceCents + plan.crmPackagePriceCents)}/mês
-                      </span>{' '}
-                      ({plan.crmIncludedSeats} {plan.crmIncludedSeats === 1 ? 'usuário' : 'usuários'} no CRM)
-                    </p>
-                  )}
-
-                  <ul className="mt-6 flex-1 space-y-2.5">
-                    {features(plan).map((f) => (
-                      <li key={f} className="flex gap-2.5 text-sm">
-                        <Check
-                          className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                          aria-hidden="true"
-                        />
-                        <span className="leading-snug">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    type="button"
-                    onClick={() => pick(plan.tier)}
-                    disabled={plan.current || pending || tooSmall || !data.gatewayReady}
-                    title={
-                      tooSmall
-                        ? `Você tem ${data.professionalsInUse} profissionais ativos; este plano permite ${plan.maxProfessionals}.`
-                        : undefined
-                    }
-                    className={`${
-                      plan.current || !featured ? 'btn-outline' : 'btn-primary'
-                    } btn-md mt-7 w-full justify-center`}
-                  >
-                    {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                    {plan.current ? (
-                      'Seu plano'
-                    ) : tooSmall ? (
-                      'Não comporta sua equipe'
-                    ) : (
-                      <>
-                        Escolher {plan.name}
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </>
-                    )}
-                  </button>
-                </article>
-              </li>
-            );
-          })}
+                    </button>
+                  </article>
+                </li>
+              );
+            })}
         </ul>
 
-        <p className="mt-5 text-center text-sm text-muted-foreground">
-          Todos os planos incluem acessibilidade WCAG 2.1 AA, backup diário e suporte por WhatsApp.
+        {escolha && (() => {
+          const plan = data.plans.find((p) => p.tier === escolha.tier);
+          if (!plan) return null;
+          const nome = `${PRODUCT_INFO[escolha.product].name} ${plan.name}`;
+          const valor = brl(productPriceCents(plan, escolha.product));
+          const mesmo = plan.current && escolha.product === data.product;
+          const aviso = mudancaDeModulos(data.product, escolha.product);
+          const assinando = !data.renewsAutomatically;
+          return (
+            <div
+              id="confirmar-plano"
+              tabIndex={-1}
+              role="region"
+              aria-labelledby="confirmar-plano-titulo"
+              className="rounded-2xl border border-primary/40 bg-primary/[0.03] p-6 focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <h3 id="confirmar-plano-titulo" className="font-semibold">
+                {assinando ? `Assinar o ${nome}` : `Trocar para o ${nome}`}
+                <span className="font-normal text-muted-foreground"> · {valor}/mês</span>
+              </h3>
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                {data.trialOpen && data.trialEndsAt
+                  ? `Você não paga nada hoje: a primeira cobrança só vence em ${dataSP(data.trialEndsAt)}, quando o teste termina. `
+                  : assinando
+                    ? 'A primeira cobrança sai hoje, na forma de pagamento escolhida. '
+                    : `O valor novo vale a partir da próxima fatura${data.currentPeriodEnd ? `, em ${date(data.currentPeriodEnd)}` : ''}, sem cobrança proporcional. `}
+                {aviso}
+                {' '}Sem fidelidade: dá para trocar ou cancelar quando quiser.
+              </p>
+
+              {assinando && !openCharge && (
+                <fieldset className="mt-4">
+                  <legend className="text-sm font-medium">Como você prefere pagar?</legend>
+                  <div className="mt-2.5 inline-flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de pagamento">
+                    {(
+                      [
+                        { id: 'PIX', label: 'PIX', icon: QrCode, hint: 'liberação imediata' },
+                        { id: 'BOLETO', label: 'Boleto', icon: Barcode, hint: 'compensa em 1 dia útil' },
+                        { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard, hint: 'renova sozinho' },
+                      ] as const
+                    ).map(({ id, label, icon: Icon, hint }) => {
+                      const on = method === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => setMethod(id)}
+                          className={`flex items-center gap-2.5 rounded-xl border px-4 py-2.5 text-left transition-colors ${
+                            on
+                              ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary/30'
+                              : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                          }`}
+                        >
+                          <Icon className={`h-4 w-4 ${on ? 'text-primary' : ''}`} aria-hidden="true" />
+                          <span>
+                            <span className="block text-sm font-medium">{label}</span>
+                            <span className="block text-xs text-muted-foreground">{hint}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              )}
+
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => pick(escolha.tier, escolha.product)}
+                  disabled={pending || !data.gatewayReady}
+                  className="btn-primary btn-md"
+                >
+                  {pending && choosing === escolha.tier && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {assinando ? 'Assinar agora' : 'Confirmar a troca'}
+                </button>
+                {data.trialOpen && !mesmo && (
+                  <button
+                    type="button"
+                    onClick={() => trocarTeste(escolha.tier, escolha.product)}
+                    disabled={pending}
+                    className="btn-outline btn-md"
+                  >
+                    Continuar testando com este plano
+                  </button>
+                )}
+                <button type="button" onClick={() => setEscolha(null)} disabled={pending} className="btn-ghost btn-md">
+                  Voltar
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        <p className="text-center text-sm text-muted-foreground">
+          Todos os planos incluem acessibilidade WCAG 2.1 AA, backup diário e suporte por WhatsApp. As conversas do WhatsApp são
+          cobradas pela Meta direto da clínica.
         </p>
       </section>
 

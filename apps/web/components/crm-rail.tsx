@@ -19,12 +19,14 @@ export function CrmRail({
   counts,
   clinicName,
   showSwitcher,
+  clinicHome = '/dashboard',
 }: {
   items: RailItem[];
   active: string | undefined;
   counts: Record<string, number>;
   clinicName: string;
   showSwitcher: boolean;
+  clinicHome?: string;
 }) {
   return (
     <nav aria-label="Menu principal" className="hidden w-[92px] shrink-0 flex-col bg-rail text-rail-foreground md:flex print:!hidden">
@@ -72,7 +74,7 @@ export function CrmRail({
         {showSwitcher && (
           <nav aria-label="Trocar de módulo">
             <Link
-              href="/dashboard"
+              href={clinicHome}
               className="flex flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-[11px] font-medium leading-tight hover:bg-rail-active/60 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white"
             >
               <Building2 className="h-[22px] w-[22px]" aria-hidden="true" />

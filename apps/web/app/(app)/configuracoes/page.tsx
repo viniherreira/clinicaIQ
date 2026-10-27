@@ -22,10 +22,12 @@ import { CrmSeatsSection } from '@/components/crm-seats-section';
 import { requireCapability } from '@/lib/guard';
 import { cloudAccountSummary } from '@/lib/cloud-account-admin';
 import { can } from '@/lib/permissions';
+import { getTenantModules } from '@/lib/access';
 export const metadata = { title: 'Configurações · DreamClin' };
 
 export default async function ConfiguracoesPage() {
-  const { role } = await requireCapability('configuracoes');
+  const { role, tenantId } = await requireCapability('configuracoes');
+  const modules = await getTenantModules(tenantId);
 
   const clinic = await getClinic();
   if (!clinic) return null; // requireOwner() redirects when there is no tenant
@@ -76,6 +78,7 @@ export default async function ConfiguracoesPage() {
       podeEquipe={podeEquipe}
       podePlano={podePlano}
       podePrivacidade={podePrivacidade}
+      agenda={modules.clinic}
       // Renderizado aqui, no servidor, e entregue pronto para a aba: busca
       // cobranças no Asaas e não pode virar componente de cliente. O Suspense
       // impede que a rede do Asaas segure as outras cinco abas.

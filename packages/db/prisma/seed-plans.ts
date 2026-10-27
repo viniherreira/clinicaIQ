@@ -1,6 +1,7 @@
 /**
- * The sellable plans: Essencial R$ 139, Profissional R$ 239, Clínica R$ 339, e
- * cada um com CRM por R$ 199, R$ 359 e R$ 519 (1, 3 e 5 usuários no CRM).
+ * Os tamanhos à venda, cada um em três produtos (docs/specs/2026-10-26-planos-teste-e-funis-design.md):
+ * Agenda R$ 139 / 239 / 339, CRM R$ 119 / 219 / 319 e Completo (os dois)
+ * R$ 199 / 359 / 519, com 1, 3 e 5 usuários no CRM.
  * Idempotent — safe to run on every deploy.
  *
  *   pnpm --filter @clinicaiq/db exec tsx prisma/seed-plans.ts
@@ -16,7 +17,7 @@ const PLANS = [
   {
     tier: 'ESSENCIAL' as const,
     name: 'Essencial',
-    description: 'Para o consultório de um profissional. Agenda, prontuário, orçamentos e WhatsApp oficial.',
+    description: 'Para o consultório de um profissional.',
     monthlyPriceCents: 13_900,
     maxProfessionals: 1,
     whatsappEnabled: true,
@@ -27,12 +28,14 @@ const PLANS = [
     // O plano com CRM: soma este valor, já com 1 usuário no CRM.
     crmPackagePriceCents: 6_000,
     crmIncludedSeats: 1,
+    // Só o CRM, sem a agenda.
+    crmOnlyPriceCents: 11_900,
     sortOrder: 1,
   },
   {
     tier: 'PROFISSIONAL' as const,
     name: 'Profissional',
-    description: 'Para clínicas em crescimento. Até 3 profissionais e campanhas em massa.',
+    description: 'Para clínicas em crescimento, com até 3 profissionais.',
     monthlyPriceCents: 23_900,
     maxProfessionals: 3,
     whatsappEnabled: true,
@@ -43,12 +46,13 @@ const PLANS = [
     // O plano com CRM: soma este valor, já com 3 usuários no CRM.
     crmPackagePriceCents: 12_000,
     crmIncludedSeats: 3,
+    crmOnlyPriceCents: 21_900,
     sortOrder: 2,
   },
   {
     tier: 'CLINICA' as const,
     name: 'Clínica',
-    description: 'Para clínicas com muitos profissionais. Equipe ilimitada e relatórios completos.',
+    description: 'Para clínicas com equipe grande e várias cadeiras.',
     monthlyPriceCents: 33_900,
     maxProfessionals: null,
     whatsappEnabled: true,
@@ -59,6 +63,7 @@ const PLANS = [
     // O plano com CRM: soma este valor, já com 5 usuários no CRM.
     crmPackagePriceCents: 18_000,
     crmIncludedSeats: 5,
+    crmOnlyPriceCents: 31_900,
     sortOrder: 3,
   },
 ];

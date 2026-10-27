@@ -49,11 +49,26 @@ describe('resolveAccess', () => {
     expect(access.warning).not.toContain('1 dias');
   });
 
-  it('dá a mesma tolerância a um teste vencido', () => {
-    const access = resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(-2) }), NOW);
+  it('dá a mesma tolerância a um teste vencido de quem já assinou', () => {
+    const access = resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(-2), billingLinked: true }), NOW);
     expect(access.level).toBe('full');
     expect(access.status).toBe('PAST_DUE');
     expect(access.inGrace).toBe(true);
+  });
+
+  it('teste que acabou sem plano: só leitura na hora, sem falar em atraso', () => {
+    const access = resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(-1), billingLinked: false }), NOW);
+    expect(access.level).toBe('readonly');
+    expect(access.trialEnded).toBe(true);
+    expect(access.inGrace).toBe(false);
+    expect(access.warning).toContain('teste grátis terminou');
+    expect(access.warning).not.toContain('atraso');
+  });
+
+  it('quem já assinou no teste não recebe o aviso de escolher plano', () => {
+    const access = resolveAccess(snapshot({ status: 'TRIALING', trialEndsAt: at(3), billingLinked: true }), NOW);
+    expect(access.level).toBe('full');
+    expect(access.warning).toBeNull();
   });
 
   it('mantém o acesso durante a tolerância de quem venceu', () => {

@@ -25,15 +25,18 @@ export const getTenantAccess = cache(async (tenantId: string): Promise<Access> =
       graceEndsAt: true,
       cancelledAt: true,
       complimentary: true,
+      asaasSubscriptionId: true,
     },
   });
-  return subscription ? resolveAccess(subscription, new Date()) : NO_SUBSCRIPTION;
+  return subscription
+    ? resolveAccess({ ...subscription, billingLinked: Boolean(subscription.asaasSubscriptionId) }, new Date())
+    : NO_SUBSCRIPTION;
 });
 
 /** Módulos que a clínica contratou. */
 export interface TenantModules {
-  /** Gestão clínica (agenda, pacientes…). Sempre ligada. */
-  clinic: true;
+  /** Agenda (gestão clínica: agenda, pacientes…). Desligada só no produto CRM. */
+  clinic: boolean;
   crm: boolean;
   /**
    * Cortesia: o CRM vem incluído e sem cobrança por pessoa, então toda a
@@ -52,12 +55,17 @@ export interface TenantModules {
  */
 export const getTenantModules = cache(async (tenantId: string): Promise<TenantModules> => {
   const subscription = await prisma.subscription
-    .findUnique({ where: { tenantId }, select: { crmEnabled: true, complimentary: true } })
+    .findUnique({ where: { tenantId }, select: { clinicEnabled: true, crmEnabled: true, complimentary: true } })
     .catch(() => null);
-  // Falha fechada: sem resposta do banco, o CRM some — a gestão clínica não.
-  // Cortesia inclui o CRM: ligado sempre, sem precisar ativar.
+  // Falha fechada para o CRM: sem resposta do banco, ele some. A agenda fica —
+  // é ela que a clínica abre de manhã com paciente na porta.
+  // Cortesia inclui tudo: ligado sempre, sem precisar ativar.
   const complimentary = subscription?.complimentary ?? false;
-  return { clinic: true, crm: Boolean(subscription?.crmEnabled) || complimentary, crmWholeTeam: complimentary };
+  return {
+    clinic: subscription?.clinicEnabled !== false || complimentary,
+    crm: Boolean(subscription?.crmEnabled) || complimentary,
+    crmWholeTeam: complimentary,
+  };
 });
 
 /** Thrown when a suspended clinic tries to change something. */

@@ -58,6 +58,12 @@ export interface BillingInput extends CrmPrice {
   planPriceCents: number;
   seats: number;
   status: CrmStatus;
+  /**
+   * Produto só CRM, sem a agenda: não há plano da agenda, o CRM custa este
+   * valor em vez do pacote e conta até no teste do CRM — os 14 dias grátis do
+   * CRM são para quem acrescenta o CRM à agenda.
+   */
+  crmOnlyPriceCents?: number;
 }
 
 /** O CRM com estas pessoas, pago: pacote + quem passar do incluído. */
@@ -78,11 +84,16 @@ export const crmPriceOf = (plan: { crmPackagePriceCents: number; crmIncludedSeat
 });
 
 export function subscriptionValueCents(input: BillingInput): number {
+  if (input.crmOnlyPriceCents !== undefined) {
+    if (input.status === 'complimentary') return 0;
+    return crmPriceCents({ ...input, packagePriceCents: input.crmOnlyPriceCents }, input.seats);
+  }
   return input.planPriceCents + crmChargeCents(input);
 }
 
 /** O texto que aparece na fatura do Asaas. */
-export function subscriptionDescription(planName: string, status: CrmStatus, seats: number): string {
+export function subscriptionDescription(planName: string, status: CrmStatus, seats: number, crmOnly = false): string {
+  if (crmOnly) return `DreamClin: CRM ${planName} (${seats} ${seats === 1 ? 'usuário' : 'usuários'})`;
   if (status !== 'paid' || seats <= 0) return `DreamClin: plano ${planName}`;
   return `DreamClin: plano ${planName} + CRM (${seats} ${seats === 1 ? 'usuário' : 'usuários'})`;
 }

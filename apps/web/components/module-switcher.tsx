@@ -4,6 +4,16 @@ import { Building2, KanbanSquare } from 'lucide-react';
 export type Space = 'clinic' | 'crm';
 
 /**
+ * Na clínica só com o CRM, do lado da clínica só existem estas telas
+ * (dados, equipe, plano). Fora de um arquivo de cliente de propósito: o layout
+ * do servidor também lê.
+ */
+export const CRM_ONLY_CLINIC_PATHS = ['/configuracoes', '/planos', '/sem-acesso', '/crm-indisponivel'] as const;
+
+/** Onde o lado "Clínica" abre. */
+export const clinicHomeFor = (crmOnly: boolean) => (crmOnly ? '/configuracoes' : '/dashboard');
+
+/**
  * A chave entre os dois espaços do sistema: a gestão da clínica e o CRM.
  *
  * São dois links, não botões de alternância: cada lado é um lugar com
@@ -13,9 +23,18 @@ export type Space = 'clinic' | 'crm';
  * Só aparece quando a clínica tem os dois módulos e a pessoa alcança o CRM —
  * quem decide isso é o `AppShell`, no servidor.
  */
-export function ModuleSwitcher({ space, onNavigate }: { space: Space; onNavigate?: () => void }) {
+export function ModuleSwitcher({
+  space,
+  onNavigate,
+  clinicHome = '/dashboard',
+}: {
+  space: Space;
+  onNavigate?: () => void;
+  /** Onde o lado "Clínica" abre. Na clínica só com o CRM, nas Configurações. */
+  clinicHome?: string;
+}) {
   const opcoes = [
-    { space: 'clinic' as const, href: '/dashboard', label: 'Clínica', icon: Building2 },
+    { space: 'clinic' as const, href: clinicHome, label: 'Clínica', icon: Building2 },
     { space: 'crm' as const, href: '/crm', label: 'CRM', icon: KanbanSquare },
   ];
 

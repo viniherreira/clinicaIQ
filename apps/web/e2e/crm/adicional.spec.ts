@@ -12,7 +12,7 @@ test.describe.configure({ mode: 'serial' });
 test('Plano mostra o CRM incluído na cortesia', async ({ page }) => {
   await page.goto('/configuracoes#plano');
   await page.waitForLoadState('networkidle');
-  const cartao = page.getByRole('region', { name: 'CRM · adicional' });
+  const cartao = page.getByRole('region', { name: 'CRM', exact: true });
   await expect(cartao).toContainText('Incluído na cortesia');
   await expect(cartao.getByRole('link', { name: 'Abrir o CRM' })).toBeVisible();
   // Na cortesia não há o que desligar nem cobrança por pessoa.

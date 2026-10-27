@@ -4,6 +4,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
 import { trialEndFrom } from '@/lib/subscription';
+import { DEFAULT_CHOICE, modulesOf, parseProduct, parseTier, productAvailable } from '@/lib/products';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -41,7 +42,8 @@ async function uniqueSlug(base: string) {
 }
 
 export type OnboardingState =
-  | { success: true; tenantId: string }
+  /** `home`: para onde ir — a clínica só com o CRM começa no CRM. */
+  | { success: true; tenantId: string; home: string }
   | { success: false; errors: Record<string, string[]> };
 
 /**
@@ -242,7 +244,7 @@ export async function completeOnboarding(
   // clínica nova. Vem antes de validar o formulário porque o convidado nunca
   // preencheu nome de clínica nenhum.
   const jaTem = await joinFromInviteIfAny();
-  if (jaTem) return { success: true, tenantId: jaTem };
+  if (jaTem) return { success: true, tenantId: jaTem, home: '/dashboard' };
 
   const raw = {
     name: formData.get('name'),
@@ -257,6 +259,14 @@ export async function completeOnboarding(
 
   const { name, document, phone } = parsed.data;
   const slug = await uniqueSlug(slugify(name));
+
+  // O plano do teste: o que a pessoa marcou (vindo do site ou trocado aqui).
+  // Inválido ou fora de venda cai no padrão — o teste começa do mesmo jeito.
+  const tier = parseTier(formData.get('tier')) ?? DEFAULT_CHOICE.tier;
+  const plano = await prisma.plan.findUnique({ where: { tier } });
+  const escolhido = parseProduct(formData.get('product')) ?? DEFAULT_CHOICE.product;
+  const product = plano && productAvailable(plano, escolhido) ? escolhido : 'AGENDA';
+  const modulos = modulesOf(product);
 
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(userId);
@@ -280,20 +290,23 @@ export async function completeOnboarding(
         'Proprietário',
       email: clerkUser.emailAddresses[0]?.emailAddress ?? '',
       role: 'OWNER',
+      // Com o CRM no plano, quem abriu a clínica já entra nele.
+      crmSeat: modulos.crmEnabled,
     },
   });
 
-  // Começa no teste grátis: TRIAL_DAYS com tudo liberado, sem cartão. Depois
-  // vem a mesma tolerância de uma fatura atrasada e então só leitura — tudo
-  // lido das datas por resolveAccess, mesmo que nenhuma rotina rode.
+  // Começa no teste grátis do plano escolhido: TRIAL_DAYS, sem cartão. Sem
+  // assinar até o fim, fica só leitura (os dados ficam) — tudo lido das datas
+  // por resolveAccess, mesmo que nenhuma rotina rode.
   const trialEndsAt = trialEndFrom(new Date());
   await prisma.subscription.create({
     data: {
       tenantId: tenant.id,
-      tier: 'ESSENCIAL',
+      tier,
       status: 'TRIALING',
       trialEndsAt,
       currentPeriodEnd: trialEndsAt,
+      ...modulos,
     },
   });
 
@@ -301,5 +314,5 @@ export async function completeOnboarding(
     publicMetadata: { tenantId: tenant.id, onboardingComplete: true },
   });
 
-  return { success: true, tenantId: tenant.id };
+  return { success: true, tenantId: tenant.id, home: modulos.clinicEnabled ? '/dashboard' : '/crm' };
 }

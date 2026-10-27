@@ -19,9 +19,11 @@ import {
 } from '@/lib/asaas';
 import { NO_SUBSCRIPTION, resolveAccess, type Access } from '@/lib/subscription';
 import { documentError, formatDocument, isValidDocument } from '@/lib/document';
-import { capabilityBlocked } from '@/lib/access';
+import { capabilityBlocked, currentRole } from '@/lib/access';
 import { stopComplimentaryBilling } from '@/lib/complimentary';
 import { billingFor } from '@/crm/addon';
+import { CRM_ELIGIBLE_ROLES } from '@/crm/billing';
+import { modulesOf, parseProduct, productAvailable, productOf, PRODUCT_INFO, type Product } from '@/lib/products';
 
 const EM_CORTESIA = 'Sua clínica está em cortesia: acesso completo, sem cobrança. Não há plano a contratar ou cancelar.';
 
@@ -29,13 +31,43 @@ async function requireTenant() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { users: { some: { clerkUserId: userId, active: true } } },
-    select: { id: true },
+  const user = await prisma.user.findFirst({
+    where: { clerkUserId: userId, active: true },
+    select: { id: true, tenantId: true },
   });
-  if (!tenant) redirect('/onboarding');
+  if (!user) redirect('/onboarding');
 
-  return { tenantId: tenant.id };
+  return { tenantId: user.tenantId, userId: user.id };
+}
+
+/**
+ * Liga os módulos do produto escolhido. Com o CRM, quem escolheu ganha acesso a
+ * ele se ninguém tiver — senão a clínica pagaria por um CRM que ninguém abre.
+ * Sem o CRM, os leads ficam guardados para quando religar.
+ */
+async function applyProduct(tenantId: string, userId: string, product: Product) {
+  const m = modulesOf(product);
+  const sub = await prisma.subscription.findUnique({ where: { tenantId }, select: { id: true, clinicEnabled: true, crmEnabled: true } });
+  if (!sub) return;
+  if (sub.clinicEnabled === m.clinicEnabled && sub.crmEnabled === m.crmEnabled) return;
+  const role = await currentRole(tenantId);
+  const semNinguem =
+    m.crmEnabled && (await prisma.user.count({ where: { tenantId, active: true, crmSeat: true } })) === 0;
+  await prisma.$transaction([
+    prisma.subscription.update({ where: { id: sub.id }, data: m }),
+    ...(semNinguem && (CRM_ELIGIBLE_ROLES as readonly string[]).includes(role)
+      ? [prisma.user.updateMany({ where: { id: userId, tenantId }, data: { crmSeat: true } })]
+      : []),
+    prisma.auditLog.create({
+      data: { tenantId, userId, action: `PRODUCT_CHANGED_${product}`, entity: 'Subscription', entityId: sub.id },
+    }),
+  ]);
+}
+
+function refreshPlan() {
+  revalidatePath('/configuracoes');
+  revalidatePath('/crm', 'layout');
+  revalidatePath('/dashboard');
 }
 
 export interface PlanOption {
@@ -51,6 +83,9 @@ export interface PlanOption {
   crmPackagePriceCents: number;
   crmIncludedSeats: number;
   crmSeatPriceCents: number;
+  /** O CRM sozinho, sem a agenda. */
+  crmOnlyPriceCents: number;
+  /** O tamanho atual da clínica (o produto atual está em `BillingData.product`). */
   current: boolean;
 }
 
@@ -81,6 +116,12 @@ export interface BillingData {
   /** CPF or CNPJ on file, already formatted. Empty when the clinic never set one. */
   document: string;
   clinicName: string;
+  /** O produto contratado (ou em teste): Agenda, CRM ou Completo. */
+  product: Product;
+  /** Em teste grátis e ainda sem assinar: escolher um plano pode só trocar o do teste. */
+  trialOpen: boolean;
+  /** Fim do teste grátis, quando houver. */
+  trialEndsAt: string | null;
 }
 
 /**
@@ -124,6 +165,7 @@ export async function getBillingData(): Promise<BillingData> {
           graceEndsAt: subscription.graceEndsAt,
           cancelledAt: subscription.cancelledAt,
           complimentary: subscription.complimentary,
+          billingLinked: Boolean(subscription.asaasSubscriptionId),
         },
         new Date(),
       )
@@ -160,8 +202,12 @@ export async function getBillingData(): Promise<BillingData> {
       crmPackagePriceCents: p.crmPackagePriceCents,
       crmIncludedSeats: p.crmIncludedSeats,
       crmSeatPriceCents: p.crmSeatPriceCents,
+      crmOnlyPriceCents: p.crmOnlyPriceCents,
       current: subscription?.tier === p.tier,
     })),
+    product: productOf({ clinicEnabled: subscription?.clinicEnabled ?? true, crmEnabled: Boolean(subscription?.crmEnabled) }),
+    trialOpen: access.status === 'TRIALING' && !subscription?.asaasSubscriptionId,
+    trialEndsAt: subscription?.trialEndsAt?.toISOString() ?? null,
     access,
     currentTier: subscription?.tier ?? null,
     // A data que a clínica procura primeiro quando abre esta tela: até quando
@@ -238,11 +284,16 @@ export interface ChoosePlanResult {
   needsDocument?: boolean;
 }
 
+/**
+ * Assina (ou troca) o plano: o tamanho (`tier`) e o produto. Na troca, o valor
+ * novo vale da próxima fatura em diante e os módulos mudam na hora.
+ */
 export async function choosePlan(
   tier: string,
   method: BillingMethod = 'PIX',
+  productInput?: string,
 ): Promise<ChoosePlanResult> {
-  const { tenantId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
 
   const semAcesso = await capabilityBlocked(tenantId, 'planos');
   if (semAcesso) return { ok: false as const, error: semAcesso };
@@ -259,20 +310,16 @@ export async function choosePlan(
   const plan = await prisma.plan.findUnique({ where: { tier: tier as PlanOption['tier'] } });
   if (!plan || !plan.active) return { ok: false, error: 'Plano indisponível.' };
 
-  // Asaas rejects anything below this, and its own wording ("forma de pagamento
-  // Pergunte ao Cliente") tells whoever set the price nothing useful.
-  if (plan.monthlyPriceCents < MIN_CHARGE_CENTS) {
-    return {
-      ok: false,
-      error: `O valor mínimo de cobrança é ${(MIN_CHARGE_CENTS / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Ajuste o preço do plano ${plan.name}.`,
-    };
-  }
+  const atual = await prisma.subscription.findUnique({ where: { tenantId }, select: { clinicEnabled: true, crmEnabled: true } });
+  const product =
+    parseProduct(productInput) ?? productOf({ clinicEnabled: atual?.clinicEnabled ?? true, crmEnabled: Boolean(atual?.crmEnabled) });
+  if (!productAvailable(plan, product)) return { ok: false, error: `O ${PRODUCT_INFO[product].name} não está à venda no plano ${plan.name}.` };
 
   // Downgrading below the professionals already registered would silently put
   // the clinic over its own limit. Say so instead of selling a plan that does
-  // not fit.
+  // not fit. Só conta com a agenda: no produto CRM não há profissionais.
   const inUse = await prisma.professional.count({ where: { tenantId, active: true } });
-  if (plan.maxProfessionals !== null && inUse > plan.maxProfessionals) {
+  if (product !== 'CRM' && plan.maxProfessionals !== null && inUse > plan.maxProfessionals) {
     return {
       ok: false,
       error: `Você tem ${inUse} profissionais ativos e o plano ${plan.name} permite ${plan.maxProfessionals}. Desative alguns antes de trocar.`,
@@ -310,13 +357,22 @@ export async function choosePlan(
         phone: tenant.phone,
       }));
 
-    // Plano + CRM (pacote e quem passar do incluído), numa cobrança só.
-    const cobranca = await billingFor(tenantId, plan);
+    // Agenda e/ou CRM (pacote e quem passar do incluído), numa cobrança só.
+    const cobranca = await billingFor(tenantId, plan, modulesOf(product));
+
+    // Asaas rejects anything below this, and its own wording ("forma de pagamento
+    // Pergunte ao Cliente") tells whoever set the price nothing useful.
+    if (cobranca.valueCents < MIN_CHARGE_CENTS) {
+      return {
+        ok: false,
+        error: `O valor mínimo de cobrança é ${(MIN_CHARGE_CENTS / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Ajuste o preço do plano ${plan.name}.`,
+      };
+    }
 
     // Switching plans updates the existing subscription instead of opening a
     // second one — two live subscriptions would bill the clinic twice.
     if (existing?.asaasSubscriptionId) {
-      await updateSubscriptionValue(existing.asaasSubscriptionId, cobranca.valueCents, plan.name, cobranca.description);
+      await updateSubscriptionValue(existing.asaasSubscriptionId, cobranca.valueCents, `${PRODUCT_INFO[product].name} ${plan.name}`, cobranca.description);
       await prisma.subscription.update({
         where: { tenantId },
         data: { tier: plan.tier, asaasCustomerId: customerId, billedValueCents: cobranca.valueCents },
@@ -331,7 +387,7 @@ export async function choosePlan(
         customerId,
         tenantId,
         priceCents: cobranca.valueCents,
-        planName: plan.name,
+        planName: `${PRODUCT_INFO[product].name} ${plan.name}`,
         billingType: method,
         firstDueDate,
       });
@@ -357,6 +413,8 @@ export async function choosePlan(
       });
     }
 
+    await applyProduct(tenantId, userId, product);
+
     const fresh = await prisma.subscription.findUnique({ where: { tenantId } });
     if (fresh?.asaasSubscriptionId) await syncCharges(tenantId, fresh.id, fresh.asaasSubscriptionId);
 
@@ -366,7 +424,7 @@ export async function choosePlan(
       select: { invoiceUrl: true },
     });
 
-    revalidatePath('/configuracoes');
+    refreshPlan();
     return { ok: true, invoiceUrl: openCharge?.invoiceUrl ?? undefined };
   } catch (error) {
     return {
@@ -374,6 +432,36 @@ export async function choosePlan(
       error: error instanceof Error ? error.message : 'Não foi possível criar a assinatura.',
     };
   }
+}
+
+/**
+ * Troca o plano do teste grátis, sem assinar: tamanho e produto mudam na hora,
+ * ninguém paga nada. Só vale enquanto o teste está aberto e sem assinatura —
+ * depois disso, a troca é pelo `choosePlan`, que acerta o valor no Asaas.
+ */
+export async function switchTrialPlan(tier: string, productInput: string): Promise<{ ok: boolean; error?: string }> {
+  const { tenantId, userId } = await requireTenant();
+
+  const semAcesso = await capabilityBlocked(tenantId, 'planos');
+  if (semAcesso) return { ok: false, error: semAcesso };
+
+  const [plan, sub] = await Promise.all([
+    prisma.plan.findUnique({ where: { tier: tier as PlanOption['tier'] } }),
+    prisma.subscription.findUnique({ where: { tenantId } }),
+  ]);
+  const product = parseProduct(productInput);
+  if (!plan || !plan.active || !product || !productAvailable(plan, product)) return { ok: false, error: 'Plano indisponível.' };
+  if (!sub) return { ok: false, error: 'Assinatura não encontrada.' };
+  if (sub.complimentary) return { ok: false, error: EM_CORTESIA };
+  const access = resolveAccess({ ...sub, billingLinked: Boolean(sub.asaasSubscriptionId) });
+  if (access.status !== 'TRIALING' || sub.asaasSubscriptionId) {
+    return { ok: false, error: 'O teste grátis já terminou ou o plano já foi assinado. Escolha o plano para assinar.' };
+  }
+
+  await prisma.subscription.update({ where: { tenantId }, data: { tier: plan.tier } });
+  await applyProduct(tenantId, userId, product);
+  refreshPlan();
+  return { ok: true };
 }
 
 /**

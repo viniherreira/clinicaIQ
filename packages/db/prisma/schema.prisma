@@ -892,6 +892,10 @@ model Plan {
   /// usuários; cada usuário a mais paga `crmSeatPriceCents`. 0 = só por usuário.
   crmPackagePriceCents Int      @default(0)
   crmIncludedSeats     Int      @default(0)
+  /// O produto só CRM, sem a agenda: o CRM sozinho, já com `crmIncludedSeats`
+  /// usuários (docs/specs/2026-10-26-planos-teste-e-funis-design.md). Maior que
+  /// o pacote: quem leva os dois paga menos pelo CRM.
+  crmOnlyPriceCents    Int      @default(0)
   /// Ordem de exibição na tela de planos.
   sortOrder            Int      @default(0)
   active               Boolean  @default(true)
@@ -929,6 +933,9 @@ model Subscription {
   asaasCustomerId     String?
   asaasSubscriptionId String?
 
+  /// Módulo Agenda (a gestão clínica: agenda, pacientes, prontuário,
+  /// orçamentos, financeiro). Desligado = a clínica contratou só o CRM.
+  clinicEnabled    Boolean   @default(true)
   /// Módulo CRM contratado. Desligado por padrão: clínica sem CRM não vê
   /// nada novo e a automação do funil não faz nada para ela.
   crmEnabled       Boolean   @default(false)
