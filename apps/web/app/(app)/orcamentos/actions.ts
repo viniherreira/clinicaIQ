@@ -24,6 +24,7 @@ import {
 } from '@/lib/document-content';
 import { valorPorExtenso } from '@/lib/extenso';
 import { clinicToday, instantDateBR, instantDateLongBR, instantDateTimeBR, wallDateBR } from '@/lib/tz';
+import { facesText, isKind, KINDS } from '@/lib/odontogram';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -246,6 +247,41 @@ export async function listQuoteProfessionals() {
 }
 
 /** Pre-selects a patient when the quote is started from the agenda or a record. */
+/**
+ * Os itens a fazer do odontograma, prontos para o orçamento: um por dente,
+ * com o procedimento da tabela (e o preço dele) quando estiver ligado.
+ */
+export async function planQuoteItems(patientId: string) {
+  const { tenantId } = await requireTenant();
+  const plano = await getTenantClient(tenantId).toothFinding.findMany({
+    where: { patientId, status: 'PLANNED' },
+    orderBy: [{ toothNumber: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      toothNumber: true,
+      kind: true,
+      surfaces: true,
+      note: true,
+      procedure: { select: { id: true, name: true, basePrice: true, allowsDiscount: true, maxDiscountPercent: true } },
+    },
+  });
+  return plano.map((f) => {
+    const faces = facesText(f.surfaces, f.toothNumber);
+    const tipo = isKind(f.kind) ? KINDS[f.kind].label : f.kind;
+    const p = f.procedure;
+    return {
+      key: `plano-${f.id}`,
+      procedureId: p?.id ?? null,
+      name: p?.name ?? tipo,
+      description: `Dente ${f.toothNumber}${faces ? ` (${faces})` : ''}${p && p.name !== tipo ? ` · ${tipo}` : ''}`.slice(0, 160),
+      unitPrice: p ? Number(p.basePrice) : 0,
+      quantity: 1,
+      discountPercent: 0,
+      maxDiscount: p ? (p.allowsDiscount ? (p.maxDiscountPercent != null ? Number(p.maxDiscountPercent) : 100) : 0) : 100,
+    };
+  });
+}
+
 export async function getQuotePatient(patientId: string) {
   const { tenantId } = await requireTenant();
   const patient = await prisma.patient.findFirst({

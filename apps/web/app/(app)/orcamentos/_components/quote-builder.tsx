@@ -59,6 +59,8 @@ interface Props {
   };
   /** Pre-selected patient when arriving from the agenda or a patient record. */
   initialPatient?: Patient;
+  /** Itens já preenchidos (o plano de tratamento do odontograma). */
+  initialItems?: QuoteItemDraft[];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -74,6 +76,7 @@ export function QuoteBuilder({
   today,
   initial,
   initialPatient,
+  initialItems,
 }: Props) {
   const router = useRouter();
   const action = mode === 'edit' && quoteId ? updateQuote.bind(null, quoteId) : createQuote;
@@ -87,7 +90,7 @@ export function QuoteBuilder({
   const [searching, startSearch] = useTransition();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [items, setItems] = useState<QuoteItemDraft[]>(initial?.items ?? []);
+  const [items, setItems] = useState<QuoteItemDraft[]>(initial?.items ?? initialItems ?? []);
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FIXED'>(initial?.discountType ?? 'PERCENT');
   const [discountValue, setDiscountValue] = useState(initial?.discountValue ?? 0);
   const [validUntil, setValidUntil] = useState(initial?.validUntil ?? defaultValidUntil);

@@ -2,8 +2,10 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, ImagePlus, Trash2, Lock, ExternalLink } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImagePlus, Lock, Trash2, UploadCloud, X } from 'lucide-react';
 import { uploadPatientFile, deletePatientFile, type UploadFileState } from '../actions';
+import { CLINIC_TZ } from '@/lib/tz';
 
 interface FileItem {
   id: string;
@@ -21,15 +23,27 @@ interface Props {
   storageEnabled: boolean;
 }
 
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
+
 function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+const dateBR = (d: Date | string) => new Date(d).toLocaleDateString('pt-BR', { timeZone: CLINIC_TZ });
+const isImage = (f: FileItem) => f.mimeType.startsWith('image/');
 
+/**
+ * Radiografias, fotos e documentos do paciente: arrastar para enviar, galeria
+ * com filtro e um visualizador que passa de uma imagem para outra pelas setas.
+ */
 export function ImagesSection({ patientId, files, storageEnabled }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [arrastando, setArrastando] = useState(false);
+  const [filtro, setFiltro] = useState<'all' | 'img' | 'doc'>('all');
+  const [aberta, setAberta] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [isDeleting, startDelete] = useTransition();
 
@@ -46,6 +60,7 @@ export function ImagesSection({ patientId, files, storageEnabled }: Props) {
 
   function remove(id: string) {
     setConfirmDelete(null);
+    setAberta(null);
     startDelete(async () => {
       await deletePatientFile(id, patientId);
       router.refresh();
@@ -55,143 +70,190 @@ export function ImagesSection({ patientId, files, storageEnabled }: Props) {
   if (!storageEnabled) {
     return (
       <div className="flex justify-center py-8">
-        <div className="max-w-md rounded-xl border border-border bg-surface p-6 text-center shadow-card">
+        <div className="max-w-md rounded-2xl border border-border bg-surface p-6 text-center shadow-card">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Lock className="h-6 w-6" aria-hidden="true" />
           </div>
           <h2 className="text-base font-semibold">Imagens e documentos</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Guarde radiografias, fotos e documentos do paciente com segurança.
-            Para ativar, o administrador precisa configurar a chave de armazenamento
-            (Supabase Storage) no servidor.
+            Guarde radiografias, fotos e documentos do paciente com segurança. Para ativar, o administrador precisa configurar a chave de
+            armazenamento (Supabase Storage) no servidor.
           </p>
         </div>
       </div>
     );
   }
 
-  const images = files.filter((f) => f.mimeType.startsWith('image/'));
-  const docs = files.filter((f) => !f.mimeType.startsWith('image/'));
+  const images = files.filter(isImage);
+  const docs = files.filter((f) => !isImage(f));
+  const galeria = images.filter((f) => f.url);
+  const atual = aberta != null ? galeria[aberta] : null;
 
   return (
     <div className="space-y-4">
-      {/* Upload */}
-      <form ref={formRef} action={formAction} className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
-        <h2 className="text-sm font-semibold">Adicionar imagem ou documento</h2>
+      {/* Enviar */}
+      <form ref={formRef} action={formAction} className="rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-5">
         {state && !state.ok && (
-          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.message}</p>
+          <p role="alert" className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {state.message}
+          </p>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="btn-outline btn-md cursor-pointer sm:shrink-0">
-            <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            {fileName ? 'Trocar arquivo' : 'Escolher arquivo'}
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <label
+            onDragOver={(e) => {
+              e.preventDefault();
+              setArrastando(true);
+            }}
+            onDragLeave={() => setArrastando(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setArrastando(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f && inputRef.current) {
+                const dt = new DataTransfer();
+                dt.items.add(f);
+                inputRef.current.files = dt.files;
+                setFileName(f.name);
+              }
+            }}
+            className={[
+              'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring',
+              arrastando ? 'border-primary bg-primary/5' : fileName ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/60 hover:bg-surface-alt/50',
+            ].join(' ')}
+          >
+            <UploadCloud className={`h-8 w-8 ${fileName ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden="true" />
+            <span className="text-sm font-medium">{fileName ?? 'Arraste o arquivo aqui ou clique para escolher'}</span>
+            <span className="text-xs text-muted-foreground">JPG, PNG, WEBP, HEIC ou PDF · até 10 MB</span>
             <input
+              ref={inputRef}
               type="file"
               name="file"
               required
-              accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+              accept={ACCEPT}
               onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
               className="sr-only"
             />
           </label>
-          {fileName && <span className="truncate text-sm text-muted-foreground">{fileName}</span>}
-          <input
-            type="text"
-            name="description"
-            maxLength={200}
-            placeholder="Descrição (ex: RX panorâmica inicial)"
-            aria-label="Descrição do arquivo"
-            className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          />
-          <button type="submit" disabled={pending} className="btn-primary btn-md sm:shrink-0">
-            {pending ? 'Enviando…' : 'Enviar'}
-          </button>
+          <div className="flex flex-col justify-between gap-3">
+            <div>
+              <label htmlFor="file-desc" className="text-xs font-medium text-muted-foreground">
+                Descrição
+              </label>
+              <input
+                id="file-desc"
+                type="text"
+                name="description"
+                maxLength={200}
+                placeholder="Ex: RX panorâmica inicial, foto do sorriso antes"
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="mr-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Guardado com acesso restrito (LGPD)
+              </p>
+              <button type="submit" disabled={pending || !fileName} className="btn-primary btn-md">
+                <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                {pending ? 'Enviando…' : 'Enviar'}
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground">JPG, PNG, WEBP, HEIC ou PDF · até 10 MB · armazenado com acesso restrito (LGPD)</p>
       </form>
 
-      {/* Gallery */}
-      {images.length === 0 && docs.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Nenhum arquivo ainda. Radiografias e fotos do caso ficam guardadas aqui.
-        </p>
+      {files.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-12 text-center">
+          <ImagePlus className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
+          <p className="mt-2 text-sm text-muted-foreground">Nenhum arquivo ainda. Radiografias e fotos do caso ficam guardadas aqui.</p>
+        </div>
       ) : (
         <>
-          {images.length > 0 && (
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div role="group" aria-label="Mostrar" className="inline-flex rounded-lg bg-surface-alt p-0.5">
+            {(
+              [
+                ['all', `Todos (${files.length})`],
+                ['img', `Imagens (${images.length})`],
+                ['doc', `Documentos (${docs.length})`],
+              ] as const
+            ).map(([k, l]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={filtro === k}
+                onClick={() => setFiltro(k)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring ${
+                  filtro === k ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {filtro !== 'doc' && images.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {images.map((f) => (
-                <li key={f.id} className="group overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+                <li key={f.id} className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
                   {f.url ? (
-                    <a href={f.url} target="_blank" rel="noreferrer" className="block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
-                      {/* Signed URLs expire, so plain <img> (not next/image cache) */}
+                    <button
+                      type="button"
+                      onClick={() => setAberta(galeria.findIndex((g) => g.id === f.id))}
+                      className="relative block w-full overflow-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                      aria-label={`Ver ${f.description || f.filename}`}
+                    >
+                      {/* URLs assinadas expiram: <img> simples, sem o cache do next/image. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={f.url}
-                        alt={f.description || f.filename}
-                        loading="lazy"
-                        className="aspect-square w-full object-cover transition-transform group-hover:scale-[1.03]"
-                      />
-                    </a>
+                      <img src={f.url} alt="" loading="lazy" className="aspect-square w-full bg-surface-alt object-cover transition-transform duration-300 group-hover:scale-105" />
+                      <span className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                    </button>
                   ) : (
                     <div className="flex aspect-square items-center justify-center text-xs text-muted-foreground">indisponível</div>
                   )}
-                  <div className="flex items-start justify-between gap-1 p-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium">{f.description || f.filename}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {new Date(f.createdAt).toLocaleDateString('pt-BR')} · {fmtSize(f.sizeBytes)}
-                      </p>
-                    </div>
-                    {confirmDelete === f.id ? (
-                      <span className="flex shrink-0 items-center gap-1 text-[11px]">
-                        <button type="button" onClick={() => setConfirmDelete(null)} className="rounded border border-border px-1.5 py-0.5 hover:bg-surface-alt">Não</button>
-                        <button type="button" disabled={isDeleting} onClick={() => remove(f.id)} className="rounded bg-destructive px-1.5 py-0.5 font-medium text-white hover:bg-destructive/90">Sim</button>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(f.id)}
-                        aria-label={`Excluir ${f.description || f.filename}`}
-                        className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    )}
+                  <div className="p-2.5">
+                    <p className="truncate text-xs font-medium">{f.description || f.filename}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {dateBR(f.createdAt)} · {fmtSize(f.sizeBytes)}
+                    </p>
                   </div>
                 </li>
               ))}
             </ul>
           )}
 
-          {docs.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
-              <p className="border-b border-border px-4 py-2.5 text-sm font-semibold">Documentos</p>
+          {filtro !== 'img' && docs.length > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
               <ul className="divide-y divide-border">
                 {docs.map((f) => (
-                  <li key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <li key={f.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400">
+                      <FileText className="h-4 w-4" aria-hidden="true" />
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{f.description || f.filename}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(f.createdAt).toLocaleDateString('pt-BR')} · {fmtSize(f.sizeBytes)}
+                        {dateBR(f.createdAt)} · {fmtSize(f.sizeBytes)}
                       </p>
                     </div>
                     {f.url && (
-                      <a href={f.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${f.filename}`} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                      <a href={f.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${f.filename}`} className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-alt hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                       </a>
                     )}
                     {confirmDelete === f.id ? (
                       <span className="flex items-center gap-1.5 text-xs">
-                        <button type="button" onClick={() => setConfirmDelete(null)} className="rounded border border-border px-2 py-0.5 hover:bg-surface-alt">Não</button>
-                        <button type="button" disabled={isDeleting} onClick={() => remove(f.id)} className="rounded bg-destructive px-2 py-0.5 font-medium text-white hover:bg-destructive/90">Sim</button>
+                        <button type="button" onClick={() => setConfirmDelete(null)} className="rounded border border-border px-2 py-0.5 hover:bg-surface-alt">
+                          Não
+                        </button>
+                        <button type="button" disabled={isDeleting} onClick={() => remove(f.id)} className="rounded bg-destructive px-2 py-0.5 font-medium text-white hover:bg-destructive/90">
+                          Sim, excluir
+                        </button>
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(f.id)}
                         aria-label={`Excluir ${f.filename}`}
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-ring"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -203,6 +265,87 @@ export function ImagesSection({ patientId, files, storageEnabled }: Props) {
           )}
         </>
       )}
+
+      {/* Visualizador */}
+      <Dialog.Root
+        open={atual != null}
+        onOpenChange={(v) => {
+          if (!v) {
+            setAberta(null);
+            setConfirmDelete(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/85" />
+          <Dialog.Content
+            className="fixed inset-0 z-50 flex flex-col focus:outline-none"
+            onKeyDown={(e) => {
+              if (aberta == null) return;
+              if (e.key === 'ArrowRight') setAberta((aberta + 1) % galeria.length);
+              if (e.key === 'ArrowLeft') setAberta((aberta - 1 + galeria.length) % galeria.length);
+            }}
+          >
+            {atual && (
+              <>
+                <div className="flex items-center gap-3 px-4 py-3 text-white">
+                  <div className="min-w-0 flex-1">
+                    <Dialog.Title className="truncate text-sm font-semibold">{atual.description || atual.filename}</Dialog.Title>
+                    <Dialog.Description className="text-xs text-white/70">
+                      {dateBR(atual.createdAt)} · {fmtSize(atual.sizeBytes)} · {aberta! + 1} de {galeria.length}
+                    </Dialog.Description>
+                  </div>
+                  <a href={atual.url!} target="_blank" rel="noreferrer" download={atual.filename} aria-label="Baixar" className="rounded-lg p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white">
+                    <Download className="h-5 w-5" aria-hidden="true" />
+                  </a>
+                  {confirmDelete === atual.id ? (
+                    <span className="flex items-center gap-1.5 text-xs">
+                      Excluir?
+                      <button type="button" onClick={() => setConfirmDelete(null)} className="rounded border border-white/30 px-2 py-0.5 hover:bg-white/10">
+                        Não
+                      </button>
+                      <button type="button" disabled={isDeleting} onClick={() => remove(atual.id)} className="rounded bg-destructive px-2 py-0.5 font-medium text-white">
+                        Sim
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => setConfirmDelete(atual.id)} aria-label="Excluir imagem" className="rounded-lg p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white">
+                      <Trash2 className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  )}
+                  <Dialog.Close aria-label="Fechar" className="rounded-lg p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white">
+                    <X className="h-5 w-5" aria-hidden="true" />
+                  </Dialog.Close>
+                </div>
+                <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-6 sm:px-16">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={atual.url!} alt={atual.description || atual.filename} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
+                  {galeria.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setAberta((aberta! - 1 + galeria.length) % galeria.length)}
+                        aria-label="Imagem anterior"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white sm:left-4"
+                      >
+                        <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAberta((aberta! + 1) % galeria.length)}
+                        aria-label="Próxima imagem"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white sm:right-4"
+                      >
+                        <ChevronRight className="h-6 w-6" aria-hidden="true" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
