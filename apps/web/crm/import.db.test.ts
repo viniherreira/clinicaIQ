@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { ROLE_RIGHTS } from '@/lib/crm-rights';
 import type { ImportRecord } from './import-map';
 
 vi.mock('server-only', () => ({}));
@@ -41,7 +42,7 @@ describe.skipIf(!process.env.DATABASE_URL)('importar planilha (banco)', async ()
   const user = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Rita Dono', email: `r-${s}@teste.local`, role: 'OWNER' } });
   const bia = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Bia Souza', email: `b-${s}@teste.local`, role: 'RECEPTIONIST' } });
   const db = getTenantClient(tenant.id);
-  const ctx = { db, tenantId: tenant.id, userId: user.id, role: 'OWNER' as const, crmRole: 'MANAGER' as const, manager: true, ownOnly: false };
+  const ctx = { db, tenantId: tenant.id, userId: user.id, role: 'OWNER' as const, crmRole: 'MANAGER' as const, rights: ROLE_RIGHTS.MANAGER, manager: true, ownOnly: false };
   await ensureDefaultPipeline(db, tenant.id);
   const etapas = await db.pipelineStage.findMany({ orderBy: { order: 'asc' } });
   const conversa = etapas.find((e) => e.name === 'Em conversa')!;

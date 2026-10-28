@@ -31,9 +31,12 @@ export function CrmToolbar({
   pipelines,
   currentPipeline,
   canConfig,
+  canExport = canConfig,
   today,
   fields = [],
 }: {
+  /** "Exportar" no quadro de permissões. */
+  canExport?: boolean;
   view: 'quadro' | 'lista';
   /** Campos personalizados ativos: viram filtro (lista e sim/não) e entram no Novo lead. */
   fields?: FieldDef[];
@@ -194,7 +197,7 @@ export function CrmToolbar({
                 </Link>
               </DropdownMenu.Item>
             )}
-            {canConfig && (
+            {canExport && (
               <DropdownMenu.Item asChild className={item}>
                 {/* A planilha leva os filtros desta busca; baixa direto (é uma rota, não uma página). */}
                 <a href={`/crm/leads/exportar${transmissaoQs}`} download>

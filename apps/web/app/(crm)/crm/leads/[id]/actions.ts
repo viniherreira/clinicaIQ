@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@clinicaiq/db';
 import { guardCrmAction } from '@/crm/guard';
 import { guardLead } from '@/crm/scope';
+import { levelAllows } from '@/lib/crm-rights';
 import { addNote, linkPatient, setTags, updateLead } from '@/crm/leads';
 import { setLeadFields } from '@/crm/lead-fields';
 import { findPatientByPhone } from '@/crm/duplicates';
@@ -117,8 +118,14 @@ export async function createTaskAction(
 }
 
 export async function completeTaskAction(taskId: string, leadId: string, result?: string): Promise<Result> {
-  const g = await guardLead('crm', leadId);
+  const g = await guardCrmAction('crm');
   if (!g.ok) return g;
+  // Tarefas têm a própria linha no quadro de permissões: "se responsável" é a tarefa dele.
+  const tarefa = await g.db.leadTask.findFirst({ where: { id: taskId, leadId }, select: { assignedToId: true } });
+  if (!tarefa) return { ok: false, message: 'Tarefa não encontrada.' };
+  if (!levelAllows(g.rights.tasks.edit, g.userId, tarefa.assignedToId)) {
+    return { ok: false, message: 'Seu cargo no CRM não permite concluir tarefas de outras pessoas.' };
+  }
   const r = await completeTask(g.db, g, taskId, typeof result === 'string' ? result : undefined);
   if (r.ok) {
     refresh(leadId);

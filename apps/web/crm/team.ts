@@ -1,6 +1,8 @@
-import { getTenantClient, prisma, type Prisma } from '@clinicaiq/db';
+import { getTenantClient, prisma, Prisma as PrismaNS, type Prisma } from '@clinicaiq/db';
 import { can } from '@/lib/permissions';
 import { crmRoleLocked, effectiveCrmRole, isCrmRole, type CrmRole } from '@/lib/crm-roles';
+import { effectiveRights, presetOf, readRights, ROLE_RIGHTS, type CrmRights } from '@/lib/crm-rights';
+import { readCrmPrefs, type CrmPrefs } from './crm-prefs';
 import { assignLead, crmMemberIds, pickAssignee } from './assignment';
 import { readDistribution, type DistributionSettings } from './distribution-rules';
 import { OPEN_LEAD, type Actor } from './leads';
@@ -18,6 +20,10 @@ export interface TeamMember {
   /** Perfil na clínica (Proprietário, Recepção…). */
   role: string;
   crmRole: CrmRole;
+  /** As permissões que valem (quadro do Kommo). */
+  rights: CrmRights;
+  /** As permissões não batem com nenhum cargo pronto. */
+  custom: boolean;
   /** O dono é sempre Gestor. */
   locked: boolean;
   /** Tem acesso ao CRM agora (chave ligada ou cortesia). */
@@ -42,6 +48,7 @@ export async function loadTeam(tenantId: string): Promise<{ members: TeamMember[
         email: true,
         role: true,
         crmRole: true,
+        crmRights: true,
         crmSeat: true,
         crmReceivesLeads: true,
         crmAvailable: true,
@@ -69,6 +76,8 @@ export async function loadTeam(tenantId: string): Promise<{ members: TeamMember[
         email: u.email,
         role: u.role,
         crmRole: effectiveCrmRole(u.role, u.crmRole),
+        rights: effectiveRights(u.role, u.crmRole, u.crmRights),
+        custom: presetOf(effectiveRights(u.role, u.crmRole, u.crmRights)) === null,
         locked: crmRoleLocked(u.role),
         member: membros.has(u.id),
         seat: u.crmSeat,
@@ -83,7 +92,13 @@ export async function loadTeam(tenantId: string): Promise<{ members: TeamMember[
   };
 }
 
-export type MemberPatch = { crmRole?: CrmRole; receivesLeads?: boolean; available?: boolean };
+export type MemberPatch = {
+  crmRole?: CrmRole;
+  /** Permissões do quadro. Batendo com um cargo, grava só o cargo; senão, "Personalizado". */
+  rights?: CrmRights;
+  receivesLeads?: boolean;
+  available?: boolean;
+};
 
 /** Cargo, "recebe leads" e disponível de alguém da equipe. Quem chama é Gestor. */
 export async function updateMember(
@@ -105,6 +120,22 @@ export async function updateMember(
       return { ok: false, message: 'Você não pode tirar o seu próprio cargo de Gestor. Peça a outro gestor.' };
     }
     data.crmRole = patch.crmRole;
+    if (patch.rights === undefined) data.crmRights = PrismaNS.DbNull;
+  }
+  if (patch.rights !== undefined) {
+    if (crmRoleLocked(alvo.role)) return { ok: false, message: 'O proprietário tem todas as permissões do CRM.' };
+    const base = ROLE_RIGHTS[isCrmRole(patch.crmRole) ? patch.crmRole : effectiveCrmRole(alvo.role, alvo.crmRole)];
+    const r = readRights(patch.rights, base);
+    if (alvo.id === actorId && !r.config) {
+      return { ok: false, message: 'Você não pode tirar de si mesmo a configuração do CRM. Peça a outro gestor.' };
+    }
+    const pronto = presetOf(r);
+    if (pronto) {
+      data.crmRole = pronto;
+      data.crmRights = PrismaNS.DbNull;
+    } else {
+      data.crmRights = r as unknown as Prisma.InputJsonValue;
+    }
   }
   if (typeof patch.receivesLeads === 'boolean') data.crmReceivesLeads = patch.receivesLeads;
   if (typeof patch.available === 'boolean') data.crmAvailable = patch.available;
@@ -118,7 +149,7 @@ export async function updateMember(
         action: 'CRM_MEMBER_UPDATED',
         entity: 'User',
         entityId: alvo.id,
-        metadata: { ...patch, antes: alvo.crmRole ?? null },
+        metadata: { ...patch, antes: alvo.crmRole ?? null } as unknown as Prisma.InputJsonValue,
       },
     }),
   ]);
@@ -202,4 +233,12 @@ export async function transferPortfolio(
     WHERE t."leadId" = l."id" AND t."tenantId" = ${tenantId} AND l."tenantId" = ${tenantId}
       AND t."assignedToId" = ${fromUserId} AND t."completedAt" IS NULL AND l."assignedToId" IS NOT NULL AND l."assignedToId" <> ${fromUserId}`;
   return { ok: true, leads: nLeads, conversations: nConv };
+}
+
+/** As preferências do CRM (Configurações › Geral e Conversas). */
+export async function savePrefs(tenantId: string, p: CrmPrefs): Promise<void> {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const atual = t?.settings && typeof t.settings === 'object' ? (t.settings as Record<string, unknown>) : {};
+  const limpo = readCrmPrefs({ crm: p });
+  await prisma.tenant.update({ where: { id: tenantId }, data: { settings: { ...atual, crm: { ...limpo } } } });
 }

@@ -19,12 +19,13 @@ const LIMITE = 20_000;
  * Exporta a lista de leads (os filtros e a situação da tela) como planilha
  * CSV para o Excel, com todas as colunas e os campos personalizados.
  *
- * Só dono e administrador (`crm_config`): sai o telefone completo. Cada
- * exportação vai para a auditoria (LGPD).
+ * Só quem tem "Exportar" no quadro de permissões (o Gestor, por padrão): sai o
+ * telefone completo. Cada exportação vai para a auditoria (LGPD).
  */
 export async function GET(req: Request) {
-  const g = await guardCrmAction('crm_config', { write: false });
+  const g = await guardCrmAction('crm', { write: false });
   if (!g.ok) return new NextResponse(g.message, { status: 403 });
+  if (g.rights.leads.export !== 'all') return new NextResponse('Seu cargo no CRM não permite exportar.', { status: 403 });
 
   const sp = Object.fromEntries(new URL(req.url).searchParams.entries());
   const filters = parseFilters(sp);

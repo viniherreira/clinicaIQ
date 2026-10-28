@@ -24,7 +24,6 @@ for (const path of [
   '/crm?editar=1',
   '/crm/whatsapp',
   '/crm/configuracoes',
-  '/crm/equipe',
   '/dashboard',
 ]) {
   test(`${path} sem violações de acessibilidade`, async ({ page }) => {

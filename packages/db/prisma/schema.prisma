@@ -202,6 +202,8 @@ model User {
   crmSeat Boolean  @default(false)
   /// Cargo no CRM. Nulo = o padrão do perfil (`lib/crm-roles.ts`).
   crmRole CrmRole?
+  /// Permissões personalizadas no CRM (`lib/crm-rights.ts`). Nulo = as do cargo.
+  crmRights Json?
   /// Entra na distribuição automática de leads e conversas.
   crmReceivesLeads  Boolean   @default(true)
   /// Disponível para receber agora (o "online" do Kommo). Ausente fica fora do rodízio.

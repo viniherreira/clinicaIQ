@@ -1,4 +1,5 @@
-import { decrypt, getTenantClient } from '@clinicaiq/db';
+import { decrypt, getTenantClient, prisma } from '@clinicaiq/db';
+import { readCrmPrefs } from './crm-prefs';
 import { runBotOnInbound } from './bot';
 import { distributeConversation } from './assignment';
 import { applyCapture } from './capture';
@@ -72,7 +73,8 @@ export async function afterInbound(
   // Número novo cai sozinho no funil, em Novo, como no Kommo: ninguém precisa
   // tocar em Aceitar. A captação pode já ter criado (com tags e funil); aí nada muda.
   // Vale também para a conversa que ficou na antiga Entrada e voltou a escrever.
-  if (conv?.status === 'INBOX') {
+  const prefs = readCrmPrefs((await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }))?.settings);
+  if (conv?.status === 'INBOX' && prefs.autoLead) {
     try {
       const ainda = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
       if (ainda?.status === 'INBOX') await acceptConversation(db, { tenantId, userId: null }, conversationId);

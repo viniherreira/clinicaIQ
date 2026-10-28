@@ -36,7 +36,10 @@ export function CrmSettings({
   fields,
   agenda = true,
   initialTab = 'funis',
+  bare = false,
 }: {
+  /** Só a seção `initialTab`, sem as abas: o menu lateral das Configurações escolhe. */
+  bare?: boolean;
   pipelines: PipelineRow[];
   /** A clínica tem a agenda (não é só o CRM): mostra "Agenda e orçamentos". */
   agenda?: boolean;
@@ -68,8 +71,8 @@ export function CrmSettings({
   ];
 
   return (
-    <div className="mt-6">
-      <div role="tablist" aria-label="Configurações do CRM" className="flex gap-1 border-b border-border">
+    <div className={bare ? '' : 'mt-6'}>
+      <div role="tablist" aria-label="Configurações do CRM" className={bare ? 'hidden' : 'flex gap-1 border-b border-border'}>
         {abas.map((a) => (
           <button
             key={a.key}
@@ -86,7 +89,7 @@ export function CrmSettings({
         ))}
       </div>
 
-      <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} className="pt-5">
+      <div id={`${id}-painel`} role={bare ? undefined : 'tabpanel'} aria-labelledby={bare ? undefined : `${id}-${aba}`} className={bare ? '' : 'pt-5'}>
         {aba === 'funis' && (
           <>
             <Funis pipelines={pipelines} />
