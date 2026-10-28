@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { prisma, getTenantClient, type ToothStatus } from '@clinicaiq/db';
+import { prisma, getTenantClient } from '@clinicaiq/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/st
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
+import { findingText, isFace, isKind, KINDS, VALID_TEETH, type FindingKind, type FindingStatus } from '@/lib/odontogram';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export async function getPatientRecord(patientId: string) {
   const db = getTenantClient(tenantId);
   const now = new Date();
 
-  const [appointments, quotes, payments, teeth, anamnesis, evolutions, files, professionals] = await Promise.all([
+  const [appointments, quotes, payments, findings, anamnesis, evolutions, files, professionals, procedures] = await Promise.all([
     db.appointment.findMany({
       where: { patientId },
       orderBy: { startTime: 'desc' },
@@ -76,9 +77,21 @@ export async function getPatientRecord(patientId: string) {
         quote: { select: { id: true, number: true } },
       },
     }),
-    db.toothRecord.findMany({
+    db.toothFinding.findMany({
       where: { patientId },
-      select: { toothNumber: true, status: true, note: true },
+      orderBy: [{ toothNumber: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        toothNumber: true,
+        surfaces: true,
+        kind: true,
+        status: true,
+        note: true,
+        doneAt: true,
+        createdAt: true,
+        procedure: { select: { id: true, name: true, basePrice: true } },
+        professional: { select: { id: true, name: true } },
+      },
     }),
     db.anamnesis.findFirst({
       where: { patientId },
@@ -113,6 +126,11 @@ export async function getPatientRecord(patientId: string) {
       where: { active: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
+    }),
+    db.procedure.findMany({
+      where: { active: true, deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, basePrice: true },
     }),
   ]);
 
@@ -189,7 +207,12 @@ export async function getPatientRecord(patientId: string) {
           .reduce((s, p) => s + Number(p.amount), 0),
       })),
     },
-    teeth: veProntuario ? teeth.map((t) => ({ ...t })) : [],
+    findings: veProntuario
+      ? findings.map(({ procedure, ...f }) => ({
+          ...f,
+          procedure: procedure ? { id: procedure.id, name: procedure.name, price: Number(procedure.basePrice) } : null,
+        }))
+      : [],
     anamnesis:
       veProntuario && anamnesis
         ? { answers: anamnesis.answers as unknown as AnamnesisAnswers, updatedAt: anamnesis.updatedAt }
@@ -197,62 +220,150 @@ export async function getPatientRecord(patientId: string) {
     evolutions: veProntuario ? evolutions.map((e) => ({ ...e })) : [],
     files: veProntuario ? filesWithUrls : [],
     professionals,
+    procedures: procedures.map((p) => ({ id: p.id, name: p.name, price: Number(p.basePrice) })),
     storageEnabled: storageEnabled(),
   };
 }
 
 // ─── Odontograma ───────────────────────────────────────────────────────────────
 
-// Permanent (quadrants 1-4, teeth 1-8) + deciduous (quadrants 5-8, teeth 1-5).
-const VALID_TEETH = new Set([
-  ...[1, 2, 3, 4].flatMap((q) => [1, 2, 3, 4, 5, 6, 7, 8].map((n) => q * 10 + n)),
-  ...[5, 6, 7, 8].flatMap((q) => [1, 2, 3, 4, 5].map((n) => q * 10 + n)),
-]);
+type OdontoResult = { ok: true } | { ok: false; message: string };
 
-export async function setToothRecord(
+/** Quem escreve no prontuário: a clínica pode escrever, a pessoa tem acesso, o paciente é daqui. */
+async function requireRecordWriter(patientId: string): Promise<{ tenantId: string; userId: string } | { message: string }> {
+  const ctx = await requirePatient(patientId);
+  if (!ctx) return { message: 'Paciente não encontrado.' };
+  const bloqueio = await writeBlocked(ctx.tenantId);
+  if (bloqueio) return { message: bloqueio };
+  const semAcesso = await capabilityBlocked(ctx.tenantId, 'prontuario');
+  if (semAcesso) return { message: semAcesso };
+  return ctx;
+}
+
+const findingSchema = z.object({
+  teeth: z.array(z.number().int()).min(1, 'Escolha ao menos um dente.').max(32),
+  kind: z.string().refine(isKind, 'Marcação inválida.'),
+  surfaces: z.array(z.string()).max(5).default([]),
+  status: z.enum(['PLANNED', 'DONE', 'EXISTING']),
+  note: z.string().trim().max(300).optional().or(z.literal('')),
+  procedureId: z.string().max(60).optional().or(z.literal('')),
+  professionalId: z.string().max(60).optional().or(z.literal('')),
+});
+
+/** A evolução que conta o que foi feito: marcar como realizado escreve na história clínica. */
+async function evolutionFor(
+  ctx: { tenantId: string; userId: string },
   patientId: string,
-  toothNumber: number,
-  status: ToothStatus | null,
-  note?: string,
-): Promise<{ ok: boolean }> {
-  const { tenantId, userId } = await requireTenant();
-
-  const bloqueio = await writeBlocked(tenantId);
-  if (bloqueio) return { ok: false };
-
-  const semAcesso = await capabilityBlocked(tenantId, 'prontuario');
-  if (semAcesso) return { ok: false };
-  if (!VALID_TEETH.has(toothNumber)) return { ok: false };
-
-  // Guard: patient must belong to this tenant.
-  const patient = await prisma.patient.findFirst({
-    where: { id: patientId, tenantId },
-    select: { id: true },
-  });
-  if (!patient) return { ok: false };
-
-  if (status === null) {
-    await prisma.toothRecord.deleteMany({ where: { tenantId, patientId, toothNumber } });
-  } else {
-    const trimmedNote = note?.trim().slice(0, 300) || null;
-    await prisma.toothRecord.upsert({
-      where: { patientId_toothNumber: { patientId, toothNumber } },
-      update: { status, note: trimmedNote, updatedById: userId },
-      create: { tenantId, patientId, toothNumber, status, note: trimmedNote, updatedById: userId },
-    });
-  }
-
-  await prisma.auditLog.create({
+  done: { toothNumber: number; kind: string; surfaces: string[]; note: string | null; professionalId: string | null }[],
+) {
+  if (done.length === 0) return;
+  const linhas = done.map((f) => `${findingText(f)}${f.note ? ` (${f.note})` : ''}`);
+  await prisma.evolution.create({
     data: {
-      tenantId,
-      userId,
-      action: status === null ? 'TOOTH_CLEAR' : `TOOTH_${status}`,
-      entity: 'Patient',
-      entityId: patientId,
-      metadata: { toothNumber },
+      tenantId: ctx.tenantId,
+      patientId,
+      professionalId: done.find((f) => f.professionalId)?.professionalId ?? null,
+      description: `Realizado: ${linhas.join('; ')}.`,
+      teeth: [...new Set(done.map((f) => f.toothNumber))],
+      createdById: ctx.userId,
     },
   });
+}
 
+/** Marca um ou mais dentes de uma vez (as mesmas faces em todos). */
+export async function addToothFindings(
+  patientId: string,
+  input: { teeth: number[]; kind: string; surfaces?: string[]; status: FindingStatus; note?: string; procedureId?: string; professionalId?: string },
+): Promise<OdontoResult> {
+  const ctx = await requireRecordWriter(patientId);
+  if ('message' in ctx) return { ok: false, message: ctx.message };
+  const parsed = findingSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
+  const d = parsed.data;
+  const kind = KINDS[d.kind as FindingKind];
+  const teeth = [...new Set(d.teeth)].filter((t) => VALID_TEETH.has(t));
+  if (teeth.length === 0) return { ok: false, message: 'Dente inválido.' };
+  const surfaces = kind.faces ? [...new Set(d.surfaces.filter(isFace))] : [];
+  if (kind.faces && surfaces.length === 0) return { ok: false, message: 'Escolha as faces do dente.' };
+
+  const foreign = await refOutsideTenant(ctx.tenantId, {
+    professionalId: d.professionalId || null,
+    procedureIds: d.procedureId ? [d.procedureId] : [],
+  });
+  if (foreign) return { ok: false, message: refErrorMessage(foreign) };
+
+  const now = new Date();
+  const rows = teeth.map((toothNumber) => ({
+    tenantId: ctx.tenantId,
+    patientId,
+    toothNumber,
+    kind: d.kind,
+    surfaces,
+    status: d.status,
+    note: d.note || null,
+    procedureId: d.procedureId || null,
+    professionalId: d.professionalId || null,
+    doneAt: d.status === 'DONE' ? now : null,
+    createdById: ctx.userId,
+  }));
+  await prisma.toothFinding.createMany({ data: rows });
+  if (d.status === 'DONE') await evolutionFor(ctx, patientId, rows);
+
+  await prisma.auditLog.create({
+    data: { tenantId: ctx.tenantId, userId: ctx.userId, action: 'TOOTH_FINDING_ADD', entity: 'Patient', entityId: patientId, metadata: { teeth, kind: d.kind } },
+  });
+  revalidatePath(`/pacientes/${patientId}`);
+  return { ok: true };
+}
+
+const patchSchema = z.object({
+  status: z.enum(['PLANNED', 'DONE', 'EXISTING']).optional(),
+  note: z.string().max(300).optional(),
+  procedureId: z.string().max(60).nullable().optional(),
+});
+
+/** Muda a situação (realizar, voltar a fazer), a anotação ou o procedimento de marcações do paciente. */
+export async function updateToothFindings(
+  patientId: string,
+  ids: string[],
+  patch: { status?: FindingStatus; note?: string; procedureId?: string | null },
+): Promise<OdontoResult> {
+  const ctx = await requireRecordWriter(patientId);
+  if ('message' in ctx) return { ok: false, message: ctx.message };
+  const parsed = patchSchema.safeParse(patch);
+  if (!parsed.success) return { ok: false, message: 'Dados inválidos.' };
+  const p = parsed.data;
+  if (p.procedureId) {
+    const foreign = await refOutsideTenant(ctx.tenantId, { procedureIds: [p.procedureId] });
+    if (foreign) return { ok: false, message: refErrorMessage(foreign) };
+  }
+  const alvo = await prisma.toothFinding.findMany({
+    where: { id: { in: ids.slice(0, 100) }, tenantId: ctx.tenantId, patientId },
+    select: { id: true, toothNumber: true, kind: true, surfaces: true, note: true, status: true, professionalId: true },
+  });
+  if (alvo.length === 0) return { ok: false, message: 'Marcação não encontrada.' };
+
+  await prisma.toothFinding.updateMany({
+    where: { id: { in: alvo.map((f) => f.id) }, tenantId: ctx.tenantId },
+    data: {
+      ...(p.status ? { status: p.status, doneAt: p.status === 'DONE' ? new Date() : null } : {}),
+      ...(p.note !== undefined ? { note: p.note.trim() || null } : {}),
+      ...(p.procedureId !== undefined ? { procedureId: p.procedureId || null } : {}),
+    },
+  });
+  if (p.status === 'DONE') await evolutionFor(ctx, patientId, alvo.filter((f) => f.status !== 'DONE'));
+  revalidatePath(`/pacientes/${patientId}`);
+  return { ok: true };
+}
+
+export async function deleteToothFinding(patientId: string, id: string): Promise<OdontoResult> {
+  const ctx = await requireRecordWriter(patientId);
+  if ('message' in ctx) return { ok: false, message: ctx.message };
+  const { count } = await prisma.toothFinding.deleteMany({ where: { id, tenantId: ctx.tenantId, patientId } });
+  if (count === 0) return { ok: false, message: 'Marcação não encontrada.' };
+  await prisma.auditLog.create({
+    data: { tenantId: ctx.tenantId, userId: ctx.userId, action: 'TOOTH_FINDING_DELETE', entity: 'Patient', entityId: patientId, metadata: { findingId: id } },
+  });
   revalidatePath(`/pacientes/${patientId}`);
   return { ok: true };
 }

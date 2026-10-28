@@ -1,7 +1,7 @@
 import { clinicToday } from '@/lib/tz';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
-import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient } from '../actions';
+import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient, planQuoteItems } from '../actions';
 import { QuoteBuilder } from '../_components/quote-builder';
 
 export const metadata = { title: 'Novo orçamento · DreamClin' };
@@ -9,14 +9,16 @@ export const metadata = { title: 'Novo orçamento · DreamClin' };
 export default async function NovoOrcamentoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ patientId?: string }>;
+  searchParams: Promise<{ patientId?: string; plano?: string }>;
 }) {
   const sp = await searchParams;
-  const [procedures, professionals, validUntil, patient] = await Promise.all([
+  const [procedures, professionals, validUntil, patient, plano] = await Promise.all([
     listQuoteProcedures(),
     listQuoteProfessionals(),
     defaultValidUntil(),
     sp.patientId ? getQuotePatient(sp.patientId) : Promise.resolve(null),
+    // Vindo do odontograma: o plano de tratamento já entra como itens.
+    sp.patientId && sp.plano === '1' ? planQuoteItems(sp.patientId) : Promise.resolve([]),
   ]);
 
   return (
@@ -32,6 +34,7 @@ export default async function NovoOrcamentoPage({
             <Link href={`/pacientes/${patient.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
               {patient.name}
             </Link>
+            {plano.length > 0 && ` · ${plano.length} ${plano.length === 1 ? 'item' : 'itens'} do plano de tratamento`}
           </p>
         )}
       </header>
@@ -42,6 +45,7 @@ export default async function NovoOrcamentoPage({
         defaultValidUntil={validUntil}
         today={clinicToday()}
         initialPatient={patient ?? undefined}
+        initialItems={plano.length ? plano : undefined}
       />
     </div>
   );

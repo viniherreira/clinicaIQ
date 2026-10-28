@@ -3,10 +3,11 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, Plus, Trash2 } from 'lucide-react';
+import { FileText, Plus, Trash2, Wallet } from 'lucide-react';
 import { addPayment, deletePayment, type PaymentFormState } from '../actions';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { DEFAULT_RECEIPT_METHODS } from '@/lib/payment-methods';
+import { CLINIC_TZ } from '@/lib/tz';
 
 interface PaymentRow {
   id: string;
@@ -87,29 +88,56 @@ export function FinancialSection({
   }, [state, router]);
 
   const errors = state && !state.success ? state.errors : {};
+  const pctPago = contracted > 0 ? Math.min(100, (paid / contracted) * 100) : 0;
 
   return (
     <div className="space-y-4">
-      {/* Summary */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
-          <p className="text-xs font-medium text-muted-foreground">Contratado (orçamentos aceitos)</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{brl(contracted)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
-          <p className="text-xs font-medium text-muted-foreground">Pago</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-success">{brl(paid)}</p>
-        </div>
-        <div className={`rounded-xl border p-4 shadow-card ${balance > 0 ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40' : 'border-border bg-surface'}`}>
-          <p className={`text-xs font-medium ${balance > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>Em aberto</p>
-          <p className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${balance > 0 ? 'text-amber-900 dark:text-amber-200' : 'text-success'}`}>
-            {brl(balance)}
-          </p>
-        </div>
-      </div>
+      {/* Resumo */}
+      <section aria-label="Resumo financeiro" className="rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-5">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" /> Contratado
+            </dt>
+            <dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{brl(contracted)}</dd>
+            <dd className="text-[11px] text-muted-foreground">orçamentos aprovados</dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" /> Pago
+            </dt>
+            <dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-success">{brl(paid)}</dd>
+            <dd className="text-[11px] text-muted-foreground">
+              {payments.length} {payments.length === 1 ? 'pagamento' : 'pagamentos'}
+            </dd>
+          </div>
+          <div className={balance > 0 ? 'rounded-xl bg-amber-50 p-3 -m-3 dark:bg-amber-950/30' : ''}>
+            <dt className={`flex items-center gap-1.5 text-xs font-medium ${balance > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
+              <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Em aberto
+            </dt>
+            <dd className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${balance > 0 ? 'text-amber-900 dark:text-amber-200' : 'text-success'}`}>{brl(balance)}</dd>
+            <dd className="text-[11px] text-muted-foreground">{balance > 0 ? 'a receber' : contracted > 0 ? 'tudo quitado' : 'nada a receber'}</dd>
+          </div>
+        </dl>
+        {contracted > 0 && (
+          <div className="mt-4">
+            <div
+              className="h-2.5 overflow-hidden rounded-full bg-surface-alt"
+              role="progressbar"
+              aria-label="Quanto do contratado já foi pago"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(pctPago)}
+            >
+              <div className="h-full rounded-full bg-success transition-all" style={{ width: `${pctPago}%` }} />
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">{Math.round(pctPago)}% do contratado já foi pago</p>
+          </div>
+        )}
+      </section>
 
       {/* Quotes for this patient */}
-      <section className="rounded-xl border border-border bg-surface shadow-card" aria-label="Orçamentos do paciente">
+      <section className="rounded-2xl border border-border bg-surface shadow-card" aria-label="Orçamentos do paciente">
         <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
           <h3 className="text-sm font-semibold">Orçamentos</h3>
           <Link href={`/orcamentos/novo?patientId=${patientId}`} className="btn-outline btn-sm">
@@ -135,9 +163,14 @@ export function FinancialSection({
                         ORC-{String(q.number).padStart(4, '0')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {new Date(q.createdAt).toLocaleDateString('pt-BR')}
+                        {new Date(q.createdAt).toLocaleDateString('pt-BR', { timeZone: CLINIC_TZ })}
                         {q.paid > 0 && ` · pago ${brl(q.paid)}`}
                       </span>
+                      {q.status === 'ACCEPTED' && q.total > 0 && (
+                        <span className="mt-1.5 block h-1.5 max-w-48 overflow-hidden rounded-full bg-surface-alt" aria-hidden="true">
+                          <span className="block h-full rounded-full bg-success" style={{ width: `${Math.min(100, (q.paid / q.total) * 100)}%` }} />
+                        </span>
+                      )}
                     </span>
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.cls}`}>
                       {meta.label}
@@ -152,7 +185,7 @@ export function FinancialSection({
       </section>
 
       {/* Payments */}
-      <section className="rounded-xl border border-border bg-surface shadow-card" aria-label="Pagamentos">
+      <section className="rounded-2xl border border-border bg-surface shadow-card" aria-label="Pagamentos">
         <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
           <h3 className="text-sm font-semibold">Pagamentos</h3>
           <button
@@ -229,10 +262,13 @@ export function FinancialSection({
           <ul className="divide-y divide-border">
             {payments.map((p) => (
               <li key={p.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success" aria-hidden="true">
+                  <Wallet className="h-4 w-4" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold tabular-nums">{brl(p.amount)}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {new Date(p.paidAt).toLocaleDateString('pt-BR')}
+                    {new Date(p.paidAt).toLocaleDateString('pt-BR', { timeZone: CLINIC_TZ })}
                     {p.method && ` · ${p.method}`}
                     {p.quoteId && p.quoteNumber != null && (
                       <>

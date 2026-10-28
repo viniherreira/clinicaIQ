@@ -87,6 +87,14 @@ enum ToothStatus {
   MISSING
 }
 
+/// Situação de uma marcação do odontograma: a fazer (plano de tratamento),
+/// realizado na clínica, ou que o paciente já tinha quando chegou.
+enum ToothFindingStatus {
+  PLANNED
+  DONE
+  EXISTING
+}
+
 // ─── Models ──────────────────────────────────────────────
 
 model Tenant {
@@ -140,6 +148,7 @@ model Tenant {
   blockedSlots        BlockedSlot[]
   patientNotes        PatientNote[]
   toothRecords        ToothRecord[]
+  toothFindings       ToothFinding[]
   payments            Payment[]
   anamneses           Anamnesis[]
   evolutions          Evolution[]
@@ -195,15 +204,15 @@ model User {
   /// "era a mesma pessoa?" quando alguém é reconvidado meses depois.
   previousClerkUserId String?
 
-  name    String
-  email   String
-  role    Role     @default(RECEPTIONIST)
+  name              String
+  email             String
+  role              Role      @default(RECEPTIONIST)
   /// Tem acesso ao CRM e conta na cobrança do adicional (R$ por usuário).
-  crmSeat Boolean  @default(false)
+  crmSeat           Boolean   @default(false)
   /// Cargo no CRM. Nulo = o padrão do perfil (`lib/crm-roles.ts`).
-  crmRole CrmRole?
+  crmRole           CrmRole?
   /// Permissões personalizadas no CRM (`lib/crm-rights.ts`). Nulo = as do cargo.
-  crmRights Json?
+  crmRights         Json?
   /// Entra na distribuição automática de leads e conversas.
   crmReceivesLeads  Boolean   @default(true)
   /// Disponível para receber agora (o "online" do Kommo). Ausente fica fora do rodízio.
@@ -211,10 +220,10 @@ model User {
   /// Último lead ou conversa recebido pela distribuição: o rodízio dá para quem recebeu há mais tempo.
   crmLastAssignedAt DateTime?
   /// Unidades em que a pessoa trabalha (agenda). Vazio = todas.
-  unitIds String[] @default([])
+  unitIds           String[]  @default([])
   /// Bandeira operacional: é ela que todas as consultas filtram.
   /// `deactivatedAt` é o registro do fato; as duas são escritas juntas.
-  active  Boolean  @default(true)
+  active            Boolean   @default(true)
 
   /// Quando o acesso foi encerrado, por quem e por quê. Nulo enquanto ativo.
   deactivatedAt      DateTime?
@@ -224,12 +233,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant           Tenant        @relation(fields: [tenantId], references: [id])
-  patientNotes     PatientNote[]
-  auditLogs        AuditLog[]
-  assignedLeads    Lead[]        @relation("LeadAssignee")
-  assignedTasks    LeadTask[]    @relation("LeadTaskAssignee")
-  chatMessagesSent ChatMessage[]
+  tenant                Tenant         @relation(fields: [tenantId], references: [id])
+  patientNotes          PatientNote[]
+  auditLogs             AuditLog[]
+  assignedLeads         Lead[]         @relation("LeadAssignee")
+  assignedTasks         LeadTask[]     @relation("LeadTaskAssignee")
+  chatMessagesSent      ChatMessage[]
   assignedConversations Conversation[] @relation("ConversationAssignee")
 
   @@index([tenantId])
@@ -285,6 +294,7 @@ model Patient {
   quotes             Quote[]
   messages           WhatsAppMessage[]
   toothRecords       ToothRecord[]
+  toothFindings      ToothFinding[]
   payments           Payment[]
   anamnesis          Anamnesis?
   evolutions         Evolution[]
@@ -333,13 +343,14 @@ model Professional {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  tenant       Tenant                 @relation(fields: [tenantId], references: [id])
-  schedules    ProfessionalSchedule[]
-  appointments Appointment[]
-  blockedSlots BlockedSlot[]
-  procedures   Procedure[]            @relation("ProcedureProfessionals")
-  evolutions   Evolution[]
-  quotes       Quote[]
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
+  schedules     ProfessionalSchedule[]
+  appointments  Appointment[]
+  blockedSlots  BlockedSlot[]
+  procedures    Procedure[]            @relation("ProcedureProfessionals")
+  evolutions    Evolution[]
+  toothFindings ToothFinding[]
+  quotes        Quote[]
 
   @@index([tenantId])
   @@map("professionals")
@@ -418,6 +429,7 @@ model Procedure {
   appointments    Appointment[]
   quoteItems      QuoteItem[]
   interestedLeads Lead[]
+  toothFindings   ToothFinding[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -633,6 +645,38 @@ model ToothRecord {
   @@unique([patientId, toothNumber])
   @@index([tenantId, patientId])
   @@map("tooth_records")
+}
+
+/// Uma marcação do odontograma: o que o dente tem ou vai ter, em quais faces.
+/// Substitui `ToothRecord` (uma situação por dente), que fica só para leitura
+/// até as fichas antigas serem copiadas (docs/producao/2026-10-28-odontograma.sql).
+model ToothFinding {
+  id             String             @id @default(cuid())
+  tenantId       String
+  patientId      String
+  toothNumber    Int
+  /// Faces: M (mesial), D (distal), O (oclusal/incisal), V (vestibular),
+  /// L (lingual/palatina). Vazio: o dente todo.
+  surfaces       String[]           @default([])
+  /// O que é: catálogo em `lib/odontogram.ts` (CARIES, RESTORATION, ROOT_CANAL…).
+  kind           String
+  status         ToothFindingStatus @default(PLANNED)
+  note           String?
+  /// Procedimento da tabela da clínica (dá o valor no plano e no orçamento).
+  procedureId    String?
+  professionalId String?
+  doneAt         DateTime?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  procedure    Procedure?    @relation(fields: [procedureId], references: [id])
+  professional Professional? @relation(fields: [professionalId], references: [id])
+
+  @@index([tenantId, patientId])
+  @@map("tooth_findings")
 }
 
 /**
