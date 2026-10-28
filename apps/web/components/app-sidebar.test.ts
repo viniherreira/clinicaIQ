@@ -83,19 +83,19 @@ describe('navFor — espaço do CRM', () => {
   });
 
   it('a recepção trabalha o funil; só dono e admin configuram', () => {
-    expect(crm('RECEPTIONIST')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes']);
+    expect(crm('RECEPTIONIST')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/configuracoes']);
     expect(crm('OWNER')).toEqual(CRM_NAV.map((i) => i.href));
     expect(crm('ADMIN')).toContain('/crm/configuracoes');
   });
 
   it('o profissional usa o CRM, mas sem as configurações', () => {
-    expect(crm('PROFESSIONAL')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes']);
+    expect(crm('PROFESSIONAL')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/configuracoes']);
   });
 
   it('as configurações do CRM seguem o cargo no CRM, não o perfil', () => {
     const itens = (role: string, gestor: boolean) => navFor(role, 'crm', false, gestor).map((i) => i.href);
-    expect(itens('RECEPTIONIST', true)).toContain('/crm/equipe');
-    expect(itens('ADMIN', false)).not.toContain('/crm/configuracoes');
+    expect(itens('RECEPTIONIST', true)).toContain('/crm/whatsapp');
+    expect(itens('ADMIN', false)).not.toContain('/crm/whatsapp');
   });
 
   it('todo item do CRM declara a permissão que exige', () => {

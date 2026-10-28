@@ -80,6 +80,7 @@ export default async function LeadsPage({
         summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
         pipelines={basics.pipelines}
         canConfig={ctx.manager}
+        canExport={ctx.rights.leads.export === 'all'}
         today={clinicToday()}
       />
 
@@ -110,7 +111,7 @@ export default async function LeadsPage({
         initialColumns={colunas}
         fields={basics.fields}
         pipelines={basics.pipelines}
-        bulk={{ team: basics.team, tags: basics.tags, lostReasons: basics.lostReasons, canDelete: ctx.manager }}
+        bulk={{ team: basics.team, tags: basics.tags, lostReasons: basics.lostReasons, canDelete: ctx.rights.leads.delete !== 'none' }}
         showClosed={mostraFechado}
         order={order}
         sortHrefs={{

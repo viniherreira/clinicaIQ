@@ -22,9 +22,9 @@ export interface SettingsSection {
  * sistema levarem a pessoa direto aonde precisa. Trocar de seção usa
  * `replaceState`: não enche o histórico de voltas para a mesma tela.
  */
-export function SettingsLayout({ sections }: { sections: SettingsSection[] }) {
+export function SettingsLayout({ sections, initial }: { sections: SettingsSection[]; /** Seção que abre, se o endereço não tiver hash. */ initial?: string }) {
   const id = useId();
-  const [ativa, setAtiva] = useState(sections[0]?.id);
+  const [ativa, setAtiva] = useState(sections.find((s) => s.id === initial || s.aliases?.includes(initial ?? ''))?.id ?? sections[0]?.id);
   const painel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

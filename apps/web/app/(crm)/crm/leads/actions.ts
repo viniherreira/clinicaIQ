@@ -7,6 +7,7 @@ import { effectiveStatus, parseFilters, parseListParams } from '@/crm/board-data
 import { bulkSummary, resolveTargets, runBulk, type BulkAction } from '@/crm/bulk';
 import { clinicLocalToInstant } from '@/crm/clock';
 import { guardCrmAction } from '@/crm/guard';
+import { idsWithin } from '@/crm/scope';
 
 /**
  * Ações em massa da lista de leads. Os leads vêm marcados na tela (ids) ou
@@ -49,7 +50,8 @@ export async function bulkLeadsAction(
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
   const { target, action: a } = parsed.data;
-  if (a.type === 'delete' && !g.manager) return { ok: false, message: 'Só quem é Gestor no CRM pode excluir leads.' };
+  if (a.type === 'delete' && g.rights.leads.delete === 'none') return { ok: false, message: 'Seu cargo no CRM não permite excluir negócios.' };
+  if (a.type !== 'delete' && g.rights.leads.edit === 'none') return { ok: false, message: 'Seu cargo no CRM não permite editar negócios.' };
 
   let action: BulkAction;
   if (a.type === 'task') {
@@ -60,7 +62,7 @@ export async function bulkLeadsAction(
     action = a as BulkAction;
   }
 
-  const ids = await resolveTargets(
+  const escolhidos = await resolveTargets(
     g,
     'ids' in target
       ? { ids: target.ids }
@@ -69,7 +71,9 @@ export async function bulkLeadsAction(
           return { filters, status: effectiveStatus(parseListParams(target.search).status, filters) };
         })(),
   );
-  if (!ids.length) return { ok: false, message: 'Nenhum lead para mudar.' };
+  // Só os que o quadro de permissões deixa mexer ("se responsável": os dele e os sem responsável).
+  const ids = await idsWithin(g, escolhidos, a.type === 'delete' ? g.rights.leads.delete : g.rights.leads.edit);
+  if (!ids.length) return { ok: false, message: escolhidos.length ? 'Esses negócios são de outras pessoas da equipe.' : 'Nenhum lead para mudar.' };
 
   const r = await runBulk(g, ids, action);
   await prisma.auditLog.create({

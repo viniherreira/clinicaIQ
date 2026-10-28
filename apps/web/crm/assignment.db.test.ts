@@ -65,6 +65,7 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
   });
 
   afterAll(async () => {
+    await prisma.chatMessage.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.leadActivity.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.leadTask.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.conversation.deleteMany({ where: { tenantId: tenant.id } });
@@ -183,5 +184,49 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
     const n = await team.distributeUnassigned(tenant.id, dona.id);
     expect(n).toBeGreaterThan(0);
     expect((await prisma.conversation.findUnique({ where: { id: fila } }))?.assignedToId).not.toBeNull();
+  });
+  it('permissões personalizadas: viram Personalizado; batendo com um cargo, gravam só o cargo', async () => {
+    const { ROLE_RIGHTS } = await import('@/lib/crm-rights');
+    const custom = { ...ROLE_RIGHTS.AGENT, leads: { ...ROLE_RIGHTS.AGENT.leads, export: 'all' as const } };
+    expect(await team.updateMember(tenant.id, dona.id, bia.id, { rights: custom })).toEqual({ ok: true });
+    let t = await team.loadTeam(tenant.id);
+    expect(t.members.find((m) => m.id === bia.id)).toMatchObject({ custom: true, rights: { leads: { export: 'all' } } });
+    expect(await team.updateMember(tenant.id, dona.id, bia.id, { rights: ROLE_RIGHTS.AGENT_OWN })).toEqual({ ok: true });
+    const u = await prisma.user.findUnique({ where: { id: bia.id } });
+    expect(u?.crmRole).toBe('AGENT_OWN');
+    expect(u?.crmRights).toBeNull();
+    t = await team.loadTeam(tenant.id);
+    expect(t.members.find((m) => m.id === bia.id)?.custom).toBe(false);
+    // Ninguém tira de si a configuração; o dono não tem permissões editáveis.
+    await team.updateMember(tenant.id, dona.id, bia.id, { crmRole: 'MANAGER' });
+    expect((await team.updateMember(tenant.id, bia.id, bia.id, { rights: ROLE_RIGHTS.AGENT })).ok).toBe(false);
+    expect((await team.updateMember(tenant.id, bia.id, dona.id, { rights: ROLE_RIGHTS.AGENT })).ok).toBe(false);
+  });
+
+  it('preferências: número novo sem lead automático e volta ao negócio fechado', async () => {
+    const { readCrmPrefs } = await import('./crm-prefs');
+    await team.savePrefs(tenant.id, { autoLead: false, reuseClosedLead: true, senderName: true });
+    const t = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { settings: true } });
+    expect(readCrmPrefs(t?.settings)).toEqual({ autoLead: false, reuseClosedLead: true, senderName: true });
+    // A distribuição continua lá (o JSON das configurações é mesclado, não trocado).
+    expect((t?.settings as Record<string, unknown>).crmDistribution).toBeTruthy();
+
+    const fechado = await createLead(db, { tenantId: tenant.id, userId: ana.id }, { name: 'Antigo', phone: '11 98765-2099' });
+    if (!fechado.ok) throw new Error(fechado.message);
+    await prisma.lead.update({ where: { id: fechado.leadId }, data: { wonAt: new Date() } });
+    const c = await chegou('5511987652099', 'Antigo');
+    expect(await conv.classifyConversation(db, tenant.id, c)).toBe('lead');
+    expect((await prisma.conversation.findUnique({ where: { id: c } }))?.leadId).toBe(fechado.leadId);
+
+    // A assinatura sai na primeira de quem responde, não na seguida.
+    await prisma.conversation.update({ where: { id: c }, data: { lastInboundAt: new Date() } });
+    const m1 = await conv.writeChatMessage(db, { tenantId: tenant.id, userId: ana.id }, c, 'Oi!', new Date(), { signAs: 'Ana' });
+    const m2 = await conv.writeChatMessage(db, { tenantId: tenant.id, userId: ana.id }, c, 'Tudo bem?', new Date(Date.now() + 1000), { signAs: 'Ana' });
+    if (!m1.ok || !m2.ok) throw new Error('não gravou');
+    const { decrypt } = await import('@clinicaiq/db');
+    const texto = async (id: string) => decrypt((await prisma.chatMessage.findUnique({ where: { id } }))!.textEncrypted!, key, tenant.id);
+    expect(await texto(m1.messageId)).toBe('*Ana:*\nOi!');
+    expect(await texto(m2.messageId)).toBe('Tudo bem?');
+    await team.savePrefs(tenant.id, { autoLead: true, reuseClosedLead: false, senderName: false });
   });
 });

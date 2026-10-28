@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation';
 import { currentAccess } from '@/lib/guard';
 import { getTenantModules, writeBlocked } from '@/lib/access';
 import { can, capabilityDeniedMessage, type Role } from '@/lib/permissions';
-import { effectiveCrmRole, isCrmManager, seesOnlyOwn, type CrmRole } from '@/lib/crm-roles';
+import { effectiveCrmRole, type CrmRole } from '@/lib/crm-roles';
+import { effectiveRights, type CrmRights } from '@/lib/crm-rights';
 import { nudgeTick } from './tick-nudge';
 
 /**
@@ -28,9 +29,11 @@ export interface CrmContext {
   role: Role;
   /** Cargo no CRM (Gestor, Atendente, Atendente só dos dele). */
   crmRole: CrmRole;
-  /** Configura o CRM: o Gestor. */
+  /** O que pode em cada coisa do CRM (quadro de permissões, como no Kommo). */
+  rights: CrmRights;
+  /** Configura o CRM (`rights.config`). */
   manager: boolean;
-  /** Vê só os negócios e conversas dele (e os sem responsável). */
+  /** Vê só os negócios e conversas dele, e os sem responsável (`rights.leads.view`). */
   ownOnly: boolean;
   db: TenantPrismaClient;
 }
@@ -41,8 +44,10 @@ export const CRM_NOT_CONTRACTED_PATH = '/crm-indisponivel';
 export const CRM_NO_SEAT_MESSAGE = 'Você não tem acesso ao CRM. Peça ao responsável da clínica para liberar na Equipe.';
 
 /** A chave de acesso e o cargo no CRM da pessoa. */
-async function crmUser(userId: string): Promise<{ crmSeat: boolean; crmRole: string | null } | null> {
-  return prisma.user.findUnique({ where: { id: userId }, select: { crmSeat: true, crmRole: true } }).catch(() => null);
+async function crmUser(userId: string): Promise<{ crmSeat: boolean; crmRole: string | null; crmRights: unknown } | null> {
+  return prisma.user
+    .findUnique({ where: { id: userId }, select: { crmSeat: true, crmRole: true, crmRights: true } })
+    .catch(() => null);
 }
 
 /** A pessoa tem a chave de acesso ao CRM ligada? */
@@ -50,10 +55,11 @@ export async function hasCrmSeat(userId: string): Promise<boolean> {
   return Boolean((await crmUser(userId))?.crmSeat);
 }
 
-/** O que a guarda junta ao acesso: cargo e o que ele permite. */
-function crmFlags(role: Role, stored: string | null | undefined) {
+/** O que a guarda junta ao acesso: cargo e permissões. */
+function crmFlags(role: Role, stored: string | null | undefined, custom?: unknown) {
   const crmRole = effectiveCrmRole(role, stored);
-  return { crmRole, manager: isCrmManager(crmRole), ownOnly: seesOnlyOwn(crmRole) };
+  const rights = effectiveRights(role, stored, custom);
+  return { crmRole, rights, manager: rights.config, ownOnly: rights.leads.view === 'own' };
 }
 
 /** A capacidade pedida, pelo cargo no CRM. */
@@ -71,7 +77,7 @@ export async function requireCrm(capability: CrmCapability): Promise<CrmContext>
   const modules = await getTenantModules(acesso.tenantId);
   if (!modules.crm) redirect(CRM_NOT_CONTRACTED_PATH);
   const eu = await crmUser(acesso.userId);
-  const flags = crmFlags(acesso.role, eu?.crmRole);
+  const flags = crmFlags(acesso.role, eu?.crmRole, eu?.crmRights);
   if (!allows(acesso.role, flags, capability)) redirect(`/sem-acesso?modulo=${capability}`);
   if (!modules.crmWholeTeam && !eu?.crmSeat) redirect(CRM_NOT_CONTRACTED_PATH);
 
@@ -101,7 +107,7 @@ export async function guardCrmAction(
   const modules = await getTenantModules(acesso.tenantId);
   if (!modules.crm) return { ok: false, message: CRM_NOT_CONTRACTED_MESSAGE };
   const eu = await crmUser(acesso.userId);
-  const flags = crmFlags(acesso.role, eu?.crmRole);
+  const flags = crmFlags(acesso.role, eu?.crmRole, eu?.crmRights);
   if (!allows(acesso.role, flags, capability)) return { ok: false, message: capabilityDeniedMessage(capability) };
   if (!modules.crmWholeTeam && !eu?.crmSeat) return { ok: false, message: CRM_NO_SEAT_MESSAGE };
 

@@ -79,6 +79,7 @@ export default async function FunilPage({
         pipelines={basics.pipelines}
         currentPipeline={funil}
         canConfig={canConfig}
+        canExport={ctx.rights.leads.export === 'all'}
         today={clinicToday()}
       />
       {total > BOARD_LIMIT && (
@@ -93,7 +94,7 @@ export default async function FunilPage({
         leads={leads}
         closedStages={funil.closed}
         lostReasons={basics.lostReasons}
-        canDelete={canConfig}
+        canDelete={ctx.rights.leads.delete !== 'none'}
       />
     </div>
   );

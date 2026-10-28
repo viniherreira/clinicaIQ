@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { parseFieldInput } from '@/crm/custom-fields';
 import { setLeadFields } from '@/crm/lead-fields';
 import { guardCrmAction } from '@/crm/guard';
-import { guardLead } from '@/crm/scope';
+import { deleteBlocked, guardLead } from '@/crm/scope';
 import { createLead, moveLead, OPEN_LEAD, softDeleteLead } from '@/crm/leads';
 import { countLeads, effectiveStatus, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
 import { hasPeriod } from '@/crm/period';
@@ -44,6 +44,7 @@ export type NewLeadForm = z.input<typeof newLeadSchema>;
 export async function createLeadAction(input: NewLeadForm): Promise<CreateLeadResult> {
   const g = await guardCrmAction('crm');
   if (!g.ok) return { ok: false, message: g.message };
+  if (g.rights.leads.create === 'none') return { ok: false, message: 'Seu cargo no CRM não permite criar negócios.' };
 
   const parsed = newLeadSchema.safeParse(input);
   if (!parsed.success) {
@@ -129,8 +130,10 @@ export async function moveLeadAction(input: z.input<typeof moveSchema>): Promise
 }
 
 export async function deleteLeadAction(leadId: string): Promise<ActionResult> {
-  const g = await guardCrmAction('crm_config');
+  const g = await guardCrmAction('crm');
   if (!g.ok) return g;
+  const bloqueio = await deleteBlocked(g, leadId);
+  if (bloqueio) return { ok: false, message: bloqueio };
   const r = await softDeleteLead(g.db, g, leadId);
   if (r.ok) revalidatePath('/crm');
   return r;

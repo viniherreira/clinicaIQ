@@ -23,6 +23,8 @@ import {
   type InboxTab,
 } from '@/crm/conversations';
 import { OPEN_LEAD } from '@/crm/leads';
+import { readCrmPrefs } from '@/crm/crm-prefs';
+import { prisma } from '@clinicaiq/db';
 import { assignConversation } from '@/crm/assignment';
 import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
 import { checkChatMedia } from '@/crm/media-rules';
@@ -38,6 +40,16 @@ export interface InboxSnapshot {
   list: ConversationSummary[];
   counts: Awaited<ReturnType<typeof inboxCounts>>;
   thread: ChatThread | null;
+}
+
+/** O nome que assina a mensagem, se a clínica ligou "Mostrar nome do remetente". */
+async function assinatura(g: { tenantId: string; userId: string }): Promise<string | null> {
+  const [t, eu] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: g.tenantId }, select: { settings: true } }),
+    prisma.user.findUnique({ where: { id: g.userId }, select: { name: true } }),
+  ]);
+  if (!readCrmPrefs(t?.settings).senderName) return null;
+  return eu?.name.trim().split(/\s+/)[0] || null;
 }
 
 const asTab = (t: string): InboxTab => ((INBOX_TABS as readonly string[]).includes(t) ? (t as InboxTab) : 'all');
@@ -93,7 +105,7 @@ export async function sendChatAction(conversationId: string, text: string): Prom
   const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const cloud = await activeCloudAccount(g.tenantId);
-  const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
+  const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud), signAs: await assinatura(g) });
   if (!r.ok) return r;
   // Responde já; a entrega ao WhatsApp segue depois.
   after(() => dispatchChat(g.tenantId, r.messageId));
@@ -128,6 +140,7 @@ export async function sendMediaAction(conversationId: string, form: FormData): P
   const r = await writeChatMessage(g.db, g, conversationId, caption, new Date(), {
     checkWindow: Boolean(cloud),
     media: { kind: check.kind, ref, mimeType: check.mimeType },
+    signAs: await assinatura(g),
   });
   if (!r.ok) {
     await deleteChatMedia(ref).catch(() => {});
@@ -152,7 +165,7 @@ export async function startLeadChatAction(leadId: string, text: string): Promise
   const conv = await ensureConversationForLead(g.db, g.tenantId, leadId);
   if (!conv.ok) return conv;
   const cloud = await activeCloudAccount(g.tenantId);
-  const r = await writeChatMessage(g.db, g, conv.conversationId, text, new Date(), { checkWindow: Boolean(cloud) });
+  const r = await writeChatMessage(g.db, g, conv.conversationId, text, new Date(), { checkWindow: Boolean(cloud), signAs: await assinatura(g) });
   if (!r.ok) return r;
   after(() => dispatchChat(g.tenantId, r.messageId));
   return { ok: true, conversationId: conv.conversationId };
@@ -164,6 +177,7 @@ export async function acceptConversationAction(
 ): Promise<Result<{ leadId: string }>> {
   const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
+  if (g.rights.leads.create === 'none') return { ok: false, message: 'Seu cargo no CRM não permite criar negócios.' };
   const r = await acceptConversation(g.db, g, conversationId, {
     name: typeof opts.name === 'string' ? opts.name.slice(0, 120) : undefined,
     stageId: typeof opts.stageId === 'string' ? opts.stageId : null,

@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { decrypt, encrypt, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
+import { decrypt, encrypt, prisma, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
 import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
 import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 import { conversationScope, type Viewer } from './scope-rules';
+import { needsSignature, readCrmPrefs, signText } from './crm-prefs';
 
 /**
  * As conversas do WhatsApp no CRM. O gateway grava o que entra e sai da linha
@@ -94,13 +95,26 @@ export async function classifyConversation(
   if (!conv || conv.classifiedAt) return 'skip';
 
   const phone = decryptPhone(conv.phoneEncrypted, tenantId);
-  const lead = phone
+  const hashes = phone ? leadHashesForChat(phone, tenantId) : [];
+  let lead = phone
     ? await db.lead.findFirst({
-        where: { phoneHash: { in: leadHashesForChat(phone, tenantId) }, ...OPEN_LEAD },
+        where: { phoneHash: { in: hashes }, ...OPEN_LEAD },
         orderBy: { createdAt: 'desc' },
         select: { id: true, patientId: true, assignedToId: true },
       })
     : null;
+  // "Volta para o último negócio, mesmo fechado" (Configurações › Geral): sem
+  // negócio aberto, a conversa entra no último que o contato teve.
+  if (!lead && phone) {
+    const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (readCrmPrefs(t?.settings).reuseClosedLead) {
+      lead = await db.lead.findFirst({
+        where: { phoneHash: { in: hashes }, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, patientId: true, assignedToId: true },
+      });
+    }
+  }
   const patientId = lead?.patientId ?? (phone ? await findPatientForChat(db, tenantId, phone) : null);
   const known = Boolean(lead || patientId);
 
@@ -457,6 +471,8 @@ export interface WriteOptions {
   sendAt?: Date;
   /** Arquivo já guardado (`crm/media-store.ts`); o `text` vira a legenda, que pode faltar. */
   media?: { kind: 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO'; ref: string; mimeType: string };
+  /** "Mostrar nome do remetente" (Configurações › Conversas): o nome de quem responde, quando a regra pede. */
+  signAs?: string | null;
 }
 
 export const WINDOW_CLOSED_MESSAGE = 'Passaram 24 horas desde a última mensagem da pessoa. Na API oficial, use um modelo aprovado.';
@@ -486,6 +502,16 @@ export async function writeChatMessage(
   const sendAt = opts.sendAt ?? now;
   const later = sendAt.getTime() > now.getTime();
   const msg = await db.$transaction(async (tx) => {
+    // A assinatura vai na primeira de quem responde e de novo depois que o contato (ou um colega) fala.
+    let body = text;
+    if (opts.signAs && origin === 'CRM' && actor.userId && text) {
+      const last = await tx.chatMessage.findFirst({
+        where: { conversationId },
+        orderBy: [{ at: 'desc' }, { createdAt: 'desc' }],
+        select: { direction: true, origin: true, sentById: true },
+      });
+      if (needsSignature(last, actor.userId)) body = signText(opts.signAs, text);
+    }
     const created = await tx.chatMessage.create({
       data: {
         tenantId,
@@ -493,7 +519,7 @@ export async function writeChatMessage(
         direction: 'OUTBOUND',
         origin,
         kind: opts.media?.kind ?? 'TEXT',
-        textEncrypted: text ? seal(text, tenantId) : null,
+        textEncrypted: body ? seal(body, tenantId) : null,
         ...(opts.media ? { mediaRef: opts.media.ref, mimeType: opts.media.mimeType } : {}),
         externalId: newMessageId(),
         status: 'PENDING',
@@ -513,7 +539,7 @@ export async function writeChatMessage(
         where: { id: conversationId, tenantId },
         data: {
           lastMessageAt: now,
-          lastPreviewEncrypted: seal(previewText(opts.media?.kind ?? 'TEXT', text || null), tenantId),
+          lastPreviewEncrypted: seal(previewText(opts.media?.kind ?? 'TEXT', body || null), tenantId),
           // Quem responde é a equipe: leu, respondeu e o robô sai da conversa.
           ...(origin === 'CRM'
             ? { unreadCount: 0, awaitingReply: false, botFlowId: null, botStepId: null, botStartedAt: null, botMisses: 0, botWakeAt: null }

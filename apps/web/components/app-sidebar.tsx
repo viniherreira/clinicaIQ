@@ -5,7 +5,6 @@ import { useLiveUnread } from './crm-chat/unread';
 import {
   LayoutDashboard, CalendarDays, Users, Stethoscope, FileText, Wallet,
   MessageCircle, Megaphone, Settings, PhoneCall, KanbanSquare, List, ListChecks, Smartphone, BarChart3, Zap,
-  UsersRound,
 } from 'lucide-react';
 import { CrmRail } from './crm-rail';
 import { ClinicSidebar } from './clinic-sidebar';
@@ -58,9 +57,9 @@ export const CRM_NAV: NavItem[] = [
   { href: '/crm/leads', label: 'Leads', icon: List, capability: 'crm' },
   { href: '/crm/tarefas', label: 'Tarefas', icon: ListChecks, capability: 'crm' },
   { href: '/crm/automacoes', label: 'Automações', icon: Zap, capability: 'crm' },
-  { href: '/crm/equipe', label: 'Equipe e distribuição', short: 'Equipe', icon: UsersRound, capability: 'crm_config' },
   { href: '/crm/whatsapp', label: 'WhatsApp', icon: Smartphone, capability: 'crm_config' },
-  { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm_config' },
+  // Todo mundo entra (o próprio perfil); a equipe, os funis e o resto são do gestor.
+  { href: '/crm/configuracoes', label: 'Configurações do CRM', short: 'Configurações', icon: Settings, capability: 'crm' },
 ];
 
 /**

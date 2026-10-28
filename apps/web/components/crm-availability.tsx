@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { setMyAvailabilityAction } from '@/app/(crm)/crm/equipe/actions';
+import { setMyAvailabilityAction } from '@/app/(crm)/crm/configuracoes/team-actions';
 
 /**
  * "Disponível / Ausente" no topo do CRM, como o status online do Kommo: quem

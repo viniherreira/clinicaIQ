@@ -4,13 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@clinicaiq/db';
 import { guardCrmAction } from '@/crm/guard';
-import { distributeUnassigned, saveDistribution, transferPortfolio, updateMember } from '@/crm/team';
+import { distributeUnassigned, savePrefs, saveDistribution, transferPortfolio, updateMember } from '@/crm/team';
 import { CRM_ROLES } from '@/lib/crm-roles';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
 const refresh = () => {
-  revalidatePath('/crm/equipe');
+  revalidatePath('/crm/configuracoes');
   revalidatePath('/crm', 'layout');
 };
 
@@ -24,8 +24,16 @@ export async function setMyAvailabilityAction(available: boolean): Promise<Resul
   return { ok: true };
 }
 
+const nivel = z.enum(['none', 'own', 'all']);
+const rightsSchema = z.object({
+  leads: z.object({ create: nivel, view: nivel, edit: nivel, delete: nivel, export: nivel }),
+  tasks: z.object({ edit: nivel }),
+  config: z.boolean(),
+});
+
 const memberSchema = z.object({
   crmRole: z.enum(CRM_ROLES as [string, ...string[]]).optional(),
+  rights: rightsSchema.optional(),
   receivesLeads: z.boolean().optional(),
   available: z.boolean().optional(),
 });
@@ -86,4 +94,20 @@ export async function transferPortfolioAction(fromUserId: string, to: string): P
     refresh();
   }
   return r;
+}
+
+const prefsSchema = z.object({ autoLead: z.boolean(), reuseClosedLead: z.boolean(), senderName: z.boolean() });
+
+/** Configurações › Geral e Conversas. */
+export async function savePrefsAction(input: z.input<typeof prefsSchema>): Promise<Result> {
+  const g = await guardCrmAction('crm_config');
+  if (!g.ok) return g;
+  const p = prefsSchema.safeParse(input);
+  if (!p.success) return { ok: false, message: 'Dados inválidos.' };
+  await savePrefs(g.tenantId, p.data);
+  await prisma.auditLog.create({
+    data: { tenantId: g.tenantId, userId: g.userId, action: 'CRM_PREFS_UPDATED', entity: 'Tenant', entityId: g.tenantId, metadata: p.data },
+  });
+  refresh();
+  return { ok: true };
 }
