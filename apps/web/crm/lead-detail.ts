@@ -93,7 +93,8 @@ export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date 
     assignedToId: lead.assignedToId,
     tags: lead.tags.map((t) => ({ id: t.tag.id, name: t.tag.name, color: t.tag.color })),
     fields: readFieldValues(lead.fields),
-    patient: lead.patient,
+    // Só com o CRM não há ficha, consulta nem orçamento para mostrar.
+    patient: ctx.agenda ? lead.patient : null,
     wonAt: lead.wonAt?.toISOString() ?? null,
     lostAt: lead.lostAt?.toISOString() ?? null,
     lostReason: lead.lostReason?.name ?? null,
@@ -116,9 +117,9 @@ export async function loadLeadDetail(ctx: CrmContext, leadId: string, now: Date 
       label: o.title || o.name,
       status: o.wonAt ? 'Fechou' : o.lostAt ? 'Perdeu' : o.stage.name,
     })),
-    nextAppointment: info?.nextAppointment
+    nextAppointment: ctx.agenda && info?.nextAppointment
       ? { startTime: info.nextAppointment.startTime.toISOString(), professionalName: info.nextAppointment.professionalName }
       : null,
-    openQuote: info?.openQuote ?? null,
+    openQuote: ctx.agenda ? (info?.openQuote ?? null) : null,
   };
 }

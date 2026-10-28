@@ -8,7 +8,7 @@ import { readDistribution, type DistributionSettings } from './distribution-rule
 import { OPEN_LEAD, type Actor } from './leads';
 
 /**
- * A equipe do CRM (CRM › Equipe e distribuição): quem usa, com que cargo, quem
+ * A equipe do CRM (CRM › Configurações › Equipe e permissões): quem usa, com que cargo, quem
  * recebe leads e como. O cadastro de quem entra na clínica continua em
  * Configurações › Equipe; aqui só se mexe no que é do CRM.
  */

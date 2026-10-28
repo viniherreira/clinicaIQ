@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { DEFAULT_LOST_REASONS, DEFAULT_PIPELINES } from './defaults';
+import { AGENDA_ROLES, CRM_ONLY_PIPELINES, DEFAULT_LOST_REASONS, DEFAULT_PIPELINES } from './defaults';
 
 const ETAPAS = DEFAULT_PIPELINES.reduce((n, p) => n + p.stages.length, 0);
 
@@ -42,5 +42,23 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
     expect(await db.pipelineStage.count()).toBe(ETAPAS);
     expect(await db.pipeline.count()).toBe(2);
     expect((await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))?.name).toBe('Chegou agora');
+  });
+
+  it('só com o CRM: um funil de vendas, sem os papéis da agenda', async () => {
+    const outra = await prisma.tenant.create({
+      data: { clerkOrgId: `pipe_crm_${suffix}`, name: 'Funil só CRM', slug: `pipe-crm-${suffix}` },
+    });
+    const dbCrm = getTenantClient(outra.id);
+    try {
+      await ensureDefaultPipeline(dbCrm, outra.id, false);
+      expect((await dbCrm.pipeline.findMany()).map((p) => p.name)).toEqual(['Vendas']);
+      expect(await dbCrm.pipelineStage.count()).toBe(CRM_ONLY_PIPELINES[0].stages.length);
+      expect(await dbCrm.pipelineStage.count({ where: { role: { in: [...AGENDA_ROLES] } } })).toBe(0);
+    } finally {
+      await prisma.pipelineStage.deleteMany({ where: { tenantId: outra.id } });
+      await prisma.pipeline.deleteMany({ where: { tenantId: outra.id } });
+      await prisma.lostReason.deleteMany({ where: { tenantId: outra.id } });
+      await prisma.tenant.delete({ where: { id: outra.id } });
+    }
   });
 });

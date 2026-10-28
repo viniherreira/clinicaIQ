@@ -121,7 +121,7 @@ export function SettingsView({
   // Os grupos e as seções do menu lateral, na ordem do dia a dia da clínica.
   // Equipe, Plano e Privacidade só para quem alcança (e só esses recebem os dados).
   const todas: SettingsSection[] = [
-    { id: 'clinica', group: 'Clínica', label: 'Dados da clínica', panel: <ClinicSection clinic={clinic} /> },
+    { id: 'clinica', group: 'Clínica', label: 'Dados da clínica', panel: <ClinicSection clinic={clinic} agenda={agenda} /> },
     {
       id: 'unidades',
       group: 'Clínica',
@@ -139,7 +139,7 @@ export function SettingsView({
             badge: team.filter((m) => m.active).length,
             panel: (
               <>
-                <TeamPanel team={team} invites={invites} />
+                <TeamPanel team={team} invites={invites} agenda={agenda} />
                 {unidadesAtivas.length > 1 && <UserUnitsPanel team={team} units={unidadesAtivas} />}
                 {crmSeats}
               </>
@@ -461,7 +461,7 @@ function BusinessHoursSection({ initialHours }: { initialHours: DayHours[] }) {
 
 // ─── Clinic data ─────────────────────────────────────────────────────────────
 
-function ClinicSection({ clinic }: { clinic: Clinic }) {
+function ClinicSection({ clinic, agenda }: { clinic: Clinic; agenda: boolean }) {
   const [state, formAction, pending] = useActionState<ClinicFormState | null, FormData>(
     updateClinic,
     null,
@@ -486,7 +486,7 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
       <div className="border-b border-border px-5 py-4">
         <h2 id="clinic-heading" className="text-base font-semibold">Dados da clínica</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Aparecem nos orçamentos, contratos, recibos e mensagens.
+          {agenda ? 'Aparecem nos orçamentos, contratos, recibos e mensagens.' : 'Aparecem nas mensagens e na cobrança do plano.'}
         </p>
       </div>
       <form action={formAction} className="space-y-4 p-5">
@@ -521,7 +521,9 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
             className={`${inputCls} sm:max-w-xs`}
           />
           <p id="clinic-doc-help" className="text-xs text-muted-foreground">
-            Sai no contrato e no recibo. É o que o paciente usa para deduzir a despesa no Imposto de Renda.
+            {agenda
+              ? 'Sai no contrato e no recibo. É o que o paciente usa para deduzir a despesa no Imposto de Renda.'
+              : 'Vai na nota fiscal e no boleto ou PIX do plano.'}
           </p>
           {err('document') && <p className="text-xs text-destructive">{err('document')}</p>}
         </div>
@@ -531,7 +533,7 @@ function ClinicSection({ clinic }: { clinic: Clinic }) {
         <fieldset className="space-y-4 rounded-lg border border-border p-4">
           <legend className="px-1 text-sm font-medium">Endereço</legend>
           <p className="text-xs text-muted-foreground">
-            Sai impresso no orçamento que o paciente recebe.
+            {agenda ? 'Sai impresso no orçamento que o paciente recebe.' : 'Vai na nota fiscal do plano.'}
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">

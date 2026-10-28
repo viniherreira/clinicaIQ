@@ -50,6 +50,9 @@ async function saveAccount(
  */
 async function afterConnect(tenantId: string): Promise<void> {
   try {
+    // Só com o CRM não há consulta para avisar: nada de modelo da agenda na Meta.
+    const sub = await prisma.subscription.findUnique({ where: { tenantId }, select: { clinicEnabled: true, complimentary: true } });
+    if (sub && !sub.clinicEnabled && !sub.complimentary) return;
     await ensureAgendaTemplates(tenantId);
   } catch (e) {
     console.error('[whatsapp] modelos da agenda não foram enviados', e instanceof Error ? e.message : e);

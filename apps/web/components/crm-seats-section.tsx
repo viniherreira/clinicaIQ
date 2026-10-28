@@ -34,7 +34,7 @@ export async function CrmSeatsSection() {
         <h2 id="crm-acesso" className="font-semibold">Acesso ao CRM</h2>
         <p className="mt-1 text-muted-foreground">
           Incluído na cortesia: toda a equipe entra no CRM. O cargo de cada um e a distribuição de leads ficam em{' '}
-          <Link href="/crm/equipe" className="text-primary hover:underline">CRM › Equipe e distribuição</Link>.
+          <Link href="/crm/configuracoes#equipe" className="text-primary hover:underline">CRM › Configurações › Equipe e permissões</Link>.
         </p>
       </section>
     );
@@ -57,7 +57,7 @@ export async function CrmSeatsSection() {
       <h2 id="crm-acesso" className="text-sm font-semibold">Acesso ao CRM</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
         Quem tem a chave ligada entra no CRM{a.status === 'paid' ? ' e conta na mensalidade' : ''}. Cargos e distribuição de leads ficam em{' '}
-        <Link href="/crm/equipe" className="text-primary hover:underline">CRM › Equipe e distribuição</Link>.
+        <Link href="/crm/configuracoes#equipe" className="text-primary hover:underline">CRM › Configurações › Equipe e permissões</Link>.
       </p>
       <ul className="mt-3 divide-y divide-border">
         {pessoas.map((p) => (

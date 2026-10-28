@@ -43,11 +43,15 @@ export function WhatsAppChannel({
   account,
   templates,
   signup,
+  agenda = true,
 }: {
   account: Account | null;
   templates: Template[];
   signup: MetaSignupConfig | null;
+  /** A clínica tem a agenda (e os avisos de consulta saem pelo mesmo número). */
+  agenda?: boolean;
 }) {
+  const saem = agenda ? 'as conversas do CRM, o robô e os avisos da agenda' : 'as conversas do CRM, o robô e as transmissões';
   const router = useRouter();
   const [pending, start] = useTransition();
   const [aviso, setAviso] = useState('');
@@ -99,7 +103,7 @@ export function WhatsAppChannel({
                 type="button"
                 disabled={pending}
                 onClick={() => {
-                  if (window.confirm('Desconectar a API oficial? Conversas, robô e avisos da agenda param de sair até conectar de novo.')) {
+                  if (window.confirm(`Desconectar a API oficial? ${saem[0].toUpperCase()}${saem.slice(1)} param de sair até conectar de novo.`)) {
                     agir(disconnectCloudAction, 'API oficial desconectada.');
                   }
                 }}
@@ -111,8 +115,7 @@ export function WhatsAppChannel({
           </div>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
-            Nenhum número conectado. Conecte o WhatsApp da clínica pela API oficial aqui embaixo: as conversas do CRM, o robô e os
-            avisos da agenda passam a sair por ele.
+            Nenhum número conectado. Conecte o WhatsApp da clínica pela API oficial aqui embaixo: {saem} passam a sair por ele.
           </p>
         )}
       </section>

@@ -185,6 +185,8 @@ export function NewLeadModal({
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Sem procedimento cadastrado (clínica só com o CRM), não há o que escolher. */}
+                {procedures.length > 0 && (
                 <div className="space-y-1.5">
                   <span id="novo-lead-interest-label" className={labelCls}>Interesse</span>
                   <Select value={form.interestProcedureId} onValueChange={set('interestProcedureId')}>
@@ -201,6 +203,7 @@ export function NewLeadModal({
                     </SelectContent>
                   </Select>
                 </div>
+                )}
                 <div className="space-y-1.5">
                   <label htmlFor="novo-lead-value" className={labelCls}>Valor estimado (R$)</label>
                   <input id="novo-lead-value" inputMode="decimal" placeholder="0" value={form.estimatedValue} onChange={(e) => set('estimatedValue')(e.target.value.replace(/[^\d.,]/g, ''))} className={inputCls} {...campo('estimatedValue')} />

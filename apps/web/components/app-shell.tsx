@@ -7,7 +7,7 @@ import { SubscriptionBanner } from '@/components/subscription-banner';
 import type { Space } from '@/components/module-switcher';
 import { getTenantAccess, getTenantModules } from '@/lib/access';
 import { can } from '@/lib/permissions';
-import { effectiveCrmRole, isCrmManager, seesOnlyOwn } from '@/lib/crm-roles';
+import { effectiveRights } from '@/lib/crm-rights';
 import { conversationScope } from '@/crm/scope-rules';
 import { getUnitContext } from '@/lib/units';
 
@@ -53,7 +53,7 @@ export async function AppShell({
   // Clerk: assim o nome no topo e o que a pessoa consegue fazer nunca divergem.
   const me = await prisma.user.findFirst({
     where: { clerkUserId: userId, tenantId: tenant.id, active: true },
-    select: { id: true, name: true, email: true, role: true, crmSeat: true, crmRole: true, crmAvailable: true },
+    select: { id: true, name: true, email: true, role: true, crmSeat: true, crmRole: true, crmRights: true, crmAvailable: true },
   });
 
   const [access, modules] = await Promise.all([
@@ -68,8 +68,9 @@ export async function AppShell({
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
-  const crmRole = effectiveCrmRole(role, me?.crmRole);
-  const crmManager = isCrmManager(crmRole);
+  // O quadro de permissões manda (o cargo é só o ponto de partida dele).
+  const rights = effectiveRights(role, me?.crmRole, me?.crmRights);
+  const crmManager = rights.config;
 
   // Conversas não lidas, no menu do CRM.
   const unread =
@@ -81,7 +82,7 @@ export async function AppShell({
               status: { not: 'DECLINED' },
               unreadCount: { gt: 0 },
               // Atendente "só os dele" conta as suas e as sem responsável.
-              ...(me && seesOnlyOwn(crmRole) ? conversationScope({ userId: me.id, ownOnly: true }) : {}),
+              ...(me && rights.leads.view === 'own' ? conversationScope({ userId: me.id, ownOnly: true }) : {}),
             },
           })
           .catch(() => 0)

@@ -103,10 +103,15 @@ export async function classifyConversation(
         select: { id: true, patientId: true, assignedToId: true },
       })
     : null;
+  const t = phone
+    ? await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { settings: true, subscription: { select: { clinicEnabled: true, complimentary: true } } },
+      })
+    : null;
   // "Volta para o último negócio, mesmo fechado" (Configurações › Geral): sem
   // negócio aberto, a conversa entra no último que o contato teve.
   if (!lead && phone) {
-    const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
     if (readCrmPrefs(t?.settings).reuseClosedLead) {
       lead = await db.lead.findFirst({
         where: { phoneHash: { in: hashes }, deletedAt: null },
@@ -115,7 +120,11 @@ export async function classifyConversation(
       });
     }
   }
-  const patientId = lead?.patientId ?? (phone ? await findPatientForChat(db, tenantId, phone) : null);
+  // Só com o CRM não há ficha de paciente para abrir: o contato entra no funil
+  // como qualquer outro, mesmo que um dia tenha sido paciente da clínica.
+  const sub = t?.subscription;
+  const agenda = !sub || sub.clinicEnabled || sub.complimentary;
+  const patientId = lead?.patientId ?? (phone && agenda ? await findPatientForChat(db, tenantId, phone) : null);
   const known = Boolean(lead || patientId);
 
   // updateMany com `classifiedAt: null`: o aviso do gateway e a tela podem chegar juntos.
@@ -186,13 +195,14 @@ const summaryInclude = {
 
 type SummaryRow = Prisma.ConversationGetPayload<{ include: typeof summaryInclude }>;
 
-function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
+/** `agenda: false` (clínica só com o CRM): sem ficha de paciente para mostrar. */
+function toSummary(r: SummaryRow, tenantId: string, agenda = true): ConversationSummary {
   const phone = decryptPhone(r.phoneEncrypted, tenantId);
   const masked = maskPhone(phone);
   const lead = r.lead && !r.lead.deletedAt ? r.lead : null;
   return {
     id: r.id,
-    name: r.patient?.name ?? lead?.name ?? r.contactName ?? masked,
+    name: (agenda ? r.patient?.name : null) ?? lead?.name ?? r.contactName ?? masked,
     contactName: r.contactName,
     phoneMasked: masked,
     preview: open(r.lastPreviewEncrypted, tenantId),
@@ -211,7 +221,7 @@ function toSummary(r: SummaryRow, tenantId: string): ConversationSummary {
           open: !lead.wonAt && !lead.lostAt,
         }
       : null,
-    patient: r.patient,
+    patient: agenda ? r.patient : null,
     tags: (lead?.tags ?? []).map((t) => t.tag).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
     assignedTo: r.assignedTo,
   };
@@ -253,7 +263,7 @@ export function conversationWhere(
 
 export async function listConversations(
   db: TenantPrismaClient,
-  ctx: { tenantId: string } & Viewer,
+  ctx: { tenantId: string; agenda?: boolean } & Viewer,
   tab: InboxTab,
   q = '',
   take = 60,
@@ -265,7 +275,7 @@ export async function listConversations(
     orderBy: { lastMessageAt: 'desc' },
     take,
   });
-  const lista = rows.map((r) => toSummary(r, ctx.tenantId));
+  const lista = rows.map((r) => toSummary(r, ctx.tenantId, ctx.agenda));
   if (lista.length === 0) return lista;
   // Quem mandou a última de cada conversa ("Ana: Tenho às 15h", "Robô: Olá!"), como no Kommo.
   const ultimas = await db.$queryRaw<{ conversationId: string; direction: string; origin: string; name: string | null }[]>`
@@ -351,6 +361,8 @@ export async function loadThread(
   conversationId: string,
   /** Quem olha: o Atendente "só os dele" não abre conversa de outra pessoa. */
   viewer?: Viewer,
+  /** A clínica tem a agenda (só com o CRM, a conversa não mostra ficha de paciente). */
+  agenda = true,
 ): Promise<ChatThread | null> {
   const escopo = viewer ? conversationScope(viewer) : null;
   const conv = await db.conversation.findFirst({ where: { id: conversationId, ...(escopo ? { AND: [escopo] } : {}) }, include: summaryInclude });
@@ -387,7 +399,7 @@ export async function loadThread(
     conv.botFlowId ? db.chatbotFlow.findFirst({ where: { id: conv.botFlowId }, select: { id: true, name: true } }) : null,
   ]);
   return {
-    conversation: toSummary(conv, tenantId),
+    conversation: toSummary(conv, tenantId, agenda),
     messages,
     truncated,
     channel: cloud ? 'cloud' : 'gateway',

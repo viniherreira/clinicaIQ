@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { requireCrm } from '@/crm/guard';
 import { decryptPhone } from '@/crm/phone';
@@ -23,6 +23,8 @@ export default async function ConverterPage({
 }) {
   const ctx = await requireCrm('crm');
   const { id } = await params;
+  // Só com o CRM não há cadastro de paciente: o negócio fica no funil.
+  if (!ctx.agenda) redirect(`/crm/leads/${id}`);
   const intent: ConvertIntent = (await searchParams).depois === 'agendar' ? 'agendar' : 'ficha';
 
   const lead = await ctx.db.lead.findFirst({

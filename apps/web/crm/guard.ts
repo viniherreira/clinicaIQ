@@ -35,6 +35,8 @@ export interface CrmContext {
   manager: boolean;
   /** Vê só os negócios e conversas dele, e os sem responsável (`rights.leads.view`). */
   ownOnly: boolean;
+  /** A clínica tem a agenda. Só com o CRM não há paciente, consulta nem orçamento. */
+  agenda: boolean;
   db: TenantPrismaClient;
 }
 
@@ -82,7 +84,7 @@ export async function requireCrm(capability: CrmCapability): Promise<CrmContext>
   if (!modules.crmWholeTeam && !eu?.crmSeat) redirect(CRM_NOT_CONTRACTED_PATH);
 
   nudgeTick();
-  return { ...acesso, ...flags, db: getTenantClient(acesso.tenantId) };
+  return { ...acesso, ...flags, agenda: modules.clinic, db: getTenantClient(acesso.tenantId) };
 }
 
 export type CrmActionGuard =
@@ -117,5 +119,5 @@ export async function guardCrmAction(
     if (bloqueio) return { ok: false, message: bloqueio };
   }
 
-  return { ok: true, ...acesso, ...flags, db: getTenantClient(acesso.tenantId) };
+  return { ok: true, ...acesso, ...flags, agenda: modules.clinic, db: getTenantClient(acesso.tenantId) };
 }

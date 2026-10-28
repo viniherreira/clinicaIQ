@@ -30,12 +30,12 @@ export default async function CrmIndisponivelPage() {
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             O CRM está ligado na clínica, mas o acesso é liberado por pessoa.
             {can(acesso.role, 'equipe')
-              ? ' Como você cuida da equipe, pode liberar o seu em Configurações → Equipe.'
-              : ' Peça ao responsável da clínica para liberar o seu em Configurações → Equipe.'}
+              ? ' Como você cuida da equipe, pode liberar o seu em Configurações → Usuários e acessos.'
+              : ' Peça ao responsável da clínica para liberar o seu em Configurações → Usuários e acessos.'}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             {can(acesso.role, 'equipe') && (
-              <Link href="/configuracoes#equipe" className="btn-primary btn-md inline-flex">Abrir a Equipe</Link>
+              <Link href="/configuracoes#equipe" className="btn-primary btn-md inline-flex">Abrir Usuários e acessos</Link>
             )}
             <Link href={inicio} className="btn-outline btn-md inline-flex">Voltar para o início</Link>
           </div>
@@ -58,7 +58,7 @@ export default async function CrmIndisponivelPage() {
         {podeContratar && (
           <CrmTurnOnButton label={addon?.trialAvailable ? 'Experimentar 14 dias grátis' : 'Ativar o CRM'} />
         )}
-        <Link href="/dashboard" className="btn-outline btn-md inline-flex">Voltar para o início</Link>
+        <Link href={inicio} className="btn-outline btn-md inline-flex">Voltar para o início</Link>
       </div>
     </Cartao>
   );

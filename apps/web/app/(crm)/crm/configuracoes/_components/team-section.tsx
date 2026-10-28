@@ -447,8 +447,8 @@ function RolesLegend() {
         ))}
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">
-        Mudou alguma permissão do quadro, o cargo vira &quot;Personalizado&quot;. O proprietário é sempre Gestor. O cargo vale só no CRM; na
-        agenda continua valendo o perfil da clínica.
+        Mudou alguma permissão do quadro, o cargo vira &quot;Personalizado&quot;. O proprietário é sempre Gestor. O cargo vale só no CRM; fora
+        dele continua valendo o perfil da clínica.
       </p>
     </section>
   );

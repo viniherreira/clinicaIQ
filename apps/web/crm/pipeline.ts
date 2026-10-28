@@ -1,5 +1,5 @@
 import type { StageRole, TenantPrismaClient } from '@clinicaiq/db';
-import { AGENDA_ROLES, AGENDA_ROLE_LABEL, DEFAULT_LOST_REASONS, DEFAULT_PIPELINES, type AgendaRole } from './defaults';
+import { AGENDA_ROLES, AGENDA_ROLE_LABEL, CRM_ONLY_PIPELINES, DEFAULT_LOST_REASONS, DEFAULT_PIPELINES, type AgendaRole } from './defaults';
 
 /** O mínimo de uma etapa que as regras precisam. */
 export interface StageLike {
@@ -109,14 +109,14 @@ export function mainPipeline<T extends { order: number; createdAt: Date }>(pipel
 }
 
 /**
- * Cria os funis padrão (Captação e Agendados) e os motivos de perda da
- * clínica, se faltarem.
+ * Cria os funis padrão (Captação e Agendados; só com o CRM, Vendas) e os
+ * motivos de perda da clínica, se faltarem.
  *
  * Idempotente: pode rodar a cada abertura do CRM. Duas abas abrindo o CRM pela
  * primeira vez ao mesmo tempo não duplicam nada — o lock de transação por
  * clínica faz a segunda esperar a primeira e encontrar tudo pronto.
  */
-export async function ensureDefaultPipeline(db: TenantPrismaClient, tenantId: string): Promise<void> {
+export async function ensureDefaultPipeline(db: TenantPrismaClient, tenantId: string, agenda = true): Promise<void> {
   const [pipelines, reasons] = await Promise.all([db.pipeline.count(), db.lostReason.count()]);
   if (pipelines > 0 && reasons > 0) return;
 
@@ -124,7 +124,7 @@ export async function ensureDefaultPipeline(db: TenantPrismaClient, tenantId: st
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`crm-pipeline:${tenantId}`}))`;
 
     if ((await tx.pipeline.count({ where: { tenantId } })) === 0) {
-      for (const p of DEFAULT_PIPELINES) {
+      for (const p of agenda ? DEFAULT_PIPELINES : CRM_ONLY_PIPELINES) {
         const funil = await tx.pipeline.create({ data: { tenantId, name: p.name, order: p.order } });
         await tx.pipelineStage.createMany({
           data: p.stages.map((s) => ({

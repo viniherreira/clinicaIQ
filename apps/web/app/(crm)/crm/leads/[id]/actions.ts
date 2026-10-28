@@ -154,6 +154,8 @@ export async function revealPhoneAction(leadId: string): Promise<Result<{ phone:
 
 export type ConvertIntent = 'ficha' | 'agendar';
 
+const SEM_AGENDA = 'Só com o CRM não há ficha de paciente. O negócio continua no funil.';
+
 const destinoDepois = (leadId: string, patientId: string, intent: ConvertIntent) =>
   intent === 'agendar' ? `/agenda?novo=1&paciente=${patientId}` : `/crm/leads/${leadId}`;
 
@@ -163,6 +165,7 @@ export async function findPatientMatchAction(
 ): Promise<Result<{ match: { id: string; name: string; controlNumber: number } | null }>> {
   const g = await guardLead('crm', leadId, { write: false });
   if (!g.ok) return g;
+  if (!g.agenda) return { ok: false, message: SEM_AGENDA };
   const lead = await g.db.lead.findFirst({ where: { id: leadId, deletedAt: null }, select: { phoneEncrypted: true } });
   if (!lead) return { ok: false, message: 'Lead não encontrado.' };
   const match = await findPatientByPhone(g.db, g.tenantId, decryptPhone(lead.phoneEncrypted, g.tenantId));
@@ -177,6 +180,7 @@ export async function linkExistingPatientAction(
 ): Promise<Result<{ href: string }>> {
   const g = await guardLead('crm', leadId);
   if (!g.ok) return g;
+  if (!g.agenda) return { ok: false, message: SEM_AGENDA };
   const r = await linkPatient(g.db, g, leadId, patientId, 'linked');
   if (!r.ok) return r;
   refresh(leadId);

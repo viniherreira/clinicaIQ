@@ -99,6 +99,27 @@ describe.skipIf(!process.env.DATABASE_URL)('conversas (banco)', async () => {
     expect(item).toMatchObject({ name: 'Carlos Lima', phoneMasked: '(11) •••••-1002', preview: 'Oi!', unread: 1 });
   });
 
+  it('só com o CRM, quem é paciente entra como contato novo e a lista não mostra a ficha', async () => {
+    await prisma.patient.create({
+      data: { tenantId: tenant.id, controlNumber: 90, name: 'Dora Paciente', phoneEncrypted: encrypt('11 98765-1090', key, tenant.id) },
+    });
+    const sub = await prisma.subscription.create({
+      data: { tenantId: tenant.id, tier: 'ESSENCIAL', currentPeriodEnd: new Date(Date.now() + 864e5), clinicEnabled: false, crmEnabled: true },
+    });
+    try {
+      const id = await chegou('5511987651090', 'Dora');
+      expect(await c.classifyConversation(db, tenant.id, id)).toBe('inbox');
+      expect(await get(id)).toMatchObject({ patientId: null });
+
+      const comFicha = (await c.listConversations(db, actor, 'all')).find((x) => x.patient)!;
+      const semAgenda = (await c.listConversations(db, { ...actor, agenda: false }, 'all')).find((x) => x.id === comFicha.id)!;
+      expect(semAgenda.patient).toBeNull();
+      expect(semAgenda.name).not.toBe(comFicha.patient!.name);
+    } finally {
+      await prisma.subscription.delete({ where: { id: sub.id } });
+    }
+  });
+
   it('aceitar a Entrada cria o lead em Novo, com origem WhatsApp e o nome de lá', async () => {
     const id = await chegou('5511987651004', 'Daniela Reis');
     await c.classifyConversation(db, tenant.id, id);

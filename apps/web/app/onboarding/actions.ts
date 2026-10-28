@@ -258,7 +258,11 @@ export async function completeOnboarding(
   // clínica nova. Vem antes de validar o formulário porque o convidado nunca
   // preencheu nome de clínica nenhum.
   const jaTem = await joinFromInviteIfAny();
-  if (jaTem) return { success: true, tenantId: jaTem, home: '/dashboard' };
+  if (jaTem) {
+    // Clínica só com o CRM não tem início na agenda.
+    const sub = await prisma.subscription.findUnique({ where: { tenantId: jaTem }, select: { clinicEnabled: true, complimentary: true } });
+    return { success: true, tenantId: jaTem, home: sub && !sub.clinicEnabled && !sub.complimentary ? '/crm' : '/dashboard' };
+  }
 
   const raw = {
     name: formData.get('name'),
