@@ -71,7 +71,7 @@ export async function refreshInboxAction(input: {
   const [list, counts, thread] = await Promise.all([
     listConversations(g.db, g, asTab(input.tab), input.q, 60, input.tagId || null),
     inboxCounts(g.db, g),
-    input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId, g) : Promise.resolve(null),
+    input.selectedId ? loadThread(g.db, g.tenantId, input.selectedId, g, g.agenda) : Promise.resolve(null),
   ]);
   if (thread && thread.conversation.unread > 0) {
     await markRead(g.db, thread.conversation.id);
@@ -93,7 +93,7 @@ export async function leadDetailAction(leadId: string): Promise<Result<{ lead: L
 export async function loadThreadAction(conversationId: string): Promise<Result<{ thread: ChatThread | null }>> {
   const g = await guardConversation('crm', conversationId, { write: false });
   if (!g.ok) return g;
-  const thread = await loadThread(g.db, g.tenantId, conversationId);
+  const thread = await loadThread(g.db, g.tenantId, conversationId, undefined, g.agenda);
   if (thread && thread.conversation.unread > 0) {
     await markRead(g.db, conversationId);
     thread.conversation.unread = 0;
@@ -225,6 +225,7 @@ export async function linkConversationAction(
 ): Promise<Result> {
   const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
+  if ('patientId' in target && !g.agenda) return { ok: false, message: 'Só com o CRM não há ficha de paciente para ligar.' };
   const r = await linkConversation(g.db, conversationId, target);
   if (r.ok) revalidatePath('/crm');
   return r;
@@ -250,12 +251,15 @@ export async function searchLinkTargetsAction(q: string): Promise<Result<{ targe
       orderBy: { updatedAt: 'desc' },
       take: 6,
     }),
-    g.db.patient.findMany({
-      where: { deletedAt: null, name: { contains: term, mode: 'insensitive' } },
-      select: { id: true, name: true, controlNumber: true },
-      orderBy: { name: 'asc' },
-      take: 6,
-    }),
+    // Só com o CRM não há ficha de paciente para ligar.
+    g.agenda
+      ? g.db.patient.findMany({
+          where: { deletedAt: null, name: { contains: term, mode: 'insensitive' } },
+          select: { id: true, name: true, controlNumber: true },
+          orderBy: { name: 'asc' },
+          take: 6,
+        })
+      : [],
   ]);
   return {
     ok: true,

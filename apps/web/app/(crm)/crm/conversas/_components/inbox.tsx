@@ -32,7 +32,7 @@ export function Inbox({
   initialSelectedId,
   quickReplies,
   lineDown,
-  canConfigWhatsapp,
+  whatsappHref,
   canManage,
   basics,
   meId,
@@ -46,7 +46,8 @@ export function Inbox({
   initialSelectedId: string | null;
   quickReplies: QuickReplyOption[];
   lineDown: boolean;
-  canConfigWhatsapp: boolean;
+  /** Onde conectar o WhatsApp (null = a pessoa não pode). */
+  whatsappHref: string | null;
   canManage: boolean;
   basics: LeadSideBasics;
 }) {
@@ -132,8 +133,8 @@ export function Inbox({
         <div role="status" className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
           <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>O WhatsApp da clínica não está conectado. As respostas ficam na fila e saem quando ele voltar.</span>
-          {canConfigWhatsapp && (
-            <Link href="/whatsapp" className="font-medium underline underline-offset-2">
+          {whatsappHref && (
+            <Link href={whatsappHref} className="font-medium underline underline-offset-2">
               Conectar
             </Link>
           )}

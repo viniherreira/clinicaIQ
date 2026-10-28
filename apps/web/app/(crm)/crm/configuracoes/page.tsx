@@ -70,7 +70,7 @@ export default async function CrmConfiguracoesPage({
     );
   }
 
-  await ensureDefaultPipeline(ctx.db, ctx.tenantId);
+  await ensureDefaultPipeline(ctx.db, ctx.tenantId, ctx.agenda);
   const [modules, pipelines, porEtapa, tags, reasons, quickReplies, fields, team, addon, tenant] = await Promise.all([
     getTenantModules(ctx.tenantId),
     ctx.db.pipeline.findMany({

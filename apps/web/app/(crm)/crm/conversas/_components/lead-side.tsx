@@ -72,6 +72,7 @@ function LeadSide({
       procedures={basics.procedures}
       lostReasons={basics.lostReasons}
       fields={basics.fields}
+      agenda={basics.agenda !== false}
       onSaved={() => {
         void carregar();
         onChanged();

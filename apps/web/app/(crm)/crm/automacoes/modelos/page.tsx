@@ -1,4 +1,5 @@
 import { requireCrm } from '@/crm/guard';
+import { getTenantModules } from '@/lib/access';
 import { activeCloudAccount } from '@/crm/cloud';
 import { listTemplateRows } from '@/lib/whatsapp-templates';
 import { WhatsAppTemplates } from '@/components/whatsapp-templates';
@@ -14,7 +15,11 @@ export const metadata = { title: 'Modelos · DreamClin' };
  */
 export default async function ModelosPage() {
   const ctx = await requireCrm('crm_config');
-  const [cloud, templates] = await Promise.all([activeCloudAccount(ctx.tenantId), listTemplateRows(ctx.tenantId)]);
+  const [cloud, templates, modules] = await Promise.all([
+    activeCloudAccount(ctx.tenantId),
+    listTemplateRows(ctx.tenantId),
+    getTenantModules(ctx.tenantId),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -23,6 +28,7 @@ export default async function ModelosPage() {
         connected={Boolean(cloud)}
         connectHref="/crm/whatsapp"
         agendaHref="/configuracoes#comunicacao"
+        agenda={modules.clinic}
         onSync={syncTemplatesAction}
         onCreate={createTemplateAction}
       />

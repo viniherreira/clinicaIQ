@@ -41,7 +41,13 @@ const PAPEIS: { value: Role; label: string; descricao: string }[] = [
 
 const LABEL: Record<string, string> = Object.fromEntries(PAPEIS.map((p) => [p.value, p.label]));
 
-const OPCOES_PAPEL = PAPEIS.map((p) => ({ value: p.value, label: p.label, hint: p.descricao }));
+/** Na clínica só com o CRM não há agenda nem cobrança de paciente: quem atende, atende no CRM. */
+const SO_CRM: Partial<Record<Role, string>> = {
+  RECEPTIONIST: 'Atende as conversas e move os negócios no CRM. Não mexe em equipe, plano nem privacidade.',
+  PROFESSIONAL: 'Atende as conversas e move os negócios no CRM. Não mexe em equipe, plano nem privacidade.',
+};
+
+const papeisDe = (agenda: boolean) => PAPEIS.map((p) => ({ ...p, descricao: (!agenda && SO_CRM[p.value]) || p.descricao }));
 
 type Filtro = 'ativos' | 'pendentes' | 'removidos';
 
@@ -77,7 +83,9 @@ function Etiqueta({ tom, children }: { tom: 'ativo' | 'pendente' | 'removido'; c
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
-export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: PendingInvite[] }) {
+export function TeamPanel({ team, invites, agenda = true }: { team: TeamMember[]; invites: PendingInvite[]; agenda?: boolean }) {
+  const papeis = papeisDe(agenda);
+  const opcoesPapel = papeis.map((p) => ({ value: p.value, label: p.label, hint: p.descricao }));
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -246,7 +254,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
                     id={`papel-${m.id}`}
                     ariaLabel={`Perfil de ${m.name}`}
                     value={m.role}
-                    options={OPCOES_PAPEL}
+                    options={opcoesPapel}
                     disabled={m.isSelf || pending}
                     onChange={(v) => trocarPapel(m.id, v)}
                     className="w-[10.5rem]"
@@ -348,7 +356,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
             O que cada perfil alcança
           </h3>
           <dl className="mt-3 grid gap-2.5 sm:grid-cols-2">
-            {PAPEIS.map((p) => (
+            {papeis.map((p) => (
               <div key={p.value} className="rounded-lg border border-border bg-background p-3">
                 <dt className="text-sm font-medium">{LABEL[p.value]}</dt>
                 <dd className="mt-0.5 text-xs leading-snug text-muted-foreground">{p.descricao}</dd>
@@ -398,7 +406,7 @@ export function TeamPanel({ team, invites }: { team: TeamMember[]; invites: Pend
               id="convite-papel"
               ariaLabel="Perfil de quem está sendo convidado"
               value={papelConvite}
-              options={OPCOES_PAPEL}
+              options={opcoesPapel}
               onChange={setPapelConvite}
               disabled={pending}
               className="w-[10.5rem]"

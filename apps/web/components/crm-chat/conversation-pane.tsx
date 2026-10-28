@@ -502,7 +502,7 @@ function LinkPicker({ onPick }: { onPick: (t: LinkTarget) => void }) {
   return (
     <div className="mt-2 rounded-lg border border-border bg-surface p-2">
       <label htmlFor={`${id}-q`} className="sr-only">
-        Buscar lead ou paciente
+        Buscar contato
       </label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

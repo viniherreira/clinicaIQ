@@ -17,7 +17,7 @@ export { pipelineOfStage, stageOptions } from './pipeline-options';
  * desta clínica, é o principal.
  */
 export async function loadCrmBasics(ctx: CrmContext, opts: { pipelineId?: string | null } = {}) {
-  await ensureDefaultPipeline(ctx.db, ctx.tenantId);
+  await ensureDefaultPipeline(ctx.db, ctx.tenantId, ctx.agenda);
 
   const [pipelines, stages, tags, reasons, team, procedures, fields, membros] = await Promise.all([
     ctx.db.pipeline.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),

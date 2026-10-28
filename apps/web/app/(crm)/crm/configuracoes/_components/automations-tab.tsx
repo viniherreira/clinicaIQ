@@ -90,7 +90,7 @@ export function AutomationsTab({
   return (
     <section aria-label="Automações por etapa">
       <p className="text-xs text-muted-foreground">
-        Quando um lead entra numa etapa (arrastado, criado ou movido pela agenda), o CRM faz isto sozinho. Se o lead sair da etapa antes da
+        Quando um lead entra numa etapa (arrastado, criado ou movido sozinho), o CRM faz isto sozinho. Se o lead sair da etapa antes da
         hora, a ação com atraso não acontece. Mensagens não vão para quem respondeu SAIR.
       </p>
       <ul className="mt-4 space-y-3">

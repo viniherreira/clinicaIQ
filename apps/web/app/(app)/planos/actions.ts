@@ -51,11 +51,15 @@ async function applyProduct(tenantId: string, userId: string, product: Product) 
   if (!sub) return;
   if (sub.clinicEnabled === m.clinicEnabled && sub.crmEnabled === m.crmEnabled) return;
   const role = await currentRole(tenantId);
-  const semNinguem =
-    m.crmEnabled && (await prisma.user.count({ where: { tenantId, active: true, crmSeat: true } })) === 0;
+  const [comAcesso, eu] = await Promise.all([
+    prisma.user.count({ where: { tenantId, active: true, crmSeat: true } }),
+    prisma.user.findFirst({ where: { id: userId, tenantId }, select: { crmSeat: true } }),
+  ]);
+  // Só com o CRM, quem trocou precisa entrar nele: fora do CRM sobram só as Configurações.
+  const darAcesso = m.crmEnabled && !eu?.crmSeat && (comAcesso === 0 || !m.clinicEnabled);
   await prisma.$transaction([
     prisma.subscription.update({ where: { id: sub.id }, data: m }),
-    ...(semNinguem && (CRM_ELIGIBLE_ROLES as readonly string[]).includes(role)
+    ...(darAcesso && (CRM_ELIGIBLE_ROLES as readonly string[]).includes(role)
       ? [prisma.user.updateMany({ where: { id: userId, tenantId }, data: { crmSeat: true } })]
       : []),
     prisma.auditLog.create({

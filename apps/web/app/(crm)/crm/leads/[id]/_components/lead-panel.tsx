@@ -29,6 +29,7 @@ export function LeadPanel({
   fields = [],
   actions,
   onSaved,
+  agenda = true,
 }: {
   lead: LeadDetail;
   /** Campos personalizados ativos da clínica, na ordem. */
@@ -39,6 +40,8 @@ export function LeadPanel({
   team: BoardPerson[];
   procedures: { id: string; name: string }[];
   lostReasons: LostReasonOption[];
+  /** A clínica tem a agenda. Só com o CRM, não há campo de paciente. */
+  agenda?: boolean;
   /** Botões de conversão/agendamento, montados pela página. */
   actions?: React.ReactNode;
   /** Algo foi salvo: quem mostra o painel fora da ficha (Conversas) busca de novo. */
@@ -216,14 +219,17 @@ export function LeadPanel({
             </Link>
           </Field>
         )}
-        <Field label="Interesse">
-          <InlineSelect
-            label="Interesse"
-            value={lead.interestProcedureId ?? ''}
-            options={[{ value: '', label: 'Não definido' }, ...procedures.map((p) => ({ value: p.id, label: p.name }))]}
-            onSave={(v) => salvar({ interestProcedureId: v || null }, 'Interesse salvo.')}
-          />
-        </Field>
+        {/* Os procedimentos são cadastrados na Agenda; só com o CRM, sem nenhum, o campo some (dá para criar um campo próprio em Campos). */}
+        {(agenda || procedures.length > 0) && (
+          <Field label="Interesse">
+            <InlineSelect
+              label="Interesse"
+              value={lead.interestProcedureId ?? ''}
+              options={[{ value: '', label: 'Não definido' }, ...procedures.map((p) => ({ value: p.id, label: p.name }))]}
+              onSave={(v) => salvar({ interestProcedureId: v || null }, 'Interesse salvo.')}
+            />
+          </Field>
+        )}
         <Field label="Telefone">
           <PhoneField leadId={lead.id} masked={lead.phoneMasked} />
         </Field>
@@ -243,6 +249,7 @@ export function LeadPanel({
             <CustomFieldEditor def={d} value={lead.fields[d.id]} onSave={(v) => salvarCampo(d, v)} />
           </Field>
         ))}
+        {agenda && (
         <Field label="Paciente">
           {lead.patient ? (
             <Link href={`/pacientes/${lead.patient.id}`} className="text-primary underline-offset-2 hover:underline">
@@ -252,6 +259,7 @@ export function LeadPanel({
             <span className="text-muted-foreground">Ainda não é paciente</span>
           )}
         </Field>
+        )}
       </dl>
 
       {lead.otherDeals.length > 0 && (

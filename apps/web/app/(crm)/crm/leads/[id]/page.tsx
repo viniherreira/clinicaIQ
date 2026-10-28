@@ -29,7 +29,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   ]);
   if (!lead) notFound();
   const [thread, cloud] = await Promise.all([
-    conversationId ? loadThread(ctx.db, ctx.tenantId, conversationId) : Promise.resolve(null),
+    conversationId ? loadThread(ctx.db, ctx.tenantId, conversationId, undefined, ctx.agenda) : Promise.resolve(null),
     activeCloudAccount(ctx.tenantId),
   ]);
 
@@ -50,6 +50,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             procedures={basics.procedures}
             lostReasons={basics.lostReasons}
             fields={basics.fields}
+            agenda={modules.clinic}
             // Só com a agenda: na clínica só com o CRM não há agenda nem ficha de paciente.
             actions={modules.clinic ? <ConvertActions key="converter" leadId={lead.id} patient={lead.patient} /> : undefined}
           />

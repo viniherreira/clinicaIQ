@@ -37,6 +37,7 @@ export function WhatsAppTemplates({
   connected,
   connectHref,
   agendaHref,
+  agenda = true,
   onSync,
   onCreate,
 }: {
@@ -46,6 +47,8 @@ export function WhatsAppTemplates({
   connectHref: string;
   /** Onde a clínica muda o texto e os botões dos avisos da agenda (null = sem link). */
   agendaHref: string | null;
+  /** A clínica tem a agenda. Só com o CRM, não há avisos de consulta para mostrar. */
+  agenda?: boolean;
   onSync: () => Promise<Result>;
   onCreate: (input: NewTemplateInput) => Promise<Result>;
 }) {
@@ -104,7 +107,7 @@ export function WhatsAppTemplates({
           </button>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Fora das 24 horas depois da última mensagem do paciente, a API oficial só manda modelo aprovado pela Meta. A análise
+          Fora das 24 horas depois da última mensagem do contato, a API oficial só manda modelo aprovado pela Meta. A análise
           costuma levar minutos, às vezes até 24 horas.
         </p>
 
@@ -127,6 +130,7 @@ export function WhatsAppTemplates({
         </p>
       </section>
 
+      {agenda && (
       <section aria-labelledby="modelos-agenda" className="rounded-xl border border-border bg-surface p-5 shadow-card">
         <h3 id="modelos-agenda" className="text-sm font-semibold">
           Avisos da agenda
@@ -163,6 +167,7 @@ export function WhatsAppTemplates({
           </>
         )}
       </section>
+      )}
 
       <section aria-labelledby="modelos-livres" className="rounded-xl border border-border bg-surface p-5 shadow-card">
         <h3 id="modelos-livres" className="text-sm font-semibold">
