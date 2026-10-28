@@ -108,17 +108,24 @@ test('transmissão para uma tag: público contado, fila e detalhes', async ({ pa
 });
 
 test('automações e robô: criar pela tela', async ({ page }) => {
+  // Funil digital: um gatilho com condição, que aparece como cartão na coluna.
   await page.goto('/crm/automacoes/etapas');
   await page.waitForLoadState('networkidle');
-
-  await page.getByRole('button', { name: /^Adicionar automação em (.* · )?Em negociação$/ }).first().click();
-  await page.getByLabel('O que fazer').selectOption('ADD_TAG');
-  const semTag = await page.getByText('Crie uma tag primeiro').count();
-  if (semTag === 0) {
-    await page.getByRole('button', { name: 'Criar automação' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Automação criada.' })).toBeVisible();
-    await expect(page.getByText(/Na hora:.*Põe a tag/).first()).toBeVisible();
-  }
+  await page.getByRole('button', { name: /^Adicionar gatilho em/ }).first().click();
+  const janela = page.getByRole('dialog');
+  await janela.getByLabel('Quando movido para esta etapa').check();
+  await janela.getByLabel(/^Mensagem/).fill('Oi {nome}, recebemos seu contato E2E');
+  await janela.getByLabel('Só em algumas condições').check();
+  await janela.getByRole('button', { name: 'Sáb' }).click();
+  await janela.getByRole('button', { name: 'Dom' }).click();
+  await janela.getByRole('button', { name: 'Criar gatilho' }).click();
+  await expect(janela).toBeHidden();
+  const cartao = page.getByRole('listitem').filter({ hasText: 'recebemos seu contato E2E' }).first();
+  await expect(cartao).toContainText('Sáb - Dom');
+  await expect(cartao).toContainText('Quando movido para esta etapa');
+  // Apaga: os outros testes não contam com ele.
+  await cartao.getByRole('button', { name: /^Apagar gatilho/ }).click();
+  await expect(page.getByText('recebemos seu contato E2E')).toHaveCount(0);
 
   await page.goto('/crm/automacoes/bots');
   await page.waitForLoadState('networkidle');

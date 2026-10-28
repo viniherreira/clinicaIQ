@@ -1669,6 +1669,17 @@ enum AutomationAction {
   CREATE_TASK
   ADD_TAG
   ASSIGN_USER
+  RUN_BOT
+  REMOVE_TAG
+  MOVE_STAGE
+}
+
+/// Quando a automação da etapa dispara: o lead entrou (criado ou movido),
+/// só quando foi criado nela, ou só quando foi movido para ela.
+enum StageTrigger {
+  ENTER
+  CREATED
+  MOVED
 }
 
 enum AutomationRunStatus {
@@ -1685,8 +1696,13 @@ model StageAutomation {
   stageId      String
   action       AutomationAction
   /// SEND_MESSAGE { text } ou { templateId, params } · CREATE_TASK { text, dueHours,
-  /// assignTo: "responsible" | userId } · ADD_TAG { tagId } · ASSIGN_USER { userId }
+  /// assignTo: "responsible" | userId } · ADD_TAG / REMOVE_TAG { tagIds } (antigas: { tagId })
+  /// · ASSIGN_USER { userId } · RUN_BOT { flowId } · MOVE_STAGE { stageId }
   config       Json
+  trigger      StageTrigger     @default(ENTER)
+  /// Só dispara se bater: { days?: number[] (0 = domingo), from?: "HH:MM", to?: "HH:MM",
+  /// sources?: LeadSource[], tagIds?: string[] } (`crm/stage-automation-rules.ts`).
+  conditions   Json             @default("{}")
   delayMinutes Int              @default(0)
   active       Boolean          @default(true)
   order        Int              @default(0)

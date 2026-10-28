@@ -96,7 +96,7 @@ test('conversa aberta e conversa na ficha sem violações', async ({ page }) => 
 test('automações por etapa e bots (com o editor aberto) sem violações', async ({ page }) => {
   await page.goto('/crm/automacoes/etapas');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /^Adicionar automação em/ }).first().click();
+  await page.getByRole('button', { name: /^Adicionar gatilho em/ }).first().click();
   expect((await axe(page)).violations).toEqual([]);
   await page.goto('/crm/automacoes/bots');
   await page.waitForLoadState('networkidle');
