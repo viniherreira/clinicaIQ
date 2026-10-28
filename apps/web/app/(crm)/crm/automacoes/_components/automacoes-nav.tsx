@@ -8,7 +8,7 @@ const ITENS = [
   { href: '/crm/automacoes/bots', label: 'Bots', icon: Bot, config: true },
   { href: '/crm/automacoes/modelos', label: 'Modelos', icon: FileCheck2, config: true },
   { href: '/crm/automacoes/transmissoes', label: 'Transmissões', icon: Megaphone, config: false },
-  { href: '/crm/automacoes/etapas', label: 'Por etapa do funil', icon: Workflow, config: true },
+  { href: '/crm/automacoes/etapas', label: 'Funil digital', icon: Workflow, config: true },
 ];
 
 export function AutomacoesNav({ config }: { config: boolean }) {

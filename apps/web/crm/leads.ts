@@ -260,7 +260,7 @@ export async function createLead(
         updatedById: actor.userId,
       },
     });
-    if (input.automations !== false) await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt);
+    if (input.automations !== false) await queueStageAutomations(tx, tenantId, lead.id, stage.id, lead.stageEnteredAt, 'created');
 
     await tx.leadActivity.create({
       data: {

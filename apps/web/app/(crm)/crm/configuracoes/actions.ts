@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
 import * as s from '@/crm/settings';
-import { deleteAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
+import { deleteAutomation, duplicateAutomation, saveAutomation, toggleAutomation } from '@/crm/stage-automations';
+import type { StageConditions, StageTriggerKind } from '@/crm/stage-automation-rules';
 import type { AutomationAction } from '@clinicaiq/db';
 import type { AgendaRole } from '@/crm/defaults';
 import { deleteBot, toggleBot } from '@/crm/bot-admin';
@@ -49,8 +50,11 @@ export const saveAutomationAction = async (input: {
   action: AutomationAction;
   config: Record<string, unknown>;
   delayMinutes: number;
+  trigger?: StageTriggerKind;
+  conditions?: StageConditions;
 }) => run((g) => saveAutomation(g.db, g.tenantId, input));
 export const toggleAutomationAction = async (id: string, active: boolean) => run((g) => toggleAutomation(g.db, id, active));
+export const duplicateAutomationAction = async (id: string) => run((g) => duplicateAutomation(g.db, g.tenantId, id));
 export const deleteAutomationAction = async (id: string) => run((g) => deleteAutomation(g.db, id));
 
 // Salvar robô: `saveFlowAction` (automacoes/bots/actions.ts), no editor em quadro.

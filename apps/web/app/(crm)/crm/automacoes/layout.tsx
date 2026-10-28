@@ -3,7 +3,7 @@ import { AutomacoesNav } from './_components/automacoes-nav';
 
 /**
  * Automações, como no Kommo: Bots, Modelos (aprovados pela Meta),
- * Transmissões e o que cada etapa do funil faz sozinha. Quem não configura o
+ * Transmissões e o funil digital (o que cada etapa faz sozinha). Quem não configura o
  * CRM só vê as Transmissões.
  */
 export default async function AutomacoesLayout({ children }: { children: React.ReactNode }) {

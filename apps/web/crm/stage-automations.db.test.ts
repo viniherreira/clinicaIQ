@@ -118,4 +118,54 @@ describe.skipIf(!process.env.DATABASE_URL)('automações por etapa (banco)', asy
     expect(await db.automationRun.count({ where: { leadId: r.leadId } })).toBe(0);
     expect(await a.runDueAutomations(new Date(), { tenantId: tenant.id })).toBe(0);
   });
+
+  it('gatilho "só criado" e "só movido", e as condições de origem', async () => {
+    const vip = await db.leadTag.create({ data: { tenantId: tenant.id, name: 'vip', color: 'amber' } });
+    const so = (trigger: 'CREATED' | 'MOVED', config: object, conditions: object = {}) =>
+      a.saveAutomation(db, tenant.id, { stageId: agendada.id, action: 'ADD_TAG', config, delayMinutes: 0, trigger, conditions });
+    expect(await so('CREATED', { tagIds: [vip.id] })).toEqual({ ok: true });
+    expect(await so('MOVED', { tagIds: [tag.id] }, { sources: ['INSTAGRAM'] })).toEqual({ ok: true });
+    // Condição com tag de outra clínica não passa.
+    expect((await so('MOVED', { tagIds: [tag.id] }, { tagIds: ['de-outra-clinica'] })).ok).toBe(false);
+
+    const criado = await createLead(db, actor, { name: 'Eva', phone: '11 97777-0005', stageId: agendada.id, source: 'INSTAGRAM' });
+    const movidoInsta = await createLead(db, actor, { name: 'Fabi', phone: '11 97777-0006', source: 'INSTAGRAM' });
+    const movidoManual = await createLead(db, actor, { name: 'Gabi', phone: '11 97777-0007' });
+    if (!criado.ok || !movidoInsta.ok || !movidoManual.ok) throw new Error('lead');
+    await moveLead(db, actor, movidoInsta.leadId, { stageId: agendada.id });
+    await moveLead(db, actor, movidoManual.leadId, { stageId: agendada.id });
+    await a.runDueAutomations(new Date(), { tenantId: tenant.id });
+
+    const tagsDe = async (id: string) => (await db.leadTagOnLead.findMany({ where: { leadId: id } })).map((t) => t.tagId).sort();
+    expect(await tagsDe(criado.leadId)).toEqual([vip.id]);
+    expect(await tagsDe(movidoInsta.leadId)).toEqual([tag.id]);
+    expect(await tagsDe(movidoManual.leadId)).toEqual([]);
+  });
+
+  it('mover de etapa, tirar tag e duplicar', async () => {
+    const compareceu = await stage('ATTENDED');
+    expect((await a.saveAutomation(db, tenant.id, { stageId: compareceu.id, action: 'MOVE_STAGE', config: { stageId: compareceu.id }, delayMinutes: 0 })).ok).toBe(false);
+    const perdeu = await stage('LOST');
+    expect((await a.saveAutomation(db, tenant.id, { stageId: compareceu.id, action: 'MOVE_STAGE', config: { stageId: perdeu.id }, delayMinutes: 0 })).ok).toBe(false);
+    const negociacao = await stage('NEGOTIATION');
+    expect(await a.saveAutomation(db, tenant.id, { stageId: compareceu.id, action: 'MOVE_STAGE', config: { stageId: negociacao.id }, delayMinutes: 0 })).toEqual({ ok: true });
+    expect(await a.saveAutomation(db, tenant.id, { stageId: negociacao.id, action: 'REMOVE_TAG', config: { tagIds: [tag.id] }, delayMinutes: 0 })).toEqual({ ok: true });
+
+    const r = await createLead(db, actor, { name: 'Helo', phone: '11 97777-0008' });
+    if (!r.ok) throw new Error(r.message);
+    await db.leadTagOnLead.create({ data: { tenantId: tenant.id, leadId: r.leadId, tagId: tag.id } });
+    await moveLead(db, actor, r.leadId, { stageId: compareceu.id });
+    await a.runDueAutomations(new Date(), { tenantId: tenant.id });
+    // A mudança de etapa agenda as automações da etapa nova; o relógio roda na volta seguinte.
+    await a.runDueAutomations(new Date(), { tenantId: tenant.id });
+    const lead = await db.lead.findFirst({ where: { id: r.leadId }, include: { tags: true } });
+    expect(lead?.stageId).toBe(negociacao.id);
+    expect(lead?.tags).toHaveLength(0);
+
+    const original = await db.stageAutomation.findFirst({ where: { stageId: negociacao.id } });
+    expect(await a.duplicateAutomation(db, tenant.id, original!.id)).toEqual({ ok: true });
+    const copias = await db.stageAutomation.findMany({ where: { stageId: negociacao.id }, orderBy: { order: 'asc' } });
+    expect(copias).toHaveLength(2);
+    expect(copias[1]).toMatchObject({ action: 'REMOVE_TAG', active: false });
+  });
 });

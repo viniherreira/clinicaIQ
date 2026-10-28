@@ -223,6 +223,16 @@ export function CrmToolbar({
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
 
+      {canConfig && view === 'quadro' && (
+        // O funil digital deste funil, como o "Automatize" do Kommo.
+        <Link
+          href={currentPipeline ? `/crm/automacoes/etapas?funil=${currentPipeline.id}` : '/crm/automacoes/etapas'}
+          className="btn-outline btn-md inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+        >
+          <Zap className="h-4 w-4 text-amber-500" aria-hidden="true" /> Automatizar
+        </Link>
+      )}
+
       <button
         type="button"
         onClick={() => setNovo(true)}
