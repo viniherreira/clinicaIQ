@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@clinicaiq/db';
 import { chargeStatusFromEvent } from '@/lib/asaas-events';
-import { bearerMatches, secretMatches } from '@/lib/bearer';
+import { getPayment, type AsaasPayment } from '@/lib/asaas';
+import { secretMatches } from '@/lib/bearer';
 
 /**
  * Asaas payment webhook.
@@ -11,21 +12,10 @@ import { bearerMatches, secretMatches } from '@/lib/bearer';
  * anything.
  */
 
+/** Do aviso só se usa o id da cobrança: o resto vem da API do Asaas. */
 interface AsaasEvent {
   event?: string;
-  payment?: {
-    id?: string;
-    status?: string;
-    value?: number;
-    dueDate?: string;
-    paymentDate?: string;
-    invoiceUrl?: string;
-    bankSlipUrl?: string;
-    subscription?: string;
-    externalReference?: string;
-    /** Verdadeiro nos avisos de cobrança removida. */
-    deleted?: boolean;
-  };
+  payment?: { id?: string };
 }
 
 /**
@@ -50,20 +40,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'invalid-json' }, { status: 400 });
   }
 
-  const payment = body.payment;
-  if (!payment?.id) {
+  const aviso = body.payment;
+  if (!aviso?.id) {
     // Not a payment event (Asaas also sends subscription and transfer events).
     // Acknowledge so it is not retried forever.
     return NextResponse.json({ ok: true, ignored: body.event ?? 'sem evento' });
   }
 
+  // O corpo do aviso só diz *qual* cobrança mudou. Situação e valor vêm da API
+  // do Asaas: com o token do webhook vazado, um POST dizendo "pago" liberava o
+  // plano de qualquer clínica. Fora do ar, 503 — o Asaas tenta de novo.
+  let payment: AsaasPayment;
+  try {
+    payment = await getPayment(aviso.id);
+  } catch (e) {
+    console.error('[asaas webhook] não deu para conferir a cobrança', aviso.id, e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: 'asaas-indisponivel' }, { status: 503 });
+  }
+
   const charge = await prisma.charge.findUnique({
     where: { asaasChargeId: payment.id },
-    select: { id: true, tenantId: true, subscriptionId: true },
+    select: { id: true, tenantId: true, subscriptionId: true, amountCents: true },
   });
 
-  const status = chargeStatusFromEvent(body.event, payment);
+  const status = chargeStatusFromEvent(undefined, payment);
   const paidAt = payment.paymentDate ? new Date(payment.paymentDate) : status === 'PAID' ? new Date() : null;
+  // Pago a menos do que a cobrança vale não devolve o acesso.
+  const valorConfere = !charge || Math.round((payment.value ?? 0) * 100) >= charge.amountCents;
 
   if (charge) {
     await prisma.charge.update({
@@ -111,7 +114,9 @@ export async function POST(req: Request) {
   // Cortesia não tem status a mover: não vence, não atrasa, e um aviso tardio
   // de uma cobrança antiga não pode marcar como inadimplente quem não deve nada.
   if (subscription && !subscription.complimentary) {
-    if (status === 'PAID') {
+    if (status === 'PAID' && !valorConfere) {
+      console.error('[asaas webhook] pago abaixo do valor da cobrança; plano não liberado', payment.id, payment.value);
+    } else if (status === 'PAID') {
       // A month from the due date, not from today: paying three days late must
       // not push every future invoice three days later too.
       const base = payment.dueDate ? new Date(payment.dueDate) : new Date();

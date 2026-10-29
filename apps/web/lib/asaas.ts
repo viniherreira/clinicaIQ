@@ -212,6 +212,10 @@ export interface AsaasPayment {
   invoiceUrl?: string;
   bankSlipUrl?: string;
   paymentDate?: string;
+  /** Assinatura de onde a cobrança saiu, quando saiu de uma. */
+  subscription?: string;
+  /** Verdadeiro quando a cobrança foi removida. */
+  deleted?: boolean;
 }
 
 export async function listPayments(subscriptionId: string): Promise<AsaasPayment[]> {
