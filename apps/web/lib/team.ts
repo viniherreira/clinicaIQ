@@ -23,15 +23,39 @@ function administradoresRestantes(equipe: MembroDaEquipe[], semEste: string): Me
 }
 
 /**
+ * Só o proprietário mexe em proprietário.
+ *
+ * OWNER e ADMIN alcançam as mesmas telas (`permissions.ts`), inclusive a
+ * Equipe. Sem esta regra, um ADMIN rebaixava o dono a recepcionista, tirava o
+ * dono da equipe ou convidava um novo dono — e a clínica mudava de mãos sem o
+ * dono poder desfazer, porque desfazer exige o acesso que ele acabou de perder.
+ *
+ * `papelAtual` é o de hoje (null num convite); `papelNovo` é o pedido (null
+ * numa remoção).
+ */
+export function podeMexerNoPapel(input: {
+  atorRole: Role | string;
+  papelAtual: Role | string | null;
+  papelNovo: Role | string | null;
+}): Veredito {
+  const { atorRole, papelAtual, papelNovo } = input;
+  if ((papelAtual === 'OWNER' || papelNovo === 'OWNER') && atorRole !== 'OWNER') {
+    return { ok: false, motivo: 'Só o proprietário pode tornar alguém proprietário, mudar o perfil dele ou removê-lo.' };
+  }
+  return { ok: true };
+}
+
+/**
  * Pode remover?
  *
- * As três recusas, em ordem de quem esbarra nelas primeiro:
+ * As quatro recusas, em ordem de quem esbarra nelas primeiro:
  *
  * 1. Perfil sem acesso à equipe. A tela já esconde o botão, mas Server Action é
  *    endereço HTTP público — esconder não é controle.
  * 2. A si mesmo. Quem se remove por engano perde o acesso na hora e não tem como
  *    desfazer, porque desfazer exige o acesso que acabou de perder.
- * 3. O último administrador. Sem ele ninguém convida, ninguém troca perfil,
+ * 3. O proprietário, por quem não é proprietário (`podeMexerNoPapel`).
+ * 4. O último administrador. Sem ele ninguém convida, ninguém troca perfil,
  *    ninguém mexe na cobrança — e não existe tela de suporte para resgatar.
  */
 export function podeRemover(input: {
@@ -56,6 +80,9 @@ export function podeRemover(input: {
   const alvo = equipe.find((m) => m.id === alvoId);
   if (!alvo) return { ok: false, motivo: 'Pessoa não encontrada nesta clínica.' };
   if (!alvo.ativo) return { ok: false, motivo: 'Esta pessoa já está sem acesso.' };
+
+  const hierarquia = podeMexerNoPapel({ atorRole, papelAtual: alvo.role, papelNovo: null });
+  if (!hierarquia.ok) return hierarquia;
 
   if (can(alvo.role, 'equipe') && administradoresRestantes(equipe, alvoId).length === 0) {
     return {

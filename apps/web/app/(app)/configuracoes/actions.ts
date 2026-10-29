@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
-import { podeRemover } from '@/lib/team';
+import { podeMexerNoPapel, podeRemover } from '@/lib/team';
 import { syncBillingValue } from '@/crm/addon';
 
 /** Mudanças na equipe mexem na cobrança do CRM (quem passar do incluído no plano). Falha no Asaas
@@ -606,7 +606,7 @@ export async function updateTeamRole(
   targetUserId: string,
   role: string,
 ): Promise<{ ok: boolean; message?: string }> {
-  const { tenantId, userId } = await requireOwner();
+  const { tenantId, userId, role: atorRole } = await requireOwner();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
@@ -624,6 +624,9 @@ export async function updateTeamRole(
     select: { id: true, role: true },
   });
   if (!alvo) return { ok: false, message: 'Usuário não encontrado.' };
+
+  const hierarquia = podeMexerNoPapel({ atorRole, papelAtual: alvo.role, papelNovo: role });
+  if (!hierarquia.ok) return { ok: false, message: hierarquia.motivo };
 
   if (can(alvo.role, 'configuracoes') && !can(role, 'configuracoes')) {
     const restantes = await prisma.user.count({
@@ -948,7 +951,7 @@ export async function inviteTeamMember(input: {
   email: string;
   role: string;
 }): Promise<{ ok: boolean; message?: string; inviteUrl?: string }> {
-  const { tenantId, userId } = await requireOwner();
+  const { tenantId, userId, role: atorRole } = await requireOwner();
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return { ok: false, message: bloqueio };
@@ -961,6 +964,9 @@ export async function inviteTeamMember(input: {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
   }
   const { email, role } = parsed.data;
+
+  const hierarquia = podeMexerNoPapel({ atorRole, papelAtual: null, papelNovo: role });
+  if (!hierarquia.ok) return { ok: false, message: hierarquia.motivo };
 
   // Já está na equipe agora? Convidar de novo criaria uma segunda conta para a
   // mesma pessoa, e ela entraria sem o histórico que já tem.
