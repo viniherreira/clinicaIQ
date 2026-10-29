@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   declararAceiteDeCampanhaParaTodos,
+  savePrivacySettings,
   type AuditEntry,
   type PrivacySummary,
 } from '../actions';
@@ -30,6 +31,11 @@ const ROTULO_ACAO: Record<string, string> = {
   USER_DEACTIVATE: 'removeu acesso',
   INVITE_REVOKED: 'cancelou convite',
   WHATSAPP_DISCONNECTED: 'desconectou o WhatsApp',
+  RECEPTION_RECORD_ON: 'liberou o prontuário para a recepção',
+  RECEPTION_RECORD_OFF: 'tirou o prontuário da recepção',
+  RECORD_VIEWED: 'abriu o prontuário',
+  PATIENT_EXPORTED: 'exportou os dados do paciente',
+  PATIENT_ANONYMIZED: 'anonimizou o paciente',
 };
 
 const ROTULO_ENTIDADE: Record<string, string> = {
@@ -117,6 +123,20 @@ export function PrivacyPanel({
   const [erro, setErro] = useState<string | null>(null);
 
   const semCampanha = summary.pacientes - summary.autorizaramCampanha;
+  const [recepcaoVe, setRecepcaoVe] = useState(summary.receptionSeesRecord);
+  const [erroAcesso, setErroAcesso] = useState<string | null>(null);
+
+  function trocarRecepcao(valor: boolean) {
+    setErroAcesso(null);
+    setRecepcaoVe(valor);
+    startTransition(async () => {
+      const r = await savePrivacySettings({ receptionSeesRecord: valor });
+      if (!r.ok) {
+        setRecepcaoVe(!valor);
+        setErroAcesso(r.message ?? 'Não foi possível salvar.');
+      } else router.refresh();
+    });
+  }
 
   function declarar() {
     setErro(null);
@@ -232,6 +252,48 @@ export function PrivacyPanel({
             obrigatório pelo conselho, então apagar de vez ainda não é automático.
           </div>
         )}
+      </section>
+
+      <section
+        aria-labelledby="record-heading"
+        className="rounded-xl border border-border bg-surface shadow-card"
+      >
+        <div className="border-b border-border px-5 py-4">
+          <h2 id="record-heading" className="text-base font-semibold">
+            Quem vê o prontuário
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Anamnese, evoluções, odontograma e imagens são dados de saúde. Dono, administrador e
+            profissionais sempre veem. A recepção, só se a clínica precisar.
+          </p>
+        </div>
+        <div className="p-5">
+          <div className="flex items-start gap-3">
+            <input
+              id="recepcao-prontuario"
+              type="checkbox"
+              checked={recepcaoVe}
+              onChange={(e) => trocarRecepcao(e.target.checked)}
+              disabled={pending}
+              aria-describedby="recepcao-prontuario-ajuda"
+              className="mt-0.5 h-4 w-4 rounded border-border accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            />
+            <div className="text-sm">
+              <label htmlFor="recepcao-prontuario" className="font-medium">
+                A recepção vê o prontuário clínico
+              </label>
+              <p id="recepcao-prontuario-ajuda" className="mt-0.5 text-muted-foreground">
+                Desmarcado, a recepção continua com agenda, cadastro e financeiro, mas não abre nem
+                escreve no prontuário.
+              </p>
+            </div>
+          </div>
+          {erroAcesso && (
+            <p role="alert" className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {erroAcesso}
+            </p>
+          )}
+        </div>
       </section>
 
       <section

@@ -6,7 +6,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
+import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
+import { anonymizePatient } from '@/lib/patient-lgpd';
+import { deleteChatMedia } from '@/crm/media-store';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { findingText, isFace, isKind, KINDS, VALID_TEETH, type FindingKind, type FindingStatus } from '@/lib/odontogram';
@@ -39,8 +42,27 @@ function parseBRL(value: string): number {
 
 // ─── Clinical record (histórico + financeiro + odontograma) ──────────────────
 
+const LEITURA_JANELA_MS = 10 * 60_000;
+
+async function registrarLeitura(tenantId: string, userId: string, patientId: string): Promise<void> {
+  const recente = await prisma.auditLog.findFirst({
+    where: {
+      tenantId,
+      userId,
+      action: 'RECORD_VIEWED',
+      entityId: patientId,
+      createdAt: { gte: new Date(Date.now() - LEITURA_JANELA_MS) },
+    },
+    select: { id: true },
+  });
+  if (recente) return;
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'RECORD_VIEWED', entity: 'Patient', entityId: patientId },
+  });
+}
+
 export async function getPatientRecord(patientId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
   const db = getTenantClient(tenantId);
   const now = new Date();
 
@@ -155,10 +177,15 @@ export async function getPatientRecord(patientId: string) {
   // precisa dele para agendar; o financeiro não é assunto de quem atende. Em vez
   // de barrar a tela inteira, devolvemos só o que o perfil alcança — a ficha do
   // paciente continua abrindo para todo mundo, com o conteúdo certo em cada caso.
-  const [veProntuario, veFinanceiro] = await Promise.all([
+  const [veProntuario, veFinanceiro, cuidaPrivacidade] = await Promise.all([
     hasCapability(tenantId, 'prontuario'),
     hasCapability(tenantId, 'financeiro'),
+    hasCapability(tenantId, 'privacidade'),
   ]);
+  // Ler o prontuário também fica no registro (LGPD): não só quem alterou, mas
+  // quem abriu. Uma linha a cada 10 minutos por pessoa e paciente, para o
+  // registro não virar uma linha por clique.
+  if (veProntuario) await registrarLeitura(tenantId, userId, patientId);
 
   const semFinanceiro = {
     contracted: 0,
@@ -180,6 +207,8 @@ export async function getPatientRecord(patientId: string) {
     },
     canSeeRecord: veProntuario,
     canSeeFinance: veFinanceiro,
+    /** Exportar e anonimizar (LGPD): dono e administrador. */
+    canManagePrivacy: cuidaPrivacidade,
     financial: !veFinanceiro ? semFinanceiro : {
       contracted,
       paid,
@@ -611,6 +640,10 @@ export async function uploadPatientFile(
   if (!ALLOWED_MIME.has(file.type)) {
     return { ok: false, message: 'Formato não suportado. Use JPG, PNG, WEBP, HEIC ou PDF.' };
   }
+  // O tipo acima é o declarado; o conteúdo tem de bater (um HTML não entra como PNG).
+  if (!contentMatchesType(file.type, await fileHead(file))) {
+    return { ok: false, message: 'O arquivo não é do formato que diz ser. Envie a imagem ou o PDF original.' };
+  }
   if (file.size > MAX_FILE_BYTES) {
     return { ok: false, message: 'Arquivo muito grande (máx. 10 MB).' };
   }
@@ -671,4 +704,28 @@ export async function deletePatientFile(id: string, patientId: string) {
     data: { tenantId, userId, action: 'DELETE', entity: 'PatientFile', entityId: id },
   });
   revalidatePath(`/pacientes/${patientId}`);
+}
+
+// ─── LGPD: anonimizar ──────────────────────────────────────────────────────────
+
+/**
+ * Tira do cadastro o que identifica o paciente (LGPD art. 18). Só quem cuida da
+ * privacidade, e só com a palavra ANONIMIZAR digitada: não tem volta. O
+ * prontuário fica (`lib/patient-lgpd.ts`).
+ */
+export async function anonymizePatientAction(patientId: string, confirmacao: string): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'privacidade'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (typeof confirmacao !== 'string' || confirmacao.trim().toUpperCase() !== 'ANONIMIZAR') {
+    return { ok: false, message: 'Digite ANONIMIZAR para confirmar.' };
+  }
+
+  const r = await anonymizePatient(tenantId, userId, patientId);
+  if (!r.ok) return r;
+  for (const ref of r.mediaRefs) await deleteChatMedia(ref).catch(() => undefined);
+
+  revalidatePath('/pacientes');
+  revalidatePath(`/pacientes/${patientId}`);
+  return { ok: true };
 }

@@ -1,14 +1,20 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { Check, X } from 'lucide-react';
-import { acceptPublicQuote, rejectPublicQuote } from './actions';
+import { acceptPublicQuote, markPublicQuoteViewed, rejectPublicQuote } from './actions';
 
 interface Props {
   token: string;
 }
 
 export function PublicQuoteActions({ token }: Props) {
+  // "Visualizado" só quando a página abre no navegador do paciente: o robô de
+  // pré-visualização do WhatsApp não roda JavaScript.
+  useEffect(() => {
+    void markPublicQuoteViewed(token).catch(() => undefined);
+  }, [token]);
+
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<'idle' | 'rejecting'>('idle');
   const [result, setResult] = useState<'accepted' | 'rejected' | null>(null);

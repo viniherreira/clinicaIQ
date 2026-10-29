@@ -10,6 +10,7 @@ import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
 import { INVITE_VALID_DAYS, podeMexerNoPapel, podeRemover } from '@/lib/team';
+import { readPrivacySettings, type PrivacySettings } from '@/lib/privacy-settings';
 import { syncBillingValue } from '@/crm/addon';
 
 /** Mudanças na equipe mexem na cobrança do CRM (quem passar do incluído no plano). Falha no Asaas
@@ -42,6 +43,7 @@ import {
   type AgendaTemplateView,
 } from '@/lib/agenda-templates-sync';
 import { activeCloudAccount } from '@/lib/cloud-account';
+import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import {
   createTemplate,
   listTemplateRows,
@@ -803,14 +805,16 @@ export interface PrivacySummary {
   aceitaramTratamento: number;
   autorizaramCampanha: number;
   excluidosMasNoBanco: number;
+  /** A recepção vê o prontuário clínico (`lib/privacy-settings.ts`). */
+  receptionSeesRecord: boolean;
 }
 
 export async function getPrivacySummary(): Promise<PrivacySummary> {
   const { tenantId, role } = await requireOwner();
   if (!can(role, 'privacidade')) {
-    return { pacientes: 0, aceitaramTratamento: 0, autorizaramCampanha: 0, excluidosMasNoBanco: 0 };
+    return { pacientes: 0, aceitaramTratamento: 0, autorizaramCampanha: 0, excluidosMasNoBanco: 0, receptionSeesRecord: false };
   }
-  const [pacientes, aceitaramTratamento, autorizaramCampanha, excluidos] =
+  const [pacientes, aceitaramTratamento, autorizaramCampanha, excluidos, clinica] =
     await Promise.all([
       prisma.patient.count({ where: { tenantId, deletedAt: null } }),
       prisma.patient.count({ where: { tenantId, deletedAt: null, lgpdConsentAt: { not: null } } }),
@@ -818,13 +822,42 @@ export async function getPrivacySummary(): Promise<PrivacySummary> {
         where: { tenantId, deletedAt: null, marketingConsentAt: { not: null } },
       }),
       prisma.patient.count({ where: { tenantId, deletedAt: { not: null } } }),
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
     ]);
   return {
     pacientes,
     aceitaramTratamento,
     autorizaramCampanha,
     excluidosMasNoBanco: excluidos,
+    receptionSeesRecord: readPrivacySettings(clinica?.settings).receptionSeesRecord,
   };
+}
+
+/**
+ * A clínica escolhe se a recepção vê o prontuário clínico. Só quem cuida da
+ * privacidade (dono e administrador) muda, e a troca fica no registro.
+ */
+export async function savePrivacySettings(input: { receptionSeesRecord: boolean }): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireOwner();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'privacidade'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (typeof input?.receptionSeesRecord !== 'boolean') return { ok: false, message: 'Escolha sim ou não.' };
+
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const atual = t?.settings && typeof t.settings === 'object' ? (t.settings as Record<string, unknown>) : {};
+  const privacy: PrivacySettings = { receptionSeesRecord: input.receptionSeesRecord };
+  await prisma.tenant.update({ where: { id: tenantId }, data: { settings: { ...atual, privacy: { ...privacy } } } });
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      userId,
+      action: input.receptionSeesRecord ? 'RECEPTION_RECORD_ON' : 'RECEPTION_RECORD_OFF',
+      entity: 'Tenant',
+      entityId: tenantId,
+    },
+  });
+  revalidatePath('/configuracoes');
+  return { ok: true };
 }
 
 export interface AuditEntry {
@@ -1461,6 +1494,7 @@ export async function uploadClinicLogo(formData: FormData): Promise<{ ok: boolea
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Selecione uma imagem.' };
   const ext = LOGO_TYPES[file.type];
   if (!ext) return { ok: false, message: 'Use uma imagem PNG ou JPG.' };
+  if (!contentMatchesType(file.type, await fileHead(file))) return { ok: false, message: 'O arquivo não é uma imagem PNG ou JPG de verdade.' };
   if (file.size > LOGO_MAX_BYTES) return { ok: false, message: 'Imagem muito grande (máx. 1 MB).' };
 
   const anterior = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { logoUrl: true } });
