@@ -3,6 +3,7 @@ import { finishBroadcasts, startDueBroadcasts } from './broadcasts';
 import { processCloudQueue } from './cloud-send';
 import { simulateDueLocal } from './dev-clock';
 import { runDueAutomations } from './stage-automations';
+import { fillMissingCpfHashes } from '@/lib/cpf-hash';
 
 /**
  * O relógio do CRM: o que precisa acontecer sem ninguém na tela. O gateway, que
@@ -21,5 +22,7 @@ export async function runTick(now: Date = new Date()) {
   const botsWoken = await wakeBots(now);
   const botsNoReply = await startNoReplyBots(now);
   const botsExpired = await expireBots(now);
-  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsNoReply, botsExpired };
+  // Manutenção: índice cego do CPF dos pacientes antigos (F-15). Zera sozinho.
+  const cpfHashes = await fillMissingCpfHashes();
+  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsNoReply, botsExpired, cpfHashes };
 }

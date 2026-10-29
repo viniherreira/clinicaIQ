@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { refOutsideTenant } from '@/lib/owns';
 import { notifyPatientCreated } from '@/crm/notify';
+import { cpfHash, cpfTaken } from '@/lib/cpf-hash';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -294,17 +295,8 @@ export async function createPatient(
 
   const masterKey = getMasterKey();
 
-  if (data.cpf) {
-    const existing = await prisma.patient.findFirst({
-      where: {
-        tenantId,
-        cpfEncrypted: encrypt(data.cpf, masterKey, tenantId),
-        deletedAt: null,
-      },
-    });
-    if (existing) {
-      return { success: false, errors: { cpf: ['CPF já cadastrado nesta clínica'] } };
-    }
+  if (data.cpf && (await cpfTaken(tenantId, data.cpf))) {
+    return { success: false, errors: { cpf: ['CPF já cadastrado nesta clínica'] } };
   }
 
   const controlNumber = await nextControlNumber(tenantId);
@@ -316,6 +308,7 @@ export async function createPatient(
       name: data.name,
       nickname: data.nickname || null,
       cpfEncrypted: data.cpf ? encrypt(data.cpf, masterKey, tenantId) : null,
+      cpfHash: data.cpf ? cpfHash(data.cpf, tenantId) : null,
       phoneEncrypted: encrypt(data.phone, masterKey, tenantId),
       phone2Encrypted: data.phone2 ? encrypt(data.phone2, masterKey, tenantId) : null,
       email: data.email || null,
@@ -379,18 +372,8 @@ export async function updatePatient(
   const data = parsed.data;
   const masterKey = getMasterKey();
 
-  if (data.cpf) {
-    const existing = await prisma.patient.findFirst({
-      where: {
-        tenantId,
-        cpfEncrypted: encrypt(data.cpf, masterKey, tenantId),
-        deletedAt: null,
-        NOT: { id },
-      },
-    });
-    if (existing) {
-      return { success: false, errors: { cpf: ['CPF já cadastrado nesta clínica'] } };
-    }
+  if (data.cpf && (await cpfTaken(tenantId, data.cpf, id))) {
+    return { success: false, errors: { cpf: ['CPF já cadastrado nesta clínica'] } };
   }
 
   // Preserva a data do primeiro aceite. Recarimbar a cada edição do cadastro
@@ -410,6 +393,7 @@ export async function updatePatient(
       name: data.name,
       nickname: data.nickname || null,
       cpfEncrypted: data.cpf ? encrypt(data.cpf, masterKey, tenantId) : null,
+      cpfHash: data.cpf ? cpfHash(data.cpf, tenantId) : null,
       phoneEncrypted: encrypt(data.phone, masterKey, tenantId),
       phone2Encrypted: data.phone2 ? encrypt(data.phone2, masterKey, tenantId) : null,
       email: data.email || null,

@@ -193,6 +193,7 @@ export async function anonymizePatient(tenantId: string, userId: string, patient
         name: `${ANONYMIZED_PREFIX} ${p.controlNumber}`,
         nickname: null,
         cpfEncrypted: null,
+        cpfHash: null,
         phoneEncrypted: encrypt('', masterKey(), tenantId),
         phone2Encrypted: null,
         email: null,
