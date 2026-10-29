@@ -81,7 +81,7 @@ async function respond(
 ): Promise<PublicResult> {
   const h = await headers();
   const ip = clientIp(h);
-  const rl = rateLimit(`quote-respond:${ip}`, 15, 60_000);
+  const rl = await rateLimit(`quote-respond:${ip}`, 15, 60_000);
   if (!rl.ok) return { ok: false, message: 'Muitas tentativas. Tente novamente em instantes.' };
 
   const quote = await prisma.quote.findUnique({

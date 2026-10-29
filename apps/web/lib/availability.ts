@@ -83,6 +83,15 @@ export const ONLINE_BOOKING_DEFAULTS: OnlineBookingSettings = {
   defaultDurationMinutes: 30,
 };
 
+/**
+ * Travas do agendamento online, que é público: por dia, no máximo tantos
+ * agendamentos por clínica e tantos pedidos por WhatsApp. Cada pedido cria
+ * paciente e consulta e manda mensagem pelo número da clínica — sem teto, um
+ * script lotava a agenda e fazia a clínica escrever para estranhos.
+ */
+export const ONLINE_BOOKING_DAILY_CAP = 30;
+export const ONLINE_BOOKING_PER_PHONE_DAILY = 3;
+
 const entre = (v: unknown, min: number, max: number, padrao: number) =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : padrao;
 const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 200) : []);

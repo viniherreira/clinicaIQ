@@ -1880,3 +1880,15 @@ model ClinicUnit {
   @@index([tenantId, order])
   @@map("clinic_units")
 }
+
+/// Contadores do limite de tentativas das rotas públicas (apps/web/lib/rate-limit.ts).
+/// Fica no banco porque a Vercel roda várias instâncias: um contador na memória
+/// de cada uma não limitava nada. `resetAt` em milissegundos, sem fuso horário.
+model RateLimit {
+  key     String @id
+  count   Int
+  resetAt BigInt
+
+  @@index([resetAt])
+  @@map("rate_limits")
+}
