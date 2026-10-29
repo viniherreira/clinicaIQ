@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
+import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
@@ -610,6 +611,10 @@ export async function uploadPatientFile(
   }
   if (!ALLOWED_MIME.has(file.type)) {
     return { ok: false, message: 'Formato não suportado. Use JPG, PNG, WEBP, HEIC ou PDF.' };
+  }
+  // O tipo acima é o declarado; o conteúdo tem de bater (um HTML não entra como PNG).
+  if (!contentMatchesType(file.type, await fileHead(file))) {
+    return { ok: false, message: 'O arquivo não é do formato que diz ser. Envie a imagem ou o PDF original.' };
   }
   if (file.size > MAX_FILE_BYTES) {
     return { ok: false, message: 'Arquivo muito grande (máx. 10 MB).' };

@@ -28,6 +28,7 @@ import { prisma } from '@clinicaiq/db';
 import { assignConversation } from '@/crm/assignment';
 import { loadLeadDetail, type LeadDetail } from '@/crm/lead-detail';
 import { checkChatMedia } from '@/crm/media-rules';
+import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import { nudgeTick } from '@/crm/tick-nudge';
 import { deleteChatMedia, mediaStoreReady, saveChatMedia } from '@/crm/media-store';
 import { activeCloudAccount, windowOpen } from '@/crm/cloud';
@@ -123,6 +124,10 @@ export async function sendMediaAction(conversationId: string, form: FormData): P
   if (!(file instanceof File)) return { ok: false, message: 'Escolha um arquivo.' };
   const check = checkChatMedia(file);
   if (!check.ok) return check;
+  // O tipo é o declarado pelo navegador; o conteúdo tem de bater com ele.
+  if (!contentMatchesType(check.mimeType, await fileHead(file))) {
+    return { ok: false, message: 'O arquivo não é do formato que diz ser. Envie o arquivo original.' };
+  }
 
   const cloud = await activeCloudAccount(g.tenantId);
   if (!cloud && (process.env.WHATSAPP_GATEWAY_URL || process.env.NODE_ENV === 'production')) {

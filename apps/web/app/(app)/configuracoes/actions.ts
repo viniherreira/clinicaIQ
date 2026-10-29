@@ -42,6 +42,7 @@ import {
   type AgendaTemplateView,
 } from '@/lib/agenda-templates-sync';
 import { activeCloudAccount } from '@/lib/cloud-account';
+import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import {
   createTemplate,
   listTemplateRows,
@@ -1461,6 +1462,7 @@ export async function uploadClinicLogo(formData: FormData): Promise<{ ok: boolea
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Selecione uma imagem.' };
   const ext = LOGO_TYPES[file.type];
   if (!ext) return { ok: false, message: 'Use uma imagem PNG ou JPG.' };
+  if (!contentMatchesType(file.type, await fileHead(file))) return { ok: false, message: 'O arquivo não é uma imagem PNG ou JPG de verdade.' };
   if (file.size > LOGO_MAX_BYTES) return { ok: false, message: 'Imagem muito grande (máx. 1 MB).' };
 
   const anterior = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { logoUrl: true } });
