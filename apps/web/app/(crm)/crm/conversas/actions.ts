@@ -3,7 +3,7 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { guardCrmAction } from '@/crm/guard';
-import { guardConversation, guardLead } from '@/crm/scope';
+import { guardConversation, guardLead, leadScope } from '@/crm/scope';
 import { dispatchChat } from '@/crm/chat-dispatch';
 import {
   INBOX_TABS,
@@ -151,7 +151,12 @@ export async function sendMediaAction(conversationId: string, form: FormData): P
 }
 
 export async function retryChatAction(chatMessageId: string): Promise<Result> {
-  const g = await guardCrmAction('crm');
+  const porta = await guardCrmAction('crm');
+  if (!porta.ok) return porta;
+  // Reenviar é responder: passa pelo escopo da conversa da mensagem.
+  const msg = await porta.db.chatMessage.findFirst({ where: { id: chatMessageId }, select: { conversationId: true } });
+  if (!msg) return { ok: false, message: 'Esta mensagem não pode ser reenviada.' };
+  const g = await guardConversation('crm', msg.conversationId);
   if (!g.ok) return g;
   const r = await retryChatMessage(g.db, chatMessageId);
   if (r.ok) after(() => dispatchChat(g.tenantId, chatMessageId));
@@ -246,7 +251,12 @@ export async function searchLinkTargetsAction(q: string): Promise<Result<{ targe
   if (term.length < 2) return { ok: true, targets: [] };
   const [leads, patients] = await Promise.all([
     g.db.lead.findMany({
-      where: { ...OPEN_LEAD, OR: [{ name: { contains: term, mode: 'insensitive' } }, { title: { contains: term, mode: 'insensitive' } }] },
+      where: {
+        ...OPEN_LEAD,
+        OR: [{ name: { contains: term, mode: 'insensitive' } }, { title: { contains: term, mode: 'insensitive' } }],
+        // "Só os dele" não vê negócio alheio nem pela busca.
+        AND: [leadScope(g) ?? {}],
+      },
       select: { id: true, name: true, title: true, stage: { select: { name: true } } },
       orderBy: { updatedAt: 'desc' },
       take: 6,
