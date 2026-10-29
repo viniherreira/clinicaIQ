@@ -1,6 +1,6 @@
 import { encrypt, getTenantClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
-import { conversationHash } from './phone';
+import { conversationHash, conversationHashes } from './phone';
 
 /**
  * Gravar no CRM uma mensagem que chegou pela API oficial (webhook da Meta).
@@ -61,7 +61,7 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
   const name = input.origin === 'CONTACT' ? input.contactName?.trim() || null : null;
 
   let conv = await db.conversation.findFirst({
-    where: { phoneHash },
+    where: { phoneHash: { in: conversationHashes(key, tenantId) } },
     select: { id: true, lastMessageAt: true, classifiedAt: true, status: true, contactName: true },
   });
   if (!conv) {
@@ -73,7 +73,7 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
     } catch {
       // Duas mensagens do mesmo número novo ao mesmo tempo: a outra criou.
       conv = await db.conversation.findFirst({
-        where: { phoneHash },
+        where: { phoneHash: { in: conversationHashes(key, tenantId) } },
         select: { id: true, lastMessageAt: true, classifiedAt: true, status: true, contactName: true },
       });
       if (!conv) throw new Error('conversa não criada');

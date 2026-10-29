@@ -1,6 +1,6 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import type { Actor } from './leads';
-import { conversationHash, decryptPhone, encryptPhone, phoneHash } from './phone';
+import { conversationHashes, decryptPhone, encryptPhone, phoneHash } from './phone';
 
 /** O nome que fica no lugar, para o Painel continuar contando sem dizer quem era. */
 export const ERASED_NAME = 'Dados apagados (LGPD)';
@@ -38,7 +38,7 @@ export async function eraseLeadPersonalData(db: TenantPrismaClient, actor: Actor
   });
   const leadIds = leads.map((l) => l.id);
   const conversations = await db.conversation.findMany({
-    where: { OR: [{ leadId: { in: leadIds } }, ...(phone ? [{ phoneHash: conversationHash(phone, tenantId) }] : [])] },
+    where: { OR: [{ leadId: { in: leadIds } }, ...(phone ? [{ phoneHash: { in: conversationHashes(phone, tenantId) } }] : [])] },
     select: { id: true },
   });
   const convIds = conversations.map((c) => c.id);

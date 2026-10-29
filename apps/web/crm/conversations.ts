@@ -4,7 +4,7 @@ import { chatKey } from '@/lib/phone';
 import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
-import { conversationHash, decryptPhone, leadHashesForChat, maskPhone } from './phone';
+import { conversationHash, conversationHashes, decryptPhone, leadHashesForChat, maskPhone } from './phone';
 import { conversationScope, type Viewer } from './scope-rules';
 import { needsSignature, readCrmPrefs, signText } from './crm-prefs';
 
@@ -251,7 +251,7 @@ export function conversationWhere(
     const digits = term.replace(/\D/g, '');
     where.OR =
       digits.length >= 10
-        ? [{ phoneHash: conversationHash(digits, ctx.tenantId) }]
+        ? [{ phoneHash: { in: conversationHashes(digits, ctx.tenantId) } }]
         : [
             { contactName: { contains: term, mode: 'insensitive' } },
             { lead: { name: { contains: term, mode: 'insensitive' } } },
@@ -423,7 +423,7 @@ export async function conversationIdForLead(db: TenantPrismaClient, tenantId: st
   const lead = await db.lead.findFirst({ where: { id: leadId, deletedAt: null }, select: { phoneEncrypted: true } });
   const phone = lead ? decryptPhone(lead.phoneEncrypted, tenantId) : '';
   if (!phone) return null;
-  const byPhone = await db.conversation.findFirst({ where: { phoneHash: conversationHash(phone, tenantId) }, select: { id: true } });
+  const byPhone = await db.conversation.findFirst({ where: { phoneHash: { in: conversationHashes(phone, tenantId) } }, select: { id: true } });
   return byPhone?.id ?? null;
 }
 
@@ -463,7 +463,7 @@ export async function ensureConversationForLead(
     return { ok: true, conversationId: conv.id };
   } catch {
     // A pessoa escreveu no mesmo instante e o gateway criou primeiro.
-    const again = await db.conversation.findFirst({ where: { phoneHash }, select: { id: true } });
+    const again = await db.conversation.findFirst({ where: { phoneHash: { in: conversationHashes(key, tenantId) } }, select: { id: true } });
     return again ? { ok: true, conversationId: again.id } : { ok: false, message: 'Não foi possível abrir a conversa.' };
   }
 }

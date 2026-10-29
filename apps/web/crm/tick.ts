@@ -4,6 +4,7 @@ import { processCloudQueue } from './cloud-send';
 import { simulateDueLocal } from './dev-clock';
 import { runDueAutomations } from './stage-automations';
 import { fillMissingCpfHashes } from '@/lib/cpf-hash';
+import { reencryptWithCurrentKey } from '@/lib/key-rotation';
 
 /**
  * O relógio do CRM: o que precisa acontecer sem ninguém na tela. O gateway, que
@@ -24,5 +25,7 @@ export async function runTick(now: Date = new Date()) {
   const botsExpired = await expireBots(now);
   // Manutenção: índice cego do CPF dos pacientes antigos (F-15). Zera sozinho.
   const cpfHashes = await fillMissingCpfHashes();
-  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsNoReply, botsExpired, cpfHashes };
+  // Troca da chave mestra (F-16): parada enquanto a chave atual é a 1.
+  const keyRotation = await reencryptWithCurrentKey();
+  return { automations, broadcastsStarted, cloudSent, simulated, broadcastsDone, botsWoken, botsNoReply, botsExpired, cpfHashes, keyRotation };
 }

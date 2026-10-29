@@ -1,7 +1,7 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import { forgetPatientKeys } from './conversations';
 import { OPEN_LEAD } from './leads';
-import { conversationHash, decryptPhone, leadHashesForChat } from './phone';
+import { conversationHashes, decryptPhone, leadHashesForChat } from './phone';
 
 /**
  * A pessoa chegou pelo WhatsApp, virou lead, e a recepção a cadastrou como
@@ -28,7 +28,7 @@ export async function adoptLeadByPhone(db: TenantPrismaClient, tenantId: string,
     where: { patientId: null, phoneHash: { in: phones.flatMap((p) => leadHashesForChat(p, tenantId)) }, ...OPEN_LEAD },
     orderBy: { createdAt: 'desc' },
   });
-  const conversas = phones.map((p) => conversationHash(p, tenantId));
+  const conversas = phones.flatMap((p) => conversationHashes(p, tenantId));
 
   return db.$transaction(async (tx) => {
     // A conversa do número, ainda sem paciente, é deste paciente.

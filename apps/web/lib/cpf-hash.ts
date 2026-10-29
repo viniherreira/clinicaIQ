@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma, decrypt, hashForTenant } from '@clinicaiq/db';
+import { prisma, decrypt, hashForTenant, hashesForTenant } from '@clinicaiq/db';
 
 /**
  * CPF repetido na clínica (achado F-15 da auditoria).
@@ -17,9 +17,14 @@ function masterKey(): string {
 
 const digitsOf = (value: string) => value.replace(/\D/g, '');
 
-/** O código do CPF nesta clínica. `cpf:` separa do código de telefone. */
+/** O código do CPF nesta clínica, para gravar. `cpf:` separa do código de telefone. */
 export function cpfHash(cpf: string, tenantId: string): string {
   return hashForTenant(`cpf:${digitsOf(cpf)}`, masterKey(), tenantId);
+}
+
+/** Os códigos para procurar: mais de um só durante uma troca da chave mestra. */
+export function cpfHashes(cpf: string, tenantId: string): string[] {
+  return hashesForTenant(`cpf:${digitsOf(cpf)}`, masterKey(), tenantId);
 }
 
 /**
@@ -33,7 +38,7 @@ export async function cpfTaken(tenantId: string, cpf: string, exceptPatientId?: 
   const notSelf = exceptPatientId ? { NOT: { id: exceptPatientId } } : {};
 
   const found = await prisma.patient.findFirst({
-    where: { tenantId, deletedAt: null, cpfHash: cpfHash(cpf, tenantId), ...notSelf },
+    where: { tenantId, deletedAt: null, cpfHash: { in: cpfHashes(cpf, tenantId) }, ...notSelf },
     select: { id: true },
   });
   if (found) return true;

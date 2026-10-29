@@ -1,4 +1,4 @@
-import { decrypt, encrypt, hashForTenant } from '@clinicaiq/db';
+import { decrypt, encrypt, hashForTenant, hashesForTenant } from '@clinicaiq/db';
 import { chatKey, normalizeBrazilPhone } from '@/lib/phone';
 
 /**
@@ -22,8 +22,17 @@ export function isValidPhone(raw: string): boolean {
   return /^55\d{10,11}$/.test(canonicalPhone(raw));
 }
 
+/** O índice do lead, para gravar. Para procurar, `phoneHashes`. */
 export function phoneHash(raw: string, tenantId: string): string {
   return hashForTenant(canonicalPhone(raw), masterKey(), tenantId);
+}
+
+/**
+ * Os índices do lead para PROCURAR: um só, exceto durante uma troca da chave
+ * mestra, quando o registro pode ainda ter o código da chave anterior.
+ */
+export function phoneHashes(raw: string, tenantId: string): string[] {
+  return hashesForTenant(canonicalPhone(raw), masterKey(), tenantId);
 }
 
 /**
@@ -34,6 +43,11 @@ export function conversationHash(raw: string, tenantId: string): string {
   return hashForTenant(chatKey(raw), masterKey(), tenantId);
 }
 
+/** Como `phoneHashes`, para a conversa. */
+export function conversationHashes(raw: string, tenantId: string): string[] {
+  return hashesForTenant(chatKey(raw), masterKey(), tenantId);
+}
+
 /**
  * Os índices de lead que podem ser o mesmo número da conversa: com e sem o 9,
  * porque o lead guarda o telefone como foi digitado.
@@ -42,7 +56,7 @@ export function leadHashesForChat(raw: string, tenantId: string): string[] {
   const key = chatKey(raw);
   const m = /^55(\d{2})9([6-9]\d{7})$/.exec(key);
   const forms = m ? [key, `55${m[1]}${m[2]}`] : [key];
-  return forms.map((f) => phoneHash(f, tenantId));
+  return forms.flatMap((f) => phoneHashes(f, tenantId));
 }
 
 export function encryptPhone(raw: string, tenantId: string): string {

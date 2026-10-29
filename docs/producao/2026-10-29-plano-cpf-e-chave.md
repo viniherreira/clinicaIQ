@@ -31,8 +31,9 @@ mensagens do chat, token da API oficial) usa uma única `ENCRYPTION_MASTER_KEY`,
 qual chave usou. Se a chave vazar, não há como trocá-la sem deixar tudo ilegível de uma vez.
 
 **Correção, parte 1 (este PR, sem mudar nenhum dado):**
-1. Chaves numeradas: a atual continua sendo `ENCRYPTION_MASTER_KEY` (versão 1). Uma futura seria
-   `ENCRYPTION_MASTER_KEY_2`, escolhida por `ENCRYPTION_KEY_VERSION=2`.
+1. Chaves numeradas: `ENCRYPTION_MASTER_KEY` é sempre a chave atual, de número
+   `ENCRYPTION_KEY_VERSION` (1 quando não existe). Numa troca, a anterior fica em
+   `ENCRYPTION_MASTER_KEY_V1` até tudo ser recifrado.
 2. Formato: o que já está gravado (sem prefixo) é versão 1 e continua abrindo. Com a versão 1 ativa,
    o app grava exatamente como hoje. Só a partir da versão 2 o texto cifrado ganha o prefixo `k2.`.
 3. Índices cegos (`phoneHash`, `cpfHash`): durante uma troca, a busca procura pelos códigos das duas
