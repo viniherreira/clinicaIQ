@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { addDays } from 'date-fns';
 import { capabilityToken } from '@/lib/tokens';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
+import { requireCapability } from '@/lib/guard';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { notifyCrm } from '@/crm/notify';
 import { describePayment, isPaymentMethod, MAX_INSTALLMENTS } from '@/lib/payment-terms';
@@ -99,6 +100,8 @@ export async function listQuotes({
   status?: string;
   page?: number;
 }) {
+  // Server Action é endereço público: o perfil é conferido aqui, não só na página.
+  await requireCapability('financeiro');
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
 
@@ -156,6 +159,7 @@ export async function listQuotes({
 // ─── Read single (internal) ──────────────────────────────────────────────────
 
 export async function getQuote(id: string) {
+  await requireCapability('financeiro');
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
   const quote = await db.quote.findUnique({
@@ -917,6 +921,7 @@ export async function getContractPdfData(id: string): Promise<ContractDocumentPr
 
 /** O que falta no cadastro para o contrato deste orçamento sair completo. */
 export async function getContractGaps(id: string): Promise<DocumentGap[]> {
+  await requireCapability('financeiro');
   const { tenantId } = await requireTenant();
   const quote = await prisma.quote.findFirst({
     where: { id, tenantId },

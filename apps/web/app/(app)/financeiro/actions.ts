@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import type { ReceiptDocumentProps } from '@clinicaiq/pdf';
 import { valorPorExtenso } from '@/lib/extenso';
 import { capabilityBlocked } from '@/lib/access';
+import { requireCapability } from '@/lib/guard';
 import { loadClinicInfo, loadPatientDocData } from '@/lib/documents';
 import { instantDateBR, instantDateLongBR, instantDateTimeBR } from '@/lib/tz';
 
@@ -94,6 +95,8 @@ export type FinanceData = Awaited<ReturnType<typeof getFinanceData>>;
  * the rest of the app's wall-clock-as-UTC model.
  */
 export async function getFinanceData(params: FinanceParams) {
+  // Server Action é endereço público: o perfil é conferido aqui, não só na página.
+  await requireCapability('financeiro');
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
 

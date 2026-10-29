@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient } from '@clinicaiq/db';
 import { redirect } from 'next/navigation';
 import { wallClockTime } from '@/lib/tz';
+import { requireCapability } from '@/lib/guard';
 
 async function requireTenant() {
   const { userId } = await auth();
@@ -80,6 +81,8 @@ const wallDate = (d: Date) => d.toISOString().slice(0, 10).split('-').reverse().
 const clockDate = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
 export async function getReportData(params: ReportParams): Promise<ReportResult> {
+  // Server Action é endereço público: o perfil é conferido aqui, não só na página.
+  await requireCapability('financeiro');
   const { tenantId } = await requireTenant();
   const db = getTenantClient(tenantId);
 

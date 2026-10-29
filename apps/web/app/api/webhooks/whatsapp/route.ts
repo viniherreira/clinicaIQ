@@ -41,7 +41,7 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  const limited = rateLimit(`wa-webhook:${ip}`, 120, 60_000);
+  const limited = await rateLimit(`wa-webhook:${ip}`, 120, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: 'rate_limited' },

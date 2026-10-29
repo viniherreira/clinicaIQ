@@ -5,7 +5,14 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { prisma, encrypt, decrypt } from '@clinicaiq/db';
 import { addDays, format, parseISO } from 'date-fns';
-import { clinicNow, freeSlots, readOnlineBooking, type OnlineBookingSettings } from '@/lib/availability';
+import {
+  clinicNow,
+  freeSlots,
+  ONLINE_BOOKING_DAILY_CAP,
+  ONLINE_BOOKING_PER_PHONE_DAILY,
+  readOnlineBooking,
+  type OnlineBookingSettings,
+} from '@/lib/availability';
 import { buildWorkingHoursMap } from '@/lib/working-hours';
 import { listUnits } from '@/lib/units';
 import { mainUnit } from '@/lib/unit-rules';
@@ -188,8 +195,8 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
   // só pega robô burro; sem limite, um script enchia a agenda da clínica de
   // horários falsos (com nomes diferentes, o freio de 2 por pessoa não vale).
   const ip = clientIp(await headers());
-  const porMinuto = rateLimit(`agendar:${ip}`, 5, 60_000);
-  const porHora = rateLimit(`agendar-h:${ip}`, 20, 60 * 60_000);
+  const porMinuto = await rateLimit(`agendar:${ip}`, 5, 60_000);
+  const porHora = await rateLimit(`agendar-h:${ip}`, 20, 60 * 60_000);
   if (!porMinuto.ok || !porHora.ok) {
     return { ok: false, message: 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.' };
   }
@@ -201,6 +208,19 @@ export async function bookOnline(slug: string, input: z.input<typeof bookingSche
   const d = parsed.data;
   const { clinic, rules } = found;
   const tenantId = clinic.id;
+
+  // Teto por clínica e por WhatsApp: com IPs variados o limite acima não segura,
+  // e cada pedido manda mensagem pelo número da clínica.
+  const hoje = await prisma.auditLog.count({
+    where: { tenantId, action: 'ONLINE_BOOKING', createdAt: { gte: new Date(Date.now() - 86_400_000) } },
+  });
+  if (hoje >= ONLINE_BOOKING_DAILY_CAP) {
+    return { ok: false, message: 'O agendamento online desta clínica chegou ao limite de hoje. Ligue ou mande mensagem para a clínica.' };
+  }
+  const porFone = await rateLimit(`agendar-fone:${tenantId}:${d.phone.replace(/\D/g, '')}`, ONLINE_BOOKING_PER_PHONE_DAILY, 86_400_000);
+  if (!porFone.ok) {
+    return { ok: false, message: 'Este WhatsApp já fez muitos pedidos hoje. Fale direto com a clínica.' };
+  }
 
   const onde = await unitFor(tenantId, d.unitId);
   if (!onde) return { ok: false, message: 'Escolha a unidade.' };

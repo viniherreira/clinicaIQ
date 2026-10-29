@@ -17,6 +17,9 @@ export interface MembroDaEquipe {
 
 export type Veredito = { ok: true } | { ok: false; motivo: string };
 
+/** Por quantos dias um convite pendente abre a porta. Depois, é preciso reenviar. */
+export const INVITE_VALID_DAYS = 14;
+
 /** Quem ainda administraria a clínica se este membro saísse. */
 function administradoresRestantes(equipe: MembroDaEquipe[], semEste: string): MembroDaEquipe[] {
   return equipe.filter((m) => m.ativo && m.id !== semEste && can(m.role, 'equipe'));

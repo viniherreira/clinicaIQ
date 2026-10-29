@@ -3,6 +3,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
+import { INVITE_VALID_DAYS } from '@/lib/team';
 import { syncBillingValue } from '@/crm/addon';
 import { trialEndFrom } from '@/lib/subscription';
 import { DEFAULT_CHOICE, modulesOf, parseProduct, parseTier, productAvailable } from '@/lib/products';
@@ -70,6 +71,9 @@ async function acceptPendingInvite(
   const convite = await prisma.invitation.findFirst({
     where: {
       status: 'PENDING',
+      // Convite tem prazo: um link esquecido (ou cuja revogação no Clerk falhou)
+      // não pode abrir a porta meses depois.
+      createdAt: { gte: new Date(Date.now() - INVITE_VALID_DAYS * 86_400_000) },
       ...(normalizado
         ? { email: normalizado }
         : doMetadata
@@ -211,10 +215,11 @@ export async function joinFromInviteIfAny(): Promise<string | null> {
   );
   if (religada) return religada;
 
-  const emailPrincipal =
-    u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ??
-    u.emailAddresses[0]?.emailAddress ??
-    null;
+  // Só o e-mail principal, e só se o Clerk o verificou — como no religamento
+  // acima. Sem isso, quem criasse conta com o e-mail convidado sem confirmá-lo
+  // entrava na clínica com o perfil do convite.
+  const principal = u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId);
+  const emailPrincipal = principal?.verification?.status === 'verified' ? principal.emailAddress : null;
 
   return acceptPendingInvite(
     userId,

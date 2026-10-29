@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { guardCrmAction } from '@/crm/guard';
+import { conversationScope } from '@/crm/scope-rules';
 import { activeCloudAccount, cloudClient } from '@/crm/cloud';
 import { fileNameOf, isStoredRef, readChatMedia } from '@/crm/media-store';
 import { mediaResponseHeaders } from '@/crm/media-rules';
@@ -17,7 +18,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!g.ok) return NextResponse.json({ error: g.message }, { status: 403 });
   const { id } = await params;
 
-  const msg = await g.db.chatMessage.findFirst({ where: { id }, select: { mediaRef: true, mimeType: true } });
+  // Mesmo escopo das conversas: o Atendente "só os dele" não abre arquivo de
+  // conversa alheia só por ter o id da mensagem.
+  if (g.rights.leads.view === 'none') return NextResponse.json({ error: 'sem acesso' }, { status: 403 });
+  const escopo = conversationScope({ userId: g.userId, ownOnly: g.ownOnly });
+  const msg = await g.db.chatMessage.findFirst({
+    where: { id, ...(escopo ? { conversation: escopo } : {}) },
+    select: { mediaRef: true, mimeType: true },
+  });
   if (!msg?.mediaRef) return NextResponse.json({ error: 'sem mídia' }, { status: 404 });
 
   if (isStoredRef(msg.mediaRef)) {

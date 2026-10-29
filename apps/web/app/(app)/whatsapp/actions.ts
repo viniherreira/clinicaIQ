@@ -358,7 +358,11 @@ export type TestMessageState = { success: boolean; message: string };
 export async function sendTestMessage(rawPhone: string): Promise<TestMessageState> {
   const { tenantId } = await requireTenant();
 
-  const digits = rawPhone.replace(/\D/g, '');
+  // Manda mensagem pelo número da clínica: mesmas travas das outras ações daqui.
+  const bloqueio = (await capabilityBlocked(tenantId, 'configuracoes')) ?? (await writeBlocked(tenantId));
+  if (bloqueio) return { success: false, message: bloqueio };
+
+  const digits = String(rawPhone ?? '').replace(/\D/g, '');
   if (digits.length < 10) return { success: false, message: 'Informe um número com DDD.' };
 
   const session = await prisma.whatsAppSession.findUnique({
