@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { writeBlocked } from '@/lib/access';
+import { capabilityBlocked, writeBlocked } from '@/lib/access';
+import { refOutsideTenant } from '@/lib/owns';
 import { notifyPatientCreated } from '@/crm/notify';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -246,6 +247,9 @@ export async function getPatient(id: string) {
     where: { id },
     include: {
       patientNotes: {
+        // O include segue a FK sem filtro de clínica (a extensão só filtra o
+        // nível de cima): nota gravada por outra clínica não aparece.
+        where: { tenantId },
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { name: true } } },
       },
@@ -492,11 +496,17 @@ export async function addPatientNote(patientId: string, content: string) {
 
   const bloqueio = await writeBlocked(tenantId);
   if (bloqueio) return;
+  if (await capabilityBlocked(tenantId, 'pacientes')) return;
 
-  if (!content.trim()) return;
+  const texto = typeof content === 'string' ? content.trim().slice(0, 2000) : '';
+  if (!texto) return;
+
+  // A FK só exige que o paciente exista em alguma clínica: sem isto, a nota
+  // entrava na ficha de outra clínica, assinada por alguém de fora.
+  if (await refOutsideTenant(tenantId, { patientId })) return;
 
   await prisma.patientNote.create({
-    data: { tenantId, patientId, userId, content: content.trim() },
+    data: { tenantId, patientId, userId, content: texto },
   });
 
   revalidatePath(`/pacientes/${patientId}`);
