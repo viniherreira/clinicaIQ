@@ -37,7 +37,7 @@ describe.skipIf(!process.env.DATABASE_URL)('escopo "só os dele" (banco)', async
   const tenant = await prisma.tenant.create({
     data: { clerkOrgId: `escopo_${suffix}`, name: 'Escopo teste', slug: `escopo-${suffix}` },
   });
-  const pessoa = (nome: string, crmRole: string) =>
+  const pessoa = (nome: string, crmRole: 'AGENT' | 'AGENT_OWN') =>
     prisma.user.create({
       data: { tenantId: tenant.id, name: nome, email: `${nome.toLowerCase()}-${suffix}@teste.local`, role: 'RECEPTIONIST', crmRole },
     });
