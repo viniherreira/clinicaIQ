@@ -6,9 +6,8 @@ import { applyCapture } from './capture';
 import { acceptConversation, classifyConversation } from './conversations';
 
 /**
- * O que acontece no CRM depois de gravada uma mensagem do contato — venha ela
- * do gateway de QR (aviso em /api/whatsapp/conversation) ou da API oficial
- * (webhook da Meta): ligar a conversa, registrar o pedido de sair, a captação
+ * O que acontece no CRM depois de gravada uma mensagem do contato que chegou
+ * pela API oficial (webhook da Meta): ligar a conversa, registrar o pedido de sair, a captação
  * (palavras da primeira mensagem viram lead com tag), o lead automático do
  * número novo (em Novo, sem Aceitar), dar um responsável (distribuição) e
  * deixar o robô responder.
