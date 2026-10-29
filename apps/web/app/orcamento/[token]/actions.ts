@@ -10,9 +10,14 @@ import { describePayment } from '@/lib/payment-terms';
 export type PublicResult = { ok: boolean; message?: string };
 
 /**
- * Loads a quote by its public token for the patient-facing page. Records the
- * first view (SENT → VIEWED) and flips expired quotes. No auth — the token is
- * the capability.
+ * Loads a quote by its public token for the patient-facing page. No auth — the
+ * token is the capability.
+ *
+ * Só lê. Marcar "Visualizado" aqui, no carregamento, fazia a pré-visualização
+ * de link do WhatsApp (que abre a página assim que a clínica envia) contar como
+ * o paciente vendo. Quem marca é `markPublicQuoteViewed`, chamada pelo
+ * navegador do paciente. Vencido aparece como expirado sem gravar nada; o
+ * `respond` grava quando alguém tenta responder.
  */
 export async function getPublicQuote(token: string) {
   const quote = await prisma.quote.findUnique({
@@ -26,19 +31,8 @@ export async function getPublicQuote(token: string) {
   });
   if (!quote) return null;
 
-  const now = new Date();
-  let status = quote.status;
-
-  if ((status === 'SENT' || status === 'VIEWED') && quote.validUntil < now) {
-    await prisma.quote.update({ where: { id: quote.id }, data: { status: 'EXPIRED' } });
-    status = 'EXPIRED';
-  } else if (status === 'SENT') {
-    await prisma.quote.update({
-      where: { id: quote.id },
-      data: { status: 'VIEWED', viewedAt: quote.viewedAt ?? now },
-    });
-    status = 'VIEWED';
-  }
+  const status =
+    (quote.status === 'SENT' || quote.status === 'VIEWED') && quote.validUntil < new Date() ? 'EXPIRED' : quote.status;
 
   return {
     number: quote.number,
@@ -72,6 +66,18 @@ export async function getPublicQuote(token: string) {
       total: Number(it.total),
     })),
   };
+}
+
+/**
+ * O paciente abriu o orçamento (chamada pelo navegador dele, depois que a página
+ * carregou: robô de pré-visualização não roda isso). Só o primeiro SENT → VIEWED.
+ */
+export async function markPublicQuoteViewed(token: string): Promise<void> {
+  if (typeof token !== 'string' || !token) return;
+  await prisma.quote.updateMany({
+    where: { publicToken: token, status: 'SENT', validUntil: { gte: new Date() } },
+    data: { status: 'VIEWED', viewedAt: new Date() },
+  });
 }
 
 async function respond(

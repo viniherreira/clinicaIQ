@@ -18,7 +18,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   const validUntil = wallDateBR(quote.validUntil);
   const discountAmount = quote.subtotal - quote.total;
   const discountLabel = quote.discountType === 'PERCENT' ? `${quote.discountValue}%` : brl(quote.discountValue);
-  const actionable = quote.status === 'VIEWED';
+  const actionable = quote.status === 'SENT' || quote.status === 'VIEWED';
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 sm:py-12">
