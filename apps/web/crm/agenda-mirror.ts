@@ -3,7 +3,7 @@ import { getTenantModules } from '@/lib/access';
 import { ingestChat } from './chat-ingest';
 import { windowOpen } from './cloud';
 import { classifyConversation } from './conversations';
-import { conversationHash } from './phone';
+import { conversationHashes } from './phone';
 
 /**
  * O aviso da agenda (confirmação, lembrete) que saiu pela API oficial aparece
@@ -40,7 +40,7 @@ export async function mirrorAgendaToCrm(
 export async function patientWindowOpen(tenantId: string, phone: string, patientId: string, now = new Date()): Promise<boolean> {
   const [conversa, resposta] = await Promise.all([
     getTenantClient(tenantId).conversation.findFirst({
-      where: { phoneHash: conversationHash(phone, tenantId) },
+      where: { phoneHash: { in: conversationHashes(phone, tenantId) } },
       select: { lastInboundAt: true },
     }),
     prisma.whatsAppMessage.findFirst({

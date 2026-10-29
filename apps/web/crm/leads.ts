@@ -1,6 +1,6 @@
 import type { LeadSource, Prisma, TenantPrismaClient } from '@clinicaiq/db';
 import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipeline';
-import { conversationHash, encryptPhone, phoneHash } from './phone';
+import { conversationHashes, encryptPhone, phoneHash } from './phone';
 import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
 
@@ -275,7 +275,7 @@ export async function createLead(
     // Já existe conversa de WhatsApp com esse número: passa a ser deste negócio
     // e sai da Entrada.
     await tx.conversation.updateMany({
-      where: { tenantId, phoneHash: conversationHash(input.phone, tenantId) },
+      where: { tenantId, phoneHash: { in: conversationHashes(input.phone, tenantId) } },
       data: {
         leadId: lead.id,
         status: 'ACTIVE',

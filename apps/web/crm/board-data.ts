@@ -4,7 +4,7 @@ import type { LeadSource, Prisma } from '@clinicaiq/db';
 import type { CrmContext } from './guard';
 import { OPEN_LEAD } from './leads';
 import { liveInfoForLeads } from './live';
-import { canonicalPhone, decryptPhone, maskPhone, phoneHash } from './phone';
+import { canonicalPhone, decryptPhone, maskPhone, phoneHashes } from './phone';
 import { taskStatus } from './tasks-status';
 import type { BoardFilters, BoardLead, BoardTaskStatus } from './types';
 import { clinicDay, hasPeriod, periodWhere } from './period';
@@ -52,7 +52,7 @@ export function leadWhere(
     and.push({
       OR:
         digits.length >= 10
-          ? [{ phoneHash: phoneHash(canonicalPhone(digits), ctx.tenantId) }]
+          ? [{ phoneHash: { in: phoneHashes(canonicalPhone(digits), ctx.tenantId) } }]
           : [{ name: { contains: f.q, mode: 'insensitive' } }, { title: { contains: f.q, mode: 'insensitive' } }],
     });
   }

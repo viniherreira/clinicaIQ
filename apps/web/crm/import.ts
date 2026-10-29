@@ -7,7 +7,7 @@ import type { ImportRecord } from './import-map';
 import { listFieldDefs, saveField, setLeadFields } from './lead-fields';
 import { createLead, moveLead, OPEN_LEAD, renumberStage, type Actor } from './leads';
 import { mainPipeline } from './pipeline';
-import { phoneHash } from './phone';
+import { phoneHashes } from './phone';
 import { createPipeline, createStage } from './settings';
 
 /** A primeira coluna aberta de um funil: a entrada de quem não tem "Novo" (Agendados). */
@@ -66,7 +66,7 @@ export interface ImportPreview {
 /** O que vai acontecer: duplicados, funis/etapas/tags novos e responsáveis que não existem. */
 export async function previewImport(ctx: CrmContext, input: PreviewInput, defaultPipelineId: string | null): Promise<ImportPreview> {
   const { db, tenantId } = ctx;
-  const hashes = [...new Set(input.phones)].map((p) => phoneHash(p, tenantId));
+  const hashes = [...new Set(input.phones)].flatMap((p) => phoneHashes(p, tenantId));
   const [abertos, funis, etapas, tags, users] = await Promise.all([
     hashes.length
       ? db.lead.findMany({ where: { phoneHash: { in: hashes }, ...OPEN_LEAD }, select: { phoneHash: true }, distinct: ['phoneHash'] })
@@ -269,16 +269,15 @@ export async function importBatch(ctx: CrmContext, records: ImportRecord[], opti
         continue;
       }
       const assignedToId = responsavel(rec.responsible);
-      const hash = phoneHash(rec.phone, tenantId);
 
       // Duplicado: lead aberto com o mesmo telefone; para negócio fechado, o mesmo negócio já fechado.
       if (options.duplicates !== 'create') {
         const existente = await db.lead.findFirst({
           where:
             outcome === 'open'
-              ? { phoneHash: hash, ...OPEN_LEAD }
+              ? { phoneHash: { in: phoneHashes(rec.phone, tenantId) }, ...OPEN_LEAD }
               : {
-                  phoneHash: hash,
+                  phoneHash: { in: phoneHashes(rec.phone, tenantId) },
                   deletedAt: null,
                   title: rec.title,
                   stageId: destino.id,

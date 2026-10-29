@@ -1,6 +1,6 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import { OPEN_LEAD } from './leads';
-import { canonicalPhone, decryptPhone, phoneHash } from './phone';
+import { canonicalPhone, decryptPhone, phoneHashes } from './phone';
 
 /**
  * Já conhecemos este telefone?
@@ -10,7 +10,7 @@ import { canonicalPhone, decryptPhone, phoneHash } from './phone';
  */
 export async function findOpenLeadByPhone(db: TenantPrismaClient, tenantId: string, phone: string) {
   return db.lead.findFirst({
-    where: { phoneHash: phoneHash(phone, tenantId), ...OPEN_LEAD },
+    where: { phoneHash: { in: phoneHashes(phone, tenantId) }, ...OPEN_LEAD },
     select: { id: true, name: true, stageId: true },
     orderBy: { createdAt: 'desc' },
   });

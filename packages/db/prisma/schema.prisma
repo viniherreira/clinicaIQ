@@ -253,6 +253,10 @@ model Patient {
   name               String
   nickname           String?
   cpfEncrypted       String?   @map("cpf")
+  /// Índice cego do CPF (`hashForTenant('cpf:' + dígitos)`): acha o CPF
+  /// repetido sem abrir a tabela. Nulo = sem CPF, ou paciente antigo que o
+  /// relógio do CRM ainda não preencheu.
+  cpfHash            String?
   phoneEncrypted     String    @map("phone")
   phone2Encrypted    String?   @map("phone2")
   email              String?
@@ -307,6 +311,7 @@ model Patient {
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, cpfHash])
   @@map("patients")
 }
 
