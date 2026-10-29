@@ -36,6 +36,8 @@ import { AnamnesisSection } from './_components/anamnesis-section';
 import { EvolutionsSection } from './_components/evolutions-section';
 import { ImagesSection } from './_components/images-section';
 import { CopyButton } from './_components/copy-button';
+import { LgpdCard } from './_components/lgpd-card';
+import { ANONYMIZED_PREFIX } from '@/lib/patient-lgpd';
 import { ANAMNESIS_QUESTIONS } from './_components/anamnesis-questions';
 import { CLINIC_TZ, wallClockTime } from '@/lib/tz';
 import { CrmPatientDeals } from '@/components/crm-patient-deals';
@@ -335,6 +337,9 @@ export default async function PatientPage({
             </button>
           </form>
         </section>
+        {record.canManagePrivacy && (
+          <LgpdCard patientId={patient.id} anonimizado={patient.name.startsWith(ANONYMIZED_PREFIX)} />
+        )}
       </aside>
     </div>
   );

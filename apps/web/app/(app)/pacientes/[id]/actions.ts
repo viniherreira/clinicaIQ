@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { storageEnabled, uploadObject, signObject, deleteObject } from '@/lib/storage';
 import { contentMatchesType, fileHead } from '@/lib/file-sniff';
 import { capabilityBlocked, hasCapability, writeBlocked } from '@/lib/access';
+import { anonymizePatient } from '@/lib/patient-lgpd';
+import { deleteChatMedia } from '@/crm/media-store';
 import { ANAMNESIS_KEYS, type AnamnesisAnswers } from './_components/anamnesis-questions';
 import { refOutsideTenant, refErrorMessage } from '@/lib/owns';
 import { findingText, isFace, isKind, KINDS, VALID_TEETH, type FindingKind, type FindingStatus } from '@/lib/odontogram';
@@ -175,9 +177,10 @@ export async function getPatientRecord(patientId: string) {
   // precisa dele para agendar; o financeiro não é assunto de quem atende. Em vez
   // de barrar a tela inteira, devolvemos só o que o perfil alcança — a ficha do
   // paciente continua abrindo para todo mundo, com o conteúdo certo em cada caso.
-  const [veProntuario, veFinanceiro] = await Promise.all([
+  const [veProntuario, veFinanceiro, cuidaPrivacidade] = await Promise.all([
     hasCapability(tenantId, 'prontuario'),
     hasCapability(tenantId, 'financeiro'),
+    hasCapability(tenantId, 'privacidade'),
   ]);
   // Ler o prontuário também fica no registro (LGPD): não só quem alterou, mas
   // quem abriu. Uma linha a cada 10 minutos por pessoa e paciente, para o
@@ -204,6 +207,8 @@ export async function getPatientRecord(patientId: string) {
     },
     canSeeRecord: veProntuario,
     canSeeFinance: veFinanceiro,
+    /** Exportar e anonimizar (LGPD): dono e administrador. */
+    canManagePrivacy: cuidaPrivacidade,
     financial: !veFinanceiro ? semFinanceiro : {
       contracted,
       paid,
@@ -699,4 +704,28 @@ export async function deletePatientFile(id: string, patientId: string) {
     data: { tenantId, userId, action: 'DELETE', entity: 'PatientFile', entityId: id },
   });
   revalidatePath(`/pacientes/${patientId}`);
+}
+
+// ─── LGPD: anonimizar ──────────────────────────────────────────────────────────
+
+/**
+ * Tira do cadastro o que identifica o paciente (LGPD art. 18). Só quem cuida da
+ * privacidade, e só com a palavra ANONIMIZAR digitada: não tem volta. O
+ * prontuário fica (`lib/patient-lgpd.ts`).
+ */
+export async function anonymizePatientAction(patientId: string, confirmacao: string): Promise<{ ok: boolean; message?: string }> {
+  const { tenantId, userId } = await requireTenant();
+  const bloqueio = (await writeBlocked(tenantId)) ?? (await capabilityBlocked(tenantId, 'privacidade'));
+  if (bloqueio) return { ok: false, message: bloqueio };
+  if (typeof confirmacao !== 'string' || confirmacao.trim().toUpperCase() !== 'ANONIMIZAR') {
+    return { ok: false, message: 'Digite ANONIMIZAR para confirmar.' };
+  }
+
+  const r = await anonymizePatient(tenantId, userId, patientId);
+  if (!r.ok) return r;
+  for (const ref of r.mediaRefs) await deleteChatMedia(ref).catch(() => undefined);
+
+  revalidatePath('/pacientes');
+  revalidatePath(`/pacientes/${patientId}`);
+  return { ok: true };
 }
