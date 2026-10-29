@@ -40,8 +40,27 @@ function parseBRL(value: string): number {
 
 // ─── Clinical record (histórico + financeiro + odontograma) ──────────────────
 
+const LEITURA_JANELA_MS = 10 * 60_000;
+
+async function registrarLeitura(tenantId: string, userId: string, patientId: string): Promise<void> {
+  const recente = await prisma.auditLog.findFirst({
+    where: {
+      tenantId,
+      userId,
+      action: 'RECORD_VIEWED',
+      entityId: patientId,
+      createdAt: { gte: new Date(Date.now() - LEITURA_JANELA_MS) },
+    },
+    select: { id: true },
+  });
+  if (recente) return;
+  await prisma.auditLog.create({
+    data: { tenantId, userId, action: 'RECORD_VIEWED', entity: 'Patient', entityId: patientId },
+  });
+}
+
 export async function getPatientRecord(patientId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId, userId } = await requireTenant();
   const db = getTenantClient(tenantId);
   const now = new Date();
 
@@ -160,6 +179,10 @@ export async function getPatientRecord(patientId: string) {
     hasCapability(tenantId, 'prontuario'),
     hasCapability(tenantId, 'financeiro'),
   ]);
+  // Ler o prontuário também fica no registro (LGPD): não só quem alterou, mas
+  // quem abriu. Uma linha a cada 10 minutos por pessoa e paciente, para o
+  // registro não virar uma linha por clique.
+  if (veProntuario) await registrarLeitura(tenantId, userId, patientId);
 
   const semFinanceiro = {
     contracted: 0,
