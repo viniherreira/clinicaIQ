@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consequenciasDaRemocao, podeRemover, type MembroDaEquipe } from './team';
+import { consequenciasDaRemocao, podeMexerNoPapel, podeRemover, type MembroDaEquipe } from './team';
 
 const dono: MembroDaEquipe = { id: 'u-dono', nome: 'Michele', role: 'OWNER', ativo: true };
 const admin: MembroDaEquipe = { id: 'u-admin', nome: 'Paulo', role: 'ADMIN', ativo: true };
@@ -38,8 +38,9 @@ describe('podeRemover', () => {
   });
 
   it('o último administrador não sai', () => {
-    const r = remover('u-admin', 'u-dono', [dono, admin, recepcao]);
-    expect(r.ok).toBe(true); // ainda sobra o admin
+    const outroAdmin: MembroDaEquipe = { id: 'u-admin2', nome: 'Rita', role: 'ADMIN', ativo: true };
+    const r = remover('u-admin', 'u-admin2', [dono, admin, outroAdmin, recepcao]);
+    expect(r.ok).toBe(true); // ainda sobram o dono e o admin
 
     const sozinho = remover('u-dono', 'u-admin', [dono, admin]);
     expect(sozinho.ok).toBe(true); // ainda sobra o dono
@@ -71,6 +72,18 @@ describe('podeRemover', () => {
     expect(r.ok === false && r.motivo).toContain('não encontrada');
   });
 
+  it('administrador não remove o proprietário', () => {
+    // Era assim que um ADMIN tomava a clínica: tirava o dono e ficava sozinho.
+    const r = remover('u-admin', 'u-dono', [dono, admin, recepcao]);
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.motivo).toContain('proprietário');
+  });
+
+  it('proprietário remove outro proprietário', () => {
+    const socio: MembroDaEquipe = { id: 'u-socio', nome: 'Bia', role: 'OWNER', ativo: true };
+    expect(remover('u-dono', 'u-socio', [dono, socio])).toEqual({ ok: true });
+  });
+
   it('papel desconhecido não remove ninguém', () => {
     const r = podeRemover({
       atorId: 'u-x',
@@ -79,6 +92,33 @@ describe('podeRemover', () => {
       equipe: [dono, recepcao],
     });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('podeMexerNoPapel', () => {
+  const mexer = (atorRole: string, papelAtual: string | null, papelNovo: string | null) =>
+    podeMexerNoPapel({ atorRole, papelAtual, papelNovo }).ok;
+
+  it('administrador não rebaixa o proprietário', () => {
+    expect(mexer('ADMIN', 'OWNER', 'RECEPTIONIST')).toBe(false);
+    expect(mexer('ADMIN', 'OWNER', 'ADMIN')).toBe(false);
+  });
+
+  it('administrador não promove nem convida proprietário', () => {
+    expect(mexer('ADMIN', 'RECEPTIONIST', 'OWNER')).toBe(false);
+    expect(mexer('ADMIN', null, 'OWNER')).toBe(false);
+  });
+
+  it('administrador segue cuidando do resto da equipe', () => {
+    expect(mexer('ADMIN', 'RECEPTIONIST', 'PROFESSIONAL')).toBe(true);
+    expect(mexer('ADMIN', 'ADMIN', 'RECEPTIONIST')).toBe(true);
+    expect(mexer('ADMIN', null, 'ADMIN')).toBe(true);
+  });
+
+  it('proprietário mexe em qualquer um', () => {
+    expect(mexer('OWNER', 'OWNER', 'ADMIN')).toBe(true);
+    expect(mexer('OWNER', null, 'OWNER')).toBe(true);
+    expect(mexer('OWNER', 'OWNER', null)).toBe(true);
   });
 });
 
