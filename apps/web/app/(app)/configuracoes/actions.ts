@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { PROFESSIONAL_PALETTE } from './_components/constants';
 import { capabilityBlocked, writeBlocked } from '@/lib/access';
 import { can, isRole, type Role } from '@/lib/permissions';
-import { podeMexerNoPapel, podeRemover } from '@/lib/team';
+import { INVITE_VALID_DAYS, podeMexerNoPapel, podeRemover } from '@/lib/team';
 import { syncBillingValue } from '@/crm/addon';
 
 /** Mudanças na equipe mexem na cobrança do CRM (quem passar do incluído no plano). Falha no Asaas
@@ -923,10 +923,15 @@ export async function listInvites(): Promise<PendingInvite[]> {
     rows.map((r) => r.email),
   );
 
+  const vencimento = Date.now() - INVITE_VALID_DAYS * 86_400_000;
   return rows.map((r) => ({
     ...r,
     role: r.role as Role,
-    bloqueio: presos.has(r.email.toLowerCase()) ? CONTA_EM_OUTRA_CLINICA : null,
+    bloqueio: presos.has(r.email.toLowerCase())
+      ? CONTA_EM_OUTRA_CLINICA
+      : r.createdAt.getTime() < vencimento
+        ? `Venceu: o convite vale ${INVITE_VALID_DAYS} dias. Reenvie para a pessoa conseguir entrar.`
+        : null,
   }));
 }
 
