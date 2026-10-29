@@ -4,6 +4,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { prisma } from '@clinicaiq/db';
 import { relinkByVerifiedEmail } from '@/lib/clerk-relink';
 import { INVITE_VALID_DAYS } from '@/lib/team';
+import { NEW_CLINIC_PRIVACY } from '@/lib/privacy-settings';
 import { syncBillingValue } from '@/crm/addon';
 import { trialEndFrom } from '@/lib/subscription';
 import { DEFAULT_CHOICE, modulesOf, parseProduct, parseTier, productAvailable } from '@/lib/products';
@@ -301,6 +302,9 @@ export async function completeOnboarding(
       slug,
       document: document ?? null,
       phone: phone ?? null,
+      // Clínica nova começa com a recepção sem prontuário clínico; o dono abre
+      // em Configurações › Privacidade se precisar (lib/privacy-settings.ts).
+      settings: { privacy: { ...NEW_CLINIC_PRIVACY } },
     },
   });
 

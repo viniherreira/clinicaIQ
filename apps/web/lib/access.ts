@@ -10,6 +10,7 @@ import {
   type Capability,
   type Role,
 } from './permissions';
+import { recordAllowed } from './privacy-settings';
 
 /**
  * The clinic's current access level. Cached per request so a page that checks
@@ -134,9 +135,23 @@ export const currentRole = cache(async (tenantId: string): Promise<Role> => {
   return (user?.role as Role | undefined) ?? LEAST_PRIVILEGE;
 });
 
-/** Mesma pergunta sem lançar, para decidir o que renderizar. */
+/** As configurações da clínica (`Tenant.settings`). Em cache por requisição. */
+const tenantSettings = cache(async (tenantId: string): Promise<unknown> => {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }).catch(() => null);
+  // Sem resposta do banco, fecha o prontuário da recepção em vez de abrir.
+  return t ? t.settings : { privacy: { receptionSeesRecord: false } };
+});
+
+/**
+ * Mesma pergunta sem lançar, para decidir o que renderizar.
+ *
+ * O prontuário depende também da clínica: a recepção só vê se a clínica deixou
+ * (`lib/privacy-settings.ts`). Toda checagem de prontuário passa por aqui.
+ */
 export async function hasCapability(tenantId: string, capability: Capability): Promise<boolean> {
-  return can(await currentRole(tenantId), capability);
+  const role = await currentRole(tenantId);
+  if (capability === 'prontuario') return recordAllowed(role, await tenantSettings(tenantId));
+  return can(role, capability);
 }
 
 /**
