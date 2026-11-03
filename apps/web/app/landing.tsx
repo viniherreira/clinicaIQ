@@ -178,8 +178,7 @@ function Hero() {
       className="relative overflow-hidden"
       style={{
         backgroundImage:
-          'radial-gradient(ellipse 80% 60% at 75% -10%, hsl(var(--primary) / 0.10), transparent), radial-gradient(ellipse 50% 40% at 0% 100%, hsl(38 92% 55% / 0.06), transparent), radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
-        backgroundSize: 'auto, auto, 28px 28px',
+          'radial-gradient(ellipse 80% 60% at 75% -10%, hsl(var(--primary) / 0.10), transparent), radial-gradient(ellipse 50% 40% at 0% 100%, hsl(38 92% 55% / 0.06), transparent)',
       }}
     >
       <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:pb-28 lg:pt-20">
