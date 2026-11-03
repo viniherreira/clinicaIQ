@@ -15,6 +15,7 @@ const isPublicRoute = createRouteMatcher([
   '/agendar/(.*)', // agendamento online: público, sem login
   '/api/webhooks/(.*)',
   '/api/cron/(.*)', // Vercel Cron authenticates via CRON_SECRET, not Clerk
+  '/api/health', // monitor de site fora do ar: só diz se está de pé
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
