@@ -3,6 +3,7 @@ import {
   CloudApiError,
   getWhatsAppProvider,
   getGatewayProvider,
+  MockWhatsAppProvider,
   WHATSAPP_TEMPLATES,
   CONFIRMATION_BUTTONS,
   buildAppointmentCreatedBody,
@@ -77,6 +78,8 @@ const PERMANENT_ERRORS = new Set([
   'empty-body',
   'automation-disabled',
   'template-pending',
+  // Sem número conectado, não há fila que vá mandar depois: fica como falha.
+  'not-configured',
 ]);
 
 /** Turns internal send-failure codes into something the clinic can act on. */
@@ -87,6 +90,7 @@ function friendlyError(code: string): string {
     'lookup-failed': 'Não foi possível verificar o número agora. Reenviando automaticamente',
     'patient-without-phone': 'Paciente sem telefone cadastrado',
     'not-connected': 'WhatsApp da clínica desconectado. Será enviada quando reconectar',
+    'not-configured': 'Não enviada: o WhatsApp da clínica ainda não está conectado. Conecte o número na tela WhatsApp',
     'automation-disabled': 'Envio desligado nas configurações',
     'invalid-number': 'Número de telefone inválido',
     'gateway-unreachable': 'Serviço de WhatsApp fora do ar. Reenviando automaticamente',
@@ -162,7 +166,14 @@ async function resolveProvider(
   if (automation === 'birthday') return { kind: 'skip', error: 'not-connected' };
 
   // No line ever paired: fall back to the environment provider (Meta / mock).
-  return { kind: 'send', resolved: { provider: getWhatsAppProvider(), ownLine: false } };
+  const provider = getWhatsAppProvider();
+  // Em produção o simulador nunca entra: ele "envia" sem mandar nada, a fila
+  // marcaria a mensagem como enviada e a clínica acharia que o paciente foi
+  // avisado. Melhor dizer que não saiu e o que fazer.
+  if (provider instanceof MockWhatsAppProvider && process.env.NODE_ENV === 'production') {
+    return { kind: 'skip', error: 'not-configured' };
+  }
+  return { kind: 'send', resolved: { provider, ownLine: false } };
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────
@@ -214,7 +225,18 @@ export async function getWhatsAppHealth(tenantId: string): Promise<WhatsAppHealt
     }),
   ]);
 
-  if (!session) return { paired: false, connected: false, problem: null };
+  if (!session) {
+    // Nunca conectou um número. Se o envio global também não manda nada de
+    // verdade (o simulador, em produção), a clínica precisa saber.
+    const semEnvio = getWhatsAppProvider() instanceof MockWhatsAppProvider && process.env.NODE_ENV === 'production';
+    return {
+      paired: false,
+      connected: false,
+      problem: semEnvio
+        ? 'O WhatsApp da clínica ainda não está conectado, então as confirmações não estão saindo. Conecte o número na tela WhatsApp.'
+        : null,
+    };
+  }
 
   if (session.status !== 'CONNECTED') {
     return {

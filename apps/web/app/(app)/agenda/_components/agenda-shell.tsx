@@ -306,7 +306,7 @@ export function AgendaShell({ initialDate, initialView, initialData, prefillPati
                 href="/whatsapp"
                 className="shrink-0 font-medium underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                Reconectar
+                {data.whatsappHealth.paired ? 'Reconectar' : 'Conectar'}
               </Link>
             </div>
           )}
