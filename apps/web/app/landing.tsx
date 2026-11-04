@@ -658,44 +658,36 @@ function FAQ() {
 function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
   return (
     <section aria-labelledby="cta-final" className="px-4 pb-16 sm:px-6 lg:pb-24">
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-brand-gradient px-6 py-14 text-center shadow-xl sm:px-12 lg:py-20">
-        {/* Decorative rings */}
-        <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full border border-white/15" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full border border-white/15" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full border border-white/10" />
+      <div className="mx-auto grid max-w-6xl gap-8 rounded-2xl border border-border bg-surface p-6 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-16">
+        <div className="max-w-2xl">
+          <h2 id="cta-final" className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Teste com a agenda da sua clínica
+          </h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+            Cadastre a equipe e marque as consultas de uma semana normal. Em {TRIAL_DAYS} dias você sabe se o sistema serve
+            para a sua rotina.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Não pedimos cartão. Se não assinar, nada é cobrado e seus dados ficam disponíveis para consulta.
+          </p>
+        </div>
 
-        <h2 id="cta-final" className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Nenhum paciente perdido no WhatsApp. Nenhuma cadeira vazia por falta.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-base text-white/85">
-          Crie a conta, conecte o WhatsApp e faça o primeiro agendamento ainda hoje. {TRIAL_DAYS} dias grátis, sem cartão e sem
-          fidelidade.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          {/* O degradê não muda com o tema, então o teal do botão também não. */}
-          <Link
-            href={TESTAR}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-teal-800 shadow-lg transition-transform hover:scale-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            Testar grátis por {TRIAL_DAYS} dias
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        <div className="flex flex-col items-start gap-3 lg:items-stretch">
+          <Link href={TESTAR} className="btn-primary !h-12 !rounded-full px-7 !text-base">
+            Começar o teste grátis
           </Link>
           {whatsapp ? (
             <a
               href={whatsapp}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              className="btn-outline !h-12 !rounded-full px-7 !text-base"
             >
-              <MessageCircle className="h-4 w-4" aria-hidden="true" />
               Falar com a gente
               <span className="sr-only"> no WhatsApp (abre em nova aba)</span>
             </a>
           ) : (
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-base font-medium text-white/90 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
+            <Link href="/sign-in" className="btn-ghost !h-12 !rounded-full px-7 !text-base">
               Já tenho conta
             </Link>
           )}
