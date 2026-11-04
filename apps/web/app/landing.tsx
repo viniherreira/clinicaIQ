@@ -1,65 +1,158 @@
 /**
  * DreamClin marketing landing page (rendered at `/` for signed-out visitors).
  *
- * Direção: SaaS de saúde profissional, limpo e confiante, no azul-petróleo e
- * marinho da marca, com a fonte do manual (Inter). O produto é o herói: em vez
- * de foto de banco de imagens, uma janela do sistema com o funil, e os cartões
- * flutuando mostram a promessa (o WhatsApp vira lead; agendou, o card anda).
+ * Direção: a clínica vista de noite, que amanhece até o fechamento. O nome é
+ * Dream, o D da logo parece uma lua e o símbolo já traz uma estrela: ele é o
+ * objeto de luz da primeira tela, e o caminho do paciente vira uma constelação.
  *
- * A página vende três produtos — Agenda, CRM e Completo — e conta a história
- * que só o Completo entrega: do primeiro "oi" no WhatsApp ao tratamento
- * fechado, com o funil andando sozinho pela agenda.
+ * A página vende três produtos, Agenda, CRM e Completo, e conta a história que
+ * só o Completo entrega: do primeiro "oi" no WhatsApp ao tratamento fechado, com
+ * o funil andando sozinho pela agenda.
  * Spec: docs/specs/2026-10-26-planos-teste-e-funis-design.md
  *
- * Texto honesto: nada de depoimento ou número inventado. Os nomes na janela do
- * sistema são ilustração. Prazo do teste e preços vêm do código e do banco, os
- * mesmos que o cadastro e a cobrança usam. Movimento: fade-in-up escalonado e
- * flutuação leve, só CSS (e desligado em prefers-reduced-motion).
+ * Texto honesto: nada de depoimento ou número inventado. Os nomes e valores nas
+ * telas são ilustração, e a página diz isso. Prazo do teste e preços vêm do
+ * código e do banco, os mesmos que o cadastro e a cobrança usam.
+ * Estilos em `landing.css`, escopados em `.lp`.
  */
 import Link from 'next/link';
+import { Outfit } from 'next/font/google';
 import {
-  Accessibility, ArrowRight, BadgeCheck, Bot, CalendarCheck, CalendarDays, Check, FileText,
-  Globe, Heart, Inbox, KanbanSquare, ListChecks, Lock, Megaphone, MessageCircle, ShieldCheck, Smile,
-  Sparkles, Stethoscope, Trophy, Wallet,
+  Accessibility, ArrowRight, BadgeCheck, Bot, CalendarCheck, Check, ClipboardCheck, Database, Heart, Inbox,
+  KanbanSquare, ListChecks, Lock, Megaphone, MessageCircle, Plus, RefreshCcw, ShieldCheck, Trophy,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { companyLine, salesWhatsAppUrl } from '@/lib/company';
 import { TRIAL_DAYS } from '@/lib/subscription';
-import { DEFAULT_CHOICE, productPriceCents, PRODUCT_INFO, signUpHref, type Product } from '@/lib/products';
+import { DEFAULT_CHOICE, productPriceCents, signUpHref, type Product } from '@/lib/products';
+import { LandingMotion } from './landing-motion';
 import { loadPublicPlans, Pricing, type PublicPlan } from './pricing-section';
+import './landing.css';
+
+// A fonte do nome na logo.
+const outfit = Outfit({ subsets: ['latin'], display: 'swap', variable: '--font-outfit' });
 
 const TESTAR = signUpHref(DEFAULT_CHOICE.product, DEFAULT_CHOICE.tier);
 
 const brl = (cents: number) =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
-const navLink =
-  'whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+// ─── Desenhos ────────────────────────────────────────────────────────────────
+
+/** O símbolo da logo com luz, e a estrela de quatro pontas usada no resto da página. */
+function SvgDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+      <defs>
+        <linearGradient id="gD" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#C8EFD8" />
+          <stop offset=".3" stopColor="#5EEAD4" />
+          <stop offset=".7" stopColor="#14B8A6" />
+          <stop offset="1" stopColor="#0F766E" />
+        </linearGradient>
+        <linearGradient id="gB" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#7FA8EA" />
+          <stop offset=".5" stopColor="#2E6FD9" />
+          <stop offset="1" stopColor="#0F3B82" />
+        </linearGradient>
+        <radialGradient id="gH" cx=".38" cy=".32">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset=".55" stopColor="#C8EFD8" />
+          <stop offset="1" stopColor="#A7E3C1" />
+        </radialGradient>
+        <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#5EEAD4" />
+        </linearGradient>
+        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#A7E3C1" />
+          <stop offset=".5" stopColor="#14B8A6" />
+          <stop offset="1" stopColor="#A7E3C1" />
+        </linearGradient>
+        <radialGradient id="vA" cx=".36" cy=".5" r=".7">
+          <stop offset="0" stopColor="#0F766E" />
+          <stop offset=".72" stopColor="#0F766E" />
+          <stop offset="1" stopColor="#14B8A6" />
+        </radialGradient>
+        <radialGradient id="vB" cx=".64" cy=".5" r=".7">
+          <stop offset="0" stopColor="#0F3B82" />
+          <stop offset=".72" stopColor="#0F3B82" />
+          <stop offset="1" stopColor="#2E6FD9" />
+        </radialGradient>
+        <clipPath id="vC">
+          <circle cx="330" cy="330" r="330" />
+        </clipPath>
+        <symbol id="lp-star" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 1c1.4 6.4 3.6 8.6 11 11-7.4 2.4-9.6 4.6-11 11-1.4-6.4-3.6-8.6-11-11 7.4-2.4 9.6-4.6 11-11z" />
+        </symbol>
+      </defs>
+    </svg>
+  );
+}
+
+function Lua({ className }: { className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 635.5 565.5" aria-hidden="true">
+      <g transform="translate(-5 -2.5)">
+        <path fill="url(#gD)" d="M6 239V75.5C6 47 39 8 88 8H277C434.5 8 565.1 141 561 295C557 444.8 450 557 289 568L238 560C339 547 440.7 452 440 333C439.2 203 330.5 122 219 122C139.5 122 54 160 6 239Z" />
+        <path fill="url(#gB)" d="M5 300C5 301 5 269.9 44.5 278C101.9 288.4 122.7 334.7 157 380C181.4 412.1 229.7 420.1 252 405.5C293.9 378 307 350.1 364 345C385.5 343.1 410.2 355.2 398 387C378.6 437.5 283.5 540.5 153 540.5H77C37.2 540.5 5 508.3 5 468.5Z" />
+        <circle fill="url(#gH)" cx="227" cy="269.5" r="67.5" />
+        <path className="tw" fill="url(#gS)" stroke="#FFFFFF" strokeWidth="8" strokeLinejoin="round" d="M575 7.5C589 56 591 58 635.5 72C591 86 589 88 575 136.5C561 88 559 86 514.5 72C559 58 561 56 575 7.5Z" />
+      </g>
+    </svg>
+  );
+}
+
+/** Céu com semente fixa: o servidor e o navegador desenham as mesmas estrelas. */
+const ESTRELAS = (() => {
+  let semente = 7;
+  const sorteio = () => (semente = (semente * 16807) % 2147483647) / 2147483647;
+  return Array.from({ length: 110 }, () => {
+    const tamanho = sorteio();
+    return {
+      x: `${(sorteio() * 100).toFixed(2)}%`,
+      y: `${(sorteio() * 100).toFixed(2)}%`,
+      r: tamanho < 0.8 ? 0.8 : tamanho < 0.96 ? 1.3 : 1.9,
+      atraso: `-${(sorteio() * 5).toFixed(1)}s`,
+    };
+  });
+})();
+
+function Ceu() {
+  return (
+    <div className="sky" aria-hidden="true">
+      <i className="blob a" />
+      <i className="blob b" />
+      <i className="blob c" />
+      <i className="blob d" />
+      <svg className="stars">
+        {ESTRELAS.map((e, i) => (
+          <circle key={i} cx={e.x} cy={e.y} r={e.r} style={{ animationDelay: e.atraso }} />
+        ))}
+      </svg>
+      <i className="grain" />
+    </div>
+  );
+}
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
 function Header() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label="DreamClin, página inicial">
-          <Logo size="md" />
-        </Link>
-
-        <nav aria-label="Menu da página" className="hidden items-center gap-1 lg:flex">
-          <a href="#produtos" className={navLink}>Produtos</a>
-          <a href="#como-funciona" className={navLink}>Como funciona</a>
-          <a href="#recursos" className={navLink}>Recursos</a>
-          <a href="#planos" className={navLink}>Preços</a>
-          <a href="#perguntas" className={navLink}>Perguntas</a>
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <Link href="/sign-in" className="btn-ghost btn-md !rounded-full max-sm:hidden">Entrar</Link>
-          <Link href={TESTAR} className="btn-primary btn-md !rounded-full shadow-md shadow-primary/25">
-            Testar grátis
-          </Link>
-        </div>
+    <header className="bar">
+      <Link href="/" className="bar-logo" aria-label="DreamClin, página inicial">
+        <Logo size="md" tone="white" />
+      </Link>
+      <nav aria-label="Menu da página">
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#produtos">Produtos</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#planos">Preços</a>
+        <a href="#perguntas">Perguntas</a>
+      </nav>
+      <div className="end">
+        <Link href="/sign-in">Entrar</Link>
+        <Link href={TESTAR} className="btn btn-mint btn-sm">Testar grátis</Link>
       </div>
     </header>
   );
@@ -67,197 +160,190 @@ function Header() {
 
 // ─── Hero ────────────────────────────────────────────────────────────────────
 
-const LEADS: { coluna: string; cor: string; cards: { nome: string; meta: string; tag?: string; valor?: string }[] }[] = [
-  {
-    coluna: 'Novo',
-    cor: 'bg-slate-400',
-    cards: [
-      { nome: 'Mariana Lopes', meta: 'WhatsApp · agora', tag: 'Clareamento' },
-      { nome: 'Rafael Souza', meta: 'Instagram · 12 min', tag: 'Implante' },
-    ],
-  },
-  {
-    coluna: 'Avaliação agendada',
-    cor: 'bg-teal-500',
-    cards: [
-      { nome: 'Juliana Prado', meta: 'Qui 14:30 · Dra. Paula', tag: 'Ortodontia' },
-      { nome: 'Carlos Mendes', meta: 'Sex 09:00 · Dr. André' },
-    ],
-  },
-  {
-    coluna: 'Em negociação',
-    cor: 'bg-amber-500',
-    cards: [
-      { nome: 'Beatriz Lima', meta: 'Orçamento visualizado', valor: 'R$ 6.500' },
-      { nome: 'Pedro Alves', meta: 'Retomar na sexta', valor: 'R$ 2.900' },
-    ],
-  },
-];
-
-/** A janela do sistema, ilustrativa: o funil com cards e as duas pontas da promessa. */
-function ProductShowcase() {
-  return (
-    <div className="relative">
-      <p className="sr-only">
-        Ilustração do DreamClin: o funil do CRM com os contatos que chegaram pelo WhatsApp, os que agendaram a avaliação e os
-        que estão negociando o orçamento.
-      </p>
-      <div aria-hidden="true" className="relative sm:pt-24">
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-primary/10">
-          <div className="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-            <span className="ml-3 flex-1 truncate rounded-md bg-surface-alt px-2.5 py-1 text-[11px] text-muted-foreground">
-              dreamclin.com/crm
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2.5 bg-board p-3 sm:p-4">
-            {LEADS.map((c) => (
-              <div key={c.coluna} className="min-w-0">
-                <p className="mb-2 flex items-center gap-1.5 truncate text-[10px] font-bold uppercase tracking-wide text-heading sm:text-[11px]">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.cor}`} />
-                  {c.coluna}
-                </p>
-                <div className="space-y-2">
-                  {c.cards.map((card) => (
-                    <div key={card.nome} className="rounded-lg border border-border bg-surface p-2 shadow-sm sm:p-2.5">
-                      <p className="truncate text-[11px] font-semibold sm:text-xs">{card.nome}</p>
-                      <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-[11px]">{card.meta}</p>
-                      {(card.tag || card.valor) && (
-                        <p className="mt-1.5 flex items-center justify-between gap-1">
-                          {card.tag && (
-                            <span className="truncate rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary-hover dark:text-sky-300 sm:text-[10px]">
-                              {card.tag}
-                            </span>
-                          )}
-                          {card.valor && <span className="ml-auto text-[10px] font-bold tabular-nums sm:text-[11px]">{card.valor}</span>}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Entrou pelo WhatsApp: virou lead sozinho. */}
-        <div className="animate-float absolute -left-4 top-0 z-10 hidden w-60 rounded-xl border border-border bg-surface p-3 shadow-xl sm:block lg:-left-10">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · agora
-          </p>
-          <p className="mt-1.5 rounded-lg rounded-tl-sm bg-surface-alt px-2.5 py-1.5 text-xs">Oi! Quanto fica o clareamento?</p>
-          <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary-hover dark:text-sky-300">
-            <ArrowRight className="h-3 w-3" /> Virou lead em Captação › Novo
-          </p>
-        </div>
-
-        {/* Agendou na agenda: o card passou de funil. */}
-        <div className="animate-float-slow absolute -bottom-10 -right-4 z-10 hidden w-64 rounded-xl border border-border bg-surface p-3 shadow-xl sm:block lg:-right-8">
-          <p className="flex items-center gap-2 text-xs font-semibold">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300">
-              <CalendarCheck className="h-4 w-4" />
-            </span>
-            Avaliação marcada · qui, 14:30
-          </p>
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-            O card foi sozinho para <strong className="font-semibold text-foreground">Agendados</strong> e a confirmação saiu no
-            WhatsApp.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Hero() {
-  const provas = ['Sem cartão de crédito', 'Cancele quando quiser', 'Sem taxa de instalação'];
   return (
-    <section
-      className="relative overflow-hidden"
-      style={{
-        backgroundImage:
-          'radial-gradient(ellipse 80% 60% at 75% -10%, hsl(var(--primary) / 0.10), transparent), radial-gradient(ellipse 50% 40% at 0% 100%, hsl(38 92% 55% / 0.06), transparent)',
-      }}
-    >
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:pb-28 lg:pt-20">
+    <section className="hero">
+      <Ceu />
+      <div className="inner hero-in">
         <div>
-          <p className="animate-fade-in-up inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary-hover dark:text-sky-300">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            Agenda + CRM com WhatsApp oficial · {TRIAL_DAYS} dias grátis
-          </p>
-
-          <h1
-            className="animate-fade-in-up mt-5 text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-5xl lg:text-[3.5rem]"
-            style={{ animationDelay: '80ms' }}
-          >
-            Do primeiro <span className="text-primary">“oi” no WhatsApp</span> ao tratamento fechado
+          <h1>
+            Do <span className="oi">oi</span> ao
+            <br />
+            tratamento
+            <br />
+            fechado.
           </h1>
-
-          <p className="animate-fade-in-up mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg" style={{ animationDelay: '160ms' }}>
-            O sistema para clínicas odontológicas e de estética que junta agenda, prontuário, orçamentos e um CRM no WhatsApp
-            oficial da Meta. Quem chama vira lead sozinho; quando a recepção agenda, o funil anda junto.
+          <p className="lede">
+            Agenda, prontuário, orçamentos e CRM no WhatsApp oficial da Meta, para clínicas odontológicas e de estética. Quem
+            chama vira lead sozinho. Quando a recepção agenda, o funil anda junto.
           </p>
-
-          <div className="animate-fade-in-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '240ms' }}>
-            <Link
-              href={TESTAR}
-              className="btn-primary !h-12 !rounded-full px-7 !text-base shadow-lg shadow-primary/30 transition-transform hover:scale-[1.03]"
-            >
-              Testar grátis por {TRIAL_DAYS} dias
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <div className="acts">
+            <Link href={TESTAR} className="btn btn-mint">
+              Testar grátis por {TRIAL_DAYS} dias <ArrowRight className="ic" aria-hidden="true" />
             </Link>
-            <a href="#planos" className="btn-outline !h-12 !rounded-full px-6 !text-base">
-              Ver planos e preços
-            </a>
+            <a href="#planos" className="btn btn-glass">Ver planos e preços</a>
           </div>
-
-          <ul className="animate-fade-in-up mt-5 flex flex-wrap gap-x-5 gap-y-2" style={{ animationDelay: '320ms' }}>
-            {provas.map((p) => (
-              <li key={p} className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} aria-hidden="true" />
-                {p}
+          <ul className="proofs">
+            {['Sem cartão de crédito', 'Cancele quando quiser', 'Sem taxa de instalação'].map((p) => (
+              <li key={p}>
+                <Check className="ic" aria-hidden="true" /> {p}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="animate-fade-in-up px-2 sm:px-6 lg:px-0" style={{ animationDelay: '200ms' }}>
-          <ProductShowcase />
+        <div
+          className="stage"
+          role="img"
+          aria-label="O símbolo da DreamClin iluminado, com quatro cartões que mostram o caminho de uma paciente: a mensagem no WhatsApp, a consulta confirmada, o orçamento em negociação e o tratamento fechado. Nomes e valores fictícios."
+        >
+          <i className="halo" />
+          <i className="orbit o1" />
+          <i className="orbit o2" />
+          <i className="comet" />
+          <Lua className="moon" />
+          <div className="fc f1">
+            <div className="top"><MessageCircle className="ic" aria-hidden="true" /> WhatsApp, agora</div>
+            <span className="say">Oi! Quanto fica o implante?</span>
+          </div>
+          <div className="fc f2">
+            <div className="top"><CalendarCheck className="ic" aria-hidden="true" /> Agenda</div>
+            <div className="row">
+              <span><b>Beatriz Lima</b><br />Qui, 14:30</span>
+              <span className="ok"><Check className="ic" aria-hidden="true" /> Confirmada</span>
+            </div>
+          </div>
+          <div className="fc f3">
+            <div className="top"><KanbanSquare className="ic" aria-hidden="true" /> Em negociação</div>
+            <div className="row"><span>Orçamento visualizado</span><b className="num">R$ 6.500</b></div>
+          </div>
+          <div className="fc f4">
+            <div className="top"><Trophy className="ic" aria-hidden="true" /> Fechado</div>
+            <strong className="num">R$ 6.500</strong>Aprovado pelo link
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-// ─── Trust strip ─────────────────────────────────────────────────────────────
+// ─── Faixa de confiança ──────────────────────────────────────────────────────
+
+const CONFIANCA = [
+  { icon: BadgeCheck, label: 'API oficial do WhatsApp (Meta)' },
+  { icon: ShieldCheck, label: 'LGPD por padrão' },
+  { icon: Lock, label: 'CPF e telefone criptografados' },
+  { icon: Database, label: 'Backup diário' },
+  { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA' },
+  { icon: Heart, label: 'Feito no Brasil' },
+];
 
 function TrustStrip() {
-  const items = [
-    { icon: BadgeCheck, label: 'API oficial do WhatsApp (Meta)', color: 'text-emerald-600 dark:text-emerald-400' },
-    { icon: ShieldCheck, label: 'LGPD por padrão', color: 'text-emerald-600 dark:text-emerald-400' },
-    { icon: Lock, label: 'CPF e telefone criptografados', color: 'text-blue-800 dark:text-blue-400' },
-    { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA', color: 'text-teal-700 dark:text-teal-400' },
-    { icon: Heart, label: 'Feito no Brasil', color: 'text-rose-500 dark:text-rose-400' },
-  ];
+  const lista = (oculta: boolean) => (
+    <ul aria-hidden={oculta || undefined}>
+      {CONFIANCA.map(({ icon: Icon, label }) => (
+        <li key={label}>
+          <Icon className="ic" aria-hidden="true" /> {label}
+        </li>
+      ))}
+    </ul>
+  );
   return (
-    <section aria-label="Segurança e conformidade" className="border-y border-border bg-surface">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-4 py-5 sm:px-6">
-        {items.map(({ icon: Icon, label, color }) => (
-          <span key={label} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
-            {label}
-          </span>
-        ))}
+    <section className="strip" aria-label="Segurança e conformidade">
+      <div className="track">
+        {lista(false)}
+        {lista(true)}
       </div>
     </section>
   );
 }
 
-// ─── Produtos ────────────────────────────────────────────────────────────────
+// ─── Como funciona: a constelação ────────────────────────────────────────────
 
-const ICONE: Record<Product, typeof CalendarDays> = { COMPLETO: Trophy, AGENDA: CalendarDays, CRM: KanbanSquare };
+function Journey() {
+  const passos = [
+    {
+      modulo: 'CRM',
+      titulo: 'Chamou no WhatsApp',
+      texto: 'Quem escreve para o número da clínica vira um card em Captação, com a conversa junto. Ninguém precisa cadastrar.',
+      mini: (
+        <>
+          <span className="bb">Oi! Quanto fica o implante?</span>
+          <span className="rowx"><b>Beatriz Lima</b>Novo card</span>
+        </>
+      ),
+    },
+    {
+      modulo: 'Agenda',
+      titulo: 'Agendou a avaliação',
+      texto: 'A recepção marca na agenda e o card passa sozinho para Agendados. A confirmação e os lembretes saem pelo WhatsApp.',
+      mini: (
+        <>
+          <span className="rowx"><b>Qui, 14:30</b>Dra. Paula</span>
+          <span className="bb me">Confirmar</span>
+        </>
+      ),
+    },
+    {
+      modulo: 'Agenda',
+      titulo: 'Veio e recebeu o orçamento',
+      texto: 'Marcou que compareceu, o card anda. Criou o orçamento, ele vai para Em negociação, com tarefa para quem cuida.',
+      mini: (
+        <>
+          <span className="rowx"><b>Implante</b><b className="num">R$ 6.500</b></span>
+          <span className="rowx">Em negociação <ClipboardCheck className="ic" aria-hidden="true" /></span>
+        </>
+      ),
+    },
+    {
+      modulo: 'CRM',
+      titulo: 'Aprovou e fechou',
+      texto: 'Aprovado pelo link, o card fecha com o valor do tratamento, e o painel mostra quanto o funil trouxe no mês.',
+      mini: (
+        <>
+          <strong className="num">R$ 6.500</strong>
+          <span>Fechado pelo link</span>
+        </>
+      ),
+    },
+  ];
+  return (
+    <section className="night inner" id="como-funciona" aria-labelledby="como-funciona-titulo">
+      <div className="sec-head">
+        <h2 id="como-funciona-titulo" data-r>A recepção marca.<br />O funil anda sozinho.</h2>
+        <p className="lede" data-r style={{ '--i': 1 } as React.CSSProperties}>
+          No Completo, a agenda e o CRM conversam. A recepção trabalha onde já trabalha, e o funil se atualiza sem ninguém
+          arrastar card.
+        </p>
+      </div>
+      <div className="con-wrap" id="lp-con">
+        <svg className="con-line" aria-hidden="true"><path id="lp-con-path" pathLength={1} /></svg>
+        <ol className="con">
+          {passos.map(({ modulo, titulo, texto, mini }, i) => (
+            <li key={titulo} className="stop" data-r style={{ '--i': i } as React.CSSProperties}>
+              <svg className="pt" aria-hidden="true"><use href="#lp-star" /></svg>
+              <div className="ccard">
+                <span className="who">{modulo}</span>
+                <h3>{titulo}</h3>
+                <p>{texto}</p>
+                <div className="mini" aria-hidden="true">{mini}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <p className="loop" data-r>
+        <RefreshCcw className="ic" aria-hidden="true" />
+        <span>
+          <b>Desmarcou ou faltou?</b> O card vai para “Desmarcou ou faltou” com a tarefa de reagendar, e volta sozinho quando
+          marcar de novo. Perder um negócio nunca é automático: quem decide é a equipe.
+        </span>
+      </p>
+    </section>
+  );
+}
+
+// ─── Produtos: Agenda + CRM = Completo ───────────────────────────────────────
 
 function Products({ plans }: { plans: PublicPlan[] }) {
   // "A partir de": o menor preço do produto entre os tamanhos à venda.
@@ -265,158 +351,49 @@ function Products({ plans }: { plans: PublicPlan[] }) {
     const precos = plans.map((plan) => productPriceCents(plan, p)).filter((v) => v > 0);
     return precos.length ? Math.min(...precos) : null;
   };
-  const ordem: Product[] = ['AGENDA', 'COMPLETO', 'CRM'];
-  return (
-    <section id="produtos" aria-labelledby="produtos-titulo" className="scroll-mt-20 py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Produtos</p>
-          <h2 id="produtos-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Um sistema, do jeito que a sua clínica precisa
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Comece pela rotina, pela captação ou pelos dois juntos. Dá para trocar de plano a qualquer momento, sem perder nada.
-          </p>
-        </div>
-
-        <ul className="mt-12 grid items-stretch gap-6 lg:grid-cols-3">
-          {ordem.map((p) => {
-            const Icon = ICONE[p];
-            const destaque = p === 'COMPLETO';
-            const preco = aPartir(p);
-            return (
-              <li key={p} className={destaque ? 'lg:-my-3' : undefined}>
-                <article
-                  aria-labelledby={`produto-${p}`}
-                  className={`relative flex h-full flex-col rounded-3xl p-7 ${
-                    destaque
-                      ? 'bg-brand-gradient text-white shadow-xl shadow-primary/20'
-                      : 'border border-border bg-surface shadow-card'
-                  }`}
-                >
-                  {destaque && (
-                    <span className="absolute right-6 top-6 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
-                      Mais completo
-                    </span>
-                  )}
-                  <span
-                    className={`flex h-11 w-11 items-center justify-center rounded-xl ${
-                      destaque ? 'bg-white/15 text-white' : 'bg-primary/10 text-primary-hover dark:text-sky-300'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 id={`produto-${p}`} className={`mt-5 text-2xl font-bold tracking-tight ${destaque ? 'text-white' : ''}`}>
-                    {PRODUCT_INFO[p].name}
-                  </h3>
-                  <p className={`mt-2 text-sm leading-relaxed ${destaque ? 'text-white/85' : 'text-muted-foreground'}`}>
-                    {PRODUCT_INFO[p].tagline}
-                  </p>
-                  <ul className="mt-6 flex-1 space-y-2.5">
-                    {PRODUCT_INFO[p].includes.map((f) => (
-                      <li key={f} className="flex gap-2.5 text-sm">
-                        <Check
-                          className={`mt-0.5 h-4 w-4 shrink-0 ${destaque ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`}
-                          aria-hidden="true"
-                        />
-                        <span className="leading-snug">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {preco !== null && (
-                    <p className={`mt-6 text-sm ${destaque ? 'text-white/85' : 'text-muted-foreground'}`}>
-                      a partir de{' '}
-                      <span className={`text-2xl font-bold tabular-nums ${destaque ? 'text-white' : 'text-foreground'}`}>{brl(preco)}</span>
-                      /mês
-                    </p>
-                  )}
-                  <a
-                    href={`#planos-${p.toLowerCase()}`}
-                    className={`mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                      destaque
-                        ? 'bg-white text-teal-800 hover:bg-white/90 focus-visible:outline-white'
-                        : 'border border-border hover:border-primary/50 hover:text-primary-hover focus-visible:outline-ring'
-                    }`}
-                  >
-                    Ver planos do {PRODUCT_INFO[p].name}
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </a>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </section>
+  const Preco = ({ produto }: { produto: Product }) => {
+    const v = aPartir(produto);
+    return v === null ? null : <p className="pz">a partir de<b className="num">{brl(v)}</b></p>;
+  };
+  const Lista = ({ itens }: { itens: string[] }) => (
+    <ul>
+      {itens.map((t) => (
+        <li key={t}><Check className="ic" aria-hidden="true" /> {t}</li>
+      ))}
+    </ul>
   );
-}
-
-// ─── Como funciona: o funil que anda sozinho ─────────────────────────────────
-
-function Journey() {
-  const passos = [
-    {
-      icon: MessageCircle,
-      modulo: 'CRM',
-      titulo: 'Chamou no WhatsApp',
-      texto: 'Quem escreve para o número da clínica vira um card em Captação, com a conversa junto. Ninguém precisa cadastrar.',
-    },
-    {
-      icon: CalendarCheck,
-      modulo: 'Agenda',
-      titulo: 'Agendou a avaliação',
-      texto: 'A recepção marca na agenda e o card passa sozinho para Agendados. A confirmação e os lembretes saem pelo WhatsApp.',
-    },
-    {
-      icon: Stethoscope,
-      modulo: 'Agenda',
-      titulo: 'Veio e recebeu o orçamento',
-      texto: 'Marcou que compareceu, o card anda. Criou o orçamento, ele vai para Em negociação, com tarefa para quem cuida.',
-    },
-    {
-      icon: Trophy,
-      modulo: 'CRM',
-      titulo: 'Aprovou e fechou',
-      texto: 'Aprovado pelo link, o card fecha com o valor do tratamento, e o painel mostra quanto o funil trouxe no mês.',
-    },
-  ];
   return (
-    <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="scroll-mt-20 border-y border-border bg-surface py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Como funciona</p>
-          <h2 id="como-funciona-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            O funil que anda sozinho com a agenda
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            No Completo, a agenda e o CRM conversam. A recepção trabalha onde já trabalha, e o funil se atualiza sem ninguém
-            arrastar card.
-          </p>
-        </div>
-
-        <ol className="relative mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <span aria-hidden="true" className="absolute left-0 right-0 top-6 hidden h-px bg-gradient-to-r from-primary/0 via-primary/40 to-primary/0 lg:block" />
-          {passos.map(({ icon: Icon, modulo, titulo, texto }, i) => (
-            <li key={titulo} className="relative">
-              <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-lg shadow-primary/25">
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <p className="mt-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <span className="tabular-nums">Passo {i + 1}</span>
-                <span aria-hidden="true">·</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 normal-case tracking-normal text-primary-hover dark:text-sky-300">{modulo}</span>
-              </p>
-              <h3 className="mt-2 text-lg font-bold tracking-tight">{titulo}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{texto}</p>
-            </li>
-          ))}
-        </ol>
-
-        <p className="mt-10 rounded-2xl border border-border bg-background px-5 py-4 text-sm leading-relaxed text-muted-foreground">
-          <strong className="font-semibold text-foreground">Desmarcou ou faltou?</strong> O card vai para “Desmarcou ou faltou” com a
-          tarefa de reagendar, e volta sozinho quando marcar de novo. Perder um negócio nunca é automático: quem decide é a
-          equipe.
+    <section className="night inner night-top0" id="produtos" aria-labelledby="produtos-titulo">
+      <div className="sec-head">
+        <h2 id="produtos-titulo" data-r>Um sistema, do jeito que a sua clínica precisa.</h2>
+        <p className="lede" data-r style={{ '--i': 1 } as React.CSSProperties}>
+          Comece pela rotina, pela captação ou pelos dois juntos. Dá para trocar de plano a qualquer momento, sem perder nada.
         </p>
+      </div>
+      <div className="venn" data-r>
+        <svg viewBox="0 0 1090 660" aria-hidden="true">
+          <circle cx="330" cy="330" r="330" fill="url(#vA)" />
+          <circle cx="760" cy="330" r="330" fill="url(#vB)" />
+          <g clipPath="url(#vC)"><circle cx="760" cy="330" r="330" fill="#A7E3C1" /></g>
+        </svg>
+        <article className="vt v1">
+          <h3><a href="#planos-agenda">Agenda</a></h3>
+          <p>A rotina da clínica.</p>
+          <Lista itens={['Agenda e agendamento online', 'Prontuário e odontograma', 'Orçamentos e financeiro', 'Lembretes no WhatsApp oficial']} />
+          <Preco produto="AGENDA" />
+        </article>
+        <article className="vt v2">
+          <h3>Completo</h3>
+          <p>Os dois integrados. Só aqui o funil anda com a agenda.</p>
+          <Preco produto="COMPLETO" />
+          <a className="btn btn-teal" href="#planos-completo">Ver planos</a>
+        </article>
+        <article className="vt v3">
+          <h3><a href="#planos-crm">CRM</a></h3>
+          <p>A captação de pacientes.</p>
+          <Lista itens={['Funis em quadro', 'WhatsApp oficial da equipe', 'Robô e transmissões', 'Tarefas e painel de vendas']} />
+          <Preco produto="CRM" />
+        </article>
       </div>
     </section>
   );
@@ -424,73 +401,185 @@ function Journey() {
 
 // ─── Recursos ────────────────────────────────────────────────────────────────
 
-function Features() {
-  const grupos = [
-    {
-      produto: 'Agenda',
-      titulo: 'Para a rotina da clínica',
-      itens: [
-        { icon: CalendarDays, t: 'Agenda por profissional', d: 'Dia, semana e mês, com expediente na grade, aviso de conflito e sala de espera.' },
-        { icon: Globe, t: 'Agendamento online', d: 'Um link para o paciente marcar sozinho nos horários livres que você liberar.' },
-        { icon: FileText, t: 'Orçamentos que fecham', d: 'Monte em minutos, envie por link ou PDF com a sua marca e veja quando foi aceito.' },
-        { icon: Smile, t: 'Prontuário com odontograma', d: 'Histórico, odontograma dente a dente e a situação financeira numa tela só.' },
-        { icon: Wallet, t: 'Financeiro sem planilha', d: 'Recebimentos, parcelas e indicadores do mês direto no painel.' },
-      ],
-    },
-    {
-      produto: 'CRM',
-      titulo: 'Para captar pacientes',
-      itens: [
-        { icon: KanbanSquare, t: 'Funis em quadro', d: 'Vários funis, etapas que você edita, filtros por tag, origem e responsável.' },
-        { icon: Inbox, t: 'Conversas da equipe', d: 'O WhatsApp da clínica no computador, com toda a recepção no mesmo número.' },
-        { icon: Bot, t: 'Robô de atendimento', d: 'Responde na hora com botões, pergunta o que importa e chama a equipe.' },
-        { icon: Megaphone, t: 'Transmissões', d: 'Mensagens para uma tag, etapa ou funil, só para quem aceitou receber.' },
-        { icon: ListChecks, t: 'Tarefas e painel de vendas', d: 'Ninguém fica sem retorno, e você vê de onde vêm e para onde vão os leads.' },
-      ],
-    },
-  ];
-  return (
-    <section id="recursos" aria-labelledby="recursos-titulo" className="scroll-mt-20 py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Recursos</p>
-          <h2 id="recursos-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Tudo o que a clínica usa no dia a dia
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Desenhado para o trabalho real: a recepção agenda em segundos, o profissional acha o prontuário e quem gerencia vê o
-            dinheiro e a captação.
-          </p>
-        </div>
+type Consulta = [topo: number, altura: number, cor: string, nome: string, detalhe: string];
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-2">
-          {grupos.map((g) => (
-            <section key={g.produto} aria-labelledby={`recursos-${g.produto}`} className="rounded-3xl border border-border bg-surface p-6 shadow-card sm:p-8">
-              <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-hover dark:text-sky-300">{g.produto}</p>
-              <h3 id={`recursos-${g.produto}`} className="mt-3 text-xl font-bold tracking-tight">
-                {g.titulo}
-              </h3>
-              <ul className="mt-6 divide-y divide-border">
-                {g.itens.map(({ icon: Icon, t, d }) => (
-                  <li key={t} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-alt text-primary-hover dark:text-sky-300">
-                      <Icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <span>
-                      <span className="block font-semibold">{t}</span>
-                      <span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">{d}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+const SEMANA: [string, Consulta[]][] = [
+  ['Seg', [[4, 18, 'm', 'Ana Reis', 'Limpeza'], [26, 16, 'n', 'Carlos M.', 'Avaliação'], [56, 24, 'b', 'Paula T.', 'Canal']]],
+  ['Ter', [[12, 20, 't', 'Helena D.', 'Harmonização'], [42, 16, 'm', 'Rui S.', 'Retorno'], [74, 18, 'n', 'Lia F.', 'Clareamento']]],
+  ['Qua', [[2, 16, 'b', 'Tiago R.', 'Avaliação'], [24, 22, 'n', 'Marta G.', 'Implante'], [64, 18, 'm', 'Davi C.', 'Limpeza']]],
+  ['Qui', [[8, 16, 'm', 'Helena D.', 'Retorno'], [50, 20, 't now', 'Beatriz L.', '14:30, Avaliação'], [76, 16, 'n', 'Juliana P.', 'Ortodontia']]],
+  ['Sex', [[4, 20, 'n', 'Carlos M.', 'Sala de espera'], [34, 16, 'b', 'Sara N.', 'Avaliação'], [60, 26, 'm', 'Otávio B.', 'Implante']]],
+];
+
+function Semana() {
+  return (
+    <div className="week" aria-hidden="true">
+      <span />
+      {SEMANA.map(([dia]) => <div key={dia} className="hd">{dia}</div>)}
+      <div className="hrs">{['08h', '10h', '12h', '14h', '16h', '18h'].map((h) => <span key={h}>{h}</span>)}</div>
+      {SEMANA.map(([dia, consultas]) => (
+        <div key={dia} className="day">
+          {consultas.map(([topo, altura, cor, nome, detalhe]) => (
+            <div key={nome + topo} className={`ev ${cor}`} style={{ top: `${topo}%`, height: `${altura}%` }}>
+              {nome}<span>{detalhe}</span>
+            </div>
           ))}
         </div>
+      ))}
+    </div>
+  );
+}
 
-        <p className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Accessibility className="h-4 w-4 text-primary" aria-hidden="true" />
-          Navegação por teclado, leitor de tela, alto contraste e modo escuro em todas as telas.
-        </p>
+const FACES = { o: '10,10 20,10 20,20 10,20', t: '0,0 30,0 20,10 10,10', b: '10,20 20,20 30,30 0,30', l: '0,0 10,10 10,20 0,30', r: '30,0 30,30 20,20 20,10' };
+const MARCAS: Record<number, Partial<Record<keyof typeof FACES, string>>> = {
+  16: { o: 'x' }, 24: { l: 'x', o: 'x' }, 36: { o: 'x', t: 'x', b: 'x', l: 'x', r: 'x' },
+  14: { o: 'y' }, 46: { o: 'y', l: 'y' }, 26: { r: 'y' }, 11: { t: 'y' }, 37: { o: 'y' },
+};
+
+function Arcada({ dentes }: { dentes: number[] }) {
+  return (
+    <div className="arch">
+      {dentes.map((n) => (
+        <svg key={n} viewBox="-1 -1 32 32">
+          {(Object.entries(FACES) as [keyof typeof FACES, string][]).map(([face, pontos]) => (
+            <polygon key={face} points={pontos} className={MARCAS[n]?.[face] ?? ''} />
+          ))}
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function Features() {
+  return (
+    <section className="sheet" id="recursos" aria-labelledby="recursos-titulo">
+      <div className="inner">
+        <div className="sec-head">
+          <h2 id="recursos-titulo" data-r>Tudo o que a clínica usa no dia a dia.</h2>
+          <p className="lede" data-r style={{ '--i': 1 } as React.CSSProperties}>
+            A recepção agenda em segundos, o profissional acha o prontuário e quem gerencia vê o dinheiro entrar.
+          </p>
+        </div>
+        <div className="bento">
+          <article className="tile t-ag" data-r>
+            <h3>Agenda por profissional</h3>
+            <p>Dia, semana e mês, com expediente na grade, aviso de conflito e sala de espera.</p>
+            <Semana />
+          </article>
+          <article className="tile t-od" data-r style={{ '--i': 1 } as React.CSSProperties}>
+            <h3>Prontuário com odontograma</h3>
+            <p>Odontograma por faces, anamnese, evoluções em linha do tempo e galeria. O plano de tratamento já vira orçamento.</p>
+            <div className="teeth" aria-hidden="true">
+              <Arcada dentes={[18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]} />
+              <Arcada dentes={[48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]} />
+            </div>
+            <p className="legend" aria-hidden="true">
+              <span><i className="lg-x" />A tratar</span>
+              <span><i className="lg-y" />Tratado</span>
+            </p>
+          </article>
+          <article className="tile t-on" data-r>
+            <h3>Agendamento online</h3>
+            <p>Um link para o paciente marcar sozinho nos horários livres que você liberar.</p>
+            <div className="slots" aria-hidden="true">
+              {['09:00', '10:30', '11:00', '14:30', '16:00', '17:30'].map((h) => (
+                <span key={h} className={h === '14:30' ? 'sel' : undefined}>{h}</span>
+              ))}
+            </div>
+          </article>
+          <article className="tile t-or" data-r style={{ '--i': 1 } as React.CSSProperties}>
+            <h3>Orçamentos que fecham</h3>
+            <p>Monte em minutos, envie por link ou PDF com a sua marca e veja quando foi aceito.</p>
+            <div className="doc" aria-hidden="true">
+              <span className="stamp"><Check className="ic" /> Aprovado</span>
+              <div className="tt"><span>Implante</span><span className="num">R$ 6.500</span></div>
+              <div><span>Parcelas</span><span className="num">10x</span></div>
+            </div>
+          </article>
+          <article className="tile t-fi" data-r style={{ '--i': 2 } as React.CSSProperties}>
+            <h3>Financeiro sem planilha</h3>
+            <p>Recebimentos, parcelas e indicadores do mês direto no painel.</p>
+            <div className="bars" aria-hidden="true">
+              {[38, 52, 46, 66, 58, 78, 100].map((h) => <i key={h} style={{ height: `${h}%` }} />)}
+            </div>
+          </article>
+        </div>
+        <p className="ilustra">As telas desta página são ilustrações, com nomes e valores fictícios.</p>
+      </div>
+    </section>
+  );
+}
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+const RECURSOS_CRM = [
+  { icon: Inbox, t: 'Conversas da equipe', d: 'O WhatsApp da clínica no computador, com toda a recepção no mesmo número.' },
+  { icon: Bot, t: 'Robô de atendimento', d: 'Responde na hora com botões, pergunta o que importa e chama a equipe.' },
+  { icon: KanbanSquare, t: 'Funis em quadro', d: 'Vários funis, etapas que você edita, filtros por tag, origem e responsável.' },
+  { icon: Megaphone, t: 'Transmissões', d: 'Mensagens para uma tag, etapa ou funil, só para quem aceitou receber.' },
+  { icon: ListChecks, t: 'Tarefas e painel de vendas', d: 'Ninguém fica sem retorno, e você vê de onde vêm e para onde vão os leads.' },
+];
+
+const FUNIL: { coluna: string; cor: string; cards: { nome: string; meta: string; tag?: string; valor?: string; destaque?: boolean }[] }[] = [
+  { coluna: 'Novo', cor: 'c-novo', cards: [
+    { nome: 'Rafael Souza', meta: 'WhatsApp, agora', tag: 'Implante' },
+    { nome: 'Tiago Rocha', meta: 'Instagram, ontem', tag: 'Avaliação' },
+    { nome: 'Luana Freitas', meta: 'Agendamento online', tag: 'Clareamento' },
+  ] },
+  { coluna: 'Avaliação agendada', cor: 'c-agenda', cards: [
+    { nome: 'Juliana Prado', meta: 'Qui 16:00, Dra. Paula', tag: 'Ortodontia' },
+    { nome: 'Carlos Mendes', meta: 'Sex 09:00, Dr. André' },
+    { nome: 'Helena Dias', meta: 'Qui 11:00, Dra. Paula', tag: 'Harmonização' },
+  ] },
+  { coluna: 'Em negociação', cor: 'c-neg', cards: [
+    { nome: 'Beatriz Lima', meta: 'Orçamento visualizado', valor: 'R$ 6.500', destaque: true },
+    { nome: 'Pedro Alves', meta: 'Retomar na sexta', valor: 'R$ 2.900' },
+  ] },
+  { coluna: 'Fechado', cor: 'c-fim', cards: [
+    { nome: 'Mariana Lopes', meta: 'Clareamento', valor: 'R$ 1.200' },
+    { nome: 'Eduardo Nunes', meta: 'Ortodontia', valor: 'R$ 4.800' },
+  ] },
+];
+
+function Crm() {
+  return (
+    <section className="night inner crm-grid" aria-labelledby="crm-titulo">
+      <h2 id="crm-titulo" data-r className="wide">Toda a recepção no mesmo número.</h2>
+      <div>
+        <ul className="feats">
+          {RECURSOS_CRM.map(({ icon: Icon, t, d }, i) => (
+            <li key={t} data-r style={{ '--i': i } as React.CSSProperties}>
+              <span className="dot"><Icon className="ic" aria-hidden="true" /></span>
+              <div><b>{t}</b><span>{d}</span></div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="board-wrap" data-r aria-hidden="true">
+        <i className="board-glow" />
+        <div className="app">
+          <div className="chrome"><Logo size="sm" tone="white" /> Funil de captação</div>
+          <div className="colsx">
+            {FUNIL.map(({ coluna, cor, cards }) => (
+              <div key={coluna} className="colx">
+                <p className="colx-h"><i className={cor} />{coluna}</p>
+                {cards.map((c) => (
+                  <div key={c.nome} className={`kard${c.destaque ? ' hot' : ''}`}>
+                    <b>{c.nome}</b>
+                    <span>{c.meta}</span>
+                    {c.tag && <em>{c.tag}</em>}
+                    {c.valor && <strong className="num">{c.valor}</strong>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bot">
+          <div className="top"><Bot className="ic" /> Robô de atendimento</div>
+          <span className="bb">Olá! Sobre qual tratamento você quer saber?</span>
+          <div className="btns"><span>Implante</span><span>Clareamento</span><span>Falar com a equipe</span></div>
+        </div>
       </div>
     </section>
   );
@@ -498,77 +587,48 @@ function Features() {
 
 // ─── WhatsApp oficial ────────────────────────────────────────────────────────
 
-/** A mensagem como o paciente vê, com os botões. Ilustração: nada aqui é clicável. */
-function WhatsAppMock() {
-  return (
-    <div className="mx-auto w-full max-w-sm rounded-[2rem] border border-border bg-surface p-3 shadow-2xl" aria-hidden="true">
-      <div className="flex items-center gap-2.5 rounded-t-[1.4rem] bg-emerald-800 px-4 py-3 text-white">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-bold text-emerald-800">CS</span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1 text-sm font-semibold">
-            Clínica Sorriso <BadgeCheck className="h-3.5 w-3.5" />
-          </span>
-          <span className="block text-[11px] text-white">Conta comercial oficial</span>
-        </span>
-      </div>
-      <div className="space-y-2 rounded-b-[1.4rem] bg-board p-3">
-        <div className="max-w-[85%] overflow-hidden rounded-lg rounded-tl-sm bg-surface text-[13px] shadow-sm">
-          <p className="px-3 py-2 leading-relaxed">
-            Olá, Ana! Passando para lembrar do seu horário na <strong>Clínica Sorriso</strong>:
-            <br />
-            <br />📅 quinta-feira, 28/05 às 14:30
-            <br />👩‍⚕️ Dra. Paula (Limpeza)
-          </p>
-          <div className="divide-y divide-border border-t border-border text-center text-[13px] font-medium text-primary">
-            <p className="py-2">Confirmar</p>
-            <p className="py-2">Reagendar</p>
-            <p className="py-2">Cancelar</p>
-          </div>
-        </div>
-        <div className="ml-auto w-fit rounded-lg rounded-tr-sm bg-bubble-out px-3 py-2 text-[13px] shadow-sm">Confirmar</div>
-        <div className="mx-auto w-fit rounded-full bg-surface px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm dark:text-emerald-400">
-          ✓ Consulta confirmada na agenda
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function WhatsAppOficial() {
   const pontos = [
-    'Mensagens saem do número da clínica, com o nome dela, sem QR code nem celular ligado',
-    'Confirmação na hora em que marca e lembretes 1 semana, 3 dias, 1 dia antes ou no dia: você escolhe',
-    'Botões Confirmar, Reagendar e Cancelar: a resposta cai sozinha na agenda',
-    'O celular continua funcionando no WhatsApp Business, junto com o sistema',
+    'Mensagens saem do número da clínica, com o nome dela, sem QR code nem celular ligado.',
+    'Confirmação na hora em que marca e lembretes 1 semana, 3 dias, 1 dia antes ou no dia: você escolhe.',
+    'Botões Confirmar, Reagendar e Cancelar: a resposta cai sozinha na agenda.',
+    'O celular continua funcionando no WhatsApp Business, junto com o sistema.',
   ];
   return (
-    <section id="whatsapp-oficial" aria-labelledby="whatsapp-oficial-titulo" className="scroll-mt-20 border-t border-border py-16 lg:py-24">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
+    <section className="wa" id="whatsapp-oficial" aria-labelledby="whatsapp-oficial-titulo">
+      <div className="inner wa-grid">
+        <div className="pho-wrap" data-r aria-hidden="true">
+          <div className="chip c2"><BadgeCheck className="ic" /><span>Conta oficial<small>Número e nome da clínica</small></span></div>
+          <div className="pho">
+            <div className="pho-h">
+              <i>CS</i>
+              <span><b>Clínica Sorriso <BadgeCheck className="ic" /></b><small>Conta comercial oficial</small></span>
+            </div>
+            <div className="chat">
+              <div className="msg">
+                Olá, Ana! Passando para lembrar do seu horário na <b>Clínica Sorriso</b>: quinta-feira às 14:30, com a Dra. Paula (Limpeza).
+                <div className="opts"><span className="tap">Confirmar</span><span>Reagendar</span><span>Cancelar</span></div>
+              </div>
+              <div className="rep">Confirmar</div>
+            </div>
+          </div>
+          <div className="chip c1"><CalendarCheck className="ic" /><span>Confirmada na agenda<small>Sem ninguém digitar</small></span></div>
+        </div>
         <div>
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-            <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> API oficial do WhatsApp (Meta)
+          <h2 id="whatsapp-oficial-titulo" data-r>O paciente responde.<br />A agenda já sabe.</h2>
+          <p className="lede" data-r style={{ '--i': 1 } as React.CSSProperties}>
+            O DreamClin conecta o número da clínica direto na Meta, o mesmo caminho das grandes empresas. Sem gambiarra e sem o
+            risco de um aparelho desconectado deixar paciente sem aviso. Conectar leva poucos minutos.
           </p>
-          <h2 id="whatsapp-oficial-titulo" className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            O WhatsApp da sua clínica, do jeito oficial
-          </h2>
-          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-            O DreamClin conecta o número da clínica direto na Meta, o mesmo caminho que as grandes empresas usam: estável, sem
-            gambiarra e sem o risco de um aparelho desconectado deixar paciente sem aviso. Conectar leva poucos minutos.
-          </p>
-          <ul className="mt-6 space-y-3">
-            {pontos.map((p) => (
-              <li key={p} className="flex gap-3 text-sm sm:text-[15px]">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                <span className="leading-snug">{p}</span>
+          <ul className="wa-list">
+            {pontos.map((p, i) => (
+              <li key={p} data-r style={{ '--i': i } as React.CSSProperties}>
+                <Check className="ic" aria-hidden="true" /> {p}
               </li>
             ))}
           </ul>
-          <Link href="/ajuda/conectar-whatsapp" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-link underline underline-offset-2">
-            Veja o passo a passo para conectar
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          <Link className="lnk" href="/ajuda/conectar-whatsapp">Veja o passo a passo para conectar</Link>
         </div>
-        <WhatsAppMock />
       </div>
     </section>
   );
@@ -620,31 +680,20 @@ function FAQ() {
     },
   ];
   return (
-    <section id="perguntas" aria-labelledby="perguntas-titulo" className="scroll-mt-20 py-16 lg:py-24">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.6fr]">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Perguntas frequentes</p>
-          <h2 id="perguntas-titulo" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Ficou alguma dúvida?
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Teste, planos, troca e cancelamento: tudo aqui. Se faltar alguma coisa, fale com a gente.
-          </p>
+    <section className="sheet" id="perguntas" aria-labelledby="perguntas-titulo">
+      <div className="inner faq">
+        <div className="faq-side">
+          <h2 id="perguntas-titulo">Ficou alguma dúvida?</h2>
+          <p className="lede">Teste, planos, troca e cancelamento: tudo aqui. Se faltar alguma coisa, fale com a gente.</p>
         </div>
-
-        <div className="space-y-3">
-          {faqs.map(({ q, a }) => (
-            <details
-              key={q}
-              className="group rounded-xl border border-border bg-surface px-5 shadow-card transition-colors open:border-primary/30"
-            >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-semibold sm:text-base [&::-webkit-details-marker]:hidden">
+        <div>
+          {faqs.map(({ q, a }, i) => (
+            <details key={q} className="q" open={i === 0}>
+              <summary>
                 {q}
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-alt text-muted-foreground transition-transform duration-200 group-open:rotate-45 group-open:bg-primary/10 group-open:text-primary" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                </span>
+                <span className="pm" aria-hidden="true"><Plus className="ic" /></span>
               </summary>
-              <p className="pb-5 text-sm leading-relaxed text-muted-foreground">{a}</p>
+              <p>{a}</p>
             </details>
           ))}
         </div>
@@ -657,42 +706,27 @@ function FAQ() {
 
 function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
   return (
-    <section aria-labelledby="cta-final" className="px-4 pb-16 sm:px-6 lg:pb-24">
-      <div className="mx-auto grid max-w-6xl gap-8 rounded-2xl border border-border bg-surface p-6 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-16">
-        <div className="max-w-2xl">
-          <h2 id="cta-final" className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Teste com a agenda da sua clínica
-          </h2>
-          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-            Cadastre a equipe e marque as consultas de uma semana normal. Em {TRIAL_DAYS} dias você sabe se o sistema serve
-            para a sua rotina.
-          </p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Não pedimos cartão. Se não assinar, nada é cobrado e seus dados ficam disponíveis para consulta.
-          </p>
-        </div>
-
-        <div className="flex flex-col items-start gap-3 lg:items-stretch">
-          <Link href={TESTAR} className="btn-primary !h-12 !rounded-full px-7 !text-base">
-            Começar o teste grátis
+    <section className="dawn" aria-labelledby="cta-final">
+      <div className="inner">
+        <h2 id="cta-final" data-r>Amanhã, teste com a agenda da sua clínica.</h2>
+        <p data-r style={{ '--i': 1 } as React.CSSProperties}>
+          Cadastre a equipe e marque as consultas de uma semana normal. Em {TRIAL_DAYS} dias você sabe se o sistema serve para a
+          sua rotina. Não pedimos cartão. Se não assinar, nada é cobrado e seus dados ficam disponíveis para consulta.
+        </p>
+        <div className="acts" data-r style={{ '--i': 2 } as React.CSSProperties}>
+          <Link href={TESTAR} className="btn btn-mint">
+            Começar o teste grátis <ArrowRight className="ic" aria-hidden="true" />
           </Link>
           {whatsapp ? (
-            <a
-              href={whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-outline !h-12 !rounded-full px-7 !text-base"
-            >
-              Falar com a gente
-              <span className="sr-only"> no WhatsApp (abre em nova aba)</span>
+            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="btn btn-glass">
+              Falar com a gente<span className="sr-only"> no WhatsApp (abre em nova aba)</span>
             </a>
           ) : (
-            <Link href="/sign-in" className="btn-ghost !h-12 !rounded-full px-7 !text-base">
-              Já tenho conta
-            </Link>
+            <Link href="/sign-in" className="btn btn-glass">Já tenho conta</Link>
           )}
         </div>
       </div>
+      <Lua className="sun" />
     </section>
   );
 }
@@ -706,14 +740,9 @@ function FinalCTA({ whatsapp }: { whatsapp: string | null }) {
  */
 function WhatsAppFloat({ href }: { href: string }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="fixed bottom-4 right-4 z-50 inline-flex h-14 items-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition-transform hover:scale-[1.04] hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:bottom-6 sm:right-6 sm:px-5"
-    >
-      <MessageCircle className="h-6 w-6 shrink-0" aria-hidden="true" />
-      <span className="max-sm:sr-only">Fale com a gente</span>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="float btn btn-mint">
+      <MessageCircle className="ic" aria-hidden="true" />
+      <span className="float-txt">Fale com a gente</span>
       <span className="sr-only"> pelo WhatsApp (abre em nova aba)</span>
     </a>
   );
@@ -721,68 +750,56 @@ function WhatsAppFloat({ href }: { href: string }) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 
-const footLink = 'rounded transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-
 function Footer({ whatsapp }: { whatsapp: string | null }) {
   return (
-    <footer className="border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <Logo size="md" />
+    <footer className="foot">
+      <div className="inner">
+        <div className="foot-g">
+          <div>
+            <Logo size="lg" tone="white" />
+            <p className="foot-sobre">Agenda, prontuário, orçamentos e CRM com WhatsApp oficial para clínicas odontológicas e de estética.</p>
           </div>
-          <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Agenda, prontuário, orçamentos e CRM com WhatsApp oficial para clínicas odontológicas e de estética.
-          </p>
+          <nav aria-label="Produtos">
+            <h3>Produtos</h3>
+            <ul>
+              <li><a href="#planos-completo">Completo</a></li>
+              <li><a href="#planos-agenda">Agenda</a></li>
+              <li><a href="#planos-crm">CRM</a></li>
+              <li><a href="#como-funciona">Como funciona</a></li>
+              <li><a href="#planos">Preços</a></li>
+            </ul>
+          </nav>
+          <nav aria-label="Ajuda">
+            <h3>Ajuda</h3>
+            <ul>
+              <li><a href="#perguntas">Perguntas frequentes</a></li>
+              <li><Link href="/ajuda/conectar-whatsapp">Como conectar o WhatsApp</Link></li>
+              <li><Link href={TESTAR}>Criar conta</Link></li>
+              <li><Link href="/sign-in">Entrar</Link></li>
+              {whatsapp && (
+                <li>
+                  <a href={whatsapp} target="_blank" rel="noopener noreferrer">
+                    Fale com a gente no WhatsApp<span className="sr-only"> (abre em nova aba)</span>
+                  </a>
+                </li>
+              )}
+            </ul>
+          </nav>
+          <div>
+            <h3>Compromissos</h3>
+            <ul>
+              <li><ShieldCheck className="ic" aria-hidden="true" /> Conformidade com a LGPD</li>
+              <li><Lock className="ic" aria-hidden="true" /> Dados sensíveis criptografados</li>
+              <li><Accessibility className="ic" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
+            </ul>
+          </div>
         </div>
-
-        <nav aria-label="Produtos">
-          <p className="text-sm font-semibold">Produtos</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><a href="#planos-completo" className={footLink}>Completo</a></li>
-            <li><a href="#planos-agenda" className={footLink}>Agenda</a></li>
-            <li><a href="#planos-crm" className={footLink}>CRM</a></li>
-            <li><a href="#como-funciona" className={footLink}>Como funciona</a></li>
-            <li><a href="#planos" className={footLink}>Preços</a></li>
-          </ul>
-        </nav>
-
-        <nav aria-label="Ajuda">
-          <p className="text-sm font-semibold">Ajuda</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><a href="#perguntas" className={footLink}>Perguntas frequentes</a></li>
-            <li><Link href="/ajuda/conectar-whatsapp" className={footLink}>Como conectar o WhatsApp</Link></li>
-            <li><Link href={TESTAR} className={footLink}>Criar conta</Link></li>
-            <li><Link href="/sign-in" className={footLink}>Entrar</Link></li>
-            {whatsapp && (
-              <li>
-                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={footLink}>
-                  Fale com a gente no WhatsApp<span className="sr-only"> (abre em nova aba)</span>
-                </a>
-              </li>
-            )}
-          </ul>
-        </nav>
-
-        <div>
-          <p className="text-sm font-semibold">Compromissos</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Conformidade com a LGPD</li>
-            <li className="flex items-center gap-2"><Lock className="h-4 w-4 text-blue-800 dark:text-blue-400" aria-hidden="true" /> Dados sensíveis criptografados</li>
-            <li className="flex items-center gap-2"><Accessibility className="h-4 w-4 text-teal-700 dark:text-teal-400" aria-hidden="true" /> Acessibilidade WCAG 2.1 AA</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
-          <p>
-            © {new Date().getFullYear()} DreamClin{companyLine() ? ` · ${companyLine()}` : ''}. Todos os direitos reservados.
-          </p>
-          <nav aria-label="Páginas legais" className="flex items-center gap-4">
-            <Link href="/privacidade" className={footLink}>Privacidade</Link>
-            <Link href="/termos" className={footLink}>Termos de uso</Link>
-            <span>Feito no Brasil 🇧🇷</span>
+        <div className="foot-legal">
+          <p>© {new Date().getFullYear()} DreamClin{companyLine() ? ` · ${companyLine()}` : ''}. Todos os direitos reservados.</p>
+          <nav aria-label="Páginas legais">
+            <Link href="/privacidade">Privacidade</Link>
+            <Link href="/termos">Termos de uso</Link>
+            <span>Feito no Brasil</span>
           </nav>
         </div>
       </div>
@@ -792,18 +809,19 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export async function LandingPage() {
-  const whatsapp = salesWhatsAppUrl();
-  const plans = await loadPublicPlans();
+export function LandingView({ plans, whatsapp }: { plans: PublicPlan[]; whatsapp: string | null }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className={`lp ${outfit.variable}`}>
+      <SvgDefs />
+      <LandingMotion />
       <Header />
       <main id="main-content">
         <Hero />
         <TrustStrip />
-        <Products plans={plans} />
         <Journey />
+        <Products plans={plans} />
         <Features />
+        <Crm />
         <WhatsAppOficial />
         <Pricing plans={plans} />
         <FAQ />
@@ -813,4 +831,9 @@ export async function LandingPage() {
       {whatsapp && <WhatsAppFloat href={whatsapp} />}
     </div>
   );
+}
+
+export async function LandingPage() {
+  const plans = await loadPublicPlans();
+  return <LandingView plans={plans} whatsapp={salesWhatsAppUrl()} />;
 }
