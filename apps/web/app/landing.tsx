@@ -22,7 +22,7 @@ import {
   KanbanSquare, ListChecks, Lock, Megaphone, MessageCircle, Plus, RefreshCcw, ShieldCheck, Trophy,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
-import { companyLine, salesWhatsAppUrl } from '@/lib/company';
+import { COMPANY, salesWhatsAppUrl } from '@/lib/company';
 import { TRIAL_DAYS } from '@/lib/subscription';
 import { DEFAULT_CHOICE, productPriceCents, signUpHref, type Product } from '@/lib/products';
 import { LandingMotion } from './landing-motion';
@@ -795,7 +795,19 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
           </div>
         </div>
         <div className="foot-legal">
-          <p>© {new Date().getFullYear()} DreamClin{companyLine() ? ` · ${companyLine()}` : ''}. Todos os direitos reservados.</p>
+          <p>
+            © {new Date().getFullYear()} DreamClin. Um produto da{' '}
+            <a
+              href={COMPANY.maker.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {COMPANY.maker.name}
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>. Todos os direitos
+            reservados.
+          </p>
           <nav aria-label="Páginas legais">
             <Link href="/privacidade">Privacidade</Link>
             <Link href="/termos">Termos de uso</Link>

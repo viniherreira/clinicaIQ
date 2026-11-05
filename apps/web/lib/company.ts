@@ -1,12 +1,15 @@
 /**
- * Quem está por trás do DreamClin, para o rodapé e as páginas legais.
+ * Quem está por trás do DreamClin. O rodapé cita a IDEON (`maker`).
  *
  * A Meta (verificação da empresa) e a LGPD pedem que o site diga qual empresa
- * responde pelo serviço. Os dados vêm das variáveis públicas da Vercel, para
- * trocar sem mexer no código; sem elas, o rodapé só não mostra a linha.
+ * responde pelo serviço: a razão social e o CNPJ ficam nas páginas de
+ * Privacidade e Termos. Vêm das variáveis públicas da Vercel, para trocar sem
+ * mexer no código; sem elas, essas páginas só não mostram a linha.
  */
 export const COMPANY = {
   brand: 'DreamClin',
+  /** Quem faz o produto, com o link do site no rodapé. */
+  maker: { name: 'IDEON', url: 'https://ideonwork.com' },
   /** Razão social, como no cartão CNPJ. */
   legalName: process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME ?? '',
   /** CNPJ formatado: 00.000.000/0001-00. */

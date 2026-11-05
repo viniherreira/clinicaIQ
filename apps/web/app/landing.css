@@ -1955,6 +1955,11 @@
   gap: 20px;
   flex-wrap: wrap;
 }
+.lp .foot-legal p a {
+  color: var(--on-night);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .lp [data-theme='light'] .lp-anim [data-r] {
   opacity: 0;
   translate: 0 34px;

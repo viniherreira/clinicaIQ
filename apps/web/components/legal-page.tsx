@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Logo } from './logo';
-import { COMPANY, companyLine } from '@/lib/company';
+import { COMPANY } from '@/lib/company';
 
 /** Moldura das páginas públicas de texto (Privacidade, Termos): logo, título, data e o texto. */
 export function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
@@ -37,7 +37,18 @@ export function LegalPage({ title, updated, children }: { title: string; updated
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:px-6">
-          <p>© {new Date().getFullYear()} {COMPANY.brand}{companyLine() ? ` · ${companyLine()}` : ''}</p>
+          <p>
+            © {new Date().getFullYear()} {COMPANY.brand}. Um produto da{' '}
+            <a
+              href={COMPANY.maker.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {COMPANY.maker.name}
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          </p>
           <nav aria-label="Páginas legais" className="flex gap-4">
             <Link href="/privacidade" className="hover:text-foreground">Privacidade</Link>
             <Link href="/termos" className="hover:text-foreground">Termos de uso</Link>
