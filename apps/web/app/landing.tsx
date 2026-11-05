@@ -801,7 +801,7 @@ function Footer({ whatsapp }: { whatsapp: string | null }) {
               href={COMPANY.maker.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               {COMPANY.maker.name}
               <span className="sr-only"> (abre em nova aba)</span>
