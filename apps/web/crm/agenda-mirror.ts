@@ -3,19 +3,48 @@ import { getTenantModules } from '@/lib/access';
 import { ingestChat } from './chat-ingest';
 import { windowOpen } from './cloud';
 import { classifyConversation } from './conversations';
-import { conversationHashes } from './phone';
+import { conversationHashes, leadHashesForChat } from './phone';
+
+/**
+ * O número já é do CRM? Tem conversa no WhatsApp do CRM (não recusada) ou um
+ * lead (aberto, ganho ou perdido) com esse telefone ou desse paciente.
+ */
+export async function crmKnowsPatient(tenantId: string, phone: string, patientId?: string | null): Promise<boolean> {
+  const db = getTenantClient(tenantId);
+  const [conversa, lead] = await Promise.all([
+    // Conversa recusada ou arquivada não conta: foi tirada do CRM de propósito.
+    db.conversation.findFirst({ where: { phoneHash: { in: conversationHashes(phone, tenantId) }, status: { not: 'DECLINED' } }, select: { id: true } }),
+    db.lead.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ phoneHash: { in: leadHashesForChat(phone, tenantId) } }, ...(patientId ? [{ patientId }] : [])],
+      },
+      select: { id: true },
+    }),
+  ]);
+  return Boolean(conversa || lead);
+}
 
 /**
  * O aviso da agenda (confirmação, lembrete) que saiu pela API oficial aparece
  * na conversa do paciente no CRM, como no Kommo: tudo o que o número manda fica
- * no chat. Só com o CRM ligado; a agenda nunca depende disso, então quem chama
- * ignora qualquer falha daqui.
+ * no chat. Só com o CRM ligado, e só para quem já é do CRM: paciente que só
+ * agendou na clínica não ganha conversa no CRM por causa do lembrete. A agenda
+ * nunca depende disso, então quem chama ignora qualquer falha daqui.
  */
 export async function mirrorAgendaToCrm(
   tenantId: string,
-  m: { phone: string; text: string; externalId: string; buttons: { payload: string; text: string }[]; at?: Date },
+  m: {
+    phone: string;
+    text: string;
+    externalId: string;
+    buttons: { payload: string; text: string }[];
+    at?: Date;
+    patientId?: string | null;
+  },
 ): Promise<boolean> {
   if (!(await getTenantModules(tenantId)).crm) return false;
+  if (!(await crmKnowsPatient(tenantId, m.phone, m.patientId))) return false;
   const r = await ingestChat(tenantId, {
     externalId: m.externalId,
     direction: 'OUTBOUND',

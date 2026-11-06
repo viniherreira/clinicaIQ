@@ -1,6 +1,9 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// `agenda-mirror` lê os módulos da clínica (lib/access), que é só do servidor.
+vi.mock('server-only', () => ({}));
 
 /** As conversas do CRM contra o banco de desenvolvimento, numa clínica descartável. */
 const envFile = resolve(__dirname, '..', '.env.local');
@@ -241,5 +244,21 @@ describe.skipIf(!process.env.DATABASE_URL)('conversas (banco)', async () => {
     await c.classifyConversation(db, tenant.id, id);
     expect(await c.linkConversation(db, id, { patientId: p.id })).toEqual({ ok: true });
     expect(await get(id)).toMatchObject({ patientId: p.id, status: 'ACTIVE' });
+  });
+
+  it('lembrete da agenda só entra no CRM para quem já é do CRM', async () => {
+    const { crmKnowsPatient } = await import('./agenda-mirror');
+    // Paciente que só agendou: sem conversa nem lead, o lembrete não abre conversa.
+    expect(await crmKnowsPatient(tenant.id, '11 98765-1077')).toBe(false);
+    // Já conversa no CRM.
+    const id = await chegou('11 98765-1077', 'Paula');
+    expect(await crmKnowsPatient(tenant.id, '11 98765-1077')).toBe(true);
+    // Conversa recusada não conta.
+    await prisma.conversation.update({ where: { id }, data: { status: 'DECLINED' } });
+    expect(await crmKnowsPatient(tenant.id, '11 98765-1077')).toBe(false);
+    // Tem lead com esse telefone (mesmo digitado sem o 9).
+    const lead = await createLead(db, actor, { name: 'Rui', phone: '11 8765-1078' });
+    if (!lead.ok) throw new Error(lead.message);
+    expect(await crmKnowsPatient(tenant.id, '11 98765-1078')).toBe(true);
   });
 });

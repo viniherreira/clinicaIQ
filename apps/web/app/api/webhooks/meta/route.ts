@@ -5,6 +5,7 @@ import { AGENDA_PAYLOADS as PAYLOADS } from '@/lib/agenda-options';
 import { applyTemplateStatus } from '@/lib/agenda-templates-sync';
 import { applyChatStatus, ingestChat } from '@/crm/chat-ingest';
 import { afterInbound } from '@/crm/inbound';
+import { crmKnowsPatient } from '@/crm/agenda-mirror';
 import { getTenantModules } from '@/lib/access';
 import { secretMatches } from '@/lib/bearer';
 import { applyAppointmentResponse, applyMessageStatus, resolveAppointmentByPhone, resolveResponseStatus } from '@/lib/whatsapp';
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
 
       // Resposta a um aviso da agenda (botão Confirmar/Reagendar, ou "1"/"2").
       let tocouBotaoDaAgenda = false;
+      let respondeuAgenda = false;
       if (ev.kind === 'message') {
         const text = ev.content.text ?? undefined;
         const buttonReplyId = ev.content.buttonId;
@@ -91,11 +93,15 @@ export async function POST(req: Request) {
           const aplicou = appointmentId
             ? await applyAppointmentResponse(appointmentId, { buttonReplyId, text, externalId: ev.id, tenantId })
             : false;
+          respondeuAgenda = aplicou;
           tocouBotaoDaAgenda = aplicou && AGENDA_PAYLOADS.has(buttonReplyId ?? '');
         }
       }
 
       if (!t.crm) continue;
+      // Paciente que não é do CRM respondeu ao lembrete da agenda: a resposta
+      // fica só na agenda, sem abrir conversa no CRM.
+      if (ev.kind === 'message' && respondeuAgenda && !(await crmKnowsPatient(tenantId, ev.from))) continue;
       const r = await ingestChat(tenantId, {
         externalId: ev.id,
         direction: ev.kind === 'message' ? 'INBOUND' : 'OUTBOUND',

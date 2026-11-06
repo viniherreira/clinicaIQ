@@ -600,9 +600,10 @@ async function prepareCloudAppointment(
         }
         r ??= await api.sendTemplate(p.to, modelo.name, modelo.language, params, modelo.buttons.map((b) => b.payload));
         const externalId = r.id;
-        // Com o CRM, o aviso aparece na conversa do paciente. Falhar aqui não desfaz o envio.
+        // Com o CRM, o aviso aparece na conversa do paciente que já é do CRM.
+        // Falhar aqui não desfaz o envio.
         await crm
-          .mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId, buttons: modelo.buttons })
+          .mirrorAgendaToCrm(m.tenantId, { phone: p.to, text: content, externalId, buttons: modelo.buttons, patientId: m.patientId })
           .catch((e) => console.error('[agenda] aviso não foi para o CRM', e instanceof Error ? e.message : e));
         return { success: true, messageId: externalId };
       } catch (e) {
