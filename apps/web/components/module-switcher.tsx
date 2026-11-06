@@ -27,8 +27,11 @@ export function ModuleSwitcher({
   space,
   onNavigate,
   clinicHome = '/dashboard',
+  className = 'w-full',
 }: {
   space: Space;
+  /** Largura e espaçamento de onde ela entra (a lateral da clínica ou o topo do CRM). */
+  className?: string;
   onNavigate?: () => void;
   /** Onde o lado "Clínica" abre. Na clínica só com o CRM, nas Configurações. */
   clinicHome?: string;
@@ -39,7 +42,7 @@ export function ModuleSwitcher({
   ];
 
   return (
-    <nav aria-label="Trocar de módulo" className="segmented w-full">
+    <nav aria-label="Trocar de módulo" className={`segmented ${className}`}>
       {opcoes.map((o) => {
         const atual = o.space === space;
         const Icon = o.icon;

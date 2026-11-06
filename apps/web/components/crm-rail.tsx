@@ -20,6 +20,7 @@ export function CrmRail({
   clinicName,
   showSwitcher,
   clinicHome = '/dashboard',
+  crmOnly = false,
 }: {
   items: RailItem[];
   active: string | undefined;
@@ -27,6 +28,8 @@ export function CrmRail({
   clinicName: string;
   showSwitcher: boolean;
   clinicHome?: string;
+  /** Só o CRM contratado: a chave do topo não aparece, então o atalho fica aqui. */
+  crmOnly?: boolean;
 }) {
   return (
     <nav aria-label="Menu principal" className="hidden w-[92px] shrink-0 flex-col bg-rail text-rail-foreground md:flex print:!hidden">
@@ -71,7 +74,7 @@ export function CrmRail({
       </ul>
 
       <div className="space-y-1 px-1.5 pb-3">
-        {showSwitcher && (
+        {showSwitcher && crmOnly && (
           <nav aria-label="Trocar de módulo">
             <Link
               href={clinicHome}
