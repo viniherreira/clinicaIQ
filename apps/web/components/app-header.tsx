@@ -76,6 +76,14 @@ export function AppHeader({
           <LogoMark size="sm" />
         </div>
 
+        {/* No CRM, a mesma chave da lateral da clínica, no topo: o menu do CRM é
+            estreito demais para ela. Só no plano Completo (Clínica + CRM). */}
+        {space === 'crm' && showSwitcher && !crmOnly && (
+          <div className="hidden md:block">
+            <ModuleSwitcher space="crm" clinicHome={clinicHomeFor(false)} className="w-56" />
+          </div>
+        )}
+
         {atual && (
           <nav aria-label="Você está em" className="hidden min-w-0 items-center gap-1.5 text-sm md:flex">
             {atual.group && atual.group !== atual.label && (

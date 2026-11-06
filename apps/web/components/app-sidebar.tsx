@@ -115,7 +115,7 @@ export function AppSidebar({
 
   if (space === 'crm') {
     return (
-      <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} />
+      <CrmRail items={itens} active={ativo} counts={contagem} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} crmOnly={crmOnly} />
     );
   }
   return <ClinicSidebar items={itens} active={ativo} clinicName={clinicName} showSwitcher={showSwitcher} clinicHome={clinicHomeFor(crmOnly)} />;
