@@ -109,7 +109,8 @@ export function mainPipeline<T extends { order: number; createdAt: Date }>(pipel
 }
 
 /**
- * Cria os funis padrão (Captação e Agendados; só com o CRM, Vendas) e os
+ * Cria os funis padrão (Captação, Interagiu, Não interagiu e Agendados; só
+ * com o CRM, Vendas no lugar de Captação e Agendados) e os
  * motivos de perda da clínica, se faltarem.
  *
  * Idempotente: pode rodar a cada abertura do CRM. Duas abas abrindo o CRM pela

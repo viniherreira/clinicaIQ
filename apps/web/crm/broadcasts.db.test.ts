@@ -60,7 +60,7 @@ describe.skipIf(!process.env.DATABASE_URL)('transmissões (banco)', async () => 
   const db = getTenantClient(tenant.id);
   const actor = { tenantId: tenant.id, userId: user.id };
   await ensureDefaultPipeline(db, tenant.id);
-  const novo = (await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))!;
+  const novo = (await db.pipelineStage.findFirst({ where: { role: 'NEW', pipeline: { name: 'Captação' } } }))!;
 
   const mk = async (name: string, phone: string) => {
     const r = await createLead(db, actor, { name, phone });

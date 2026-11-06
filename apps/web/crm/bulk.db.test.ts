@@ -24,9 +24,12 @@ describe.skipIf(!process.env.DATABASE_URL)('ações em massa (banco)', async () 
   const ctx = { db, tenantId: tenant.id, userId: user.id, role: 'OWNER' as const, crmRole: 'MANAGER' as const, rights: ROLE_RIGHTS.MANAGER, manager: true, ownOnly: false, agenda: true };
   await ensureDefaultPipeline(db, tenant.id);
   const etapas = await db.pipelineStage.findMany({ orderBy: { order: 'asc' } });
-  const novo = etapas.find((e) => e.role === 'NEW')!;
+  // A entrada da Captação, o funil principal (Interagiu e Não interagiu também têm entrada).
+  const principal = (await db.pipeline.findFirst({ where: { name: 'Captação' } }))!;
+  const novo = etapas.find((e) => e.role === 'NEW' && e.pipelineId === principal.id)!;
   const conversa = etapas.find((e) => e.name === 'Em conversa')!;
-  const perdeu = etapas.find((e) => e.role === 'LOST')!;
+  // O Perdeu do funil dos leads (a Captação): cada funil tem o seu.
+  const perdeu = etapas.find((e) => e.role === 'LOST' && e.pipelineId === novo.pipelineId)!;
   const tag = await db.leadTag.create({ data: { tenantId: tenant.id, name: 'implante', color: 'blue' } });
   const campo = await db.leadField.create({ data: { tenantId: tenant.id, name: 'Convênio', type: 'SELECT', options: ['Amil'] } });
   const motivo = await db.lostReason.create({ data: { tenantId: tenant.id, name: 'Preço', order: 99 } });

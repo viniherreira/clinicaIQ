@@ -46,9 +46,46 @@ export interface DefaultPipeline {
   stages: readonly DefaultStage[];
 }
 
+/** Nomes dos funis de resposta ao robô (o modelo "Atendimento" acha os dois por eles). */
+export const INTERAGIU_PIPELINE_NAME = 'Interagiu';
+export const NAO_INTERAGIU_PIPELINE_NAME = 'Não interagiu';
+
+/**
+ * Os funis de quem passou pelo robô de atendimento. Quem respondeu tudo e
+ * chegou ao "aguarde um momento" vai para Interagiu, esperando a consultora;
+ * quem parou de responder vai para Não interagiu, para a equipe tentar de
+ * novo. Assim "interagiu" é lugar no funil, e as tags ficam para o que a
+ * pessoa procura e de onde ela veio.
+ *
+ * A entrada de cada um (papel NEW) é a etapa para onde o robô manda.
+ */
+export const INTERACTION_PIPELINES: readonly DefaultPipeline[] = [
+  {
+    name: INTERAGIU_PIPELINE_NAME,
+    order: 20,
+    stages: [
+      { name: 'Aguardando consultora', color: 'blue', order: 10, role: 'NEW' },
+      { name: 'Em atendimento', color: 'teal', order: 20, role: null },
+      { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
+      { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
+    ],
+  },
+  {
+    name: NAO_INTERAGIU_PIPELINE_NAME,
+    order: 30,
+    stages: [
+      { name: 'Sem resposta', color: 'amber', order: 10, role: 'NEW' },
+      { name: 'Tentar de novo', color: 'orange', order: 20, role: null },
+      { name: 'Fechou', color: 'green', order: 1000, role: 'WON' },
+      { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
+    ],
+  },
+];
+
 /**
  * Os funis com que toda clínica nova começa, como os times comerciais das
- * clínicas trabalham: a recepção conversa e agenda na Captação; agendou, o card
+ * clínicas trabalham: o contato chega na Captação, onde o robô conversa; quem
+ * responde vai para Interagiu e quem some, para Não interagiu; agendou, o card
  * passa sozinho para Agendados, onde a avaliação, o orçamento e o fechamento
  * andam com a agenda. Spec: docs/specs/2026-10-26-planos-teste-e-funis-design.md.
  */
@@ -63,9 +100,10 @@ export const DEFAULT_PIPELINES: readonly DefaultPipeline[] = [
       { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
     ],
   },
+  ...INTERACTION_PIPELINES,
   {
     name: 'Agendados',
-    order: 20,
+    order: 40,
     stages: [
       { name: 'Avaliação agendada', color: 'teal', order: 10, role: 'SCHEDULED' },
       { name: 'Desmarcou ou faltou', color: 'orange', order: 20, role: 'CANCELLED' },
@@ -78,10 +116,11 @@ export const DEFAULT_PIPELINES: readonly DefaultPipeline[] = [
 ];
 
 /**
- * O funil da clínica só com o CRM: sem agenda no sistema, ninguém move o card
- * sozinho para Agendados, então é um funil só, de venda, que a equipe anda à
- * mão (a avaliação é marcada na agenda que a clínica já usa). Sem papéis da
- * agenda: se um dia ela contratar a Agenda, liga os papéis em Funis e etapas.
+ * Os funis da clínica só com o CRM: sem agenda no sistema, ninguém move o card
+ * sozinho para Agendados, então a venda é um funil só, que a equipe anda à
+ * mão (a avaliação é marcada na agenda que a clínica já usa), mais os dois de
+ * resposta ao robô. Sem papéis da agenda: se um dia ela contratar a Agenda,
+ * liga os papéis em Funis e etapas.
  */
 export const CRM_ONLY_PIPELINES: readonly DefaultPipeline[] = [
   {
@@ -97,6 +136,7 @@ export const CRM_ONLY_PIPELINES: readonly DefaultPipeline[] = [
       { name: 'Perdeu', color: 'red', order: 1001, role: 'LOST' },
     ],
   },
+  ...INTERACTION_PIPELINES,
 ];
 
 /**

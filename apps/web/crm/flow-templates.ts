@@ -1,6 +1,7 @@
 import { DEFAULT_HOURS } from './bot-engine';
 import { autoLayout } from './flow-legacy';
-import type { FlowDoc, FlowStep, FlowStepType } from './flow-engine';
+import { INTERAGIU_PIPELINE_NAME, NAO_INTERAGIU_PIPELINE_NAME } from './defaults';
+import type { ConditionStep, FlowAction, FlowDoc, FlowStep, FlowStepType } from './flow-engine';
 
 /**
  * O catálogo de passos do editor (nome, explicação, cor da caixa), passo em
@@ -73,16 +74,148 @@ const comLayout = (d: Omit<FlowDoc, 'layout'>): FlowDoc => ({ ...d, layout: auto
 
 export type FlowTrigger = 'NEW_CONTACT' | 'KEYWORD' | 'STAGE' | 'TAG' | 'NO_REPLY';
 
+/** Os funis e as tags da clínica, para o modelo já apontar para os dela. */
+export interface TemplateRefs {
+  pipelines: readonly { name: string; columns: readonly { id: string; role: string | null }[] }[];
+  tags: readonly { id: string; name: string }[];
+}
+
 export interface FlowTemplate {
   key: string;
   title: string;
   description: string;
   name: string;
   trigger: FlowTrigger;
-  doc: () => FlowDoc;
+  doc: (refs?: TemplateRefs) => FlowDoc;
+}
+
+const semAcento = (t: string) =>
+  t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+/** A entrada (papel NEW) do funil com esse nome; vazio se a clínica não tiver. */
+export function entryOf(refs: TemplateRefs | undefined, pipelineName: string): string {
+  const funil = refs?.pipelines.find((p) => semAcento(p.name) === semAcento(pipelineName));
+  return funil?.columns.find((c) => c.role === 'NEW')?.id ?? '';
+}
+
+/** A tag da clínica com um desses nomes (sem acento, hífen ou maiúscula). */
+export function tagNamed(refs: TemplateRefs | undefined, names: readonly string[]): string | undefined {
+  const alvos = names.map(semAcento);
+  return refs?.tags.find((t) => alvos.includes(semAcento(t.name)))?.id;
+}
+
+/** Os procedimentos do modelo de atendimento e os nomes de tag que cada um aceita. */
+const PROCEDIMENTOS = [
+  { id: 'limpeza', label: 'Limpeza', synonyms: ['limpar', 'tártaro', 'profilaxia'], tags: ['limpeza'] },
+  { id: 'clareamento', label: 'Clareamento', synonyms: ['clarear', 'branquear'], tags: ['clareamento'] },
+  { id: 'implante', label: 'Implante', synonyms: ['implantes', 'dente fixo', 'pino'], tags: ['implante', 'implantes'] },
+  { id: 'lentes', label: 'Lentes de contato', synonyms: ['lente', 'lentes', 'faceta'], tags: ['lentes', 'lentes de contato', 'lentes dentais', 'facetas'] },
+  { id: 'ortodontia', label: 'Aparelho ou alinhador', synonyms: ['aparelho', 'alinhador', 'ortodontia'], tags: ['ortodontia', 'aparelho'] },
+  { id: 'urgencia', label: 'Urgência ou dor', synonyms: ['dor', 'urgente', 'urgência', 'emergência'], tags: ['urgencia', 'urgencia dor', 'dor'] },
+  { id: 'outros', label: 'Outros', synonyms: ['outro', 'outra coisa'], tags: ['outros', 'outro'] },
+] as const;
+
+/** Condição "dentro do horário" (o horário é o do robô). */
+const dentroDoHorario = (id: string, sim: string, nao: string): ConditionStep => ({
+  id,
+  type: 'condition',
+  cases: [{ id: 'aberto', label: 'Dentro do horário', match: 'all', rules: [{ subject: 'hours', op: 'inside' }] }],
+  out: { 'c:aberto': sim, else: nao },
+});
+
+/**
+ * O robô de atendimento: pergunta o nome e o procedimento, põe a tag do
+ * procedimento (quando a clínica tem uma com esse nome) e, no "aguarde um
+ * momento", move o lead para Interagiu; quem para de responder vai para Não
+ * interagiu. Clínica sem esses funis: o editor pede a etapa antes de salvar.
+ */
+function atendimentoDoc(refs?: TemplateRefs): FlowDoc {
+  const interagiu = entryOf(refs, INTERAGIU_PIPELINE_NAME);
+  const naoInteragiu = entryOf(refs, NAO_INTERAGIU_PIPELINE_NAME);
+  const passosProc: Record<string, FlowStep> = {};
+  for (const p of PROCEDIMENTOS) {
+    const tagId = tagNamed(refs, p.tags);
+    const actions: FlowAction[] = [{ type: 'createLead' }];
+    if (tagId) actions.push({ type: 'tag', tagId });
+    if (p.id === 'urgencia') actions.push({ type: 'notify', text: 'Urgência: paciente com dor no WhatsApp' });
+    passosProc[`p_${p.id}`] = { id: `p_${p.id}`, type: 'action', actions, out: { next: 'fim' } };
+  }
+  const perguntaNome = { other: 'nome', timeout: 'lembrete' };
+  return comLayout({
+    version: 2,
+    start: 'entrada',
+    hours: DEFAULT_HOURS,
+    steps: {
+      entrada: { id: 'entrada', type: 'action', actions: [{ type: 'createLead' }], out: { next: 'boasVindas' } },
+      boasVindas: dentroDoHorario('boasVindas', 'bvDentro', 'bvFora'),
+      bvDentro: msg('bvDentro', 'Olá! Seja bem-vindo(a) à {{clinica}}. 😊\n\nPara te atender melhor, qual é o seu nome?', perguntaNome, {
+        waitReply: true,
+        timeoutMinutes: 10,
+      }),
+      bvFora: msg(
+        'bvFora',
+        'Olá! Que bom falar com você. 😊\nAgora estamos fora do horário, mas já posso adiantar seu atendimento.\n\nQual é o seu nome?',
+        perguntaNome,
+        { waitReply: true, timeoutMinutes: 10 },
+      ),
+      lembrete: msg('lembrete', 'Oi! Ainda está por aí?\nMe conta seu nome para eu seguir com seu atendimento.', { other: 'nome', timeout: 'semResposta' }, {
+        waitReply: true,
+        timeoutMinutes: 30,
+      }),
+      nome: {
+        id: 'nome',
+        type: 'action',
+        actions: [{ type: 'createLead' }, { type: 'setField', field: 'name', from: 'lastMessage', question: 'Qual é o seu nome?' }],
+        out: { next: 'proc' },
+      },
+      proc: msg(
+        'proc',
+        'Prazer, {{primeiro_nome}}! Qual destes procedimentos você procura?',
+        { ...Object.fromEntries(PROCEDIMENTOS.map((p) => [`b:${p.id}`, `p_${p.id}`])), other: 'p_outros', timeout: 'semResposta' },
+        { buttons: PROCEDIMENTOS.map((p) => btn(p.id, p.label, [...p.synonyms])), waitReply: true, timeoutMinutes: 60 },
+      ),
+      ...passosProc,
+      fim: dentroDoHorario('fim', 'equipe', 'equipeFora'),
+      equipe: {
+        id: 'equipe',
+        type: 'action',
+        actions: [
+          { type: 'stage', stageId: interagiu },
+          { type: 'task', text: 'Responder {{primeiro_nome}} no WhatsApp (robô de atendimento)', dueMinutes: 15 },
+        ],
+        out: { next: 'consultora' },
+      },
+      consultora: { id: 'consultora', type: 'handoff', text: 'Aguarde um momento que uma consultora vai entrar em contato com você. 😊', out: {} },
+      equipeFora: {
+        id: 'equipeFora',
+        type: 'action',
+        actions: [
+          { type: 'stage', stageId: interagiu },
+          { type: 'task', text: 'Responder {{primeiro_nome}} (chegou fora do horário)', dueMinutes: 15 },
+        ],
+        out: { next: 'foraFim' },
+      },
+      foraFim: { id: 'foraFim', type: 'handoff', text: 'Agora estamos fora do horário. Assim que abrirmos, uma consultora fala com você. 😊', out: {} },
+      semResposta: { id: 'semResposta', type: 'action', actions: [{ type: 'createLead' }, { type: 'stage', stageId: naoInteragiu }], out: { next: 'parar' } },
+      parar: { id: 'parar', type: 'stop', out: {} },
+    },
+  });
 }
 
 export const FLOW_TEMPLATES: FlowTemplate[] = [
+  {
+    key: 'atendimento',
+    title: 'Atendimento (nome e procedimento)',
+    description:
+      'Pergunta o nome e o procedimento e põe a tag dele. Quem chega ao "aguarde um momento" vai para o funil Interagiu; quem para de responder, para Não interagiu.',
+    name: 'Atendimento (nome e procedimento)',
+    trigger: 'NEW_CONTACT',
+    doc: atendimentoDoc,
+  },
   {
     key: 'boas-vindas',
     title: 'Boas-vindas com menu',

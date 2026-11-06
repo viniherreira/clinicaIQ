@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { DEFAULT_PIPELINES } from './defaults';
 
 /** Configurações do funil contra o banco de desenvolvimento. Pulado sem banco. */
 const envFile = resolve(__dirname, '..', '.env.local');
@@ -44,7 +45,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     const retorno = (await db.pipelineStage.findFirst({ where: { name: 'Retorno' } }))!;
     await s.moveStage(db, tenant.id, retorno.id, -1);
     expect(await colunas()).toEqual(['Novo', 'Retorno', 'Em conversa']);
-    await s.moveStage(db, tenant.id, (await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))!.id, -1);
+    await s.moveStage(db, tenant.id, (await db.pipelineStage.findFirst({ where: { role: 'NEW', pipeline: { name: 'Captação' } } }))!.id, -1);
     expect((await colunas())[0]).toBe('Novo');
   });
 
@@ -60,7 +61,7 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
   });
 
   it('etapa com papel não se apaga', async () => {
-    const novo = (await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))!;
+    const novo = (await db.pipelineStage.findFirst({ where: { role: 'NEW', pipeline: { name: 'Captação' } } }))!;
     expect((await s.deleteStage(db, tenant.id, novo.id, null)).ok).toBe(false);
   });
 
@@ -102,7 +103,8 @@ describe.skipIf(!process.env.DATABASE_URL)('configurações do CRM (banco)', asy
     const papel = (id: string) => destino.find((x) => x.id === id)?.role;
     expect(papel((await db.lead.findFirst({ where: { id: aberto.leadId } }))!.stageId)).toBe('NEW');
     expect(papel((await db.lead.findFirst({ where: { id: ganho.leadId } }))!.stageId)).toBe('WON');
-    expect(await db.pipeline.count()).toBe(2);
+    // Sobram os funis padrão: o que foi apagado era o único criado no teste.
+    expect(await db.pipeline.count()).toBe(DEFAULT_PIPELINES.length);
   });
 
   it('Agenda e orçamentos: o papel muda de etapa (até de funil); funil com papel não se apaga', async () => {

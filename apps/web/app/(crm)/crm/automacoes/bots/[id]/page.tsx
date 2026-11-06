@@ -32,7 +32,8 @@ export default async function BotEditorPage({
   if (id === 'novo') {
     const modelo = FLOW_TEMPLATES.find((t) => t.key === sp.modelo);
     meta = { id: null, name: modelo?.name ?? 'Meu robô', trigger: modelo?.trigger ?? 'KEYWORD', keywords: ['menu'], active: false };
-    doc = modelo ? modelo.doc() : blankFlow();
+    // O modelo já aponta para os funis e as tags da clínica, quando ela tem.
+    doc = modelo ? modelo.doc({ pipelines: basics.pipelines, tags: basics.tags }) : blankFlow();
   } else {
     const bot = await ctx.db.chatbotFlow.findFirst({ where: { id } });
     doc = bot ? readFlow(bot.steps) : null;
