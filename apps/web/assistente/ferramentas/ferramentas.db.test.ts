@@ -60,5 +60,29 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('buscarPacientes', async () => {
+    const { buscarPacientes } = await import('./pacientes');
+    const maria = await paciente(A, 'Maria Souza');
+    await paciente(B, 'Maria da Clínica B');
+
+    it('acha pelo nome, só na própria clínica, sem telefone por padrão', async () => {
+      const r = (await buscarPacientes.executar(ctxA, { nome: 'maria' })) as { itens: Record<string, unknown>[] };
+      expect(r.itens).toHaveLength(1);
+      expect(r.itens[0]).toMatchObject({ id: maria.id, nome: 'Maria Souza' });
+      expect(r.itens[0]).not.toHaveProperty('telefone');
+    });
+
+    it('decifra o telefone só quando pedido', async () => {
+      const r = (await buscarPacientes.executar(ctxA, { ids: [maria.id], incluirContato: true })) as { itens: { telefone: string }[] };
+      expect(r.itens[0].telefone).toBe('11987654321');
+    });
+
+    it('não devolve paciente de outra clínica nem pelo id', async () => {
+      const deB = await prisma.patient.findFirst({ where: { tenantId: B.tenant.id } });
+      const r = (await buscarPacientes.executar(ctxA, { ids: [deB!.id] })) as { itens: unknown[] };
+      expect(r.itens).toEqual([]);
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
