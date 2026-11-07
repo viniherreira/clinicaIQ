@@ -16,7 +16,11 @@ describe.skipIf(!process.env.DATABASE_URL)('histórico do assistente (banco)', a
   const ana = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Ana', email: `a-${sufixo}@t.local`, role: 'OWNER' } });
   const bia = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Bia', email: `b-${sufixo}@t.local`, role: 'RECEPTIONIST' } });
 
+  const outra = await prisma.tenant.create({ data: { clerkOrgId: `iah2_${sufixo}`, name: 'H2', slug: `iah2-${sufixo}` } });
+  const msg = (text: string) => ({ param: { role: 'user' as const, content: [{ type: 'text' as const, text }] }, tools: [], inputTokens: 0, outputTokens: 0 });
+
   afterAll(async () => {
+    await prisma.tenant.delete({ where: { id: outra.id } });
     await prisma.assistantMessage.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.assistantConversation.deleteMany({ where: { tenantId: tenant.id } });
     await prisma.user.deleteMany({ where: { tenantId: tenant.id } });
@@ -53,5 +57,22 @@ describe.skipIf(!process.env.DATABASE_URL)('histórico do assistente (banco)', a
     expect(await h.apagarAntigas(new Date())).toBeGreaterThanOrEqual(1);
     expect(await prisma.assistantConversation.findUnique({ where: { id: velha } })).toBeNull();
     expect(await prisma.assistantConversation.findUnique({ where: { id: nova } })).not.toBeNull();
+  });
+
+  it('não grava em conversa de outra clínica', async () => {
+    const id = await h.criarConversa(tenant.id, ana.id, 'minha');
+    await expect(h.salvarMensagens(outra.id, id, [msg('intruso')])).rejects.toThrow('conversa não encontrada');
+    expect(await prisma.assistantMessage.count({ where: { conversationId: id } })).toBe(0);
+  });
+
+  it('gravações simultâneas na mesma conversa não perdem nem repetem seq', async () => {
+    const id = await h.criarConversa(tenant.id, ana.id, 'concorrente');
+    await Promise.all([
+      h.salvarMensagens(tenant.id, id, [msg('a1'), msg('a2')]),
+      h.salvarMensagens(tenant.id, id, [msg('b1'), msg('b2')]),
+      h.salvarMensagens(tenant.id, id, [msg('c1')]),
+    ]);
+    const bruto = await prisma.assistantMessage.findMany({ where: { conversationId: id }, orderBy: { seq: 'asc' } });
+    expect(bruto.map((m) => m.seq)).toEqual([0, 1, 2, 3, 4]);
   });
 });

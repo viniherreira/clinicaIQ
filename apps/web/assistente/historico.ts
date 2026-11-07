@@ -33,6 +33,13 @@ export async function salvarMensagens(tenantId: string, conversationId: string, 
   if (novas.length === 0) return;
   const k = chave();
   await prisma.$transaction(async (tx) => {
+    // Pega o lock da linha da conversa primeiro: gravações concorrentes da
+    // mesma conversa esperam aqui e leem o último `seq` já atualizado.
+    const travada = await tx.assistantConversation.updateMany({
+      where: { id: conversationId, tenantId },
+      data: { updatedAt: new Date() },
+    });
+    if (travada.count === 0) throw new Error('conversa não encontrada');
     const ultima = await tx.assistantMessage.findFirst({
       where: { conversationId, tenantId },
       orderBy: { seq: 'desc' },
@@ -51,7 +58,6 @@ export async function salvarMensagens(tenantId: string, conversationId: string, 
         outputTokens: n.outputTokens,
       })),
     });
-    await tx.assistantConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   });
 }
 
