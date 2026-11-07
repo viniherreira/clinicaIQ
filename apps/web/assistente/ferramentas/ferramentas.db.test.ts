@@ -100,5 +100,21 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('agendaDoDia', async () => {
+    const { agendaDoDia } = await import('./agenda-do-dia');
+    const p = await paciente(A, 'Da Agenda');
+    await consulta(A, p.id, '2026-11-08T09:00:00.000Z', 'SCHEDULED');
+    await consulta(A, p.id, '2026-11-08T11:00:00.000Z', 'CANCELLED');
+    await consulta(A, p.id, '2026-11-09T09:00:00.000Z', 'SCHEDULED');
+    const pB = await paciente(B, 'Da Agenda B');
+    await consulta(B, pB.id, '2026-11-08T10:00:00.000Z', 'SCHEDULED');
+
+    it('conta só os do dia, sem cancelados, só da clínica', async () => {
+      const r = (await agendaDoDia.executar(ctxA, { data: '2026-11-08' })) as { total: number; itens: { hora: string }[] };
+      expect(r.total).toBe(1);
+      expect(r.itens[0].hora).toBe('09:00');
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
