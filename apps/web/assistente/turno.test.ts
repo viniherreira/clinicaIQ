@@ -30,17 +30,23 @@ describe('lerPedido', () => {
 
 describe('avisoFinal', () => {
   it.each([AVISO_RECUSA, AVISO_LIMITE, AVISO_CORTADA])('devolve o aviso fixo: %s', (aviso) => {
-    expect(avisoFinal([msg('user', 'oi'), msg('assistant', aviso)])).toBe(aviso);
+    expect(avisoFinal([msg('user', 'oi'), msg('assistant', aviso)], 'end_turn')).toBe(aviso);
   });
   it('junta os blocos de texto da última mensagem', () => {
-    expect(avisoFinal([msg('assistant', AVISO_RECUSA.slice(0, 10), AVISO_RECUSA.slice(10))])).toBe(AVISO_RECUSA);
+    expect(avisoFinal([msg('assistant', AVISO_RECUSA.slice(0, 10), AVISO_RECUSA.slice(10))], 'end_turn')).toBe(AVISO_RECUSA);
   });
   it('resposta normal não é aviso', () => {
-    expect(avisoFinal([msg('user', 'oi'), msg('assistant', 'Temos 3 agendamentos.')])).toBeNull();
+    expect(avisoFinal([msg('user', 'oi'), msg('assistant', 'Temos 3 agendamentos.')], 'end_turn')).toBeNull();
   });
   it('última mensagem de usuário ou lista vazia não é aviso', () => {
-    expect(avisoFinal([msg('user', AVISO_RECUSA)])).toBeNull();
-    expect(avisoFinal([])).toBeNull();
+    expect(avisoFinal([msg('user', AVISO_RECUSA)], 'end_turn')).toBeNull();
+    expect(avisoFinal([], 'end_turn')).toBeNull();
+  });
+  it.each(['max_tokens', 'model_context_window_exceeded'])('resposta cortada (%s) sem aviso no histórico devolve AVISO_CORTADA', (motivo) => {
+    expect(avisoFinal([msg('user', 'oi'), msg('assistant', 'parcial')], motivo)).toBe(AVISO_CORTADA);
+  });
+  it('cortada com aviso já no histórico devolve o aviso que está lá', () => {
+    expect(avisoFinal([msg('user', 'oi'), msg('assistant', AVISO_LIMITE)], 'max_tokens')).toBe(AVISO_LIMITE);
   });
 });
 

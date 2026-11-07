@@ -25,14 +25,17 @@ export function lerPedido(corpo: unknown):
 }
 
 const AVISOS = [AVISO_RECUSA, AVISO_LIMITE, AVISO_CORTADA];
+const CORTES = ['max_tokens', 'model_context_window_exceeded'];
 
 /** Se o turno terminou com um dos avisos fixos do loop, devolve o texto; senão, null. */
-export function avisoFinal(novas: NovaMensagem[]): string | null {
+export function avisoFinal(novas: NovaMensagem[], parouPor: string): string | null {
   const ultima = novas[novas.length - 1];
   if (!ultima || ultima.param.role !== 'assistant') return null;
   const c = ultima.param.content;
   const texto = typeof c === 'string' ? c : c.map((b) => (b.type === 'text' ? b.text : '')).join('');
-  return AVISOS.includes(texto) ? texto : null;
+  if (AVISOS.includes(texto)) return texto;
+  // Resposta cortada sem ferramenta pendente: o loop não acrescenta mensagem (quebraria a alternância), a rota avisa.
+  return CORTES.includes(parouPor) ? AVISO_CORTADA : null;
 }
 
 const PAPEL: Record<string, string> = { OWNER: 'Proprietário', ADMIN: 'Administrador', RECEPTIONIST: 'Recepção', PROFESSIONAL: 'Profissional' };
@@ -113,7 +116,7 @@ export async function rodarTurno(args: {
     return { conversaId, parouPor: 'erro' };
   }
 
-  const aviso = avisoFinal(r.novas);
+  const aviso = avisoFinal(r.novas, r.parouPor);
   if (aviso) avisar(aviso);
 
   try {
