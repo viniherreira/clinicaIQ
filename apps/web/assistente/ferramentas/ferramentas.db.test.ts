@@ -150,5 +150,26 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('semRetorno', async () => {
+    const { semRetorno } = await import('./sem-retorno');
+    const sumido = await paciente(A, 'Sumido Faz Tempo');
+    await consulta(A, sumido.id, '2026-03-10T09:00:00.000Z', 'ATTENDED');
+    const voltou = await paciente(A, 'Voltou Recente');
+    await consulta(A, voltou.id, '2026-03-10T09:00:00.000Z', 'ATTENDED');
+    await consulta(A, voltou.id, '2026-10-10T09:00:00.000Z', 'ATTENDED');
+    const marcado = await paciente(A, 'Sumido Mas Marcou');
+    await consulta(A, marcado.id, '2026-02-10T09:00:00.000Z', 'ATTENDED');
+    await consulta(A, marcado.id, '2026-11-20T09:00:00.000Z', 'SCHEDULED');
+
+    it('traz quem não volta desde o corte e não tem consulta marcada', async () => {
+      const r = (await semRetorno.executar(ctxA, { meses: 6 })) as { itens: { paciente: string; ultimaVisita: string }[] };
+      const nomes = r.itens.map((i) => i.paciente);
+      expect(nomes).toContain('Sumido Faz Tempo');
+      expect(nomes).not.toContain('Voltou Recente');
+      expect(nomes).not.toContain('Sumido Mas Marcou');
+      expect(r.itens.find((i) => i.paciente === 'Sumido Faz Tempo')!.ultimaVisita).toBe('2026-03-10');
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
