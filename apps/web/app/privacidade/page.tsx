@@ -87,7 +87,7 @@ export default function PrivacidadePage() {
         <li>
           Assistente de IA (Anthropic, nos Estados Unidos): processa as perguntas feitas ao assistente e os dados que ele
           consulta para responder (agenda, cadastro e financeiro). Não usa esses dados para treinar modelos. As conversas
-          ficam guardadas no {b} por 30 dias e depois são apagadas. O assistente fica disponível só nas clínicas que
+          ficam guardadas no {b} e são apagadas 30 dias depois da última mensagem. O assistente fica disponível só nas clínicas que
           optarem por ele.
         </li>
       </ul>

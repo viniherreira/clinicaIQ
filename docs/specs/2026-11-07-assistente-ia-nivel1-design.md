@@ -57,7 +57,7 @@ Toda ferramenta:
 - Cada pergunta leva o histórico inteiro da conversa, incluindo os resultados das ferramentas. É assim que "quais deles" e "esses 5" funcionam.
 - O histórico só cresce: nada é editado no meio, o que mantém o cache e o pensamento do modelo válidos.
 
-### 6. Histórico salvo por 30 dias, cifrado
+### 6. Histórico cifrado, apagado 30 dias depois da última mensagem
 Tabelas novas, com SQL à mão em `docs/producao/AAAA-MM-DD-assistente.sql` (com a data em que rodar em produção), com RLS ligado e `tenantId`:
 - `assistant_conversations`: id, tenantId, userId, title, createdAt, updatedAt.
 - `assistant_messages`: id, conversationId, tenantId, role, content (cifrado com a chave versionada, como o texto das conversas do CRM), tools (os nomes das ferramentas usadas), inputTokens, outputTokens, createdAt.
@@ -65,7 +65,7 @@ Tabelas novas, com SQL à mão em `docs/producao/AAAA-MM-DD-assistente.sql` (com
 Regras:
 - Cada usuário vê só as próprias conversas.
 - O cron `reminders`, que já existe, apaga as conversas paradas há mais de 30 dias (conta a última mensagem). Não gasta um cron novo do plano Hobby.
-- Exportar e anonimizar o paciente (LGPD) não precisa mexer nisso: as conversas somem sozinhas em 30 dias. A Política de Privacidade passa a citar esse prazo.
+- Exportar e anonimizar o paciente (LGPD) não precisa mexer nisso: cada conversa some sozinha 30 dias depois da última mensagem (não se apagam mensagens avulsas). A Política de Privacidade passa a citar esse prazo.
 
 ### 7. Painel lateral
 - Um botão fixo no `AppShell` da gestão (`space="clinic"`) abre um painel à direita, sem sair da página.
@@ -90,6 +90,7 @@ Regras:
 ### 10. Privacidade e Termos
 - A Anthropic entra em `/privacidade` como operadora de dados (suboperadora) do assistente. Pela API, ela não usa os dados para treinar modelos.
 - O assistente só aparece nas clínicas do piloto, que são avisadas antes de ser ligado.
+- O texto da política diz que as conversas "são apagadas 30 dias depois da última mensagem".
 
 ## Fora do Nível 1
 - Preparar mensagens, cobranças ou qualquer ação que grave (Nível 2).
