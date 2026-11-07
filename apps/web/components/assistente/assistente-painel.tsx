@@ -26,7 +26,9 @@ export function AssistentePainel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const ocupadoRef = useRef(false);
 
-  useEffect(() => fimRef.current?.scrollIntoView({ block: 'end' }), [lista]);
+  useEffect(() => {
+    fimRef.current?.scrollIntoView({ block: 'end' });
+  }, [lista]);
   useEffect(() => {
     if (!aberto) return;
     fetch('/api/assistente/conversas')
@@ -168,6 +170,8 @@ export function AssistentePainel() {
 
           <div
             className="flex-1 space-y-3 overflow-y-auto px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+            role="region"
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- área rolável precisa de foco pelo teclado (axe scrollable-region-focusable)
             tabIndex={0}
             aria-label="Conversa com o assistente"
           >
