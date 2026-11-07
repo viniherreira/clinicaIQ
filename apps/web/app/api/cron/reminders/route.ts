@@ -4,6 +4,7 @@ import { bearerMatches } from '@/lib/bearer';
 import { reconcileSubscriptions } from '@/lib/subscription-sync';
 import { refreshAgendaTemplates } from '@/lib/agenda-templates-sync';
 import { sendDueReminders } from '@/lib/reminder-sweep';
+import { reportError } from '@/lib/observability';
 import { apagarAntigas } from '@/assistente/historico';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,8 @@ export async function GET(req: Request) {
   let assistente: { apagadas: number } | { error: string };
   try {
     assistente = { apagadas: await apagarAntigas(new Date()) };
-  } catch {
+  } catch (e) {
+    reportError(e, { area: 'cron-reminders', etapa: 'apagar-conversas-assistente' });
     assistente = { error: 'falhou' };
   }
 

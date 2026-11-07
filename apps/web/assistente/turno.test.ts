@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { avisoFinal, lerPedido, SEPARADOR_FIM } from './turno';
+const h = vi.hoisted(() => ({ carregarHistorico: vi.fn() }));
+vi.mock('./historico', () => ({ carregarHistorico: h.carregarHistorico, criarConversa: vi.fn(), salvarMensagens: vi.fn() }));
+vi.mock('@/lib/observability', () => ({ reportError: vi.fn() }));
+vi.mock('@clinicaiq/db', () => ({ prisma: {}, getTenantClient: vi.fn() }));
+import { avisoFinal, lerPedido, prepararTurno, SEPARADOR_FIM } from './turno';
 import { AVISO_CORTADA, AVISO_LIMITE, AVISO_RECUSA, type NovaMensagem } from './loop';
 
 const msg = (role: 'assistant' | 'user', ...textos: string[]): NovaMensagem => ({
@@ -37,5 +41,28 @@ describe('avisoFinal', () => {
   it('última mensagem de usuário ou lista vazia não é aviso', () => {
     expect(avisoFinal([msg('user', AVISO_RECUSA)])).toBeNull();
     expect(avisoFinal([])).toBeNull();
+  });
+});
+
+describe('prepararTurno', () => {
+  it('sem conversa: historico vazio, nada e lido', async () => {
+    expect(await prepararTurno({ tenantId: 't', userId: 'u' })).toEqual({ ok: true, historico: [] });
+    expect(h.carregarHistorico).not.toHaveBeenCalled();
+  });
+  it('404 quando a conversa nao e do usuario', async () => {
+    h.carregarHistorico.mockResolvedValue(null);
+    expect(await prepararTurno({ tenantId: 't', userId: 'u', conversaId: 'c' })).toMatchObject({ ok: false, status: 404 });
+  });
+  it('409 quando o historico nao abre', async () => {
+    h.carregarHistorico.mockRejectedValue(new Error('decrypt'));
+    expect(await prepararTurno({ tenantId: 't', userId: 'u', conversaId: 'c' })).toMatchObject({ ok: false, status: 409 });
+  });
+  it('devolve o historico lido', async () => {
+    h.carregarHistorico.mockResolvedValue([{ role: 'user', content: 'x' }]);
+    expect(await prepararTurno({ tenantId: 't', userId: 'u', conversaId: 'c' })).toEqual({
+      ok: true,
+      historico: [{ role: 'user', content: 'x' }],
+      conversaId: 'c',
+    });
   });
 });

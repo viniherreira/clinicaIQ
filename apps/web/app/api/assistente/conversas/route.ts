@@ -3,7 +3,7 @@ import { currentAccess } from '@/lib/guard';
 import { reportError } from '@/lib/observability';
 import { assistenteLiberado } from '@/assistente/acesso';
 import { carregarHistorico, listarConversas } from '@/assistente/historico';
-import { ERRO_CONVERSA_ILEGIVEL } from '@/assistente/turno';
+import { ERRO_CONVERSA_ILEGIVEL } from '@/assistente/mensagens-erro';
 
 export const dynamic = 'force-dynamic';
 
