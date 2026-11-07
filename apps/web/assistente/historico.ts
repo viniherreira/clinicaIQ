@@ -12,7 +12,8 @@ const chave = () => {
 
 export async function criarConversa(tenantId: string, userId: string, titulo: string): Promise<string> {
   const c = await prisma.assistantConversation.create({
-    data: { tenantId, userId, title: titulo.slice(0, 80) },
+    // O título é a pergunta, que pode ter nome de paciente: vai cifrado como as mensagens.
+    data: { tenantId, userId, title: encrypt(Array.from(titulo).slice(0, 80).join(''), chave(), tenantId) },
     select: { id: true },
   });
   return c.id;
@@ -68,7 +69,15 @@ export async function listarConversas(tenantId: string, userId: string) {
     take: 20,
     select: { id: true, title: true, updatedAt: true },
   });
-  return cs.map((c) => ({ id: c.id, titulo: c.title, atualizadaEm: c.updatedAt.toISOString() }));
+  const k = chave();
+  const titulo = (t: string, tenant: string) => {
+    try {
+      return decrypt(t, k, tenant);
+    } catch {
+      return 'Conversa';
+    }
+  };
+  return cs.map((c) => ({ id: c.id, titulo: titulo(c.title, tenantId), atualizadaEm: c.updatedAt.toISOString() }));
 }
 
 /** Chamada pelo cron `reminders`. Apaga conversas paradas há mais de 30 dias (as mensagens vão em cascata). */

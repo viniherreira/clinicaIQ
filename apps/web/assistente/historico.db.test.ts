@@ -47,6 +47,8 @@ describe.skipIf(!process.env.DATABASE_URL)('histórico do assistente (banco)', a
     expect(hist!.map((p) => p.role)).toEqual(['user', 'assistant', 'user']);
     expect(await h.carregarHistorico(tenant.id, bia.id, id)).toBeNull();
     expect((await h.listarConversas(tenant.id, ana.id)).map((c) => c.titulo)).toContain('Últimos atendidos');
+    const crua = await prisma.assistantConversation.findUnique({ where: { id }, select: { title: true } });
+    expect(crua!.title).not.toContain('Últimos');
     expect(await h.listarConversas(tenant.id, bia.id)).toEqual([]);
   });
 
