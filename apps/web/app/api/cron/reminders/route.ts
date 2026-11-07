@@ -4,6 +4,7 @@ import { bearerMatches } from '@/lib/bearer';
 import { reconcileSubscriptions } from '@/lib/subscription-sync';
 import { refreshAgendaTemplates } from '@/lib/agenda-templates-sync';
 import { sendDueReminders } from '@/lib/reminder-sweep';
+import { apagarAntigas } from '@/assistente/historico';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -46,6 +47,14 @@ export async function GET(req: Request) {
     subscriptions = { error: 'falhou' };
   }
 
+  // Conversas do assistente de IA: guardadas 30 dias (LGPD). Try próprio, pela mesma razão acima.
+  let assistente: { apagadas: number } | { error: string };
+  try {
+    assistente = { apagadas: await apagarAntigas(new Date()) };
+  } catch {
+    assistente = { error: 'falhou' };
+  }
+
   // Textos da agenda em análise na Meta: pergunta antes de mandar, para o que
   // foi aprovado desde ontem já sair hoje (o webhook também avisa, mas pode falhar).
   const emAnalise = await prisma.messageTemplate.findMany({
@@ -64,5 +73,6 @@ export async function GET(req: Request) {
     sent: porDia.reduce((n, d) => n + d.sent, 0),
     failed: porDia.reduce((n, d) => n + d.failed, 0),
     subscriptions,
+    assistente,
   });
 }
