@@ -21,7 +21,10 @@ export function AssistentePainel() {
   const [recentes, setRecentes] = useState<{ id: string; titulo: string }[]>([]);
   const [texto, setTexto] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [anuncio, setAnuncio] = useState('');
   const fimRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const ocupadoRef = useRef(false);
 
   useEffect(() => fimRef.current?.scrollIntoView({ block: 'end' }), [lista]);
   useEffect(() => {
@@ -50,10 +53,19 @@ export function AssistentePainel() {
   }
 
   async function perguntar(pergunta: string) {
-    if (!pergunta.trim() || ocupado) return;
+    if (!pergunta.trim() || ocupadoRef.current) return;
+    ocupadoRef.current = true;
     setTexto('');
     setOcupado(true);
+    setAnuncio('Consultando…');
     setLista((l) => [...l, { autor: 'voce', texto: pergunta }, { autor: 'assistente', texto: '' }]);
+    // O que está na bolha da resposta; é também o que o leitor de tela ouve no fim.
+    let visivel = '';
+    const mostrar = (t: string) => {
+      visivel = t;
+      setLista((l) => [...l.slice(0, -1), { autor: 'assistente', texto: t }]);
+    };
+    const acrescentar = (aviso: string) => mostrar(visivel.trim() ? `${visivel}\n\n${aviso}` : aviso);
     try {
       const r = await fetch('/api/assistente', {
         method: 'POST',
@@ -67,35 +79,42 @@ export function AssistentePainel() {
       const leitor = r.body.getReader();
       const dec = new TextDecoder();
       let tudo = '';
-      for (;;) {
-        const { done, value } = await leitor.read();
-        if (done) break;
-        tudo += dec.decode(value, { stream: true });
-        const visivel = tudo.split(SEPARADOR_FIM)[0].replace(/\n$/, '');
-        setLista((l) => [...l.slice(0, -1), { autor: 'assistente', texto: visivel }]);
-      }
-      const fim = tudo.split(SEPARADOR_FIM)[1];
-      if (fim) {
-        try {
-          const meta = JSON.parse(fim) as { conversaId?: string; erro?: string };
-          // O id pode faltar quando o turno falhou antes de criar a conversa: fica o atual.
-          if (meta.conversaId) setConversaId(meta.conversaId);
-          if (meta.erro) {
-            const aviso = meta.erro;
-            setLista((l) => {
-              const ultima = l[l.length - 1];
-              const completo = ultima.texto ? `${ultima.texto}\n\n${aviso}` : aviso;
-              return [...l.slice(0, -1), { autor: 'assistente', texto: completo }];
-            });
-          }
-        } catch {
-          // Linha final ilegível: a resposta já está na tela.
+      try {
+        for (;;) {
+          const { done, value } = await leitor.read();
+          if (done) break;
+          tudo += dec.decode(value, { stream: true });
+          mostrar(tudo.split(SEPARADOR_FIM)[0].replace(/\n$/, ''));
         }
+        tudo += dec.decode();
+      } catch (e) {
+        // Falha no meio do stream: fica o que já chegou, mais o aviso.
+        const aviso = (e as Error).message || 'A resposta foi interrompida. Tente de novo.';
+        acrescentar(aviso);
+        return;
+      }
+      const partes = tudo.split(SEPARADOR_FIM);
+      mostrar(partes[0].replace(/\n$/, ''));
+      if (partes.length < 2) {
+        acrescentar('A resposta foi interrompida. Tente de novo.');
+        return;
+      }
+      try {
+        const meta = JSON.parse(partes[1]) as { conversaId?: string; erro?: string };
+        // O id pode faltar quando o turno falhou antes de criar a conversa: fica o atual.
+        if (meta.conversaId) setConversaId(meta.conversaId);
+        if (meta.erro) acrescentar(meta.erro);
+        else if (!visivel.trim()) mostrar('Sem resposta. Tente de novo.');
+      } catch {
+        if (!visivel.trim()) mostrar('Sem resposta. Tente de novo.');
       }
     } catch (e) {
-      setLista((l) => [...l.slice(0, -1), { autor: 'assistente', texto: (e as Error).message }]);
+      mostrar((e as Error).message);
     } finally {
+      setAnuncio(visivel);
+      ocupadoRef.current = false;
       setOcupado(false);
+      inputRef.current?.focus();
     }
   }
 
@@ -115,6 +134,10 @@ export function AssistentePainel() {
         <Dialog.Content
           className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-surface shadow-2xl focus:outline-none"
           aria-describedby="assistente-descricao"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
         >
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
             <Dialog.Title className="text-base font-semibold">Assistente</Dialog.Title>
@@ -143,7 +166,11 @@ export function AssistentePainel() {
             Pergunte sobre a agenda, os pacientes e o financeiro. O assistente só consulta, não altera nada.
           </Dialog.Description>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3" aria-live="polite" aria-busy={ocupado}>
+          <div
+            className="flex-1 space-y-3 overflow-y-auto px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+            tabIndex={0}
+            aria-label="Conversa com o assistente"
+          >
             {lista.length === 0 && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
@@ -197,6 +224,9 @@ export function AssistentePainel() {
             ))}
             <div ref={fimRef} />
           </div>
+          <div role="status" aria-live="polite" className="sr-only">
+            {anuncio}
+          </div>
 
           <form
             onSubmit={(e) => {
@@ -210,12 +240,14 @@ export function AssistentePainel() {
             </label>
             <input
               id="assistente-pergunta"
+              ref={inputRef}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               maxLength={2000}
               placeholder="Ex.: quem não volta há 6 meses?"
               className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              disabled={ocupado}
+              readOnly={ocupado}
+              aria-disabled={ocupado}
             />
             <button
               type="submit"

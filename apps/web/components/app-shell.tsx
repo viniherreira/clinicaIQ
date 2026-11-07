@@ -58,9 +58,11 @@ export async function AppShell({
     select: { id: true, name: true, email: true, role: true, crmSeat: true, crmRole: true, crmRights: true, crmAvailable: true },
   });
 
-  const [access, modules] = await Promise.all([
+  const [access, modules, assistenteOk] = await Promise.all([
     getTenantAccess(tenant.id),
     getTenantModules(tenant.id),
+    // Assistente de IA: só na gestão, só nas clínicas do piloto (ou com o plano liberado).
+    space === 'clinic' ? assistenteLiberado(tenant.id) : Promise.resolve(false),
   ]);
 
   const role = me?.role ?? '';
@@ -68,8 +70,7 @@ export async function AppShell({
   guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
   const crmOnly = !modules.clinic;
 
-  // Assistente de IA: só na gestão, só nas clínicas do piloto (ou com o plano liberado).
-  const assistente = space === 'clinic' && modules.clinic ? await assistenteLiberado(tenant.id) : false;
+  const assistente = space === 'clinic' && modules.clinic && assistenteOk;
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
