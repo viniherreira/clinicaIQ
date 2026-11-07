@@ -116,5 +116,24 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('horariosLivres', async () => {
+    const { horariosLivres } = await import('./horarios-livres');
+    await prisma.professionalSchedule.create({
+      data: { professionalId: A.prof.id, dayOfWeek: 1, startTime: '08:00', endTime: '10:00' },
+    });
+    const p = await paciente(A, 'Ocupa Horário');
+    await consulta(A, p.id, '2030-01-07T08:30:00.000Z', 'SCHEDULED');
+
+    it('devolve o expediente menos o ocupado', async () => {
+      const r = (await horariosLivres.executar(ctxA, { profissionalId: A.prof.id, data: '2030-01-07' })) as { horarios: string[] };
+      expect(r.horarios).toEqual(['08:00', '09:00', '09:30']);
+    });
+
+    it('recusa profissional de outra clínica', async () => {
+      const r = (await horariosLivres.executar(ctxA, { profissionalId: B.prof.id, data: '2030-01-07' })) as { erro: string };
+      expect(r.erro).toMatch(/não encontrado/);
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
