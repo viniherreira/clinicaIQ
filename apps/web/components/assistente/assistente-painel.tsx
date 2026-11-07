@@ -7,6 +7,10 @@ import { bolhas, type Bolha } from './mensagens';
 
 /** O mesmo separador de assistente/turno.ts (aquele arquivo não pode vir para o client). */
 const SEPARADOR_FIM = '\u0000';
+const SEM_CONEXAO = 'Sem conexão. Verifique a internet e tente de novo.';
+/** Falha de rede no navegador vira TypeError com mensagem em inglês: troca pela nossa. */
+const mensagemDoErro = (e: unknown, padrao: string) =>
+  e instanceof TypeError ? SEM_CONEXAO : (e as Error).message || padrao;
 const SUGESTOES = [
   'Quantos agendamentos temos amanhã?',
   'Me passe os dados dos últimos 5 pacientes atendidos.',
@@ -91,7 +95,7 @@ export function AssistentePainel() {
         tudo += dec.decode();
       } catch (e) {
         // Falha no meio do stream: fica o que já chegou, mais o aviso.
-        const aviso = (e as Error).message || 'A resposta foi interrompida. Tente de novo.';
+        const aviso = mensagemDoErro(e, 'A resposta foi interrompida. Tente de novo.');
         acrescentar(aviso);
         return;
       }
@@ -111,7 +115,7 @@ export function AssistentePainel() {
         if (!visivel.trim()) mostrar('Sem resposta. Tente de novo.');
       }
     } catch (e) {
-      mostrar((e as Error).message);
+      mostrar(mensagemDoErro(e, 'Não foi possível responder agora.'));
     } finally {
       setAnuncio(visivel);
       ocupadoRef.current = false;
