@@ -134,29 +134,31 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users               User[]
-  units               ClinicUnit[]
-  patients            Patient[]
-  professionals       Professional[]
-  procedures          Procedure[]
-  procedureCategories ProcedureCategory[]
-  appointments        Appointment[]
-  appointmentLabels   AppointmentLabel[]
-  quotes              Quote[]
-  messages            WhatsAppMessage[]
-  auditLogs           AuditLog[]
-  blockedSlots        BlockedSlot[]
-  patientNotes        PatientNote[]
-  toothRecords        ToothRecord[]
-  toothFindings       ToothFinding[]
-  payments            Payment[]
-  anamneses           Anamnesis[]
-  evolutions          Evolution[]
-  patientFiles        PatientFile[]
-  whatsappSession     WhatsAppSession?
-  campaigns           Campaign[]
-  subscription        Subscription?
-  invitations         Invitation[]
+  users                  User[]
+  units                  ClinicUnit[]
+  patients               Patient[]
+  professionals          Professional[]
+  procedures             Procedure[]
+  procedureCategories    ProcedureCategory[]
+  appointments           Appointment[]
+  appointmentLabels      AppointmentLabel[]
+  quotes                 Quote[]
+  messages               WhatsAppMessage[]
+  auditLogs              AuditLog[]
+  blockedSlots           BlockedSlot[]
+  patientNotes           PatientNote[]
+  toothRecords           ToothRecord[]
+  toothFindings          ToothFinding[]
+  payments               Payment[]
+  anamneses              Anamnesis[]
+  evolutions             Evolution[]
+  patientFiles           PatientFile[]
+  whatsappSession        WhatsAppSession?
+  campaigns              Campaign[]
+  subscription           Subscription?
+  invitations            Invitation[]
+  assistantConversations AssistantConversation[]
+  assistantMessages      AssistantMessage[]
 
   // CRM (etapa 1)
   leads          Lead[]
@@ -233,13 +235,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant                Tenant         @relation(fields: [tenantId], references: [id])
-  patientNotes          PatientNote[]
-  auditLogs             AuditLog[]
-  assignedLeads         Lead[]         @relation("LeadAssignee")
-  assignedTasks         LeadTask[]     @relation("LeadTaskAssignee")
-  chatMessagesSent      ChatMessage[]
-  assignedConversations Conversation[] @relation("ConversationAssignee")
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  patientNotes           PatientNote[]
+  auditLogs              AuditLog[]
+  assignedLeads          Lead[]                  @relation("LeadAssignee")
+  assignedTasks          LeadTask[]              @relation("LeadTaskAssignee")
+  chatMessagesSent       ChatMessage[]
+  assignedConversations  Conversation[]          @relation("ConversationAssignee")
+  assistantConversations AssistantConversation[]
 
   @@index([tenantId])
   @@index([tenantId, deactivatedAt])
@@ -1000,6 +1003,11 @@ model Subscription {
   complimentary     Boolean @default(false)
   /// Por que foi concedida — para quem ler a tabela daqui a um ano.
   complimentaryNote String?
+
+  /// Piloto do assistente de IA, ligado à mão por clínica
+  /// (docs/specs/2026-11-07-assistente-ia-nivel1-design.md). Também libera
+  /// quando o plano tem `assistantEnabled`.
+  assistantEnabled Boolean @default(false)
 
   /// Identificadores no Asaas. Nulos enquanto a cobrança for manual.
   asaasCustomerId     String?
@@ -1896,4 +1904,46 @@ model RateLimit {
 
   @@index([resetAt])
   @@map("rate_limits")
+}
+
+/// Conversa de um usuário com o assistente de IA. Apagada depois de 30 dias.
+model AssistantConversation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  user     User               @relation(fields: [userId], references: [id])
+  messages AssistantMessage[]
+
+  @@index([tenantId, userId, updatedAt(sort: Desc)])
+  @@index([updatedAt])
+  @@map("assistant_conversations")
+}
+
+/// Uma mensagem da API do Claude (pergunta, resposta ou resultado de
+/// ferramenta), cifrada inteira em JSON. A ordem é a de `seq`.
+model AssistantMessage {
+  id             String   @id @default(cuid())
+  tenantId       String
+  conversationId String
+  seq            Int
+  role           String
+  /// `encrypt(JSON.stringify(BetaMessageParam))`.
+  content        String
+  /// Nomes das ferramentas chamadas nesta mensagem (sem os dados).
+  tools          String[] @default([])
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, seq])
+  @@index([tenantId])
+  @@map("assistant_messages")
 }
