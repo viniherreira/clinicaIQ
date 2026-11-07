@@ -84,5 +84,21 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('ultimosAtendidos', async () => {
+    const { ultimosAtendidos } = await import('./atendidos');
+    const p1 = await paciente(A, 'Atendido Antigo');
+    const p2 = await paciente(A, 'Atendido Recente');
+    await consulta(A, p1.id, '2026-10-01T09:00:00.000Z', 'ATTENDED');
+    await consulta(A, p2.id, '2026-11-05T14:30:00.000Z', 'ATTENDED');
+    await consulta(A, p2.id, '2026-11-06T10:00:00.000Z', 'CANCELLED');
+
+    it('traz os atendidos, do mais recente, e ignora cancelados', async () => {
+      const r = (await ultimosAtendidos.executar(ctxA, { quantidade: 5 })) as { itens: { paciente: string; data: string; hora: string }[] };
+      const meus = r.itens.filter((i) => i.paciente.startsWith('Atendido'));
+      expect(meus.map((i) => i.paciente)).toEqual(['Atendido Recente', 'Atendido Antigo']);
+      expect(meus[0]).toMatchObject({ data: '2026-11-05', hora: '14:30' });
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
