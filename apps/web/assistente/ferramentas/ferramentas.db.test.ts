@@ -200,5 +200,22 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('faturamento', async () => {
+    const { faturamento } = await import('./faturamento');
+    const p = await paciente(A, 'Pagante');
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: p.id, amount: 200, method: 'PIX', paidAt: new Date('2026-10-01T03:00:00.000Z') } });
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: p.id, amount: 100, method: 'PIX', paidAt: new Date('2026-10-31T20:00:00.000Z') } });
+    // 31/10 às 23h30 em Brasília já é 01/11 em UTC: tem de contar em outubro.
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: p.id, amount: 50, method: 'Dinheiro', paidAt: new Date('2026-11-01T02:30:00.000Z') } });
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: p.id, amount: 999, paidAt: new Date('2026-11-01T03:00:00.000Z') } });
+
+    it('soma o período no relógio da clínica', async () => {
+      const r = (await faturamento.executar(ctxA, { inicio: '2026-10-01', fim: '2026-10-31' })) as { pagamentos: number; porForma: { forma: string }[] };
+      // O saldoDevedor também grava pagamentos: confira só os deste bloco.
+      expect(r.pagamentos).toBeGreaterThanOrEqual(3);
+      expect(r.porForma.map((f) => f.forma)).toEqual(expect.arrayContaining(['PIX', 'Dinheiro']));
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
