@@ -7,7 +7,12 @@ const m = vi.hoisted(() => ({
   checarLimites: vi.fn(),
   prepararTurno: vi.fn(),
   rodarTurno: vi.fn(),
+  getTenantAccess: vi.fn(),
+  getTenantModules: vi.fn(),
+  after: vi.fn(),
 }));
+vi.mock('@/lib/access', () => ({ getTenantAccess: m.getTenantAccess, getTenantModules: m.getTenantModules }));
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: m.after }));
 vi.mock('@/lib/guard', () => ({ currentAccess: m.currentAccess }));
 vi.mock('@/lib/observability', () => ({ reportError: vi.fn() }));
 vi.mock('@/assistente/acesso', () => ({ assistenteLiberado: m.assistenteLiberado, checarLimites: m.checarLimites }));
@@ -29,6 +34,8 @@ beforeEach(() => {
   m.assistenteLiberado.mockResolvedValue(true);
   m.checarLimites.mockResolvedValue({ ok: true });
   m.prepararTurno.mockResolvedValue({ ok: true, historico: [] });
+  m.getTenantAccess.mockResolvedValue({ level: 'full' });
+  m.getTenantModules.mockResolvedValue({ clinic: true });
 });
 
 describe('POST /api/assistente', () => {
@@ -37,6 +44,27 @@ describe('POST /api/assistente', () => {
     const r = await POST(req({ pergunta: 'oi' }));
     expect(r.status).toBe(404);
     expect(await r.json()).toEqual({ erro: 'não encontrado' });
+  });
+
+  it('404 quando a assinatura está em somente leitura', async () => {
+    m.getTenantAccess.mockResolvedValue({ level: 'readonly' });
+    const r = await POST(req({ pergunta: 'oi' }));
+    expect(r.status).toBe(404);
+    expect(m.rodarTurno).not.toHaveBeenCalled();
+  });
+
+  it('404 quando a clínica não tem o módulo da Agenda', async () => {
+    m.getTenantModules.mockResolvedValue({ clinic: false });
+    const r = await POST(req({ pergunta: 'oi' }));
+    expect(r.status).toBe(404);
+  });
+
+  it('registra o turno em after() para sobreviver ao fechamento da tela', async () => {
+    m.rodarTurno.mockResolvedValue({ conversaId: 'c1', parouPor: 'end_turn' });
+    const r = await POST(req({ pergunta: 'oi' }));
+    await r.text();
+    expect(m.after).toHaveBeenCalledTimes(1);
+    expect(m.after.mock.calls[0][0]).toBeInstanceOf(Promise);
   });
 
   it('409 em JSON vindo do prepararTurno, sem rodar o turno', async () => {

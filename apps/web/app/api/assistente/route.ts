@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { currentAccess } from '@/lib/guard';
+import { getTenantAccess, getTenantModules } from '@/lib/access';
 import { reportError } from '@/lib/observability';
 import { assistenteLiberado, checarLimites } from '@/assistente/acesso';
 import { lerPedido, prepararTurno, rodarTurno, SEPARADOR_FIM } from '@/assistente/turno';
@@ -7,10 +8,16 @@ import { lerPedido, prepararTurno, rodarTurno, SEPARADOR_FIM } from '@/assistent
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+/** Só clínica com a Agenda contratada e a assinatura em dia (nada de modo somente leitura). */
+async function assinaturaOk(tenantId: string) {
+  const [access, modules] = await Promise.all([getTenantAccess(tenantId), getTenantModules(tenantId)]);
+  return access.level === 'full' && modules.clinic;
+}
+
 export async function POST(req: Request) {
   const acesso = await currentAccess();
   // 404, e não 403: para quem não está no piloto, a rota não existe.
-  if (!acesso || !(await assistenteLiberado(acesso.tenantId))) {
+  if (!acesso || !(await assistenteLiberado(acesso.tenantId)) || !(await assinaturaOk(acesso.tenantId))) {
     return NextResponse.json({ erro: 'não encontrado' }, { status: 404 });
   }
   const pedido = lerPedido(await req.json().catch(() => null));
@@ -25,6 +32,7 @@ export async function POST(req: Request) {
   if (!preparo.ok) return NextResponse.json({ erro: preparo.erro }, { status: preparo.status });
 
   const codificador = new TextEncoder();
+  let turno: Promise<void> | undefined;
   // Se a tela fecha, o turno continua: ainda grava o histórico e a auditoria.
   let fechado = false;
   const corpo = new ReadableStream<Uint8Array>({
@@ -46,7 +54,7 @@ export async function POST(req: Request) {
           /* já fechado */
         }
       };
-      void (async () => {
+      turno = (async () => {
         try {
           const r = await rodarTurno({
             tenantId: acesso.tenantId,
@@ -70,5 +78,8 @@ export async function POST(req: Request) {
       fechado = true;
     },
   });
+  // start() roda dentro do construtor: `turno` já existe. O after() segura a função viva
+  // na Vercel mesmo se o cliente fechar a tela e a resposta terminar.
+  if (turno) after(turno);
   return new Response(corpo, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
 }

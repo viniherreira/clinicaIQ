@@ -70,7 +70,7 @@ export async function AppShell({
   guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
   const crmOnly = !modules.clinic;
 
-  const assistente = space === 'clinic' && modules.clinic && assistenteOk;
+  const assistente = space === 'clinic' && modules.clinic && access.level === 'full' && assistenteOk;
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
