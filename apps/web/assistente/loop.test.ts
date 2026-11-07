@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
-import { responder, MAX_VOLTAS, AVISO_RECUSA, AVISO_LIMITE, AVISO_CORTADA, type ClienteClaude, type Param } from './loop';
+import { responder, MAX_VOLTAS, ORCAMENTO_MS, AVISO_RECUSA, AVISO_LIMITE, AVISO_CORTADA, type ClienteClaude, type Param } from './loop';
 import { ferramenta } from './ferramentas/tipos';
 
 type Msg = Anthropic.Beta.BetaMessage;
@@ -161,5 +161,74 @@ describe('responder', () => {
     const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: (t) => escrito.push(t) });
     expect(escrito.join('')).toBe('Vou ver.\n\nSão 1.');
     expect(r.textoFinal).toBe('São 1.');
+  });
+  it('estourou o orçamento de tempo: fecha como no limite de voltas, com histórico alternado', async () => {
+    const { cliente, pedidos } = falso([
+      msg([{ type: 'tool_use', id: 't0', name: 'eco', input: { n: 0 } }] as Msg['content'], 'tool_use'),
+      msg([{ type: 'text', text: 'nunca' }] as Msg['content'], 'end_turn'),
+    ]);
+    let t = 1000;
+    const agora = () => {
+      const v = t;
+      t += ORCAMENTO_MS; // cada leitura do relógio avança o orçamento inteiro
+      return v;
+    };
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {}, agora });
+    expect(pedidos).toHaveLength(1);
+    expect(r.parouPor).toBe('limite');
+    expect(r.textoFinal).toBe(AVISO_LIMITE);
+    const papeis = r.novas.map((n) => n.param.role);
+    papeis.forEach((p, i) => expect(p).toBe(i % 2 === 0 ? 'user' : 'assistant'));
+    expect(papeis.at(-1)).toBe('assistant');
+    expect(r.novas.at(-1)!.param.content).toEqual([{ type: 'text', text: AVISO_LIMITE }]);
+  });
+
+  it('dentro do orçamento continua normalmente', async () => {
+    const { cliente, pedidos } = falso([
+      msg([{ type: 'tool_use', id: 't0', name: 'eco', input: { n: 0 } }] as Msg['content'], 'tool_use'),
+      msg([{ type: 'text', text: 'ok' }] as Msg['content'], 'end_turn'),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {}, agora: () => 5 });
+    expect(pedidos).toHaveLength(2);
+    expect(r.textoFinal).toBe('ok');
+  });
+
+  it('fallback no meio: tool_use do modelo recusado não roda nem volta ao histórico', async () => {
+    const espiao = vi.fn(async () => ({}));
+    const f = ferramenta({ nome: 'eco', descricao: 'd', capability: 'agenda', entrada: z.object({ n: z.number() }).strict(), executar: espiao });
+    const { cliente } = falso([
+      msg(
+        [
+          { type: 'thinking', thinking: 'x', signature: 's' },
+          { type: 'tool_use', id: 't1', name: 'eco', input: { n: 1 } },
+          { type: 'fallback', from: { model: 'a' }, to: { model: 'b' } },
+          { type: 'text', text: 'Resposta do reserva.' },
+        ] as unknown as Msg['content'],
+        'end_turn',
+      ),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [f], ctx: {} as never, aoEscrever: () => {} });
+    expect(espiao).not.toHaveBeenCalled();
+    const guardado = r.novas[1].param.content as { type: string }[];
+    expect(guardado.map((b) => b.type)).toEqual(['fallback', 'text']);
+    expect(r.novas[1].tools).toEqual([]);
+    expect(r.textoFinal).toBe('Resposta do reserva.');
+  });
+
+  it('fallback: tool_use depois do bloco de fallback é executado normalmente', async () => {
+    const { cliente } = falso([
+      msg(
+        [
+          { type: 'tool_use', id: 'velho', name: 'eco', input: { n: 1 } },
+          { type: 'fallback', from: { model: 'a' }, to: { model: 'b' } },
+          { type: 'tool_use', id: 'novo', name: 'eco', input: { n: 2 } },
+        ] as unknown as Msg['content'],
+        'tool_use',
+      ),
+      msg([{ type: 'text', text: 'ok' }] as Msg['content'], 'end_turn'),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
+    const res = r.novas[2].param.content as Anthropic.Beta.BetaToolResultBlockParam[];
+    expect(res.map((x) => x.tool_use_id)).toEqual(['novo']);
   });
 });

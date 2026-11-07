@@ -26,10 +26,21 @@ export interface NovaMensagem {
 /** Teto de idas e voltas com ferramentas numa pergunta. */
 export const MAX_VOLTAS = 8;
 
+/** Orçamento de tempo do turno (a rota tem maxDuration de 60 s): depois dele não começa volta nova. */
+export const ORCAMENTO_MS = 45_000;
+
 /** Textos fixos: a rota mostra ao usuário a mesma string que o histórico guarda. */
 export const AVISO_RECUSA = 'Não consegui responder a essa pergunta. Tente reformular.';
 export const AVISO_LIMITE = 'A pergunta exigiu consultas demais. Tente dividir em partes.';
 export const AVISO_CORTADA = 'A resposta ficou longa demais e foi cortada. Tente uma pergunta mais específica.';
+
+type Bloco = Anthropic.Beta.BetaMessage['content'][number];
+
+function semAntesDoFallback(content: Bloco[]): Bloco[] {
+  const i = content.findLastIndex((b) => (b as { type: string }).type === 'fallback');
+  if (i < 0) return content;
+  return content.filter((b, j) => j >= i || b.type === 'text');
+}
 
 const aviso = (text: string): NovaMensagem => ({
   param: { role: 'assistant', content: [{ type: 'text', text }] },
@@ -50,6 +61,7 @@ export async function responder({
   ferramentas,
   ctx,
   aoEscrever,
+  agora = Date.now,
 }: {
   cliente: ClienteClaude;
   historico: Param[];
@@ -57,14 +69,19 @@ export async function responder({
   ferramentas: Ferramenta[];
   ctx: Contexto;
   aoEscrever: (texto: string) => void;
+  /** Relógio, injetável para o teste. */
+  agora?: () => number;
 }): Promise<{ novas: NovaMensagem[]; textoFinal: string; parouPor: string }> {
   const tools = paraApi(ferramentas);
   const messages: Param[] = [...historico, pergunta];
   const novas: NovaMensagem[] = [{ param: pergunta, tools: [], inputTokens: 0, outputTokens: 0 }];
   let textoFinal = '';
   let jaEscreveu = false;
+  const inicio = agora();
 
   for (let volta = 0; volta < MAX_VOLTAS; volta++) {
+    // Antes de uma volta nova o histórico termina em tool_result (user): o aviso do assistente fecha direito.
+    if (volta > 0 && agora() - inicio >= ORCAMENTO_MS) break;
     const stream = cliente.beta.messages.stream({
       model: MODELO,
       max_tokens: 16000,
@@ -92,8 +109,11 @@ export async function responder({
       return { novas, textoFinal: AVISO_RECUSA, parouPor: 'refusal' };
     }
 
-    const assistente: Param = { role: 'assistant', content: resposta.content };
-    const chamadas = resposta.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use');
+    // Com fallback no servidor, o que veio antes do último bloco `fallback` é do modelo que recusou:
+    // thinking e tool_use dali não rodam nem voltam ao histórico (a API exige essa omissão).
+    const conteudo = semAntesDoFallback(resposta.content);
+    const assistente: Param = { role: 'assistant', content: conteudo };
+    const chamadas = conteudo.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use');
     messages.push(assistente);
     novas.push({
       param: assistente,
@@ -104,7 +124,7 @@ export async function responder({
         (resposta.usage.cache_creation_input_tokens ?? 0),
       outputTokens: resposta.usage.output_tokens,
     });
-    textoFinal = resposta.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
+    textoFinal = conteudo.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
 
     if (resposta.stop_reason !== 'tool_use' && chamadas.length > 0) {
       // Chamada cortada: não roda, mas cada tool_use precisa de um resultado para o histórico ser válido.
