@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
-import { responder, MAX_VOLTAS, type ClienteClaude, type Param } from './loop';
+import { responder, MAX_VOLTAS, AVISO_RECUSA, AVISO_LIMITE, AVISO_CORTADA, type ClienteClaude, type Param } from './loop';
 import { ferramenta } from './ferramentas/tipos';
 
 type Msg = Anthropic.Beta.BetaMessage;
@@ -72,14 +72,19 @@ describe('responder', () => {
     expect(pedidos[0].messages).toEqual([...antes, pergunta]);
   });
 
-  it('para em recusa sem rodar ferramenta', async () => {
+  it('recusa: não roda ferramenta, não guarda o turno cortado e fecha com aviso do assistente', async () => {
+    const espiao = vi.fn(async () => ({}));
+    const f = ferramenta({ nome: 'eco', descricao: 'd', capability: 'agenda', entrada: z.object({ n: z.number() }).strict(), executar: espiao });
     const { cliente } = falso([msg([{ type: 'tool_use', id: 't1', name: 'eco', input: { n: 1 } }] as Msg['content'], 'refusal')]);
-    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [f], ctx: {} as never, aoEscrever: () => {} });
+    expect(espiao).not.toHaveBeenCalled();
     expect(r.parouPor).toBe('refusal');
-    expect(r.novas.map((n) => n.param.role)).toEqual(['user']);
+    expect(r.textoFinal).toBe(AVISO_RECUSA);
+    expect(r.novas.map((n) => n.param.role)).toEqual(['user', 'assistant']);
+    expect(r.novas.at(-1)!.param.content).toEqual([{ type: 'text', text: AVISO_RECUSA }]);
   });
 
-  it(`não passa de ${MAX_VOLTAS} voltas`, async () => {
+  it(`não passa de ${MAX_VOLTAS} voltas e fecha com aviso do assistente`, async () => {
     const roteiro = Array.from({ length: MAX_VOLTAS + 2 }, (_, i) =>
       msg([{ type: 'tool_use', id: `t${i}`, name: 'eco', input: { n: i } }] as Msg['content'], 'tool_use'),
     );
@@ -87,5 +92,74 @@ describe('responder', () => {
     const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
     expect(pedidos).toHaveLength(MAX_VOLTAS);
     expect(r.parouPor).toBe('limite');
+    expect(r.textoFinal).toBe(AVISO_LIMITE);
+    const papeis = r.novas.map((n) => n.param.role);
+    expect(papeis.at(-1)).toBe('assistant');
+    papeis.forEach((p, i) => expect(p).toBe(i % 2 === 0 ? 'user' : 'assistant'));
+    expect(r.novas.at(-1)!.param.content).toEqual([{ type: 'text', text: AVISO_LIMITE }]);
+  });
+
+  it('max_tokens com tool_use pendurado: resultado de erro sintético, aviso e papéis alternados', async () => {
+    const { cliente } = falso([
+      msg([{ type: 'tool_use', id: 't1', name: 'eco', input: { n: 1 } }, { type: 'tool_use', id: 't2', name: 'eco', input: {} }] as Msg['content'], 'max_tokens'),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
+    expect(r.parouPor).toBe('max_tokens');
+    expect(r.novas.map((n) => n.param.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    expect(r.novas[2].param.content).toEqual([
+      { type: 'tool_result', tool_use_id: 't1', content: 'não executada: a resposta foi cortada', is_error: true },
+      { type: 'tool_result', tool_use_id: 't2', content: 'não executada: a resposta foi cortada', is_error: true },
+    ]);
+    expect(r.novas[3].param.content).toEqual([{ type: 'text', text: AVISO_CORTADA }]);
+  });
+
+  it('max_tokens sem tool_use: só devolve o motivo', async () => {
+    const { cliente } = falso([msg([{ type: 'text', text: 'parcial' }] as Msg['content'], 'max_tokens')]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
+    expect(r.parouPor).toBe('max_tokens');
+    expect(r.textoFinal).toBe('parcial');
+    expect(r.novas.map((n) => n.param.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('duas chamadas paralelas voltam numa mensagem só, com dois resultados', async () => {
+    const { cliente } = falso([
+      msg([{ type: 'tool_use', id: 'a', name: 'eco', input: { n: 1 } }, { type: 'tool_use', id: 'b', name: 'eco', input: { n: 2 } }] as Msg['content'], 'tool_use'),
+      msg([{ type: 'text', text: 'ok' }] as Msg['content'], 'end_turn'),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: () => {} });
+    expect(r.novas.map((n) => n.param.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    const res = r.novas[2].param.content as Anthropic.Beta.BetaToolResultBlockParam[];
+    expect(res.map((x) => x.tool_use_id)).toEqual(['a', 'b']);
+  });
+
+  it('ferramenta que lança vira tool_result com is_error', async () => {
+    const quebra = ferramenta({ nome: 'quebra', descricao: 'd', capability: 'agenda', entrada: z.object({}).strict(), executar: async () => { throw new Error('boom'); } });
+    const { cliente } = falso([
+      msg([{ type: 'tool_use', id: 'q', name: 'quebra', input: {} }] as Msg['content'], 'tool_use'),
+      msg([{ type: 'text', text: 'não deu' }] as Msg['content'], 'end_turn'),
+    ]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [quebra], ctx: {} as never, aoEscrever: () => {} });
+    const res = r.novas[2].param.content as Anthropic.Beta.BetaToolResultBlockParam[];
+    expect(res[0]).toMatchObject({ tool_use_id: 'q', is_error: true });
+  });
+
+  it('inputTokens soma entrada, leitura e criação de cache', async () => {
+    const m = msg([{ type: 'text', text: 'ok' }] as Msg['content'], 'end_turn');
+    (m.usage as unknown as Record<string, number>).cache_read_input_tokens = 100;
+    (m.usage as unknown as Record<string, number>).cache_creation_input_tokens = 1000;
+    const { cliente } = falso([m]);
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [], ctx: {} as never, aoEscrever: () => {} });
+    expect(r.novas[1].inputTokens).toBe(1110);
+  });
+
+  it('separa com linha em branco o texto de voltas diferentes', async () => {
+    const { cliente } = falso([
+      msg([{ type: 'text', text: 'Vou ver.' }, { type: 'tool_use', id: 't1', name: 'eco', input: { n: 1 } }] as Msg['content'], 'tool_use'),
+      msg([{ type: 'text', text: 'São 1.' }] as Msg['content'], 'end_turn'),
+    ]);
+    const escrito: string[] = [];
+    const r = await responder({ cliente, historico: [], pergunta, ferramentas: [eco], ctx: {} as never, aoEscrever: (t) => escrito.push(t) });
+    expect(escrito.join('')).toBe('Vou ver.\n\nSão 1.');
+    expect(r.textoFinal).toBe('São 1.');
   });
 });

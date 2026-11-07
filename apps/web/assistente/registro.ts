@@ -52,7 +52,7 @@ export async function executarFerramenta(
   const f = fs.find((x) => x.nome === nome);
   if (!f) return { conteudo: 'ferramenta não disponível para este usuário', erro: true };
   const parsed = f.entrada.safeParse(input);
-  if (!parsed.success) return { conteudo: `entrada inválida: ${parsed.error.issues.map((i) => i.message).join('; ')}`, erro: true };
+  if (!parsed.success) return { conteudo: `entrada inválida: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'entrada'}: ${i.message}`).join('; ')}`, erro: true };
   try {
     return { conteudo: JSON.stringify(await f.executar(ctx, parsed.data)), erro: false };
   } catch (e) {

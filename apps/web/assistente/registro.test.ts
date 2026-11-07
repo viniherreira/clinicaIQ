@@ -27,7 +27,7 @@ describe('registro de ferramentas', () => {
   it('entrada inválida volta como erro para o modelo, sem executar', async () => {
     const r = await executarFerramenta(TODAS, 'ultimos_atendidos', { quantidade: 500 }, {} as never);
     expect(r.erro).toBe(true);
-    expect(r.conteudo).toMatch(/entrada inválida/);
+    expect(r.conteudo).toMatch(/entrada inválida: quantidade: /);
   });
 
   it('ferramenta fora da lista é recusada', async () => {
