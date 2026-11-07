@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@clerk/localizations": "^4.6.8",
     "@clerk/nextjs": "^6",
     "@clinicaiq/db": "workspace:*",
@@ -45,7 +46,8 @@
     "react-dom": "^19",
     "read-excel-file": "^9.3.12",
     "tailwind-merge": "^3",
-    "zod": "^3"
+    "zod": "^3",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4",
