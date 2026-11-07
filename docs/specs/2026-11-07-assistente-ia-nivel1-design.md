@@ -64,7 +64,7 @@ Tabelas novas, com SQL à mão em `docs/producao/AAAA-MM-DD-assistente.sql` (com
 
 Regras:
 - Cada usuário vê só as próprias conversas.
-- O cron `reminders`, que já existe, apaga o que tem mais de 30 dias. Não gasta um cron novo do plano Hobby.
+- O cron `reminders`, que já existe, apaga as conversas paradas há mais de 30 dias (conta a última mensagem). Não gasta um cron novo do plano Hobby.
 - Exportar e anonimizar o paciente (LGPD) não precisa mexer nisso: as conversas somem sozinhas em 30 dias. A Política de Privacidade passa a citar esse prazo.
 
 ### 7. Painel lateral

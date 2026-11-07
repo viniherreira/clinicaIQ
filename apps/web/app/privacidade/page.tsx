@@ -84,6 +84,12 @@ export default function PrivacidadePage() {
         <li>Login e autenticação (Clerk).</li>
         <li>Cobrança (Asaas).</li>
         <li>Mensagens (WhatsApp Business Platform, da Meta).</li>
+        <li>
+          Assistente de IA (Anthropic, nos Estados Unidos): processa as perguntas feitas ao assistente e os dados que ele
+          consulta para responder (agenda, cadastro e financeiro). Não usa esses dados para treinar modelos. As conversas
+          ficam guardadas no {b} por 30 dias e depois são apagadas. O assistente fica disponível só nas clínicas que
+          optarem por ele.
+        </li>
       </ul>
       <p>
         Alguns desses fornecedores ficam fora do Brasil, como nos Estados Unidos. Essas transferências seguem o art. 33 da LGPD, com
