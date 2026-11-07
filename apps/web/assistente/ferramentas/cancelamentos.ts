@@ -13,6 +13,7 @@ export const cancelamentos = ferramenta({
     const ags = await ctx.db.appointment.findMany({
       where: {
         tenantId: ctx.tenantId,
+        patient: { active: true, deletedAt: null },
         status: { in: ['CANCELLED', 'MISSED'] },
         ...(desde ? { startTime: { gte: new Date(`${desde}T00:00:00.000Z`) } } : {}),
       },

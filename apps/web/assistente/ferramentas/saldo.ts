@@ -12,10 +12,13 @@ export const saldoDevedor = ferramenta({
     // A mesma conta da tela de Retorno (app/(app)/retorno/actions.ts).
     const [orcamentos, pagamentos] = await Promise.all([
       ctx.db.quote.findMany({
-        where: { tenantId: ctx.tenantId, status: 'ACCEPTED', ...filtro },
+        where: { tenantId: ctx.tenantId, status: 'ACCEPTED', patient: { active: true, deletedAt: null }, ...filtro },
         select: { total: true, patient: { select: { id: true, name: true } } },
       }),
-      ctx.db.payment.findMany({ where: { tenantId: ctx.tenantId, ...filtro }, select: { patientId: true, amount: true } }),
+      ctx.db.payment.findMany({
+        where: { tenantId: ctx.tenantId, patient: { active: true, deletedAt: null }, ...filtro },
+        select: { patientId: true, amount: true },
+      }),
     ]);
     const conta = new Map<string, { nome: string; aprovado: number; pago: number }>();
     for (const o of orcamentos) {

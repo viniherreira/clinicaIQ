@@ -20,6 +20,7 @@ export const agendaDoDia = ferramenta({
     const ags = await ctx.db.appointment.findMany({
       where: {
         tenantId: ctx.tenantId,
+        patient: { active: true, deletedAt: null },
         startTime: { gte: inicio, lte: fim },
         status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
         ...(profissionalId ? { professionalId: profissionalId } : {}),

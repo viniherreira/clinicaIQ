@@ -9,7 +9,7 @@ export const ultimosAtendidos = ferramenta({
   entrada: z.object({ quantidade: z.number().int().min(1).max(50) }).strict(),
   async executar(ctx, { quantidade }) {
     const atendimentos = await ctx.db.appointment.findMany({
-      where: { tenantId: ctx.tenantId, status: 'ATTENDED' },
+      where: { tenantId: ctx.tenantId, status: 'ATTENDED', patient: { active: true, deletedAt: null } },
       orderBy: { startTime: 'desc' },
       take: quantidade,
       select: {

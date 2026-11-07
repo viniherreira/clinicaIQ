@@ -66,8 +66,10 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     await paciente(B, 'Maria da Clínica B');
 
     it('acha pelo nome, só na própria clínica, sem telefone por padrão', async () => {
-      const r = (await buscarPacientes.executar(ctxA, { nome: 'maria' })) as { itens: Record<string, unknown>[] };
+      const r = (await buscarPacientes.executar(ctxA, { nome: 'maria' })) as { itens: Record<string, unknown>[]; total: number; cortado: boolean };
       expect(r.itens).toHaveLength(1);
+      expect(r.total).toBe(1);
+      expect(r.cortado).toBe(false);
       expect(r.itens[0]).toMatchObject({ id: maria.id, nome: 'Maria Souza' });
       expect(r.itens[0]).not.toHaveProperty('telefone');
     });
