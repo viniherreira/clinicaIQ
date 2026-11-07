@@ -53,6 +53,8 @@ redeploy. O relógio só recifra quando a versão é 2 ou mais, então para sozi
 
 ## Também precisa da chave
 
+- As tabelas do assistente (`assistant_conversations.title` e `assistant_messages.content`) não passam pelo relógio de recifra do CRM: mantenha a `ENCRYPTION_MASTER_KEY_V<n>` antiga por pelo menos 30 dias depois da troca, senão as conversas antigas devolvem 409.
+
 - Ambiente **Preview** da Vercel: tem chave própria (banco separado), não precisa trocar junto.
 - O gateway de QR (`apps/whatsapp-gateway`) saiu do ar e não entende o formato `k2.`. Não religue
   sem atualizar.
