@@ -10,6 +10,8 @@ import { can } from '@/lib/permissions';
 import { effectiveRights } from '@/lib/crm-rights';
 import { conversationScope } from '@/crm/scope-rules';
 import { getUnitContext } from '@/lib/units';
+import { AssistentePainel } from '@/components/assistente/assistente-painel';
+import { assistenteLiberado } from '@/assistente/acesso';
 
 /** Os mesmos rótulos da tela de Equipe — o perfil precisa se chamar igual nos
  *  dois lugares, senão a pessoa não relaciona um com o outro. */
@@ -65,6 +67,9 @@ export async function AppShell({
   const seat = Boolean(me?.crmSeat) || modules.crmWholeTeam;
   guard?.({ role, crm: modules.crm, seat, clinic: modules.clinic });
   const crmOnly = !modules.clinic;
+
+  // Assistente de IA: só na gestão, só nas clínicas do piloto (ou com o plano liberado).
+  const assistente = space === 'clinic' && modules.clinic ? await assistenteLiberado(tenant.id) : false;
 
   // O seletor só aparece para quem consegue entrar no CRM.
   const showSwitcher = modules.crm && seat && can(role, 'crm');
@@ -130,6 +135,7 @@ export async function AppShell({
           {children}
         </main>
       </div>
+      {assistente && <AssistentePainel />}
     </div>
   );
 }
