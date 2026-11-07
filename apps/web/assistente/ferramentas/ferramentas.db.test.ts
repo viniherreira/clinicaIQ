@@ -171,5 +171,34 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('saldoDevedor', async () => {
+    const { saldoDevedor } = await import('./saldo');
+    const devedor = await paciente(A, 'Deve Quinhentos');
+    const quite = await paciente(A, 'Está Quite');
+    let n = 1;
+    const orcamento = (patientId: string, total: number) =>
+      prisma.quote.create({
+        data: {
+          tenantId: A.tenant.id, patientId, number: n++, publicToken: `tk-${sufixo}-${n}`, status: 'ACCEPTED',
+          subtotal: total, total, validUntil: new Date('2026-12-31'),
+        },
+      });
+    await orcamento(devedor.id, 800);
+    await orcamento(quite.id, 300);
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: devedor.id, amount: 300 } });
+    await prisma.payment.create({ data: { tenantId: A.tenant.id, patientId: quite.id, amount: 300 } });
+
+    it('mostra só quem deve, com o valor em reais', async () => {
+      const r = (await saldoDevedor.executar(ctxA, {})) as { itens: { paciente: string; emAberto: string }[] };
+      expect(r.itens.map((i) => i.paciente)).toEqual(['Deve Quinhentos']);
+      expect(r.itens[0].emAberto).toBe('R$ 500,00');
+    });
+
+    it('filtra por ids (o "quais deles" da conversa)', async () => {
+      const r = (await saldoDevedor.executar(ctxA, { pacienteIds: [quite.id] })) as { itens: unknown[] };
+      expect(r.itens).toEqual([]);
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
