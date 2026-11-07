@@ -135,5 +135,20 @@ describe.skipIf(!process.env.DATABASE_URL)('ferramentas do assistente (banco)', 
     });
   });
 
+  describe('cancelamentos', async () => {
+    const { cancelamentos } = await import('./cancelamentos');
+    const p = await paciente(A, 'Cancela Muito');
+    await consulta(A, p.id, '2026-09-01T09:00:00.000Z', 'CANCELLED');
+    await consulta(A, p.id, '2026-09-08T09:00:00.000Z', 'CANCELLED');
+    await consulta(A, p.id, '2026-09-15T09:00:00.000Z', 'MISSED');
+    const q = await paciente(A, 'Cancela Pouco');
+    await consulta(A, q.id, '2026-09-01T10:00:00.000Z', 'CANCELLED');
+
+    it('lista quem passou do mínimo, somando cancelado e falta', async () => {
+      const r = (await cancelamentos.executar(ctxA, { minimo: 3 })) as { itens: { paciente: string; cancelados: number; faltas: number; total: number }[] };
+      expect(r.itens).toEqual([expect.objectContaining({ paciente: 'Cancela Muito', cancelados: 2, faltas: 1, total: 3 })]);
+    });
+  });
+
   // TAREFAS 6 A 13: novos blocos describe entram aqui, acima deste comentário.
 });
