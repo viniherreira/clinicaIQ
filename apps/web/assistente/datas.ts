@@ -1,7 +1,13 @@
 import { z } from 'zod';
-import { addDays, format, parseISO, subMonths } from 'date-fns';
+import { addDays, format, isValid, parseISO, subMonths } from 'date-fns';
 
-export const DATA_ISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD');
+export const DATA_ISO = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD')
+  .refine((v) => {
+    const d = parseISO(v);
+    return isValid(d) && format(d, 'yyyy-MM-dd') === v;
+  }, 'data inexistente no calendário');
 
 /**
  * Um dia da agenda. Os agendamentos guardam a hora de parede em UTC

@@ -6,6 +6,9 @@ describe('datas do assistente', () => {
     expect(DATA_ISO.safeParse('2026-11-08').success).toBe(true);
     expect(DATA_ISO.safeParse('08/11/2026').success).toBe(false);
     expect(DATA_ISO.safeParse('amanhã').success).toBe(false);
+    expect(DATA_ISO.safeParse('2026-02-30').success).toBe(false);
+    expect(DATA_ISO.safeParse('2026-13-01').success).toBe(false);
+    expect(DATA_ISO.safeParse('2028-02-29').success).toBe(true);
   });
 
   it('dia de parede: hora guardada em UTC, como a agenda', () => {
