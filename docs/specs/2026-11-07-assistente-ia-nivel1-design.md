@@ -12,7 +12,7 @@ O trabalho fica na branch `feat/ia` até o Nível 1 estar pronto, e então volta
 ## Decisões
 
 ### 1. Piloto grátis, ligado por clínica
-- `subscriptions.assistantEnabled` (boolean, padrão `false`), ligado à mão por SQL nas clínicas escolhidas.
+- `subscriptions.assistantEnabled` (boolean, padrão `false`), ligado à mão por SQL nas clínicas escolhidas. O `plans.assistantEnabled`, que já existe, também libera: liberado = assinatura OU plano. Quando houver preço, liga-se no plano.
 - Sem item na cobrança. O preço é decidido depois, com o uso real do piloto.
 - Clínica sem a chave não vê o botão, e a rota responde 404.
 
@@ -30,7 +30,7 @@ Toda ferramenta:
 - usa `getTenantClient(tenantId)`;
 - exige uma `Capability` de `lib/permissions.ts`. Uma ferramenta que o usuário não pode usar **nem é enviada** ao Claude;
 - devolve no máximo 50 linhas e avisa quando cortou;
-- recebe datas em texto ("amanhã", "mês passado") e as resolve no fuso da clínica (`lib/tz`).
+- recebe datas como AAAA-MM-DD. O modelo recebe a data de hoje no fuso da clínica e converte "amanhã" e "mês passado" sozinho;
 
 | Ferramenta | Responde | Permissão | Base |
 |---|---|---|---|
@@ -39,12 +39,12 @@ Toda ferramenta:
 | `agendaDoDia(data, profissional?)` | "quantos agendamentos amanhã?" | `agenda` | `Appointment` do dia, sem CANCELLED |
 | `horariosLivres(profissional, data)` | "horários da Dra. Ana" | `agenda` | `lib/availability` |
 | `cancelamentos(minimo, periodo)` | "cancelaram mais de duas" | `agenda` | `Appointment` CANCELLED e MISSED por paciente |
-| `semRetorno(meses)` | "não retornam há 6 meses" | `pacientes` | `lib/recall` |
+| `semRetorno(meses)` | "não retornam há 6 meses" | `pacientes` | última visita ATTENDED antes do corte e nenhum agendamento futuro (a mesma ideia do recall) |
 | `saldoDevedor(pacienteIds?)` | "quem está devendo?", "quais deles não pagaram?" | `financeiro` | orçamentos aprovados menos `Payment`, a mesma conta do recall |
 | `faturamento(periodo)` | "faturamento do mês passado" | `financeiro` | `Payment.amount` por `paidAt`, igual ao relatório do financeiro |
 | `listarProfissionais()` | traduz "Dra. Ana" para o id | `agenda` | `Professional` |
 
-- Telefone e CPF são decifrados só quando a pergunta pede contato, e sempre com a permissão `pacientes`.
+- O CPF não sai em nenhuma ferramenta. O telefone só sai com incluirContato: true, sempre sob a permissão pacientes.
 
 ### 4. O modelo
 - **Claude Opus 5.5** (`claude-opus-5-5`), pela API da Anthropic com o SDK oficial `@anthropic-ai/sdk`. A chave fica em `ANTHROPIC_API_KEY` na Vercel.
