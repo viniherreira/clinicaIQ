@@ -152,6 +152,7 @@ export function sourceOf(texto: string | undefined): LeadSource | null {
   if (!t) return null;
   if (/whats/.test(t)) return 'WHATSAPP';
   if (/insta/.test(t)) return 'INSTAGRAM';
+  if (/\b(facebook|face|fb)\b/.test(t)) return 'FACEBOOK';
   if (/\b(site|website|formulario|form|landing|google)\b/.test(t)) return 'SITE';
   if (/\b(indicacao|indicado|referral|referencia|recomendacao)\b/.test(t)) return 'INDICACAO';
   return 'OUTRO';

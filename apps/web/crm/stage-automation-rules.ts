@@ -14,7 +14,7 @@ export const TRIGGER_LABEL: Record<StageTriggerKind, string> = {
   MOVED: 'Quando movido para esta etapa',
 };
 
-export const LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'SITE', 'INDICACAO', 'MANUAL', 'OUTRO'] as const;
+export const LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'INDICACAO', 'MANUAL', 'OUTRO'] as const;
 export type LeadSourceKey = (typeof LEAD_SOURCES)[number];
 
 export interface StageConditions {

@@ -47,4 +47,4 @@ export {
 } from './cloud-api';
 export type { CloudButton, CloudConfig, GraphTemplate } from './cloud-api';
 export { cloudContent, parseCloudWebhook, verifyMetaSignature } from './cloud-webhook';
-export type { CloudContent, CloudEvent, CloudKind } from './cloud-webhook';
+export type { CloudAd, CloudContent, CloudEvent, CloudKind } from './cloud-webhook';

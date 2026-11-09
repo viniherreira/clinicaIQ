@@ -16,6 +16,27 @@ export interface CloudContent {
   mimeType?: string;
   /** Botão ou item de lista tocado (id que nós mandamos). */
   buttonId?: string;
+  /** A pessoa chegou por um anúncio de clique para o WhatsApp (só na 1ª mensagem). */
+  ad?: CloudAd;
+}
+
+/** O anúncio de onde veio a conversa (`referral` da Meta). */
+export interface CloudAd {
+  /** Id do anúncio (ou da publicação) na Meta. */
+  sourceId: string | null;
+  /** 'ad' ou 'post'. */
+  sourceType: string | null;
+  /** Link do anúncio: fb.me/… no Facebook, instagram.com/… no Instagram. */
+  sourceUrl: string | null;
+  headline: string | null;
+  body: string | null;
+  mediaType: 'image' | 'video' | null;
+  /** Links da Meta para a imagem ou o vídeo; expiram depois de um tempo. */
+  imageUrl: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  /** Id do clique, para medir a conversão na Meta. */
+  ctwaClid: string | null;
 }
 
 export type CloudEvent =
@@ -66,8 +87,38 @@ const when = (ts: unknown) => {
   return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : new Date();
 };
 
+const httpsUrl = (v: unknown): string | null => {
+  const t = clean(v);
+  return t && /^https:\/\//i.test(t) ? t.slice(0, 2000) : null;
+};
+
+/** O `referral` da mensagem (anúncio de clique para o WhatsApp), ou undefined. */
+export function cloudAd(r: Any): CloudAd | undefined {
+  if (!r || typeof r !== 'object') return undefined;
+  const cut = (v: unknown, n: number) => clean(v)?.slice(0, n) ?? null;
+  const ad: CloudAd = {
+    sourceId: cut(r.source_id, 100),
+    sourceType: cut(r.source_type, 20),
+    sourceUrl: httpsUrl(r.source_url),
+    headline: cut(r.headline, 200),
+    body: cut(r.body, 1000),
+    mediaType: r.media_type === 'image' || r.media_type === 'video' ? r.media_type : null,
+    imageUrl: httpsUrl(r.image_url),
+    videoUrl: httpsUrl(r.video_url),
+    thumbnailUrl: httpsUrl(r.thumbnail_url),
+    ctwaClid: cut(r.ctwa_clid, 500),
+  };
+  return ad.sourceId || ad.sourceUrl || ad.headline || ad.body ? ad : undefined;
+}
+
 /** O conteúdo de uma mensagem da Meta. Null = não é conversa (reação, sistema…). */
 export function cloudContent(m: Any): CloudContent | null {
+  const c = baseContent(m);
+  const ad = c ? cloudAd(m?.referral) : undefined;
+  return c && ad ? { ...c, ad } : c;
+}
+
+function baseContent(m: Any): CloudContent | null {
   switch (m?.type) {
     case 'text':
       return clean(m.text?.body) ? { kind: 'TEXT', text: clean(m.text.body) } : null;

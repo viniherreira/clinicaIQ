@@ -3,7 +3,7 @@ import { parsePeriod } from './period';
 import { parseFieldFilters } from './custom-fields';
 import type { BoardFilters } from './types';
 
-const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
+const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO'];
 
 /** Lê os filtros da URL, sem confiar em nada que venha dela. */
 export function parseFilters(sp: Record<string, string | string[] | undefined>): BoardFilters {

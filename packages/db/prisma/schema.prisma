@@ -1114,6 +1114,8 @@ enum LeadSource {
   SITE
   MANUAL
   OUTRO
+  /// Anúncio do Facebook (clique para o WhatsApp).
+  FACEBOOK
 }
 
 enum LeadActivityType {
@@ -1504,6 +1506,9 @@ model ChatMessage {
   /// Opções do robô: [{ id, title }]. Botões na API oficial; no QR o texto já
   /// traz as opções numeradas.
   buttons        Json?
+  /// Anúncio de onde a pessoa veio (clique para o WhatsApp), na 1ª mensagem:
+  /// { sourceId, sourceUrl, headline, body, mediaType, imageUrl, … } (`CloudAd`).
+  ad             Json?
 
   /// Fila do envio pelo CRM. `acceptedAt` = o WhatsApp aceitou; daí em diante
   /// quem manda no status são os acks.
