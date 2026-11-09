@@ -32,7 +32,7 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
   it('duas aberturas ao mesmo tempo criam os funis uma vez só', async () => {
     await Promise.all([ensureDefaultPipeline(db, tenant.id), ensureDefaultPipeline(db, tenant.id)]);
     expect(await db.pipelineStage.count()).toBe(ETAPAS);
-    expect((await db.pipeline.findMany({ orderBy: { order: 'asc' } })).map((p) => p.name)).toEqual(['Captação', 'Agendados']);
+    expect((await db.pipeline.findMany({ orderBy: { order: 'asc' } })).map((p) => p.name)).toEqual(['Captação', 'Interagiu', 'Não interagiu', 'Agendados']);
     expect(await db.lostReason.count()).toBe(DEFAULT_LOST_REASONS.length);
   });
 
@@ -40,19 +40,19 @@ describe.skipIf(!process.env.DATABASE_URL)('ensureDefaultPipeline (banco)', asyn
     await db.pipelineStage.updateMany({ where: { role: 'NEW' }, data: { name: 'Chegou agora' } });
     await ensureDefaultPipeline(db, tenant.id);
     expect(await db.pipelineStage.count()).toBe(ETAPAS);
-    expect(await db.pipeline.count()).toBe(2);
+    expect(await db.pipeline.count()).toBe(DEFAULT_PIPELINES.length);
     expect((await db.pipelineStage.findFirst({ where: { role: 'NEW' } }))?.name).toBe('Chegou agora');
   });
 
-  it('só com o CRM: um funil de vendas, sem os papéis da agenda', async () => {
+  it('só com o CRM: o funil de vendas e os de resposta ao robô, sem os papéis da agenda', async () => {
     const outra = await prisma.tenant.create({
       data: { clerkOrgId: `pipe_crm_${suffix}`, name: 'Funil só CRM', slug: `pipe-crm-${suffix}` },
     });
     const dbCrm = getTenantClient(outra.id);
     try {
       await ensureDefaultPipeline(dbCrm, outra.id, false);
-      expect((await dbCrm.pipeline.findMany()).map((p) => p.name)).toEqual(['Vendas']);
-      expect(await dbCrm.pipelineStage.count()).toBe(CRM_ONLY_PIPELINES[0].stages.length);
+      expect((await dbCrm.pipeline.findMany({ orderBy: { order: 'asc' } })).map((p) => p.name)).toEqual(['Vendas', 'Interagiu', 'Não interagiu']);
+      expect(await dbCrm.pipelineStage.count()).toBe(CRM_ONLY_PIPELINES.reduce((n, p) => n + p.stages.length, 0));
       expect(await dbCrm.pipelineStage.count({ where: { role: { in: [...AGENDA_ROLES] } } })).toBe(0);
     } finally {
       await prisma.pipelineStage.deleteMany({ where: { tenantId: outra.id } });

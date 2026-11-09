@@ -72,6 +72,11 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     await prisma.chatMessage.deleteMany({ where: t });
     await prisma.conversation.deleteMany({ where: t });
     await prisma.subscription.deleteMany({ where: t });
+    await prisma.leadActivity.deleteMany({ where: t });
+    await prisma.lead.deleteMany({ where: t });
+    await prisma.lostReason.deleteMany({ where: t });
+    await prisma.pipelineStage.deleteMany({ where: t });
+    await prisma.pipeline.deleteMany({ where: t });
     await prisma.whatsAppMessage.deleteMany({ where: t });
     await prisma.appointment.deleteMany({ where: t });
     await prisma.patient.deleteMany({ where: t });
@@ -321,23 +326,47 @@ describe.skipIf(!process.env.DATABASE_URL)('avisos da agenda pela API oficial (b
     });
     expect((await prisma.appointment.findUniqueOrThrow({ where: { id: alvo! } })).status).toBe('CANCELLED');
   });
-  it('com o CRM, o lembrete aparece na conversa do paciente, com os botões', async () => {
+  it('com o CRM, o lembrete só aparece na conversa de quem já é do CRM, com os botões', async () => {
     const meta = metaFalsa();
     vi.stubGlobal('fetch', meta.fetchFalso);
     await prisma.subscription.create({
       data: { tenantId: tenant.id, tier: 'PROFISSIONAL', status: 'ACTIVE', currentPeriodEnd: new Date('2099-01-01'), crmEnabled: true },
     });
     const dia = format(addDays(parseISO(clinicToday()), 2), 'yyyy-MM-dd');
-    const outra = await prisma.appointment.create({
+    const marcar = (hora: string) =>
+      prisma.appointment.create({
+        data: {
+          tenantId: tenant.id,
+          patientId: paciente.id,
+          professionalId: profissional.id,
+          startTime: new Date(`${dia}T${hora}:00.000Z`),
+          endTime: new Date(`${dia}T${hora.replace(':00', ':30')}:00.000Z`),
+        },
+      });
+
+    // Paciente que só agendou na clínica: o lembrete sai, mas não abre conversa no CRM.
+    expect((await dispatchAppointmentMessage((await marcar('10:00')).id, 'reminder', { reminderDays: 2 })).success).toBe(true);
+    expect(await prisma.chatMessage.count({ where: { tenantId: tenant.id, origin: 'AUTOMATION' } })).toBe(0);
+    expect(await prisma.conversation.count({ where: { tenantId: tenant.id } })).toBe(0);
+
+    // Com um negócio aberto no CRM, o lembrete aparece na conversa dele.
+    const { getTenantClient } = await import('@clinicaiq/db');
+    const { ensureDefaultPipeline } = await import('@/crm/pipeline');
+    const { phoneHash } = await import('@/crm/phone');
+    await ensureDefaultPipeline(getTenantClient(tenant.id), tenant.id);
+    const entrada = await prisma.pipelineStage.findFirstOrThrow({ where: { tenantId: tenant.id, role: 'NEW', pipeline: { name: 'Captação' } } });
+    await prisma.lead.create({
       data: {
         tenantId: tenant.id,
+        title: 'Avaliação',
+        name: 'Paciente',
+        stageId: entrada.id,
         patientId: paciente.id,
-        professionalId: profissional.id,
-        startTime: new Date(`${dia}T10:00:00.000Z`),
-        endTime: new Date(`${dia}T10:30:00.000Z`),
+        phoneEncrypted: encrypt(telefone, process.env.ENCRYPTION_MASTER_KEY!, tenant.id),
+        phoneHash: phoneHash(telefone, tenant.id),
       },
     });
-    expect((await dispatchAppointmentMessage(outra.id, 'reminder', { reminderDays: 2 })).success).toBe(true);
+    expect((await dispatchAppointmentMessage((await marcar('11:00')).id, 'reminder', { reminderDays: 2 })).success).toBe(true);
 
     const msg = await prisma.chatMessage.findFirstOrThrow({ where: { tenantId: tenant.id, origin: 'AUTOMATION' } });
     expect(msg).toMatchObject({ direction: 'OUTBOUND', status: 'SENT' });
