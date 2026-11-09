@@ -10,7 +10,7 @@ import { deleteCaptureRuleAction, saveCaptureRuleAction, toggleCaptureRuleAction
 export type CaptureRow = CaptureRuleLite & { active: boolean };
 type Option = { id: string; name: string };
 
-const SOURCES = ['WHATSAPP', 'INSTAGRAM', 'SITE', 'INDICACAO', 'OUTRO'] as const;
+const SOURCES = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'INDICACAO', 'OUTRO'] as const;
 const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 

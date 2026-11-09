@@ -15,7 +15,7 @@ type PipelineOption = { id: string; name: string; stages: Option[] };
 type TagOption = { id: string; name: string; color: string; count: number };
 type Template = { id: string; name: string; body: string; variables: number };
 
-const SOURCES = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'] as const;
+const SOURCES = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO'] as const;
 const SITUACOES: { v: AudienceStatus; label: string }[] = [
   { v: 'abertos', label: 'Em andamento' },
   { v: 'ganhos', label: 'Ganhos' },

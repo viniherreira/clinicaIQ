@@ -216,6 +216,58 @@ describe('parseCloudWebhook', () => {
     expect(ev[0]).toMatchObject({ kind: 'echo', to: '551187654321', content: { text: 'Até amanhã' } });
   });
 
+  it('mensagem que veio de anúncio traz o anúncio (referral)', () => {
+    const ev = parseCloudWebhook(
+      envelope('messages', {
+        messages: [
+          {
+            from: '5511999990000',
+            id: 'wamid.AD',
+            timestamp: '1760000000',
+            type: 'text',
+            text: { body: 'Quero saber da prótese' },
+            referral: {
+              source_url: 'https://fb.me/4YAcPbZJ2',
+              source_id: '120226305854810726',
+              source_type: 'ad',
+              headline: 'Prótese de Mama',
+              body: 'Apenas este mês…',
+              media_type: 'image',
+              image_url: 'https://scontent.xx.fbcdn.net/v/t45.abc',
+              ctwa_clid: 'CLID1',
+              welcome_message: { text: 'Oi!' },
+            },
+          },
+        ],
+      }),
+    );
+    expect(ev[0]).toMatchObject({
+      kind: 'message',
+      content: {
+        text: 'Quero saber da prótese',
+        ad: {
+          sourceId: '120226305854810726',
+          sourceType: 'ad',
+          sourceUrl: 'https://fb.me/4YAcPbZJ2',
+          headline: 'Prótese de Mama',
+          body: 'Apenas este mês…',
+          mediaType: 'image',
+          imageUrl: 'https://scontent.xx.fbcdn.net/v/t45.abc',
+          videoUrl: null,
+          ctwaClid: 'CLID1',
+        },
+      },
+    });
+  });
+
+  it('referral vazio ou com link estranho não vira anúncio nem link', () => {
+    const msg = (referral: object) =>
+      parseCloudWebhook(envelope('messages', { messages: [{ from: '1', id: 'x', type: 'text', text: { body: 'oi' }, referral }] }))[0];
+    expect((msg({}) as { content: object }).content).not.toHaveProperty('ad');
+    const ad = (msg({ headline: 'Promo', source_url: 'javascript:alert(1)', image_url: 'http://x' }) as { content: { ad: object } }).content.ad;
+    expect(ad).toMatchObject({ headline: 'Promo', sourceUrl: null, imageUrl: null });
+  });
+
   it('ignora o que não é do WhatsApp e o que não é conversa', () => {
     expect(parseCloudWebhook({ object: 'page', entry: [] })).toEqual([]);
     expect(parseCloudWebhook(envelope('messages', { messages: [{ from: '1', id: 'x', type: 'reaction', reaction: { emoji: '👍' } }] }))).toEqual([]);

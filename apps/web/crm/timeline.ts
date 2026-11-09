@@ -46,7 +46,7 @@ const CLINIC_TEXT: Record<string, string> = {
 };
 
 const SOURCE: Record<string, string> = {
-  WHATSAPP: 'WhatsApp', INDICACAO: 'Indicação', INSTAGRAM: 'Instagram', SITE: 'Site', MANUAL: 'cadastro manual', OUTRO: 'outra origem',
+  WHATSAPP: 'WhatsApp', INDICACAO: 'Indicação', INSTAGRAM: 'Instagram', FACEBOOK: 'Facebook', SITE: 'Site', MANUAL: 'cadastro manual', OUTRO: 'outra origem',
 };
 
 /** Como o responsável mudou (`crm/assignment.ts`). */

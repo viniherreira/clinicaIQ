@@ -1,4 +1,5 @@
-import { encrypt, getTenantClient } from '@clinicaiq/db';
+import { encrypt, getTenantClient, type Prisma } from '@clinicaiq/db';
+import type { CloudAd } from '@clinicaiq/whatsapp';
 import { chatKey } from '@/lib/phone';
 import { conversationHash, conversationHashes } from './phone';
 
@@ -45,6 +46,8 @@ export interface IngestInput {
   mimeType?: string | null;
   /** Botões que foram junto (aviso da agenda), para a conversa mostrar. */
   buttons?: { id: string; title: string }[];
+  /** Anúncio de onde a pessoa veio (clique para o WhatsApp). */
+  ad?: CloudAd;
   at: Date;
 }
 
@@ -95,6 +98,7 @@ export async function ingestChat(tenantId: string, input: IngestInput): Promise<
         mediaRef: input.mediaRef ?? null,
         mimeType: input.mimeType ?? null,
         ...(input.buttons?.length ? { buttons: input.buttons } : {}),
+        ...(input.ad ? { ad: input.ad as unknown as Prisma.InputJsonValue } : {}),
       },
     ],
     skipDuplicates: true,

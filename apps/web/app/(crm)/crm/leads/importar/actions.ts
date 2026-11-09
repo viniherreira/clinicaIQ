@@ -79,7 +79,7 @@ const recordSchema = z.object({
   tags: z.array(texto(30).min(1)).max(20),
   createdAt: iso,
   closedAt: iso,
-  source: z.enum(['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO']).nullable(),
+  source: z.enum(['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO']).nullable(),
   notes: z.array(texto(2000)).max(20),
   lostReason: texto(60).nullable(),
   fields: z.record(z.string().regex(/^field:/), texto(2000)),

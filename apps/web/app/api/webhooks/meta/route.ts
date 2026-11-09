@@ -112,6 +112,7 @@ export async function POST(req: Request) {
         text: ev.content.text,
         mediaRef: ev.content.mediaRef,
         mimeType: ev.content.mimeType,
+        ad: ev.content.ad,
         at: ev.at,
       });
 

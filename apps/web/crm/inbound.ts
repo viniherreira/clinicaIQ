@@ -2,6 +2,7 @@ import { decrypt, getTenantClient, prisma } from '@clinicaiq/db';
 import { readCrmPrefs } from './crm-prefs';
 import { runBotOnInbound } from './bot';
 import { distributeConversation } from './assignment';
+import { applyOrigin, originOf, readAd } from './ad-origin';
 import { applyCapture } from './capture';
 import { acceptConversation, classifyConversation } from './conversations';
 
@@ -33,7 +34,7 @@ export async function afterInbound(
 
   const msg = await db.chatMessage.findFirst({
     where: { id: messageId, origin: 'CONTACT' },
-    select: { id: true, textEncrypted: true },
+    select: { id: true, textEncrypted: true, ad: true },
   });
   if (!msg) return;
 
@@ -73,12 +74,29 @@ export async function afterInbound(
   // tocar em Aceitar. A captação pode já ter criado (com tags e funil); aí nada muda.
   // Vale também para a conversa que ficou na antiga Entrada e voltou a escrever.
   const prefs = readCrmPrefs((await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }))?.settings);
+  // De onde veio: anúncio (a Meta manda junto) ou a frase do site na 1ª mensagem.
+  const ad = readAd(msg.ad);
+  const origem = originOf(ad, first ? text : '');
   if (conv?.status === 'INBOX' && prefs.autoLead) {
     try {
       const ainda = await db.conversation.findFirst({ where: { id: conversationId }, select: { status: true } });
-      if (ainda?.status === 'INBOX') await acceptConversation(db, { tenantId, userId: null }, conversationId);
+      if (ainda?.status === 'INBOX') await acceptConversation(db, { tenantId, userId: null }, conversationId, origem ? { source: origem } : {});
     } catch (e) {
       console.error('[crm] lead automático falhou', e instanceof Error ? e.message : e);
+    }
+  }
+
+  // O negócio aberto (novo, da captação ou que já existia) ganha a origem e a tag.
+  if (origem) {
+    try {
+      const c = await db.conversation.findFirst({
+        where: { id: conversationId },
+        select: { lead: { select: { id: true, wonAt: true, lostAt: true, deletedAt: true } } },
+      });
+      const lead = c?.lead && !c.lead.wonAt && !c.lead.lostAt && !c.lead.deletedAt ? c.lead : null;
+      if (lead) await applyOrigin(db, tenantId, lead.id, origem, ad);
+    } catch (e) {
+      console.error('[crm] origem do anúncio falhou', e instanceof Error ? e.message : e);
     }
   }
 

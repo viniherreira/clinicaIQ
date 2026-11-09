@@ -17,6 +17,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   WHATSAPP: 'WhatsApp',
   INDICACAO: 'Indicação',
   INSTAGRAM: 'Instagram',
+  FACEBOOK: 'Facebook',
   SITE: 'Site',
   MANUAL: 'Manual',
   OUTRO: 'Outro',

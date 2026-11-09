@@ -21,7 +21,7 @@ export type CreateLeadResult =
   | { ok: false; message: string; fieldErrors?: Record<string, string> }
   | { ok: false; duplicate: { leadId: string; name: string } };
 
-const SOURCES = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'] as const;
+const SOURCES = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO'] as const;
 
 const newLeadSchema = z.object({
   name: z.string().trim().min(2, 'Escreva o nome.').max(120),

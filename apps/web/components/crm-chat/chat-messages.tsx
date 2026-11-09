@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle, Bot, CalendarClock, Check, CircleDot, Megaphone, CheckCheck, Clock, FileText, Image as ImageIcon, MapPin, Mic, RotateCw,
   Smartphone, StickyNote, Sticker, Trophy, User, Video, XCircle,
@@ -178,6 +178,7 @@ export function ChatMessages({
                         </span>
                       </p>
                     )}
+                    {m.ad && <AdCard ad={m.ad} />}
                     {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
                     {m.buttons.length > 0 && (
                       <ul aria-label="Botões da mensagem" className="mt-2 flex flex-col gap-1">
@@ -277,5 +278,45 @@ function MediaView({ line, label }: { line: ChatLine; label: string }) {
     <a href={src} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-2">
       <FileText className="h-4 w-4" aria-hidden="true" /> Abrir {label.toLowerCase()}
     </a>
+  );
+}
+
+/** O anúncio de onde a pessoa veio, como no Kommo: imagem, título, texto e link. */
+function AdCard({ ad }: { ad: NonNullable<ChatLine['ad']> }) {
+  const [semImagem, setSemImagem] = useState(false);
+  return (
+    <figure className="mb-2 overflow-hidden rounded-md border border-border bg-surface-alt">
+      {ad.imageUrl && !semImagem && (
+        <div className="relative">
+          {/* A Meta manda o link da imagem do anúncio; ele expira depois de um tempo. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ad.imageUrl}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setSemImagem(true)}
+            className="max-h-56 w-full object-cover"
+          />
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-medium text-white">
+            <Megaphone className="h-3 w-3" aria-hidden="true" /> Anúncio do {ad.platform}
+          </span>
+        </div>
+      )}
+      <figcaption className="space-y-0.5 px-2.5 py-2 text-xs">
+        {(!ad.imageUrl || semImagem) && (
+          <p className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Megaphone className="h-3 w-3" aria-hidden="true" /> Anúncio do {ad.platform}
+          </p>
+        )}
+        {ad.headline && <p className="text-sm font-semibold text-foreground">{ad.headline}</p>}
+        {ad.body && <p className="line-clamp-2 text-muted-foreground">{ad.body}</p>}
+        {ad.url && (
+          <a href={ad.url} target="_blank" rel="noopener noreferrer" className="block truncate text-primary underline-offset-2 hover:underline">
+            {ad.url.replace(/^https:\/\//, '')}
+          </a>
+        )}
+      </figcaption>
+    </figure>
   );
 }

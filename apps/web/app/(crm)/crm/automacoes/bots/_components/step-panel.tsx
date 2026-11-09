@@ -399,6 +399,7 @@ const OPS: Record<FlowRule['subject'], { v: string; label: string }[]> = {
 const ORIGENS = [
   ['WHATSAPP', 'WhatsApp'],
   ['INSTAGRAM', 'Instagram'],
+  ['FACEBOOK', 'Facebook'],
   ['SITE', 'Site'],
   ['INDICACAO', 'Indicação'],
   ['MANUAL', 'Cadastro manual'],

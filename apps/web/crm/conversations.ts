@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { decrypt, encrypt, prisma, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
+import { decrypt, encrypt, prisma, type LeadSource, type Prisma, type TenantPrismaClient } from '@clinicaiq/db';
 import { chatKey } from '@/lib/phone';
+import { originOf, readAd } from './ad-origin';
 import { activeCloudAccount, WINDOW_MS, windowOpen } from './cloud';
 import { previewText } from './chat-ingest';
 import { createLead, OPEN_LEAD, setTags, softDeleteLead, type Actor } from './leads';
@@ -334,6 +335,8 @@ export interface ChatLine {
   templateName: string | null;
   /** Botões que foram junto (robô): a equipe vê o que a pessoa podia tocar. */
   buttons: string[];
+  /** A pessoa veio de um anúncio: o card dele, como no Kommo. */
+  ad: { platform: 'Facebook' | 'Instagram'; headline: string | null; body: string | null; url: string | null; imageUrl: string | null } | null;
 }
 
 export interface ChatThread {
@@ -354,6 +357,18 @@ export interface ChatThread {
 }
 
 const THREAD_LIMIT = 200;
+
+function adCard(raw: unknown): ChatLine['ad'] {
+  const ad = readAd(raw);
+  if (!ad) return null;
+  return {
+    platform: originOf(ad, '') === 'INSTAGRAM' ? 'Instagram' : 'Facebook',
+    headline: ad.headline ?? null,
+    body: ad.body,
+    url: ad.sourceUrl ?? null,
+    imageUrl: ad.imageUrl,
+  };
+}
 
 export async function loadThread(
   db: TenantPrismaClient,
@@ -393,6 +408,7 @@ export async function loadThread(
       mimeType: m.mimeType,
       templateName: m.templateName,
       buttons: Array.isArray(m.buttons) ? (m.buttons as { title?: unknown }[]).map((b) => String(b?.title ?? '')).filter(Boolean) : [],
+      ad: adCard(m.ad),
     }));
   const [cloud, bot] = await Promise.all([
     activeCloudAccount(tenantId),
@@ -610,7 +626,7 @@ export async function acceptConversation(
   /** `userId: null`: número novo aceito sozinho ao chegar (`crm/inbound.ts`). */
   actor: Actor,
   conversationId: string,
-  opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[] } = {},
+  opts: { name?: string; stageId?: string | null; pipelineId?: string | null; tagIds?: string[]; source?: LeadSource } = {},
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const conv = await db.conversation.findFirst({
     where: { id: conversationId },
@@ -634,7 +650,7 @@ export async function acceptConversation(
   const r = await createLead(db, actor, {
     name: opts.name?.trim() || (conv.patient?.name ?? conv.contactName ?? 'Contato do WhatsApp'),
     phone,
-    source: 'WHATSAPP',
+    source: opts.source ?? 'WHATSAPP',
     patientId: conv.patientId,
     stageId: opts.stageId || null,
     pipelineId: opts.pipelineId || null,

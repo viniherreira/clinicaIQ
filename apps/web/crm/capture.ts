@@ -11,7 +11,7 @@ import { decryptPhone } from './phone';
 
 type Result = { ok: true } | { ok: false; message: string };
 
-const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INSTAGRAM', 'SITE', 'INDICACAO', 'OUTRO', 'MANUAL'];
+const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'INDICACAO', 'OUTRO', 'MANUAL'];
 export const MAX_CAPTURE_RULES = 50;
 
 export async function applyCapture(

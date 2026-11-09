@@ -59,7 +59,7 @@ export const EMPTY_AUDIENCE: Audience = {
   fields: [],
 };
 
-const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO'];
+const SOURCES: readonly LeadSource[] = ['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO'];
 const STATUS: readonly AudienceStatus[] = ['abertos', 'ganhos', 'perdidos', 'todos'];
 
 /** Lê o público vindo da tela (ou de uma transmissão antiga) sem confiar em nada. */

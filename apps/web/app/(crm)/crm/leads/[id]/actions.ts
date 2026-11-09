@@ -29,7 +29,7 @@ const patchSchema = z.object({
   name: z.string().trim().min(2, 'Escreva o nome.').max(120).optional(),
   email: z.union([z.literal(''), z.string().trim().email('E-mail inválido.')]).nullable().optional(),
   phone: z.string().trim().refine(isValidPhone, 'Telefone com DDD.').optional(),
-  source: z.enum(['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'SITE', 'MANUAL', 'OUTRO']).optional(),
+  source: z.enum(['WHATSAPP', 'INDICACAO', 'INSTAGRAM', 'FACEBOOK', 'SITE', 'MANUAL', 'OUTRO']).optional(),
   interestProcedureId: z.string().nullable().optional(),
   estimatedValue: z.number().nonnegative().max(10_000_000).nullable().optional(),
   assignedToId: z.string().nullable().optional(),
