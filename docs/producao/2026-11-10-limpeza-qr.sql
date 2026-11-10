@@ -21,6 +21,8 @@ BEGIN;
 -- 0. Cópia de segurança, no próprio banco (apagar depois de uns dias).
 CREATE TABLE IF NOT EXISTS "_bkp_20261110_tooth_records" AS TABLE "tooth_records";
 CREATE TABLE IF NOT EXISTS "_bkp_20261110_whatsapp_auth_keys" AS TABLE "whatsapp_auth_keys";
+-- Texto comum na cópia: senão ela prende o tipo "ToothStatus" e o DROP TYPE falha.
+ALTER TABLE "_bkp_20261110_tooth_records" ALTER COLUMN "status" TYPE TEXT;
 ALTER TABLE "_bkp_20261110_tooth_records" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "_bkp_20261110_whatsapp_auth_keys" ENABLE ROW LEVEL SECURITY;
 
