@@ -7,12 +7,7 @@ export interface SendMessageParams {
     id: string;
     title: string;
   }>;
-  /**
-   * Id of the outbox row this send belongs to. The gateway stamps the row with
-   * WhatsApp's message id the instant the socket accepts, which is what lets a
-   * retry distinguish "never sent" from "sent, but the HTTP reply was lost".
-   * Ignored by providers that answer synchronously (Meta, mock).
-   */
+  /** Id of the outbox row this send belongs to (for logs; Meta and mock ignore it). */
   ref?: string;
 }
 

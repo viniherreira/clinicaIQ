@@ -7,8 +7,7 @@ vi.mock('server-only', () => ({}));
 const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
 process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
-// Sem gateway: as mensagens do robô são dadas como enviadas.
-delete process.env.WHATSAPP_GATEWAY_URL;
+// Sem a API oficial (testes): as mensagens do robô são dadas como enviadas.
 
 describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
   const { prisma, getTenantClient, encrypt, decrypt } = await import('@clinicaiq/db');

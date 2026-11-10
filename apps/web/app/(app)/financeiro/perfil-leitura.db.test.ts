@@ -41,7 +41,6 @@ describe.skipIf(!process.env.DATABASE_URL)('leituras conferem o perfil (banco)',
   const { getFinanceData } = await import('./actions');
   const { getReportData } = await import('./report-actions');
   const { listQuotes, getQuote, getContractGaps } = await import('../orcamentos/actions');
-  const { sendTestMessage } = await import('../whatsapp/actions');
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const tenant = await prisma.tenant.create({
@@ -73,11 +72,5 @@ describe.skipIf(!process.env.DATABASE_URL)('leituras conferem o perfil (banco)',
     await expect(listQuotes({})).rejects.toThrow(semAcesso);
     await expect(getQuote('qualquer')).rejects.toThrow(semAcesso);
     await expect(getContractGaps('qualquer')).rejects.toThrow(semAcesso);
-  });
-
-  it('mensagem de teste do WhatsApp', async () => {
-    const r = await sendTestMessage('11987650005');
-    expect(r.success).toBe(false);
-    expect(r.message).toContain('perfil');
   });
 });

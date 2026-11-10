@@ -50,7 +50,6 @@ A agenda nunca depende do CRM. Uma clínica sem o módulo usa tudo da gestão no
 ```
 apps/
   web/               o site e o sistema (Next.js 15)
-  whatsapp-gateway/  conexão com o WhatsApp por QR code (Baileys, no Fly.io)
 packages/
   db/                Prisma, cliente por clínica e criptografia
   pdf/               orçamento, contrato e recibo

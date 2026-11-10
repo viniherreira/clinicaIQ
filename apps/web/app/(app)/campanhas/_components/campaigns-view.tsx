@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Megaphone, Plus, Send, UserX } from 'lucide-react';
 import type { listCampaigns } from '../actions';
@@ -46,13 +45,10 @@ export function CampaignsView({ data }: { data: Data }) {
         <div className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-amber-950/40">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
           <div>
-            <p className="font-medium text-amber-900 dark:text-amber-200">WhatsApp não conectado</p>
+            <p className="font-medium text-amber-900 dark:text-amber-200">Campanhas em breve pelo WhatsApp oficial</p>
             <p className="mt-1 text-amber-800 dark:text-amber-300">
-              Conecte o número da clínica em{' '}
-              <Link href="/whatsapp" className="font-medium underline">
-                WhatsApp
-              </Link>{' '}
-              para poder enviar campanhas.
+              O envio de campanhas está pausado enquanto passa para a API oficial da Meta. As campanhas
+              anteriores continuam aqui embaixo.
             </p>
           </div>
         </div>

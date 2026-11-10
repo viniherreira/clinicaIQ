@@ -6,9 +6,8 @@ import { conversationHash, conversationHashes } from './phone';
 /**
  * Gravar no CRM uma mensagem que chegou pela API oficial (webhook da Meta).
  *
- * É o mesmo que o gateway faz para o QR (`apps/whatsapp-gateway/src/chat-log.ts`):
- * conversa por número, mensagem cifrada, sem duplicar pelo id do WhatsApp, e o
- * resumo da conversa só mexido pela mensagem mais nova. Mudar os dois juntos.
+ * Conversa por número, mensagem cifrada, sem duplicar pelo id do WhatsApp, e o
+ * resumo da conversa só mexido pela mensagem mais nova.
  */
 
 function masterKey(): string {

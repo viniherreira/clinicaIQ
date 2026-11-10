@@ -9,35 +9,20 @@ import { decryptPhone, isValidPhone, maskPhone } from './phone';
  * Transmissões: uma mensagem para um grupo de leads, como no Kommo.
  *
  * Cada pessoa vira uma mensagem na fila da própria conversa, com hora marcada.
- * No QR, as horas são espaçadas como uma recepcionista mandando (o número não
- * é banido); na API oficial, só dá para mandar modelo aprovado.
+ * Pela API oficial só dá para mandar modelo aprovado. Sem a API oficial, o
+ * texto livre só existe no desenvolvimento e nos testes (a mensagem é simulada).
  */
 
 export { audienceWhere, EMPTY_AUDIENCE, parseAudience, type Audience } from './audience';
 
-/** Quanto tempo a transmissão leva no QR, para a tela avisar. */
-export function gatewayDurationMinutes(n: number): number {
-  return Math.ceil((n * 20 + Math.floor(n / 20) * 120) / 60);
+/** As horas de saída: meio segundo entre uma mensagem e outra. */
+export function sendTimes(n: number, start: Date): Date[] {
+  return Array.from({ length: n }, (_, i) => new Date(start.getTime() + i * 500));
 }
 
-/**
- * As horas de saída. No QR: 12 a 28 s entre mensagens e 2 min de pausa a cada
- * 20, como as campanhas (`apps/whatsapp-gateway/src/campaigns.ts`). Na API
- * oficial: meio segundo entre elas.
- */
-export function sendTimes(n: number, start: Date, channel: 'cloud' | 'gateway', random: () => number = Math.random): Date[] {
-  const out: Date[] = [];
-  let t = start.getTime();
-  for (let i = 0; i < n; i++) {
-    out.push(new Date(t));
-    if (channel === 'cloud') t += 500;
-    else {
-      t += 12_000 + Math.floor(random() * 16_000);
-      if ((i + 1) % 20 === 0) t += 120_000;
-    }
-  }
-  return out;
-}
+/** Transmissão de texto livre só sem a API oficial, e só fora da produção. */
+const NO_CHANNEL = 'Conecte o WhatsApp oficial da clínica para mandar transmissões.';
+const semCanalEmProducao = () => process.env.NODE_ENV === 'production';
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? '';
 export const personalize = (text: string, name: string) => text.replace(/\{nome\}/gi, firstName(name));
@@ -103,6 +88,7 @@ export async function createBroadcast(
     if (params.length < t.variables || params.some((p) => !p)) return { ok: false, message: 'Preencha todas as variáveis do modelo.' };
     templateId = t.id;
   } else {
+    if (semCanalEmProducao()) return { ok: false, message: NO_CHANNEL };
     text = (input.text ?? '').trim();
     if (!text) return { ok: false, message: 'Escreva a mensagem.' };
     if (text.length > 1000) return { ok: false, message: 'A mensagem passa de 1000 caracteres.' };
@@ -146,7 +132,7 @@ export async function startBroadcast(tenantId: string, broadcastId: string, now:
   const b = await db.broadcast.findFirst({ where: { id: broadcastId }, include: { template: true } });
   if (!b) return { ok: false, message: 'Transmissão não encontrada.' };
   const cloud = await activeCloudAccount(tenantId);
-  const channel = cloud ? 'cloud' : 'gateway';
+  const channel = cloud ? 'cloud' : 'none';
 
   const cancel = async (why: string) => {
     await db.broadcast.updateMany({ where: { id: b.id }, data: { status: 'CANCELLED', cancelledAt: now, finishedAt: now } });
@@ -155,8 +141,9 @@ export async function startBroadcast(tenantId: string, broadcastId: string, now:
   if (channel === 'cloud' && !(b.template && b.template.status === 'APPROVED')) {
     return cancel('O canal agora é a API oficial e a transmissão não tem modelo aprovado.');
   }
-  if (channel === 'gateway' && !b.text) {
-    return cancel('O canal agora é o QR code e a transmissão só tem modelo da API oficial.');
+  if (channel === 'none' && semCanalEmProducao()) return cancel(NO_CHANNEL);
+  if (channel === 'none' && !b.text) {
+    return cancel('A API oficial foi desligada e a transmissão só tem modelo dela.');
   }
 
   const audience = parseAudience(b.audience);
@@ -181,7 +168,7 @@ export async function startBroadcast(tenantId: string, broadcastId: string, now:
     } else reachable.push(l);
   }
 
-  const times = sendTimes(reachable.length, now, channel);
+  const times = sendTimes(reachable.length, now);
   let queued = 0;
   for (const [i, l] of reachable.entries()) {
     const conv = await ensureConversationForLead(db, tenantId, l.id);

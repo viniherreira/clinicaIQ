@@ -26,15 +26,14 @@ export default async function ConversasPage({
   const selectedId = one('c') || null;
   const tagId = one('tag') || null;
 
-  // As que o aviso do gateway não alcançou.
+  // As que o webhook não classificou.
   await classifyPending(ctx.db, ctx.tenantId);
 
-  const [list, counts, thread, quickReplies, line, cloud, basics] = await Promise.all([
+  const [list, counts, thread, quickReplies, cloud, basics] = await Promise.all([
     listConversations(ctx.db, ctx, tab, q, 60, tagId),
     inboxCounts(ctx.db, ctx),
     selectedId ? loadThread(ctx.db, ctx.tenantId, selectedId, ctx, ctx.agenda) : Promise.resolve(null),
     ctx.db.quickReply.findMany({ orderBy: [{ order: 'asc' }, { title: 'asc' }], select: { id: true, title: true, body: true } }),
-    ctx.db.whatsAppSession.findFirst({ select: { status: true } }),
     activeCloudAccount(ctx.tenantId),
     loadCrmBasics(ctx),
   ]);
@@ -53,8 +52,8 @@ export default async function ConversasPage({
       initialTagId={tagId}
       initialSelectedId={thread ? selectedId : null}
       quickReplies={quickReplies}
-      // Na API oficial não há linha de QR para cair.
-      lineDown={!cloud && line?.status !== 'CONNECTED'}
+      // Sem a API oficial ligada, não há por onde responder.
+      lineDown={!cloud}
       // Quem configura o CRM conecta pelo próprio CRM; só com o CRM não existe a tela da gestão.
       whatsappHref={ctx.manager ? '/crm/whatsapp' : modules.clinic && can(ctx.role, 'configuracoes') ? '/whatsapp' : null}
       canManage={ctx.manager}

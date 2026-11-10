@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chatKey } from './phone';
 
-/**
- * A mesma tabela nos dois lados (app e gateway): se divergirem, a conversa que o
- * gateway grava não é a que o app procura.
- */
+/** A chave da conversa: a mesma pessoa, com ou sem o 9, é uma conversa só. */
 const CASOS: [string, string][] = [
   ['11 98765-4321', '5511987654321'],
   ['5511987654321', '5511987654321'],

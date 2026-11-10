@@ -49,7 +49,7 @@ export default async function NovaTransmissaoPage({
         pipelines={basics.pipelines.map((p) => ({ id: p.id, name: p.name, stages: p.columns.map((s) => ({ id: s.id, name: s.name })) }))}
         tags={basics.tags.map((t) => ({ id: t.id, name: t.name, color: t.color, count: counts.get(t.id) ?? 0 }))}
         team={basics.team}
-        channel={cloud ? 'cloud' : 'gateway'}
+        channel={cloud ? 'cloud' : 'none'}
         templates={templates}
       />
     </div>

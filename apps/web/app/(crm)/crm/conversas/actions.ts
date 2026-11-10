@@ -102,10 +102,15 @@ export async function loadThreadAction(conversationId: string): Promise<Result<{
   return { ok: true, thread };
 }
 
+/** Sem a API oficial, em produção, não há por onde a mensagem sair. */
+const SEM_CANAL = { ok: false as const, message: 'Conecte o WhatsApp oficial da clínica em Configurações › WhatsApp para mandar mensagens.' };
+const semCanal = (cloud: unknown) => !cloud && process.env.NODE_ENV === 'production';
+
 export async function sendChatAction(conversationId: string, text: string): Promise<Result> {
   const g = await guardConversation('crm', conversationId);
   if (!g.ok) return g;
   const cloud = await activeCloudAccount(g.tenantId);
+  if (semCanal(cloud)) return SEM_CANAL;
   const r = await writeChatMessage(g.db, g, conversationId, text, new Date(), { checkWindow: Boolean(cloud), signAs: await assinatura(g) });
   if (!r.ok) return r;
   // Responde já; a entrega ao WhatsApp segue depois.
@@ -114,8 +119,8 @@ export async function sendChatAction(conversationId: string, text: string): Prom
 }
 
 /**
- * Manda uma foto, documento, áudio ou vídeo, com legenda opcional. Por enquanto
- * só pela API oficial (e simulado no desenvolvimento): o gateway de QR não manda arquivo.
+ * Manda uma foto, documento, áudio ou vídeo, com legenda opcional, pela API
+ * oficial (simulado no desenvolvimento).
  */
 export async function sendMediaAction(conversationId: string, form: FormData): Promise<Result> {
   const g = await guardConversation('crm', conversationId);
@@ -130,9 +135,7 @@ export async function sendMediaAction(conversationId: string, form: FormData): P
   }
 
   const cloud = await activeCloudAccount(g.tenantId);
-  if (!cloud && (process.env.WHATSAPP_GATEWAY_URL || process.env.NODE_ENV === 'production')) {
-    return { ok: false, message: 'Mandar arquivos pelo CRM precisa da API oficial do WhatsApp.' };
-  }
+  if (semCanal(cloud)) return SEM_CANAL;
   if (!mediaStoreReady()) return { ok: false, message: 'O envio de arquivos ainda não está configurado.' };
 
   let ref: string;
@@ -175,6 +178,7 @@ export async function startLeadChatAction(leadId: string, text: string): Promise
   const conv = await ensureConversationForLead(g.db, g.tenantId, leadId);
   if (!conv.ok) return conv;
   const cloud = await activeCloudAccount(g.tenantId);
+  if (semCanal(cloud)) return SEM_CANAL;
   const r = await writeChatMessage(g.db, g, conv.conversationId, text, new Date(), { checkWindow: Boolean(cloud), signAs: await assinatura(g) });
   if (!r.ok) return r;
   after(() => dispatchChat(g.tenantId, r.messageId));

@@ -32,8 +32,6 @@ const inputCls =
   'h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 const legendCls = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
-/** Minutos que a transmissão leva no QR (mesma conta de `gatewayDurationMinutes`). */
-const minutosQr = (n: number) => Math.ceil((n * 20 + Math.floor(n / 20) * 120) / 60);
 
 function Chip({ on, onClick, children, className = '' }: { on: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
   return (
@@ -88,7 +86,8 @@ export function BroadcastForm({
   pipelines: PipelineOption[];
   tags: TagOption[];
   team: Option[];
-  channel: 'cloud' | 'gateway';
+  /** `none`: sem a API oficial (texto livre só no desenvolvimento). */
+  channel: 'cloud' | 'none';
   templates: Template[];
   /** Dia da clínica, "AAAA-MM-DD". */
   today: string;
@@ -460,6 +459,10 @@ export function BroadcastForm({
                 <p className="text-xs text-muted-foreground">Use {'{nome}'} numa variável para o primeiro nome de cada pessoa.</p>
               </>
             )
+          ) : process.env.NODE_ENV === 'production' ? (
+            <p className="text-sm text-muted-foreground">
+              Conecte o WhatsApp oficial da clínica em Configurações › WhatsApp para mandar transmissões.
+            </p>
           ) : (
             <>
               <label htmlFor={`${id}-texto`} className="block text-xs font-medium text-muted-foreground">Texto ({'{nome}'} vira o primeiro nome)</label>
@@ -472,10 +475,7 @@ export function BroadcastForm({
                 placeholder="Oi {nome}! Em outubro o clareamento está com 20% de desconto. Quer agendar uma avaliação? Responda SAIR para não receber mais."
                 className="w-full rounded-lg border border-border bg-background p-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               />
-              <p className="text-xs text-muted-foreground">
-                Pelo QR code, as mensagens saem devagar, como uma pessoa mandando, para o número não ser bloqueado
-                {n > 0 && `, cerca de ${minutosQr(n)} min para ${n} pessoas`}.
-              </p>
+              <p className="text-xs text-muted-foreground">Sem a API oficial, as mensagens são só simuladas (desenvolvimento).</p>
             </>
           )}
           {exemplo && (

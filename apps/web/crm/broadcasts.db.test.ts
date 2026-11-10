@@ -7,17 +7,11 @@ if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFil
 process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
 
 describe('transmissões: regras puras', async () => {
-  const { sendTimes, parseAudience, personalize, gatewayDurationMinutes } = await import('./broadcasts');
+  const { sendTimes, parseAudience, personalize } = await import('./broadcasts');
 
-  it('no QR, 12 a 28 s entre mensagens e pausa de 2 min a cada 20', () => {
+  it('meio segundo entre uma mensagem e outra', () => {
     const t0 = new Date('2026-10-11T12:00:00Z');
-    const meio = () => 0.5; // 12 + 8 = 20 s
-    const t = sendTimes(22, t0, 'gateway', meio);
-    expect(t[0]).toEqual(t0);
-    expect(t[1].getTime() - t[0].getTime()).toBe(20_000);
-    expect(t[20].getTime() - t[19].getTime()).toBe(20_000 + 120_000);
-    expect(sendTimes(3, t0, 'cloud').map((d) => d.getTime() - t0.getTime())).toEqual([0, 500, 1000]);
-    expect(gatewayDurationMinutes(40)).toBe(18);
+    expect(sendTimes(3, t0).map((d) => d.getTime() - t0.getTime())).toEqual([0, 500, 1000]);
   });
 
   it('público: só o que é válido passa', () => {
@@ -96,7 +90,7 @@ describe.skipIf(!process.env.DATABASE_URL)('transmissões (banco)', async () => 
     expect(await b.previewAudience(db, { ...b.EMPTY_AUDIENCE, stageIds: [novo.id] })).toEqual({ total: 4, optedOut: 1, reachable: 3 });
   });
 
-  it('no QR: cada pessoa vira uma mensagem personalizada na fila, espaçada; quem saiu é pulado', async () => {
+  it('sem a API oficial (testes): cada pessoa vira uma mensagem personalizada na fila; quem saiu é pulado', async () => {
     const r = await b.createBroadcast(db, actor, { name: 'Outubro', audience: { ...b.EMPTY_AUDIENCE, stageIds: [novo.id] }, text: 'Oi {nome}! Clareamento com 20% em outubro.' });
     if (!r.ok) throw new Error(r.message);
     expect(r.startNow).toBe(true);
@@ -118,7 +112,7 @@ describe.skipIf(!process.env.DATABASE_URL)('transmissões (banco)', async () => 
       'Oi Bia! Clareamento com 20% em outubro.',
     ]);
     const gap = Math.abs(msgs[1].at.getTime() - msgs[0].at.getTime());
-    expect(gap).toBeGreaterThanOrEqual(12_000);
+    expect(gap).toBe(500);
 
     // Rodar de novo não manda duas vezes.
     expect((await b.startBroadcast(tenant.id, r.broadcastId)).ok).toBe(false);

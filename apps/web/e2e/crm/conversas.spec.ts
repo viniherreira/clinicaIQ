@@ -5,9 +5,9 @@ import { incomingMessage } from './chat';
 import { columnOf, createLeadViaModal, uniquePhone } from './helpers';
 
 /**
- * As conversas do WhatsApp no CRM. O gateway não roda nos testes: a mensagem
+ * As conversas do WhatsApp no CRM. A Meta não entra nos testes: a mensagem
  * que chega é gravada direto no banco, como ele gravaria, e a resposta é dada
- * como enviada (sem gateway, o app simula).
+ * como enviada (sem a API oficial, o app simula).
  */
 
 test('contato sem card: sem Entrada nem formulário, "Abrir negócio" cria o lead em Novo com um clique', async ({ page }) => {
@@ -52,7 +52,7 @@ test('responder pela tela Conversas e ver na ficha do lead', async ({ page }) =>
   await page.keyboard.press('Enter');
   const bolha = conversa.getByRole('listitem').filter({ hasText: resposta });
   await expect(bolha).toBeVisible();
-  // Sem gateway, a mensagem é dada como enviada logo depois.
+  // Sem a API oficial, a mensagem é dada como enviada logo depois.
   await expect(bolha.getByText('Enviada')).toBeAttached({ timeout: 20_000 });
 
   await conversa.getByRole('link', { name: new RegExp(lead.title) }).click();

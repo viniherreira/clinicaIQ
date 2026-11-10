@@ -346,9 +346,8 @@ export async function createAppointment(
   if (sendWhatsApp) {
     // Record the message *before* returning, while we still control the request.
     // `after()` is an optimisation, not a guarantee — if the platform never runs
-    // the callback, a booking recorded here is still in the outbox and the
-    // gateway sends it within a couple of minutes. Recorded inside `after()`, the
-    // same booking would leave no trace and nobody would ever know.
+    // the callback, a booking recorded here still left a row in the history.
+    // Recorded inside `after()`, the same booking would leave no trace.
     let prepared: Preparation | null = null;
     try {
       prepared = await prepareAppointmentMessage(appointment.id, 'created');
@@ -362,7 +361,7 @@ export async function createAppointment(
       try {
         if (prepared?.kind === 'send') await deliverPrepared(prepared.send);
       } catch (error) {
-        // The row is already in the outbox; the gateway will pick it up.
+        // The row is already in the history, with the failure.
         console.error('[agenda] falha ao enviar WhatsApp de criacao', appointment.id, error);
       }
 

@@ -28,7 +28,7 @@ describe.skipIf(!process.env.DATABASE_URL)('conversas (banco)', async () => {
   await ensureDefaultPipeline(db, tenant.id);
 
   let seq = 0;
-  /** O que o gateway gravaria: conversa sem classificar e uma mensagem do contato. */
+  /** O que o webhook gravaria: conversa sem classificar e uma mensagem do contato. */
   async function chegou(phone: string, name: string, text = 'Oi!') {
     const k = chatKey(phone);
     const conv = await prisma.conversation.create({

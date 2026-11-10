@@ -7,10 +7,9 @@ import { fileNameOf, isStoredRef, readChatMedia } from './media-store';
 const CLOUD_KIND = { IMAGE: 'image', VIDEO: 'video', AUDIO: 'audio', DOCUMENT: 'document' } as const;
 
 /**
- * Envio das mensagens do CRM pela API oficial. Mesma ideia da fila do gateway
- * (`apps/whatsapp-gateway/src/chat-send.ts`): a linha é reservada antes de
+ * Envio das mensagens do CRM pela API oficial: a linha é reservada antes de
  * mandar, a falha passageira volta para a fila e a definitiva vira "não
- * enviada" com o motivo. A diferença: aqui o id é a Meta que dá.
+ * enviada" com o motivo. O id da mensagem é a Meta que dá.
  */
 
 const MAX_ATTEMPTS = 5;

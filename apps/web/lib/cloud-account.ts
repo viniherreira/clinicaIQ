@@ -24,7 +24,7 @@ export interface CloudAccount {
   token: string;
 }
 
-/** A conta oficial que está valendo, ou null (então é o gateway). */
+/** A conta oficial que está valendo, ou null (a clínica ainda não conectou). */
 export async function activeCloudAccount(tenantId: string): Promise<CloudAccount | null> {
   const a = await prisma.whatsAppCloudAccount.findUnique({ where: { tenantId } });
   if (!a || !a.active || a.status !== 'CONNECTED') return null;
