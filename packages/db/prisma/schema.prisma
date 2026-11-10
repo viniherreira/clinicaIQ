@@ -79,14 +79,6 @@ enum DiscountType {
   FIXED
 }
 
-enum ToothStatus {
-  TO_TREAT
-  IN_TREATMENT
-  TREATED
-  EXTRACTED
-  MISSING
-}
-
 /// Situação de uma marcação do odontograma: a fazer (plano de tratamento),
 /// realizado na clínica, ou que o paciente já tinha quando chegou.
 enum ToothFindingStatus {
@@ -147,7 +139,6 @@ model Tenant {
   auditLogs           AuditLog[]
   blockedSlots        BlockedSlot[]
   patientNotes        PatientNote[]
-  toothRecords        ToothRecord[]
   toothFindings       ToothFinding[]
   payments            Payment[]
   anamneses           Anamnesis[]
@@ -297,7 +288,6 @@ model Patient {
   appointments       Appointment[]
   quotes             Quote[]
   messages           WhatsAppMessage[]
-  toothRecords       ToothRecord[]
   toothFindings      ToothFinding[]
   payments           Payment[]
   anamnesis          Anamnesis?
@@ -628,33 +618,13 @@ model WhatsAppMessage {
   @@index([tenantId, appointmentId])
   @@index([tenantId, patientId, createdAt(sort: Desc)])
   @@index([externalId])
-  /// Drives the gateway's retry scan, which runs on a timer against every tenant.
   @@index([status, nextAttemptAt])
   @@map("whatsapp_messages")
 }
 
-model ToothRecord {
-  id          String      @id @default(cuid())
-  tenantId    String
-  patientId   String
-  toothNumber Int
-  status      ToothStatus
-  note        String?
-  updatedById String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  patient Patient @relation(fields: [patientId], references: [id])
-
-  @@unique([patientId, toothNumber])
-  @@index([tenantId, patientId])
-  @@map("tooth_records")
-}
-
 /// Uma marcação do odontograma: o que o dente tem ou vai ter, em quais faces.
-/// Substitui `ToothRecord` (uma situação por dente), que fica só para leitura
-/// até as fichas antigas serem copiadas (docs/producao/2026-10-28-odontograma.sql).
+/// Substituiu a tabela antiga `tooth_records` (uma situação por dente), já
+/// copiada para cá (docs/producao/2026-10-28-odontograma.sql).
 model ToothFinding {
   id             String             @id @default(cuid())
   tenantId       String
@@ -801,6 +771,8 @@ model WhatsAppSession {
   tenantId String                   @unique
   status   WhatsAppConnectionStatus @default(DISCONNECTED)
 
+  // `status` até `disconnectedAt`: da conexão antiga por QR, que saiu do sistema.
+  // Ficam até a limpeza do banco (docs/producao/2026-11-10-limpeza-qr.sql).
   /// Number the clinic paired, in E.164 digits (no mask). Filled on connect.
   phoneNumber String?
   displayName String?
@@ -813,7 +785,7 @@ model WhatsAppSession {
   connectedAt    DateTime?
   disconnectedAt DateTime?
 
-  /// Which automations this clinic wants on its own line.
+  /// Quais mensagens da agenda a clínica quer mandar.
   notifyOnCreate  Boolean @default(true)
   notifyReminder  Boolean @default(true)
   notifyBirthday  Boolean @default(false)
@@ -835,36 +807,6 @@ model WhatsAppSession {
 
   @@index([status])
   @@map("whatsapp_sessions")
-}
-
-/// Baileys credential store. One row per (tenant, key); values are encrypted
-/// with the tenant-scoped master key, never logged.
-model WhatsAppAuthKey {
-  id       String @id @default(cuid())
-  tenantId String
-  key      String
-  value    String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([tenantId, key])
-  @@index([tenantId])
-  @@map("whatsapp_auth_keys")
-}
-
-/// Liveness beacon written by the WhatsApp gateway. Single row: the gateway
-/// stamps it on boot and refreshes it periodically, so the app (and whoever is
-/// debugging a deploy) can tell whether the always-on service is really alive
-/// and which port it bound — without shell access to the host.
-model GatewayHeartbeat {
-  id       String   @id @default("gateway")
-  bootedAt DateTime @default(now())
-  beatAt   DateTime @updatedAt
-  port     Int
-  note     String?
-
-  @@map("gateway_heartbeat")
 }
 
 enum CampaignStatus {

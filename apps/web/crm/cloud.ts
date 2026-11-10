@@ -1,6 +1,6 @@
 /**
  * O canal das conversas do CRM de cada clínica: a API oficial (Cloud API), quando
- * a conta está conectada e ativa, ou o gateway de QR. A conta é da clínica e mora
+ * a conta está conectada e ativa. A conta é da clínica e mora
  * em `lib/cloud-account.ts`; aqui fica o que é só das conversas.
  */
 export {

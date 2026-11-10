@@ -37,7 +37,7 @@ export function phoneHashes(raw: string, tenantId: string): string[] {
 
 /**
  * Índice cego da conversa de WhatsApp desse telefone. Usa a chave de conversa
- * (celular sempre com o 9), a mesma que o gateway grava.
+ * (celular sempre com o 9), a mesma que o webhook grava.
  */
 export function conversationHash(raw: string, tenantId: string): string {
   return hashForTenant(chatKey(raw), masterKey(), tenantId);

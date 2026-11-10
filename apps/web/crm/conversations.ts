@@ -10,7 +10,7 @@ import { conversationScope, type Viewer } from './scope-rules';
 import { needsSignature, readCrmPrefs, signText } from './crm-prefs';
 
 /**
- * As conversas do WhatsApp no CRM. O gateway grava o que entra e sai da linha
+ * As conversas do WhatsApp no CRM. O webhook da Meta grava o que entra na linha
  * da clínica; aqui ficam as regras do lado do app: ligar a conversa ao lead ou
  * ao paciente, listar, abrir, responder, aceitar e recusar a Entrada.
  *
@@ -128,7 +128,7 @@ export async function classifyConversation(
   const patientId = lead?.patientId ?? (phone && agenda ? await findPatientForChat(db, tenantId, phone) : null);
   const known = Boolean(lead || patientId);
 
-  // updateMany com `classifiedAt: null`: o aviso do gateway e a tela podem chegar juntos.
+  // updateMany com `classifiedAt: null`: o webhook e a tela podem chegar juntos.
   await db.conversation.updateMany({
     where: { id: conv.id, classifiedAt: null },
     data: {
@@ -143,7 +143,7 @@ export async function classifyConversation(
   return lead ? 'lead' : patientId ? 'patient' : 'inbox';
 }
 
-/** As que o aviso do gateway não alcançou. Roda quando alguém abre a tela. */
+/** As que o webhook não classificou. Roda quando alguém abre a tela. */
 export async function classifyPending(db: TenantPrismaClient, tenantId: string): Promise<void> {
   const pending = await db.conversation.findMany({ where: { classifiedAt: null }, select: { id: true }, take: 50 });
   for (const c of pending) await classifyConversation(db, tenantId, c.id);
@@ -344,8 +344,8 @@ export interface ChatThread {
   messages: ChatLine[];
   /** Há mensagens mais antigas que as mostradas. */
   truncated: boolean;
-  /** Por onde a clínica responde. */
-  channel: 'cloud' | 'gateway';
+  /** Por onde a clínica responde: a API oficial, ou nenhum canal ligado ainda. */
+  channel: 'cloud' | 'none';
   /** API oficial: dá para escrever livre (24 h desde a última mensagem da pessoa). */
   windowOpen: boolean;
   /** Dá para mandar arquivo por este canal. */
@@ -418,10 +418,10 @@ export async function loadThread(
     conversation: toSummary(conv, tenantId, agenda),
     messages,
     truncated,
-    channel: cloud ? 'cloud' : 'gateway',
+    channel: cloud ? 'cloud' : 'none',
     windowOpen: windowOpen(conv.lastInboundAt),
     // Arquivo sai pela API oficial; sem canal nenhum (desenvolvimento), é simulado.
-    mediaOk: Boolean(cloud) || (!process.env.WHATSAPP_GATEWAY_URL && process.env.NODE_ENV !== 'production'),
+    mediaOk: Boolean(cloud) || process.env.NODE_ENV !== 'production',
     bot,
     windowEndsAt: conv.lastInboundAt && windowOpen(conv.lastInboundAt) ? new Date(conv.lastInboundAt.getTime() + WINDOW_MS).toISOString() : null,
   };
@@ -478,7 +478,7 @@ export async function ensureConversationForLead(
     });
     return { ok: true, conversationId: conv.id };
   } catch {
-    // A pessoa escreveu no mesmo instante e o gateway criou primeiro.
+    // A pessoa escreveu no mesmo instante e o webhook criou primeiro.
     const again = await db.conversation.findFirst({ where: { phoneHash: { in: conversationHashes(key, tenantId) } }, select: { id: true } });
     return again ? { ok: true, conversationId: again.id } : { ok: false, message: 'Não foi possível abrir a conversa.' };
   }
@@ -604,13 +604,24 @@ export async function retryChatMessage(
 }
 
 /**
- * Sem gateway (desenvolvimento e testes) a mensagem "sai" na hora — senão a tela
- * ficaria com o relógio para sempre.
+ * Sem a API oficial, no desenvolvimento e nos testes, a mensagem "sai" na hora —
+ * senão a tela ficaria com o relógio para sempre.
  */
 export async function simulateSent(db: TenantPrismaClient, chatMessageId: string): Promise<void> {
   await db.chatMessage.updateMany({
     where: { id: chatMessageId, status: 'PENDING' },
     data: { status: 'SENT', acceptedAt: new Date(), attempts: 1 },
+  });
+}
+
+/** Mensagem do CRM que deveria sair sem a API oficial ligada (produção). */
+export const NO_CHANNEL_MESSAGE = 'Não enviada: conecte o WhatsApp oficial da clínica para mandar mensagens.';
+
+/** Sem canal em produção: a mensagem vira "não enviada", com o motivo, em vez de ficar no relógio. */
+export async function failNoChannel(db: TenantPrismaClient, chatMessageId: string): Promise<void> {
+  await db.chatMessage.updateMany({
+    where: { id: chatMessageId, status: 'PENDING' },
+    data: { status: 'FAILED', errorMessage: NO_CHANNEL_MESSAGE, nextAttemptAt: null, claimedUntil: null },
   });
 }
 

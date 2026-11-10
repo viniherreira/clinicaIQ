@@ -10,7 +10,7 @@ captação (funil de leads no estilo Kommo).
 - Frontend: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui
 - Auth: Clerk. Não usa Organizations: a clínica é ligada ao usuário (`Tenant.clerkOrgId = user_<id>`, `User.clerkUserId`)
 - DB: PostgreSQL + Prisma ORM (`packages/db`), schema aplicado com `db push` (sem migrations)
-- WhatsApp: provider abstrato (`packages/whatsapp`). Em produção, o gateway de QR code (`apps/whatsapp-gateway`, Baileys, no Fly.io em São Paulo); mock em dev; Meta Cloud API preparada para o CRM
+- WhatsApp: só a API oficial da Meta (Cloud API), com o número de cada clínica (cadastro incorporado; Tech Provider aprovado em 10/11/2026). Mock no desenvolvimento. O gateway de QR code saiu do sistema em 10/11/2026
 - Envio de mensagens: outbox no Postgres (`WhatsAppMessage` com `attempts`/`nextAttemptAt`), reprocessado pelo gateway. Não há BullMQ nem Redis
 - Cobrança: Asaas
 - PDF: @react-pdf/renderer (`packages/pdf`)
@@ -42,7 +42,6 @@ captação (funil de leads no estilo Kommo).
   - `app/(crm)` — telas do CRM (`/crm/painel`, `/crm`, `/crm/conversas`, `/crm/leads`, `/crm/tarefas`, `/crm/automacoes` (bots, modelos, transmissões, por etapa), `/crm/whatsapp`, `/crm/configuracoes`)
   - `crm/` — regras do CRM (funil, leads, tarefas, automação), sem telas
   - `e2e/regressao` — regressão da agenda e dos orçamentos; `e2e/crm` — CRM
-- `apps/whatsapp-gateway` — gateway de WhatsApp por QR code
 - `packages/db` — Prisma schema, client with multi-tenant extension, encryption
 - `packages/whatsapp` — WhatsApp provider abstraction
 - `packages/pdf` — PDF generation for quotes
@@ -87,11 +86,11 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 
 ### Conversas do WhatsApp (etapa 2)
 
-- O gateway grava toda mensagem 1:1 da linha da clínica (`apps/whatsapp-gateway/src/chat-log.ts`) só para clínica com CRM: `Conversation` (um número = uma conversa) e `ChatMessage` (texto **cifrado**), sem duplicar por `tenantId + externalId`. A confirmação de consulta roda antes e não depende disso.
-- A chave da conversa é `chatKey` (celular sempre com o 9), duplicada em `apps/web/lib/phone.ts` e `apps/whatsapp-gateway/src/phone.ts` — mudar as duas juntas (`chat-key.test.ts` nos dois lados).
-- O app liga a conversa a lead aberto, paciente ou Entrada (`crm/conversations.ts`, `classifyConversation`), avisado pelo gateway em `/api/whatsapp/conversation` ou ao abrir o funil/Conversas.
+- O webhook da Meta grava toda mensagem 1:1 da linha da clínica (`crm/chat-ingest.ts`) só para clínica com CRM: `Conversation` (um número = uma conversa) e `ChatMessage` (texto **cifrado**), sem duplicar por `tenantId + externalId`. A confirmação de consulta roda antes e não depende disso.
+- A chave da conversa é `chatKey` (celular sempre com o 9), em `apps/web/lib/phone.ts` (`chat-key.test.ts`).
+- O app liga a conversa a lead aberto, paciente ou Entrada (`crm/conversations.ts`, `classifyConversation`), no webhook da Meta ou ao abrir o funil/Conversas.
 - **Número novo vira lead sozinho, como no Kommo**: na primeira mensagem de um número desconhecido, `afterInbound` (`crm/inbound.ts`) aceita a conversa sem ninguém (`acceptConversation` com `userId: null`) e o lead nasce em Novo — depois da captação, antes do robô (que continua sendo de "número novo"). Paciente sem negócio aberto não vira lead sozinho. A Entrada só aparece se esse passo falhar. O webhook da Meta roda esse passo antes de responder (com `after()` não rodava em produção). O funil e a lista se atualizam sozinhos (`components/auto-refresh.tsx`, a cada 10–15 s, parado durante arrasto ou janela aberta); as Conversas já atualizavam a cada 4 s.
-- Resposta do CRM: a action grava `ChatMessage` PENDING com o id do WhatsApp já escolhido e `after(dispatchChat)` pede ao gateway (`POST /sessions/:tenantId/chat`); o gateway reserva a linha e reenvia sozinho. Sem gateway configurado, o app dá como enviada (só fora de produção).
+- Resposta do CRM: a action grava `ChatMessage` PENDING com o id do WhatsApp já escolhido e `after(dispatchChat)` manda pela API oficial (`crm/cloud-send.ts`); falha passageira volta para a fila do relógio. Sem a API oficial: em produção a mensagem vira "não enviada" com o motivo (`crm/no-channel.ts`); fora de produção, é dada como enviada.
 - Origem: `CONTACT`, `CRM`, `PHONE` (celular da clínica) e `AUTOMATION` (o `send()` do gateway anota o id antes de mandar).
 - Spec e plano: `docs/specs/2026-10-10-crm-etapa2-conversas-design.md` e `docs/planos/2026-10-10-crm-etapa2-plan.md`.
 

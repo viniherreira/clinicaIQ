@@ -7,7 +7,6 @@ vi.mock('server-only', () => ({}));
 const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
 process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
-delete process.env.WHATSAPP_GATEWAY_URL;
 
 describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async () => {
   const { prisma, getTenantClient } = await import('@clinicaiq/db');

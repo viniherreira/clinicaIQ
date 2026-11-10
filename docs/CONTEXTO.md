@@ -86,5 +86,4 @@ onboarding, a tela de Planos, o webhook do Asaas e a rotina diária.
 3. Aplicar no banco de produção (com autorização do dono).
 4. `seed-plans.ts` em produção (grava `crmSeatPriceCents`).
 5. Merge na `main` → deploy da Vercel.
-6. Deploy do gateway no Fly.io (`apps/whatsapp-gateway`), só depois do banco e do app. Gateway novo com banco antigo: a gravação das conversas falha em silêncio e a confirmação de consulta continua.
-7. Conferir o site; a clínica piloto experimenta o CRM.
+6. Conferir o site; a clínica piloto experimenta o CRM.

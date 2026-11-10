@@ -1,16 +1,15 @@
 import { getTenantClient } from '@clinicaiq/db';
-import { getGatewayProvider } from '@clinicaiq/whatsapp';
 import { activeCloudAccount } from './cloud';
 import { sendViaCloud } from './cloud-send';
-import { simulateSent } from './conversations';
+import { failNoChannel, simulateSent } from './conversations';
 
 /**
- * Entrega uma mensagem já gravada pelo canal da clínica. Chamado depois de
- * responder à tela (`after`), então nunca segura quem está digitando. Se
- * falhar, a fila tenta de novo sozinha (o gateway no QR, o relógio do CRM na
- * API oficial).
+ * Entrega uma mensagem já gravada pelo canal da clínica, a API oficial.
+ * Chamado depois de responder à tela (`after`), então nunca segura quem está
+ * digitando. Se a Meta falhar de passagem, o relógio do CRM tenta de novo.
  *
- * Sem nenhum canal configurado (desenvolvimento), a mensagem é dada como enviada.
+ * Sem a API oficial ligada: em produção a mensagem fica "não enviada", com o
+ * motivo; no desenvolvimento ela é dada como enviada.
  */
 export async function dispatchChat(tenantId: string, chatMessageId: string): Promise<void> {
   const cloud = await activeCloudAccount(tenantId);
@@ -18,10 +17,7 @@ export async function dispatchChat(tenantId: string, chatMessageId: string): Pro
     await sendViaCloud(cloud, chatMessageId);
     return;
   }
-  const gateway = getGatewayProvider(tenantId);
-  if (gateway) {
-    await gateway.sendChat(chatMessageId);
-    return;
-  }
-  if (process.env.NODE_ENV !== 'production') await simulateSent(getTenantClient(tenantId), chatMessageId);
+  const db = getTenantClient(tenantId);
+  if (process.env.NODE_ENV === 'production') await failNoChannel(db, chatMessageId);
+  else await simulateSent(db, chatMessageId);
 }

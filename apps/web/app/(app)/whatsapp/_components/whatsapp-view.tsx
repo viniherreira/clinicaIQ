@@ -3,25 +3,9 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Link2,
-  Loader2,
-  MessageSquare,
-  Power,
-  Send,
-  Smartphone,
-} from 'lucide-react';
-import {
-  disconnectWhatsApp,
-  saveWhatsAppSettings,
-  sendTestMessage,
-  type WhatsAppPanelData,
-} from '../actions';
+import { MessageSquare } from 'lucide-react';
+import { saveWhatsAppSettings, type WhatsAppPanelData } from '../actions';
 import { OfficialCard } from './official-card';
-import { OptInCard } from './opt-in-card';
-import { PairingModal } from './pairing-modal';
 
 interface Props {
   data: WhatsAppPanelData;
@@ -50,31 +34,7 @@ const TEMPLATE_PT: Record<string, string> = {
   birthday_greeting: 'Aniversário',
 };
 
-function formatPhone(digits: string | null): string {
-  if (!digits) return '';
-  const m = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(digits);
-  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : `+${digits}`;
-}
-
 export function WhatsAppView({ data }: Props) {
-  const router = useRouter();
-  const [pairing, setPairing] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
-  const connected = data.status === 'CONNECTED';
-  // O WhatsApp é só pela API oficial. O cartão do QR code aparece apenas para
-  // quem ainda tem uma conexão antiga por QR ligada, para poder desligar.
-  const oficial = Boolean(data.official.account?.active);
-  const legado = !oficial && connected;
-
-  function onDisconnect() {
-    if (!confirm('Desconectar o WhatsApp da clínica? As confirmações deixam de ser enviadas.')) return;
-    startTransition(async () => {
-      await disconnectWhatsApp();
-      router.refresh();
-    });
-  }
-
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-6 lg:p-8">
       <header>
@@ -87,93 +47,8 @@ export function WhatsAppView({ data }: Props) {
 
       <OfficialCard official={data.official} />
 
-      {legado && !data.gatewayReady && (
-        <div className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-amber-950/40">
-          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-          <div>
-            <p className="font-medium text-amber-900 dark:text-amber-200">
-              Serviço de WhatsApp ainda não configurado
-            </p>
-            <p className="mt-1 text-amber-800 dark:text-amber-300">
-              Falta apontar as variáveis <code className="font-mono text-xs">WHATSAPP_GATEWAY_URL</code> e{' '}
-              <code className="font-mono text-xs">WHATSAPP_GATEWAY_TOKEN</code> para o serviço de conexão.
-              Enquanto isso, o botão de conectar fica indisponível.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Conexão antiga por QR code (só enquanto estiver ligada) */}
-      {legado && (
-      <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex gap-4">
-            <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                connected ? 'bg-success/10 text-success' : 'bg-surface-alt text-muted-foreground'
-              }`}
-            >
-              {connected ? (
-                <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Smartphone className="h-6 w-6" aria-hidden="true" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-semibold">
-                {connected ? 'WhatsApp conectado' : 'WhatsApp não conectado'}
-              </p>
-              {connected ? (
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {data.displayName ? `${data.displayName} · ` : ''}
-                  <span className="tabular-nums">{formatPhone(data.phoneNumber)}</span>
-                  {data.connectedAt && (
-                    <> · desde {new Date(data.connectedAt).toLocaleDateString('pt-BR')}</>
-                  )}
-                </p>
-              ) : (
-                <p className="mt-0.5 max-w-md text-sm text-muted-foreground">
-                  Outra forma, não oficial: ler um QR code com o celular da clínica, como no WhatsApp Web.
-                </p>
-              )}
-              {data.lastError && !connected && (
-                <p className="mt-1.5 text-sm text-destructive">{data.lastError}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            {connected ? (
-              <button type="button" onClick={onDisconnect} disabled={isPending} className="btn-outline btn-md">
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Power className="h-4 w-4" aria-hidden="true" />
-                )}
-                Desconectar
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setPairing(true)}
-                disabled={!data.gatewayReady}
-                className="btn-primary btn-md"
-              >
-                <Link2 className="h-4 w-4" aria-hidden="true" /> Conectar WhatsApp
-              </button>
-            )}
-          </div>
-        </div>
-
-        {connected && <TestMessage />}
-      </section>
-      )}
-
-      {/* Opt-in: the patient speaking first is what makes delivery work */}
-      {!oficial && connected && <OptInCard phoneNumber={data.phoneNumber} />}
-
       {/* Automations */}
-      <AutomationSettings initial={data.settings} connected={connected || oficial} />
+      <AutomationSettings initial={data.settings} />
 
       {/* Stats */}
       <section aria-label="Envios" className="grid grid-cols-3 gap-4">
@@ -248,74 +123,13 @@ export function WhatsAppView({ data }: Props) {
         )}
       </section>
 
-      {legado && (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Esta conexão antiga usa o WhatsApp Web do celular da clínica. Conecte a API oficial acima e
-          desligue esta: é mais estável e sem risco de bloqueio.
-        </p>
-      )}
-
-      <PairingModal open={pairing} onClose={() => setPairing(false)} />
-    </div>
-  );
-}
-
-// ─── Test message ────────────────────────────────────────────────────────────
-
-function TestMessage() {
-  const [phone, setPhone] = useState('');
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  function onSend() {
-    setResult(null);
-    startTransition(async () => setResult(await sendTestMessage(phone)));
-  }
-
-  return (
-    <div className="mt-5 border-t border-border pt-4">
-      <label htmlFor="wa-test" className="text-xs font-medium">
-        Enviar mensagem de teste
-      </label>
-      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
-        <input
-          id="wa-test"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          inputMode="tel"
-          placeholder="(11) 99999-9999"
-          className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm tabular-nums placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        />
-        <button type="button" onClick={onSend} disabled={isPending || !phone.trim()} className="btn-outline btn-md">
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Send className="h-4 w-4" aria-hidden="true" />
-          )}
-          Enviar teste
-        </button>
-      </div>
-      {result && (
-        <p
-          aria-live="polite"
-          className={`mt-2 text-xs ${result.success ? 'text-success' : 'text-destructive'}`}
-        >
-          {result.message}
-        </p>
-      )}
     </div>
   );
 }
 
 // ─── Automations ─────────────────────────────────────────────────────────────
 
-function AutomationSettings({
-  initial,
-  connected,
-}: {
-  initial: WhatsAppPanelData['settings'];
-  connected: boolean;
-}) {
+function AutomationSettings({ initial }: { initial: WhatsAppPanelData['settings'] }) {
   const router = useRouter();
   const [settings, setSettings] = useState(initial);
   const [saved, setSaved] = useState(false);
@@ -355,40 +169,16 @@ function AutomationSettings({
           checked={settings.notifyReminder}
           onChange={(v) => save({ ...settings, notifyReminder: v })}
         />
+        {/* Pela API oficial, aniversário é marketing e precisa de modelo aprovado: ainda não sai. */}
         <Toggle
           label="Mensagem de aniversário"
-          hint={
-            connected
-              ? 'Enviada de manhã para quem faz aniversário no dia.'
-              : 'Só funciona com o WhatsApp da clínica conectado.'
-          }
-          checked={settings.notifyBirthday}
-          disabled={!connected}
-          onChange={(v) => save({ ...settings, notifyBirthday: v })}
+          hint="Em breve pelo WhatsApp oficial."
+          checked={false}
+          disabled
+          onChange={() => undefined}
         />
       </div>
 
-      {settings.notifyBirthday && (
-        <div className="border-t border-border p-5">
-          <label htmlFor="wa-birthday" className="text-xs font-medium">
-            Texto do aniversário
-          </label>
-          <textarea
-            id="wa-birthday"
-            rows={4}
-            maxLength={600}
-            value={settings.birthdayMessage}
-            onChange={(e) => setSettings({ ...settings, birthdayMessage: e.target.value })}
-            onBlur={() => save(settings)}
-            placeholder="Deixe em branco para usar o texto padrão."
-            className="mt-1.5 w-full rounded-md border border-border bg-background p-3 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          />
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Use <code className="font-mono">{'{nome}'}</code> para o primeiro nome do paciente e{' '}
-            <code className="font-mono">{'{clinica}'}</code> para o nome da clínica.
-          </p>
-        </div>
-      )}
     </section>
   );
 }

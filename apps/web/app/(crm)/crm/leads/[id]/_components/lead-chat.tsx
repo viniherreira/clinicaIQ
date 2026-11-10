@@ -34,7 +34,7 @@ export function LeadRightPane({
   meId: string;
   initialThread: ChatThread | null;
   quickReplies: QuickReplyOption[];
-  channel: 'cloud' | 'gateway';
+  channel: 'cloud' | 'none';
   canManage: boolean;
 }) {
   const [thread, setThread] = useState(initialThread);
@@ -118,7 +118,7 @@ function StartChat({
   leadId: string;
   leadName: string;
   quickReplies: QuickReplyOption[];
-  channel: 'cloud' | 'gateway';
+  channel: 'cloud' | 'none';
   canManage: boolean;
   onStarted: (conversationId: string) => void;
 }) {
@@ -126,11 +126,13 @@ function StartChat({
     <div>
       <p className="px-4 pt-2 text-xs text-muted-foreground">
         Ainda não há conversa com {leadName} no WhatsApp da clínica.{' '}
-        {channel === 'cloud' ? 'Na API oficial, a primeira mensagem precisa ser um modelo aprovado.' : 'A mensagem sai pelo número da clínica.'}
+        {channel === 'cloud'
+          ? 'Na API oficial, a primeira mensagem precisa ser um modelo aprovado.'
+          : 'Conecte o WhatsApp oficial da clínica em Configurações › WhatsApp para mandar mensagens.'}
       </p>
       {channel === 'cloud' ? (
         <TemplatePicker target={{ leadId }} contactName={leadName} canManage={canManage} onSent={onStarted} />
-      ) : (
+      ) : process.env.NODE_ENV === 'production' ? null : (
         <ChatComposer
           quickReplies={quickReplies}
           contactName={leadName}

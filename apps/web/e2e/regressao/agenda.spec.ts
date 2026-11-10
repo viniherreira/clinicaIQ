@@ -29,7 +29,7 @@ test('cadastra paciente, agenda, marca falta e cancela', async ({ page }) => {
   await page.getByRole('option', { name: new RegExp(patientName) }).click();
   await expect(modal.getByText(`Selecionado: ${patientName}`, { exact: false })).toBeVisible();
 
-  // Sem gateway de WhatsApp no ambiente de teste.
+  // Sem WhatsApp de verdade no ambiente de teste.
   await modal.getByRole('checkbox', { name: 'Enviar confirmação por WhatsApp' }).uncheck();
   await modal.getByRole('button', { name: 'Agendar' }).click();
   await expect(modal).toBeHidden();

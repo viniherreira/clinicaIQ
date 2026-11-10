@@ -6,7 +6,7 @@ import { E2E_TENANT_SLUG } from '../support/seed';
 let seq = 0;
 
 /**
- * Uma mensagem chegando no WhatsApp da clínica, gravada como o gateway grava:
+ * Uma mensagem chegando no WhatsApp da clínica, gravada como o webhook da Meta grava:
  * conversa sem classificar e a mensagem do contato, cifradas. O app liga a
  * conversa ao lead ou ao paciente quando alguém abre o funil ou as Conversas.
  */

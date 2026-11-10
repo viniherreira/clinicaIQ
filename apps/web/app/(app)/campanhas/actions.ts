@@ -2,7 +2,6 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { prisma, getTenantClient, decrypt } from '@clinicaiq/db';
-import { getGatewayProvider } from '@clinicaiq/whatsapp';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -179,9 +178,10 @@ export type CampaignFormState =
   | { success: true; campaignId: string; queued: number }
   | { success: false; error: string };
 
-/** Daily ceiling per clinic. A QR-paired line that blasts hundreds of marketing
- *  messages in a day is the classic ban pattern; this keeps volume plausible. */
+/** Teto diário por clínica, para o volume de marketing ficar plausível. */
 const DAILY_LIMIT = 200;
+
+const CAMPAIGNS_PAUSED = 'O envio de campanhas pelo WhatsApp oficial chega em breve.';
 
 export async function createAndSendCampaign(input: {
   name: string;
@@ -200,93 +200,10 @@ export async function createAndSendCampaign(input: {
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
   }
-  const { name, message, patientIds } = parsed.data;
-
-  const session = await prisma.whatsAppSession.findUnique({
-    where: { tenantId },
-    select: { status: true },
-  });
-  if (session?.status !== 'CONNECTED') {
-    return { success: false, error: 'Conecte o WhatsApp da clínica antes de enviar.' };
-  }
-
-  // Re-check ownership, opt-out and aceite no momento do envio: a lista do
-  // navegador pode estar velha, e é aqui que a mensagem realmente sai.
-  const eligible = await prisma.patient.findMany({
-    where: {
-      id: { in: patientIds },
-      tenantId,
-      active: true,
-      deletedAt: null,
-      whatsappOptOut: false,
-      marketingConsentAt: { not: null },
-    },
-    select: { id: true },
-  });
-  if (eligible.length === 0) {
-    return { success: false, error: 'Nenhum destinatário elegível na seleção.' };
-  }
-
-  const since = new Date(Date.now() - 86400000);
-  const sentToday = await prisma.campaignRecipient.count({
-    where: { tenantId, status: { in: ['SENT', 'DELIVERED', 'READ'] }, sentAt: { gte: since } },
-  });
-  const room = DAILY_LIMIT - sentToday;
-  if (room <= 0) {
-    return {
-      success: false,
-      error: `Limite diário de ${DAILY_LIMIT} mensagens atingido. Tente novamente amanhã.`,
-    };
-  }
-
-  const targets = eligible.slice(0, room);
-
-  const campaign = await prisma.campaign.create({
-    data: {
-      tenantId,
-      name,
-      message,
-      status: 'SENDING',
-      total: targets.length,
-      startedAt: new Date(),
-      recipients: {
-        create: targets.map((p) => ({ tenantId, patientId: p.id })),
-      },
-    },
-    select: { id: true },
-  });
-
-  const gateway = getGatewayProvider(tenantId);
-  if (!gateway) {
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: 'CANCELLED', finishedAt: new Date() },
-    });
-    return { success: false, error: 'Serviço de WhatsApp não configurado.' };
-  }
-
-  // The gateway paces delivery and writes results back; we don't block the UI.
-  const started = await gateway.startCampaign(campaign.id);
-  if (!started) {
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: 'CANCELLED', finishedAt: new Date() },
-    });
-    return { success: false, error: 'Não foi possível iniciar o envio. Tente novamente.' };
-  }
-
-  await prisma.auditLog.create({
-    data: {
-      tenantId,
-      action: 'CAMPAIGN_STARTED',
-      entity: 'Campaign',
-      entityId: campaign.id,
-      metadata: { recipients: targets.length },
-    },
-  });
-
-  revalidatePath('/campanhas');
-  return { success: true, campaignId: campaign.id, queued: targets.length };
+  // As campanhas saíam pelo número pareado por QR, que não existe mais. Pela
+  // API oficial, mensagem de marketing precisa de modelo aprovado pela Meta:
+  // até essa parte ficar pronta, nada sai daqui (o histórico continua).
+  return { success: false, error: CAMPAIGNS_PAUSED };
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────
@@ -311,10 +228,7 @@ export async function listCampaigns() {
     },
   });
 
-  const [connected, optedOut] = await Promise.all([
-    prisma.whatsAppSession.findUnique({ where: { tenantId }, select: { status: true } }),
-    db.patient.count({ where: { whatsappOptOut: true } }),
-  ]);
+  const optedOut = await db.patient.count({ where: { whatsappOptOut: true } });
 
   const since = new Date(Date.now() - 86400000);
   const sentToday = await db.campaignRecipient.count({
@@ -323,7 +237,8 @@ export async function listCampaigns() {
 
   return {
     campaigns,
-    connected: connected?.status === 'CONNECTED',
+    // Envio pausado até as campanhas saírem pela API oficial (ver createAndSendCampaign).
+    connected: false,
     optedOut,
     sentToday,
     dailyLimit: DAILY_LIMIT,

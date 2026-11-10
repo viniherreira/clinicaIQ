@@ -62,7 +62,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           meId={ctx.userId}
           initialThread={thread}
           quickReplies={quickReplies}
-          channel={cloud ? 'cloud' : 'gateway'}
+          channel={cloud ? 'cloud' : 'none'}
           canManage={ctx.manager}
         />
       </div>
