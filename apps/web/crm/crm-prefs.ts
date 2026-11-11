@@ -15,9 +15,15 @@ export interface CrmPrefs {
   reuseClosedLead: boolean;
   /** Põe o nome de quem respondeu na mensagem ("*Ana:*"), como o "Mostrar nome do remetente" do Kommo. */
   senderName: boolean;
+  /**
+   * Tags sozinhas no lead: o canal de entrada (whatsapp, instagram, facebook,
+   * site, indicação) e os procedimentos que a pessoa citou (implante,
+   * clareamento…). Ver `crm/auto-tags.ts`.
+   */
+  autoTags: boolean;
 }
 
-export const CRM_PREFS_DEFAULTS: CrmPrefs = { autoLead: true, reuseClosedLead: false, senderName: false };
+export const CRM_PREFS_DEFAULTS: CrmPrefs = { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: true };
 
 export function readCrmPrefs(settings: unknown): CrmPrefs {
   const raw = settings && typeof settings === 'object' ? (settings as Record<string, unknown>).crm : undefined;
@@ -28,6 +34,7 @@ export function readCrmPrefs(settings: unknown): CrmPrefs {
     autoLead: bool(o.autoLead, d.autoLead),
     reuseClosedLead: bool(o.reuseClosedLead, d.reuseClosedLead),
     senderName: bool(o.senderName, d.senderName),
+    autoTags: bool(o.autoTags, d.autoTags),
   };
 }
 

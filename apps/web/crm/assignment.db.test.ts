@@ -4,6 +4,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+// As tags automáticas (canal e procedimento) têm o próprio teste (auto-tags.db.test.ts);
+// aqui ficam desligadas para as contas de tags deste arquivo continuarem exatas.
+const SEM_TAGS_AUTO = { crm: { autoTags: false } };
+
 /** Responsável, distribuição e "só os dele" contra o banco de desenvolvimento, numa clínica descartável. */
 const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
@@ -23,7 +27,7 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
   const key = process.env.ENCRYPTION_MASTER_KEY!;
 
   const s = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `eq_${s}`, name: 'Equipe', slug: `eq-${s}` } });
+  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `eq_${s}`, name: 'Equipe', slug: `eq-${s}`, settings: SEM_TAGS_AUTO } });
   await prisma.subscription.create({
     data: { tenantId: tenant.id, tier: 'PROFISSIONAL', status: 'ACTIVE', currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000), crmEnabled: true },
   });
@@ -205,9 +209,9 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
 
   it('preferências: número novo sem lead automático e volta ao negócio fechado', async () => {
     const { readCrmPrefs } = await import('./crm-prefs');
-    await team.savePrefs(tenant.id, { autoLead: false, reuseClosedLead: true, senderName: true });
+    await team.savePrefs(tenant.id, { autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false });
     const t = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { settings: true } });
-    expect(readCrmPrefs(t?.settings)).toEqual({ autoLead: false, reuseClosedLead: true, senderName: true });
+    expect(readCrmPrefs(t?.settings)).toEqual({ autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false });
     // A distribuição continua lá (o JSON das configurações é mesclado, não trocado).
     expect((t?.settings as Record<string, unknown>).crmDistribution).toBeTruthy();
 
@@ -227,6 +231,6 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
     const texto = async (id: string) => decrypt((await prisma.chatMessage.findUnique({ where: { id } }))!.textEncrypted!, key, tenant.id);
     expect(await texto(m1.messageId)).toBe('*Ana:*\nOi!');
     expect(await texto(m2.messageId)).toBe('Tudo bem?');
-    await team.savePrefs(tenant.id, { autoLead: true, reuseClosedLead: false, senderName: false });
+    await team.savePrefs(tenant.id, { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: false });
   });
 });

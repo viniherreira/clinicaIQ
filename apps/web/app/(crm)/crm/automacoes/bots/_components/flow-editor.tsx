@@ -11,6 +11,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  applyNodeChanges,
   useReactFlow,
   type Connection,
   type Edge,
@@ -19,12 +20,12 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronLeft, LayoutGrid, List, Plus, Settings2, Smartphone, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, LayoutGrid, Lightbulb, List, Plus, Settings2, Smartphone, Wand2, X } from 'lucide-react';
 import type { ChatbotTrigger } from '@clinicaiq/db';
 import { DEFAULT_HOURS, type BotHours } from '@/crm/bot-engine';
-import { flowProblem, stepHandles, type FlowDoc, type FlowStep, type FlowStepType } from '@/crm/flow-engine';
+import { flowProblems, stepHandles, type FlowDoc, type FlowStep, type FlowStepType } from '@/crm/flow-engine';
 import { autoLayout } from '@/crm/flow-legacy';
-import { newId, newStep, STEP_META, STEP_ORDER, triggerLabel } from '@/crm/flow-templates';
+import { newId, newStep, STEP_GROUPS, STEP_META, STEP_ORDER, triggerLabel } from '@/crm/flow-templates';
 import { saveFlowAction } from '../actions';
 import type { FlowRefs } from './flow-refs';
 import { FlowSimulator } from './flow-simulator';
@@ -69,7 +70,7 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
   const [meta, setMeta] = useState(inicial);
   const [keywords, setKeywords] = useState(inicial.keywords.join(', '));
   const [selected, setSelected] = useState<string | null>(null);
-  const [painel, setPainel] = useState<'config' | 'step' | 'teste'>('config');
+  const [painel, setPainel] = useState<'config' | 'step' | 'teste' | 'pendencias'>('config');
   const [vista, setVista] = useState<'quadro' | 'lista'>('quadro');
   const [ativo, setAtivo] = useState<string | null>(null);
   const [aviso, setAviso] = useState('');
@@ -98,6 +99,10 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
     return () => window.removeEventListener('beforeunload', h);
   }, [sujo]);
 
+  // O que falta preencher: a lista "Falta" e o aviso em cada caixa.
+  const problemas = useMemo(() => flowProblems(doc), [doc]);
+  const problemaDo = useMemo(() => new Map(problemas.filter((p) => p.stepId).map((p) => [p.stepId!, p.text])), [problemas]);
+
   const metaComKw = { ...meta, keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean) };
   const layout = doc.layout ?? {};
   const nodes: Node[] = useMemo(
@@ -115,12 +120,34 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
         type: 'step',
         position: layout[sid] ?? { x: i * 40, y: i * 40 },
         selected: sid === selected,
-        data: { step: doc.steps[sid], n: i + 1, refs, isStart: sid === doc.start, active: sid === ativo, numberOf } satisfies StepNodeData,
+        data: {
+          step: doc.steps[sid],
+          n: i + 1,
+          refs,
+          isStart: sid === doc.start,
+          active: sid === ativo,
+          numberOf,
+          problem: problemaDo.get(sid) ?? null,
+        } satisfies StepNodeData,
       })),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doc, selected, ativo, refs, keywords, meta.trigger],
+    [doc, selected, ativo, refs, keywords, meta.trigger, problemaDo],
   );
+
+  // O quadro guarda as caixas do jeito dele (medidas, arrasto) e só devolve a
+  // posição ao robô quando a pessoa solta a caixa. Antes, cada pixel arrastado
+  // refazia o robô inteiro e redesenhava todas as caixas: travava.
+  const [rfNodes, setRfNodes] = useState<Node[]>(nodes);
+  useEffect(() => {
+    setRfNodes((prev) => {
+      const antes = new Map(prev.map((n) => [n.id, n]));
+      return nodes.map((n) => {
+        const o = antes.get(n.id);
+        return o ? { ...o, position: n.position, data: n.data, selected: n.selected } : n;
+      });
+    });
+  }, [nodes]);
   const edges: Edge[] = useMemo(() => {
     const out: Edge[] = [{ id: 'e-start', source: START, sourceHandle: 'start', target: doc.start, markerEnd: { type: MarkerType.ArrowClosed }, className: 'flow-edge' }];
     for (const s of Object.values(doc.steps)) {
@@ -136,13 +163,19 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
   }, [doc]);
 
   const onNodesChange = (changes: NodeChange[]) => {
-    for (const c of changes) {
-      if (c.type === 'position' && c.position) {
-        const p = c.position;
-        mudar((d) => ({ ...d, layout: { ...(d.layout ?? {}), [c.id]: { x: Math.round(p.x), y: Math.round(p.y) } } }));
-      }
-      if (c.type === 'remove' && c.id !== START) apagar(c.id);
-    }
+    setRfNodes((ns) => applyNodeChanges(changes.filter((c) => c.type !== 'remove'), ns));
+    for (const c of changes) if (c.type === 'remove' && c.id !== START) apagar(c.id);
+  };
+
+  // Soltou a caixa (ou várias): a posição nova vai para o robô, uma vez só.
+  const onNodeDragStop = (_: unknown, __: Node, arrastadas: Node[]) => {
+    mudar((d) => ({
+      ...d,
+      layout: {
+        ...(d.layout ?? {}),
+        ...Object.fromEntries(arrastadas.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }])),
+      },
+    }));
   };
 
   const ligar = (source: string, handle: string, target: string) => {
@@ -210,10 +243,17 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
     setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 50);
   };
 
+  const irPara = (sid: string) => {
+    setSelected(sid);
+    setPainel('step');
+    const n = rf.getNode(sid);
+    if (n && vista === 'quadro') rf.setCenter(n.position.x + 130, n.position.y + 80, { zoom: Math.max(rf.getZoom(), 0.9), duration: 400 });
+  };
+
   const salvar = async () => {
-    const problema = flowProblem(doc);
-    if (problema) {
-      setAviso(problema);
+    if (problemas.length) {
+      setAviso(`Falta preencher ${problemas.length === 1 ? '1 coisa' : `${problemas.length} coisas`} antes de salvar.`);
+      setPainel('pendencias');
       return;
     }
     setSalvando(true);
@@ -287,6 +327,15 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
           <button type="button" onClick={() => setPainel(painel === 'teste' ? 'config' : 'teste')} aria-pressed={painel === 'teste'} className="btn-outline btn-sm">
             <Smartphone className="h-3.5 w-3.5" aria-hidden="true" /> Testar
           </button>
+          <button
+            type="button"
+            onClick={() => setPainel(painel === 'pendencias' ? 'config' : 'pendencias')}
+            aria-pressed={painel === 'pendencias'}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring ${problemas.length ? 'border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-400'}`}
+          >
+            {problemas.length ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+            {problemas.length ? `Falta ${problemas.length}` : 'Tudo certo'}
+          </button>
           <button type="button" onClick={salvar} disabled={salvando} className="btn-primary btn-sm">
             {salvando ? 'Salvando…' : sujo ? 'Salvar' : 'Salvo'}
           </button>
@@ -301,10 +350,11 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
           {vista === 'quadro' ? (
             <>
               <ReactFlow
-                nodes={nodes}
+                nodes={rfNodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 onNodesChange={onNodesChange}
+                onNodeDragStop={onNodeDragStop}
                 onEdgesChange={(changes) => {
                   for (const c of changes) {
                     if (c.type !== 'remove') continue;
@@ -356,15 +406,20 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
                     <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Passo
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content align="start" sideOffset={6} className="z-50 w-72 rounded-xl border border-border bg-popover p-1 shadow-xl">
-                      {STEP_ORDER.map((t) => (
-                        <DropdownMenu.Item key={t} onSelect={() => criar(t)} className="flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-surface-alt">
-                          <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${STEP_META[t].tone}`} aria-hidden="true" />
-                          <span>
-                            <span className="block font-medium">{STEP_META[t].label}</span>
-                            <span className="block text-xs text-muted-foreground">{STEP_META[t].description}</span>
-                          </span>
-                        </DropdownMenu.Item>
+                    <DropdownMenu.Content align="start" sideOffset={6} className="z-50 max-h-[75vh] w-80 overflow-y-auto rounded-xl border border-border bg-popover p-1 shadow-xl">
+                      {STEP_GROUPS.map((g) => (
+                        <DropdownMenu.Group key={g.label}>
+                          <DropdownMenu.Label className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</DropdownMenu.Label>
+                          {g.types.map((t) => (
+                            <DropdownMenu.Item key={t} onSelect={() => criar(t)} className="flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-surface-alt">
+                              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${STEP_META[t].tone}`} aria-hidden="true" />
+                              <span>
+                                <span className="block font-medium">{STEP_META[t].label}</span>
+                                <span className="block text-xs text-muted-foreground">{STEP_META[t].description}</span>
+                              </span>
+                            </DropdownMenu.Item>
+                          ))}
+                        </DropdownMenu.Group>
                       ))}
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
@@ -373,6 +428,7 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
                   <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Organizar
                 </button>
               </div>
+              <Guia />
               {menuSolto && (
                 <div
                   role="menu"
@@ -381,7 +437,7 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
                   style={{ left: menuSolto.x, top: menuSolto.y }}
                 >
                   <p className="px-2.5 py-1.5 text-xs text-muted-foreground">Novo passo ligado aqui:</p>
-                  {STEP_ORDER.map((t) => (
+                  {STEP_GROUPS.flatMap((g) => g.types).map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -405,7 +461,9 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
         </div>
 
         <aside aria-label="Painel do robô" className="flex w-full max-w-[380px] shrink-0 flex-col border-l border-border bg-surface">
-          {painel === 'teste' ? (
+          {painel === 'pendencias' ? (
+            <Pendencias problemas={problemas} onIr={irPara} onClose={() => setPainel('config')} />
+          ) : painel === 'teste' ? (
             <FlowSimulator doc={doc} refs={refs} onActive={setAtivo} onClose={() => { setPainel('config'); setAtivo(null); }} />
           ) : painel === 'step' && sel ? (
             <StepPanel
@@ -443,6 +501,128 @@ function Editor({ meta: inicial, doc: docInicial, refs }: { meta: FlowBotMeta; d
           )}
         </aside>
       </div>
+    </div>
+  );
+}
+
+const GUIA_KEY = 'dreamclin:guia-robo';
+
+/**
+ * O passo a passo para quem nunca montou um robô, em cima do quadro. Fecha no
+ * X e não volta (fica guardado no navegador); "Como montar" reabre.
+ */
+function Guia() {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    try {
+      setAberto(localStorage.getItem(GUIA_KEY) !== 'fechado');
+    } catch {
+      setAberto(true);
+    }
+  }, []);
+  const fechar = () => {
+    setAberto(false);
+    try {
+      localStorage.setItem(GUIA_KEY, 'fechado');
+    } catch {
+      // Sem armazenamento (aba anônima): só fecha agora.
+    }
+  };
+  if (!aberto) {
+    return (
+      <button type="button" onClick={() => setAberto(true)} className="btn-outline btn-sm absolute bottom-3 left-1/2 z-10 -translate-x-1/2 bg-surface shadow-lg">
+        <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" /> Como montar
+      </button>
+    );
+  }
+  return (
+    <section
+      aria-label="Como montar um robô"
+      className="absolute bottom-3 left-1/2 z-10 w-[min(92%,640px)] -translate-x-1/2 rounded-xl border border-border bg-surface p-4 text-sm shadow-xl"
+    >
+      <div className="flex items-start gap-2">
+        <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold">Como montar um robô em 4 passos</h2>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>
+              Em <b className="text-foreground">Gatilho e público</b>, diga quando ele começa (ex.: número novo).
+            </li>
+            <li>
+              Comece com uma <b className="text-foreground">Mensagem</b> de boas-vindas com botões (ex.: Agendar, Preços, Falar com alguém).
+            </li>
+            <li>
+              Puxe a <b className="text-foreground">bolinha</b> de cada botão até o próximo passo, ou solte no vazio para criar um passo novo ali.
+            </li>
+            <li>
+              Termine os caminhos em <b className="text-foreground">Passar para a equipe</b>. Clique em <b className="text-foreground">Testar</b> para conversar com o robô
+              antes de ligar.
+            </li>
+          </ol>
+        </div>
+        <button type="button" onClick={fechar} aria-label="Fechar o guia" className="rounded-md p-1 text-muted-foreground hover:bg-surface-alt hover:text-foreground">
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** O que falta preencher, um item por passo; clicar leva até a caixa. */
+function Pendencias({
+  problemas,
+  onIr,
+  onClose,
+}: {
+  problemas: { stepId: string | null; n: number | null; text: string }[];
+  onIr: (stepId: string) => void;
+  onClose: () => void;
+}) {
+  const primeira = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  return (
+    <div className="flex h-full flex-col overflow-y-auto">
+      <div className="flex items-start gap-2 border-b border-border px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold">{problemas.length ? 'Falta preencher' : 'Tudo certo'}</h2>
+          <p className="text-xs text-muted-foreground">
+            {problemas.length ? 'Resolva estes itens para salvar o robô. Clique num item para ir até o passo.' : 'Nada pendente. Teste o robô e depois ligue.'}
+          </p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Fechar a lista" className="rounded-md p-1 text-muted-foreground hover:bg-surface-alt hover:text-foreground">
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      {problemas.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+          <CheckCircle2 className="h-8 w-8 text-green-600" aria-hidden="true" />
+          Pronto para testar e salvar.
+        </div>
+      ) : (
+        <ul className="space-y-1.5 p-3">
+          {problemas.map((p, i) => (
+            <li key={`${p.stepId ?? 'geral'}-${i}`}>
+              {p.stepId ? (
+                <button
+                  type="button"
+                  onClick={() => onIr(p.stepId!)}
+                  className="flex w-full items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-left text-sm hover:bg-amber-500/10 focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                  <span>
+                    <span className="block text-xs font-semibold text-muted-foreground">Passo {p.n}</span>
+                    {primeira(p.text)}
+                  </span>
+                </button>
+              ) : (
+                <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-sm">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                  {p.text}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

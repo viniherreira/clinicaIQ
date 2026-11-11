@@ -4,6 +4,10 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+// As tags automáticas (canal e procedimento) têm o próprio teste (auto-tags.db.test.ts);
+// aqui ficam desligadas para as contas de tags deste arquivo continuarem exatas.
+const SEM_TAGS_AUTO = { crm: { autoTags: false } };
+
 /**
  * A integração automática de ponta a ponta contra o banco de desenvolvimento:
  * agenda e orçamentos de verdade numa clínica descartável. Pulado sem banco.
@@ -22,7 +26,7 @@ describe.skipIf(!process.env.DATABASE_URL)('notifyCrm (banco)', async () => {
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const tenant = await prisma.tenant.create({
-    data: { clerkOrgId: `notify_${suffix}`, name: 'Notify teste', slug: `notify-${suffix}` },
+    data: { clerkOrgId: `notify_${suffix}`, name: 'Notify teste', slug: `notify-${suffix}`, settings: SEM_TAGS_AUTO },
   });
   await prisma.subscription.create({
     data: { tenantId: tenant.id, tier: 'CLINICA', status: 'ACTIVE', currentPeriodEnd: new Date('2099-01-01'), crmEnabled: true },

@@ -1,6 +1,7 @@
 import type { TenantPrismaClient } from '@clinicaiq/db';
 import { normalize } from './bot-engine';
 import type { CrmColor } from './defaults';
+import { applyChannelTag } from './auto-tags';
 
 /**
  * De onde veio o contato: anúncio do Facebook, do Instagram ou o site. A Meta
@@ -59,22 +60,6 @@ export function readAd(raw: unknown): (AdLite & { body: string | null; imageUrl:
   return ad.sourceUrl || ad.headline || ad.body ? ad : null;
 }
 
-/** A tag da origem: a da clínica com esse nome, ou cria. */
-export async function originTagId(db: TenantPrismaClient, tenantId: string, key: OriginKey): Promise<string> {
-  const { name, color } = ORIGIN_TAG[key];
-  const achar = () => db.leadTag.findFirst({ where: { name: { equals: name, mode: 'insensitive' } }, select: { id: true } });
-  const tem = await achar();
-  if (tem) return tem.id;
-  try {
-    return (await db.leadTag.create({ data: { tenantId, name, color }, select: { id: true } })).id;
-  } catch {
-    // Duas mensagens ao mesmo tempo: a outra criou.
-    const outra = await achar();
-    if (!outra) throw new Error('tag de origem não criada');
-    return outra.id;
-  }
-}
-
 /**
  * Põe a origem no lead: a tag, a origem (anúncio sempre manda; o site só
  * troca a origem genérica WhatsApp) e, com anúncio, uma nota no histórico.
@@ -91,9 +76,8 @@ export async function applyOrigin(
   const trocar = key !== 'SITE' ? lead.source !== key : lead.source === 'WHATSAPP' || lead.source === 'MANUAL';
   if (trocar) await db.lead.updateMany({ where: { id: leadId }, data: { source: key } });
 
-  const tagId = await originTagId(db, tenantId, key);
-  const { count } = await db.leadTagOnLead.createMany({ data: [{ tenantId, leadId, tagId }], skipDuplicates: true });
-  if (count) await db.leadActivity.create({ data: { tenantId, leadId, type: 'TAG_ADDED', actorId: null, data: { tagId } } });
+  // A tag do canal (a "whatsapp" genérica sai, se estava).
+  await applyChannelTag(db, tenantId, leadId, key);
 
   if (ad) {
     const titulo = ad.headline ? ` “${ad.headline.slice(0, 120)}”` : '';

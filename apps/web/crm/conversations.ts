@@ -667,7 +667,11 @@ export async function acceptConversation(
     pipelineId: opts.pipelineId || null,
   });
   if (!r.ok) return r;
-  if (opts.tagIds?.length) await setTags(db, actor, r.leadId, opts.tagIds);
+  if (opts.tagIds?.length) {
+    // Soma às que o lead já ganhou ao nascer (a tag do canal), sem tirar.
+    const ja = (await db.leadTagOnLead.findMany({ where: { leadId: r.leadId }, select: { tagId: true } })).map((t) => t.tagId);
+    await setTags(db, actor, r.leadId, [...new Set([...ja, ...opts.tagIds])]);
+  }
   // createLead já liga pela chave do número; garante mesmo se o número da
   // conversa e o do lead diferirem na forma.
   await db.conversation.update({

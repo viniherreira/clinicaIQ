@@ -16,7 +16,8 @@ setup('entra com a conta de teste', async ({ page }) => {
   // automatizado como robô e barra o login.
   await clerkSetup();
 
-  await page.goto('/');
+  // A página de login carrega o Clerk (o site de vendas, desde o SEO, não carrega).
+  await page.goto('/sign-in');
   // Entra pelo e-mail, sem senha: o @clerk/testing pede ao Clerk um token de
   // login para essa conta usando a CLERK_SECRET_KEY.
   await clerk.signIn({ page, emailAddress: required('E2E_CLERK_USER_EMAIL') });

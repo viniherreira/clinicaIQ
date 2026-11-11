@@ -82,8 +82,9 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
     const id = await chega('11 95555-0001', 'Diminuir as mamas um sonho meu', anuncio('https://fb.me/4YAcPbZJ2'));
     expect(await leadDa(id)).toEqual({
       source: 'FACEBOOK',
-      tags: ['facebook'],
-      notas: ['Veio do anúncio “Prótese de Mama” (Facebook).'],
+      // "Prótese" no anúncio também vira tag de procedimento (tags automáticas).
+      tags: ['facebook', 'prótese'],
+      notas: ['Veio do anúncio “Prótese de Mama” (Facebook).', 'Tags automáticas: a pessoa falou em “protese”.'],
     });
     const tag = await db.leadTag.findFirst({ where: { name: 'facebook' } });
     expect(tag?.color).toBe('blue');
@@ -99,7 +100,7 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
       url: 'https://www.instagram.com/p/C1abc/',
       imageUrl: 'https://scontent.xx.fbcdn.net/v/t45.abc',
     });
-    expect(await leadDa(id)).toMatchObject({ source: 'INSTAGRAM', tags: ['instagram'] });
+    expect(await leadDa(id)).toMatchObject({ source: 'INSTAGRAM', tags: ['instagram', 'prótese'] });
   });
 
   it('a tag da clínica com o mesmo nome é reaproveitada, sem criar outra', async () => {
@@ -112,9 +113,9 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
     expect(await leadDa(id)).toEqual({ source: 'SITE', tags: ['site'], notas: [] });
   });
 
-  it('mensagem comum não ganha origem nem tag', async () => {
+  it('mensagem comum fica com a origem WhatsApp e a tag whatsapp', async () => {
     const id = await chega('11 95555-0005', 'Boa tarde, quero agendar');
-    expect(await leadDa(id)).toEqual({ source: 'WHATSAPP', tags: [], notas: [] });
+    expect(await leadDa(id)).toEqual({ source: 'WHATSAPP', tags: ['whatsapp'], notas: [] });
   });
 
   it('quem já tinha negócio aberto e chega por anúncio: o negócio ganha a origem e a tag', async () => {
@@ -123,6 +124,6 @@ describe.skipIf(!process.env.DATABASE_URL)('origem do anúncio (banco)', async (
     const id = await chega('11 95555-0006', 'Vi o anúncio', anuncio('https://fb.me/abc'));
     const c = await db.conversation.findFirst({ where: { id }, select: { leadId: true } });
     expect(c?.leadId).toBe(r.leadId);
-    expect(await leadDa(id)).toMatchObject({ source: 'FACEBOOK', tags: ['facebook'] });
+    expect(await leadDa(id)).toMatchObject({ source: 'FACEBOOK', tags: ['facebook', 'prótese'] });
   });
 });

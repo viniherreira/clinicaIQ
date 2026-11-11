@@ -3,6 +3,7 @@ import { isClosedStage, mainPipeline, stageByRole, type StageLike } from './pipe
 import { conversationHashes, encryptPhone, phoneHash } from './phone';
 import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
+import { channelTagForNewLead } from './auto-tags';
 
 /**
  * Operações do lead. Cada uma grava a mudança e o registro no histórico na
@@ -222,7 +223,7 @@ export async function createLead(
   input: NewLeadInput,
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const { tenantId } = actor;
-  return db.$transaction(async (tx) => {
+  const r = await db.$transaction(async (tx) => {
     const [stages, funis] = await Promise.all([
       tx.pipelineStage.findMany({ where: { tenantId } }),
       tx.pipeline.findMany({ where: { tenantId } }),
@@ -288,6 +289,9 @@ export async function createLead(
     });
     return { ok: true as const, leadId: lead.id };
   });
+  // A tag do canal de entrada (fora da transação: se falhar, o lead fica).
+  if (r.ok) await channelTagForNewLead(db, tenantId, r.leadId, input.source ?? 'MANUAL');
+  return r;
 }
 
 export type LeadPatch = Partial<
@@ -301,9 +305,11 @@ export async function updateLead(
   patch: LeadPatch,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId } = actor;
-  return db.$transaction(async (tx) => {
+  let trocouOrigem = false;
+  const r = await db.$transaction(async (tx) => {
     const lead = await tx.lead.findFirst({ where: { id: leadId, tenantId, deletedAt: null } });
     if (!lead) return { ok: false as const, message: 'Lead não encontrado.' };
+    trocouOrigem = patch.source !== undefined && patch.source !== lead.source;
 
     const data: Prisma.LeadUncheckedUpdateInput = { updatedById: actor.userId };
     if (patch.name !== undefined) data.name = patch.name.trim();
@@ -330,6 +336,9 @@ export async function updateLead(
     }
     return { ok: true as const };
   });
+  // Mudou a origem à mão: a tag do canal acompanha.
+  if (r.ok && trocouOrigem && patch.source) await channelTagForNewLead(db, tenantId, leadId, patch.source);
+  return r;
 }
 
 /** Liga o lead a um paciente (depois de converter ou vincular). */

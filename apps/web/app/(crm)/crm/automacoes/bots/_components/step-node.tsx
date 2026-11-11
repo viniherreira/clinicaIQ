@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Clock, Play, Zap } from 'lucide-react';
+import { AlertTriangle, Clock, Play, Zap } from 'lucide-react';
 import { stepHandles, type FlowStep } from '@/crm/flow-engine';
 import { STEP_META } from '@/crm/flow-templates';
 import type { FlowRefs } from './flow-refs';
@@ -15,6 +15,8 @@ export type StepNodeData = {
   /** O passo onde o teste está agora. */
   active: boolean;
   numberOf: (id: string) => number | null;
+  /** O que falta preencher neste passo, ou null. */
+  problem: string | null;
 };
 
 const nome = (l: { id: string; name: string }[], id?: string) => l.find((x) => x.id === id)?.name ?? '-';
@@ -90,12 +92,12 @@ function Resumo({ step: s, refs, numberOf }: Pick<StepNodeData, 'step' | 'refs' 
 
 /** Uma caixa do quadro, como no Salesbot: número, tipo, resumo e uma bolinha por saída. */
 export const StepNode = memo(function StepNode({ data, selected }: NodeProps & { data: StepNodeData }) {
-  const { step, n, refs, isStart, active, numberOf } = data;
+  const { step, n, refs, isStart, active, numberOf, problem } = data;
   const meta = STEP_META[step.type];
   const saidas = stepHandles(step);
   return (
     <div
-      className={`w-[260px] overflow-visible rounded-xl border bg-surface text-foreground shadow-lg transition-shadow ${selected ? 'border-link ring-2 ring-link/40' : active ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-border-strong'}`}
+      className={`w-[260px] overflow-visible rounded-xl border bg-surface text-foreground shadow-lg transition-shadow ${selected ? 'border-link ring-2 ring-link/40' : active ? 'border-amber-400 ring-2 ring-amber-400/50' : problem ? 'border-amber-500/70' : 'border-border-strong'}`}
     >
       <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-2 !border-surface !bg-link" />
       <div className="flex items-center gap-2 rounded-t-xl border-b border-border px-3 py-2">
@@ -111,6 +113,12 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps & {
       <div className="px-3 py-2">
         <Resumo step={step} refs={refs} numberOf={numberOf} />
       </div>
+      {problem && (
+        <p className="flex items-start gap-1.5 border-t border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>Falta: {problem}</span>
+        </p>
+      )}
       {saidas.length > 0 && (
         <ul className="border-t border-border py-1">
           {saidas.map((h) => (

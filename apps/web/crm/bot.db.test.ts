@@ -4,6 +4,10 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+// As tags automáticas (canal e procedimento) têm o próprio teste (auto-tags.db.test.ts);
+// aqui ficam desligadas para as contas de tags deste arquivo continuarem exatas.
+const SEM_TAGS_AUTO = { crm: { autoTags: false } };
+
 const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
 process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
@@ -22,7 +26,7 @@ describe.skipIf(!process.env.DATABASE_URL)('robô (banco)', async () => {
   const key = process.env.ENCRYPTION_MASTER_KEY!;
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `bot_${suffix}`, name: 'Robô', slug: `bot-${suffix}` } });
+  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `bot_${suffix}`, name: 'Robô', slug: `bot-${suffix}`, settings: SEM_TAGS_AUTO } });
   const user = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Rita', email: `r-${suffix}@teste.local`, role: 'RECEPTIONIST' } });
   const db = getTenantClient(tenant.id);
   await ensureDefaultPipeline(db, tenant.id);
