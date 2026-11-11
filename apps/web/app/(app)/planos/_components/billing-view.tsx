@@ -839,7 +839,7 @@ export function BillingView({
         })()}
 
         <p className="text-center text-sm text-muted-foreground">
-          Todos os planos incluem acessibilidade WCAG 2.1 AA, backup diário e suporte por WhatsApp. As conversas do WhatsApp são
+          Todos os planos incluem acessibilidade WCAG 2.1 AA, dados sensíveis criptografados e suporte por WhatsApp. As conversas do WhatsApp são
           cobradas pela Meta direto da clínica.
         </p>
       </section>
