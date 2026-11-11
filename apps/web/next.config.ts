@@ -8,7 +8,9 @@ const dev = process.env.NODE_ENV !== 'production';
  * desta lista, um script injetado não roda nem manda dados para fora.
  *
  * - Clerk (login): clerk.dreamclin.com em produção, *.clerk.accounts.dev nos
- *   testes; a verificação anti-robô vem da Cloudflare.
+ *   testes; a verificação anti-robô vem da Cloudflare e a proteção contra
+ *   fraude no cadastro, do *.protect.clerk.com (em portas fora da 443, daí o
+ *   `:*` no connect-src).
  * - Meta: o SDK do botão "Conectar com a Meta" (cadastro incorporado).
  * - Sentry (alerta de erro), ViaCEP (busca de CEP), Supabase (arquivos dos
  *   pacientes, por link assinado).
@@ -20,18 +22,19 @@ const dev = process.env.NODE_ENV !== 'production';
  * websocket da recarga.
  */
 const CLERK = 'https://clerk.dreamclin.com https://*.clerk.accounts.dev';
+const CLERK_PROTECT = 'https://*.protect.clerk.com';
 const META = 'https://connect.facebook.net https://*.facebook.com https://*.facebook.net';
 const SENTRY = 'https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io';
 const SUPABASE = 'https://*.supabase.co';
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''} ${CLERK} https://challenges.cloudflare.com ${META} https://vercel.live`,
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''} ${CLERK} ${CLERK_PROTECT} https://challenges.cloudflare.com ${META} https://vercel.live`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   `media-src 'self' blob: ${SUPABASE}`,
-  `connect-src 'self' ${CLERK} https://clerk-telemetry.com ${META} ${SENTRY} ${SUPABASE} https://viacep.com.br https://vercel.live${dev ? ' ws: wss:' : ''}`,
-  `frame-src 'self' ${CLERK} https://challenges.cloudflare.com ${META} https://vercel.live`,
+  `connect-src 'self' ${CLERK} ${CLERK_PROTECT}:* https://clerk-telemetry.com ${META} ${SENTRY} ${SUPABASE} https://viacep.com.br https://vercel.live${dev ? ' ws: wss:' : ''}`,
+  `frame-src 'self' ${CLERK} ${CLERK_PROTECT} https://challenges.cloudflare.com ${META} https://vercel.live`,
   "worker-src 'self' blob:",
   "form-action 'self'",
   "frame-ancestors 'none'",

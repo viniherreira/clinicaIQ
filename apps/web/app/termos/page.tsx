@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalPage, PrivacyContact } from '@/components/legal-page';
 import { COMPANY, companyLine } from '@/lib/company';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: `Termos de Uso · ${COMPANY.brand}`,
-  description: `As regras de uso do ${COMPANY.brand} para clínicas.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Termos de Uso',
+  description: `As regras de uso do ${COMPANY.brand} para clínicas: planos, teste grátis e cobrança, responsabilidades, suporte e o que acontece com os dados ao fim do contrato.`,
+  path: '/termos',
+});
 
 /**
  * Termos de Uso. Texto de partida, escrito a partir de como o serviço funciona

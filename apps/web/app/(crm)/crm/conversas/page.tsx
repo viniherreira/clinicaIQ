@@ -6,7 +6,7 @@ import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
 import { Inbox } from './_components/inbox';
 
-export const metadata = { title: 'Conversas · DreamClin' };
+export const metadata = { title: 'Conversas' };
 
 /**
  * A caixa de conversas do WhatsApp, como os chats do Kommo: lista à esquerda,

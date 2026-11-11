@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/legal-page';
 import { COMPANY } from '@/lib/company';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: `Como conectar o WhatsApp · ${COMPANY.brand}`,
-  description: `Passo a passo para a clínica ligar o próprio número de WhatsApp ao ${COMPANY.brand} pela API oficial da Meta.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Como conectar o WhatsApp oficial da clínica',
+  description: `Passo a passo para a clínica ligar o próprio número de WhatsApp ao ${COMPANY.brand} pela API oficial da Meta, sem QR code e sem celular ligado.`,
+  path: '/ajuda/conectar-whatsapp',
+});
 
 /**
  * Ajuda para a clínica ligar o próprio número pelo botão "Conectar com a Meta"

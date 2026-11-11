@@ -3,7 +3,7 @@ import { getTenantModules } from '@/lib/access';
 import { graphVersion, metaSignupConfigured } from '@/crm/cloud';
 import { WhatsAppChannel } from './_components/whatsapp-channel';
 
-export const metadata = { title: 'WhatsApp do CRM · DreamClin' };
+export const metadata = { title: 'WhatsApp do CRM' };
 
 /** O canal das conversas do CRM (API oficial da Meta) e os modelos aprovados. */
 export default async function CrmWhatsAppPage() {

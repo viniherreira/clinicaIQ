@@ -6,7 +6,7 @@ import { acessoEncerrado, joinFromInviteIfAny } from './actions';
 import { CreateClinicForm, type TrialPlan } from './_components/create-clinic-form';
 import { AcessoEncerrado } from './_components/acesso-encerrado';
 
-export const metadata = { title: 'Configure sua clínica · DreamClin' };
+export const metadata = { title: 'Configure sua clínica' };
 
 /**
  * Três pessoas chegam nesta rota por motivos diferentes.

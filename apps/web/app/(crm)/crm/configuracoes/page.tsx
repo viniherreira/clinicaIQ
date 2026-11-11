@@ -16,7 +16,7 @@ import { CrmSettings, type SettingsTab } from './_components/crm-settings';
 import { ChatSection, GeneralSection, ProfileSection } from './_components/prefs-sections';
 import { DistributionSection, TeamSection } from './_components/team-section';
 
-export const metadata = { title: 'Configurações do CRM · DreamClin' };
+export const metadata = { title: 'Configurações do CRM' };
 
 const PERFIL: Record<string, string> = {
   OWNER: 'Proprietário',

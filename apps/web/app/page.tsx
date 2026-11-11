@@ -1,51 +1,37 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { OG_IMAGE } from '@/lib/seo';
+import { TRIAL_DAYS } from '@/lib/subscription';
 import { LandingPage } from './landing';
 
+// O título vai inteiro (sem o "| DreamClin" do layout): ~55 caracteres, o que
+// o Google mostra sem cortar. A descrição fica abaixo de 160.
 export const metadata: Metadata = {
-  title: 'DreamClin | Agenda e CRM com WhatsApp oficial para clínicas odontológicas e de estética',
-  description:
-    'Agenda, prontuário com odontograma, orçamentos e CRM no WhatsApp oficial da Meta, num só sistema para clínicas. O funil anda sozinho quando a recepção agenda. Planos Agenda, CRM e Completo: 14 dias grátis, sem cartão.',
-  keywords: [
-    'sistema para clínica odontológica',
-    'CRM para clínica',
-    'CRM odontológico',
-    'software para dentista',
-    'gestão de clínica estética',
-    'agenda para clínica',
-    'WhatsApp API oficial para clínica',
-    'confirmação de consulta WhatsApp',
-    'orçamento odontológico',
-    'odontograma digital',
-  ],
+  title: { absolute: 'Sistema e CRM para clínicas odontológicas | DreamClin' },
+  description: `Agenda, prontuário com odontograma, orçamentos e CRM no WhatsApp oficial para clínicas odontológicas e de estética. Teste grátis por ${TRIAL_DAYS} dias, sem cartão.`,
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'DreamClin | Agenda e CRM para clínicas, com WhatsApp oficial',
-    description:
-      'Do primeiro "oi" no WhatsApp ao tratamento fechado: agenda, prontuário, orçamentos e CRM integrados. Teste grátis por 14 dias.',
-    locale: 'pt_BR',
     type: 'website',
+    locale: 'pt_BR',
     siteName: 'DreamClin',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DreamClin: agenda e CRM para clínicas' }],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: ['/og.png'],
+    url: '/',
+    title: 'DreamClin: agenda e CRM para clínicas, com WhatsApp oficial',
+    description: `Do primeiro "oi" no WhatsApp ao tratamento fechado: agenda, prontuário, orçamentos e CRM integrados. Teste grátis por ${TRIAL_DAYS} dias.`,
+    images: [OG_IMAGE],
   },
 };
 
-export default async function Home() {
+/**
+ * O site de vendas é o mesmo para todo visitante, então sai pronto do cache da
+ * Vercel (abre rápido; o Google mede isso) e se refaz a cada hora, para pegar
+ * preço novo. Quem já entrou nem chega aqui: o middleware manda para o painel.
+ */
+export const revalidate = 3600;
+
+export default function Home() {
   // Without Clerk configured (local/dev shortcut), skip straight to the app.
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     redirect('/dashboard');
   }
-
-  const { auth } = await import('@clerk/nextjs/server');
-  const { userId } = await auth();
-
-  // Signed-in users land on their dashboard; visitors see the marketing page.
-  if (userId) {
-    redirect('/dashboard');
-  }
-
   return <LandingPage />;
 }

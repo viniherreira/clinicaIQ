@@ -5,7 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 import { getQuote, listQuoteProcedures, listQuoteProfessionals, defaultValidUntil } from '../../actions';
 import { QuoteBuilder } from '../../_components/quote-builder';
 
-export const metadata = { title: 'Editar orçamento · DreamClin' };
+export const metadata = { title: 'Editar orçamento' };
 
 export default async function EditarOrcamentoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

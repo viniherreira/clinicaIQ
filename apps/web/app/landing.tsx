@@ -26,6 +26,7 @@ import { COMPANY, salesWhatsAppUrl } from '@/lib/company';
 import { TRIAL_DAYS } from '@/lib/subscription';
 import { DEFAULT_CHOICE, productPriceCents, signUpHref, type Product } from '@/lib/products';
 import { LandingMotion } from './landing-motion';
+import { faqJsonLd, homeJsonLd, jsonLdHtml } from '@/lib/seo';
 import { loadPublicPlans, Pricing, type PublicPlan } from './pricing-section';
 import './landing.css';
 
@@ -109,14 +110,17 @@ const ESTRELAS = (() => {
   const sorteio = () => (semente = (semente * 16807) % 2147483647) / 2147483647;
   return Array.from({ length: 110 }, () => {
     const tamanho = sorteio();
+    const x = sorteio();
+    const y = sorteio();
+    sorteio(); // era o atraso de cada estrela: fica para o céu não mudar de lugar
     return {
-      x: `${(sorteio() * 100).toFixed(2)}%`,
-      y: `${(sorteio() * 100).toFixed(2)}%`,
+      x: `${(x * 100).toFixed(2)}%`,
+      y: `${(y * 100).toFixed(2)}%`,
       r: tamanho < 0.8 ? 0.8 : tamanho < 0.96 ? 1.3 : 1.9,
-      atraso: `-${(sorteio() * 5).toFixed(1)}s`,
     };
   });
 })();
+const CAMADAS = [0, 1, 2] as const;
 
 function Ceu() {
   return (
@@ -125,11 +129,15 @@ function Ceu() {
       <i className="blob b" />
       <i className="blob c" />
       <i className="blob d" />
-      <svg className="stars">
-        {ESTRELAS.map((e, i) => (
-          <circle key={i} cx={e.x} cy={e.y} r={e.r} style={{ animationDelay: e.atraso }} />
-        ))}
-      </svg>
+      {/* Três camadas que piscam inteiras, em tempos diferentes: animar cada uma
+          das 110 estrelas travava o celular (o Google mede isso). */}
+      {CAMADAS.map((camada) => (
+        <svg key={camada} className="stars">
+          {ESTRELAS.filter((_, i) => i % CAMADAS.length === camada).map((e) => (
+            <circle key={`${e.x}${e.y}`} cx={e.x} cy={e.y} r={e.r} />
+          ))}
+        </svg>
+      ))}
       <i className="grain" />
     </div>
   );
@@ -167,6 +175,8 @@ function Hero() {
       <div className="inner hero-in">
         <div>
           <h1>
+            {/* O que o Google precisa ler no título; a frase grande é a da marca. */}
+            <span className="kick">Sistema e CRM para clínicas odontológicas e de estética</span>
             Do <span className="oi">oi</span> ao
             <br />
             tratamento
@@ -636,49 +646,52 @@ function WhatsAppOficial() {
 
 // ─── FAQ ─────────────────────────────────────────────────────────────────────
 
+/** As perguntas da página; vão também para o Google (FAQPage, em `page.tsx`). */
+export const FAQS = [
+  {
+    q: 'Como funciona o teste grátis?',
+    a: `Você escolhe o plano, cria a conta e usa tudo por ${TRIAL_DAYS} dias, sem cartão. Durante o teste dá para trocar de plano à vontade. Se assinar antes do fim, a primeira cobrança só vence quando o teste acaba.`,
+  },
+  {
+    q: 'O que acontece quando o teste acaba?',
+    a: 'Se você assinou, segue usando sem interrupção. Se não, nada é cobrado: a conta fica só para consulta, com tudo guardado, até você escolher um plano. Avisamos dentro do sistema nos últimos dias do teste.',
+  },
+  {
+    q: 'Qual a diferença entre Agenda, CRM e Completo?',
+    a: 'A Agenda é a rotina da clínica: agenda, pacientes, prontuário, orçamentos, financeiro e os avisos no WhatsApp. O CRM é a captação: funis, conversas do WhatsApp com a equipe, robô e transmissões. O Completo junta os dois, integrados, e sai mais barato que comprar separado.',
+  },
+  {
+    q: 'Posso contratar só o CRM e continuar com meu sistema de agenda?',
+    a: 'Pode. O CRM funciona sozinho, com funis, WhatsApp oficial, robô e transmissões; as etapas você move no quadro. A parte de o card andar sozinho quando agenda, falta ou aprova o orçamento é do Completo, porque depende da agenda do DreamClin.',
+  },
+  {
+    q: 'Posso trocar de plano depois?',
+    a: 'Quando quiser, pela tela de Plano. Subir de plano ou acrescentar o CRM vale na hora; o valor novo entra na próxima fatura, sem cobrança proporcional. Ao trocar de produto, nada é apagado: leads, conversas e pacientes ficam guardados.',
+  },
+  {
+    q: 'Tem fidelidade ou multa para cancelar?',
+    a: 'Não. Você cancela pela própria tela de Plano e continua com acesso até o fim do mês já pago. Também não há taxa de instalação.',
+  },
+  {
+    q: 'O WhatsApp é oficial mesmo? Quanto custa?',
+    a: 'É a API oficial do WhatsApp, da Meta, no número da sua clínica, sem QR code nem celular ligado. As conversas são cobradas pela Meta direto da clínica, conforme a tabela dela; responder quem escreveu nas últimas 24 horas não tem custo.',
+  },
+  {
+    q: 'Meus dados e os dos pacientes estão seguros?',
+    a: 'Sim. CPF e telefone são criptografados (AES-256), o sistema segue a LGPD desde a arquitetura, faz backup diário e cada clínica só acessa os próprios dados.',
+  },
+  {
+    q: 'Consigo trazer meus pacientes e leads de outro sistema?',
+    a: 'Sim. Os leads entram por planilha no próprio CRM, com funil, etapa, tags e responsável. Para os pacientes, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
+  },
+  {
+    q: 'Preciso instalar alguma coisa?',
+    a: 'Não. O DreamClin roda no navegador, no computador da recepção, no tablet do consultório e no celular.',
+  },
+];
+
 function FAQ() {
-  const faqs = [
-    {
-      q: 'Como funciona o teste grátis?',
-      a: `Você escolhe o plano, cria a conta e usa tudo por ${TRIAL_DAYS} dias, sem cartão. Durante o teste dá para trocar de plano à vontade. Se assinar antes do fim, a primeira cobrança só vence quando o teste acaba.`,
-    },
-    {
-      q: 'O que acontece quando o teste acaba?',
-      a: 'Se você assinou, segue usando sem interrupção. Se não, nada é cobrado: a conta fica só para consulta, com tudo guardado, até você escolher um plano. Avisamos dentro do sistema nos últimos dias do teste.',
-    },
-    {
-      q: 'Qual a diferença entre Agenda, CRM e Completo?',
-      a: 'A Agenda é a rotina da clínica: agenda, pacientes, prontuário, orçamentos, financeiro e os avisos no WhatsApp. O CRM é a captação: funis, conversas do WhatsApp com a equipe, robô e transmissões. O Completo junta os dois, integrados, e sai mais barato que comprar separado.',
-    },
-    {
-      q: 'Posso contratar só o CRM e continuar com meu sistema de agenda?',
-      a: 'Pode. O CRM funciona sozinho, com funis, WhatsApp oficial, robô e transmissões; as etapas você move no quadro. A parte de o card andar sozinho quando agenda, falta ou aprova o orçamento é do Completo, porque depende da agenda do DreamClin.',
-    },
-    {
-      q: 'Posso trocar de plano depois?',
-      a: 'Quando quiser, pela tela de Plano. Subir de plano ou acrescentar o CRM vale na hora; o valor novo entra na próxima fatura, sem cobrança proporcional. Ao trocar de produto, nada é apagado: leads, conversas e pacientes ficam guardados.',
-    },
-    {
-      q: 'Tem fidelidade ou multa para cancelar?',
-      a: 'Não. Você cancela pela própria tela de Plano e continua com acesso até o fim do mês já pago. Também não há taxa de instalação.',
-    },
-    {
-      q: 'O WhatsApp é oficial mesmo? Quanto custa?',
-      a: 'É a API oficial do WhatsApp, da Meta, no número da sua clínica, sem QR code nem celular ligado. As conversas são cobradas pela Meta direto da clínica, conforme a tabela dela; responder quem escreveu nas últimas 24 horas não tem custo.',
-    },
-    {
-      q: 'Meus dados e os dos pacientes estão seguros?',
-      a: 'Sim. CPF e telefone são criptografados (AES-256), o sistema segue a LGPD desde a arquitetura, faz backup diário e cada clínica só acessa os próprios dados.',
-    },
-    {
-      q: 'Consigo trazer meus pacientes e leads de outro sistema?',
-      a: 'Sim. Os leads entram por planilha no próprio CRM, com funil, etapa, tags e responsável. Para os pacientes, se você tiver uma planilha exportada do sistema atual, a gente ajuda na migração.',
-    },
-    {
-      q: 'Preciso instalar alguma coisa?',
-      a: 'Não. O DreamClin roda no navegador, no computador da recepção, no tablet do consultório e no celular.',
-    },
-  ];
+  const faqs = FAQS;
   return (
     <section className="sheet" id="perguntas" aria-labelledby="perguntas-titulo">
       <div className="inner faq">
@@ -847,5 +860,12 @@ export function LandingView({ plans, whatsapp }: { plans: PublicPlan[]; whatsapp
 
 export async function LandingPage() {
   const plans = await loadPublicPlans();
-  return <LandingView plans={plans} whatsapp={salesWhatsAppUrl()} />;
+  return (
+    <>
+      {/* Para o Google e os assistentes de IA: o que é o DreamClin, preços e perguntas. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdHtml(homeJsonLd(plans, TRIAL_DAYS))} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdHtml(faqJsonLd(FAQS))} />
+      <LandingView plans={plans} whatsapp={salesWhatsAppUrl()} />
+    </>
+  );
 }

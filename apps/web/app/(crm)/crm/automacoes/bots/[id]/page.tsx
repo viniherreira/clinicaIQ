@@ -5,7 +5,7 @@ import { blankFlow, FLOW_TEMPLATES } from '@/crm/flow-templates';
 import { loadCrmBasics, stageOptions } from '@/crm/page-data';
 import { FlowEditor, type FlowBotMeta } from '../_components/flow-editor';
 
-export const metadata = { title: 'Robô · DreamClin' };
+export const metadata = { title: 'Robô' };
 
 /**
  * O editor do robô em tela cheia, como o Salesbot do Kommo: o quadro de passos
