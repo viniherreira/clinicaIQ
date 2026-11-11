@@ -1,6 +1,7 @@
 # Confere todo PR e todo push na develop e na main: tipos, lint e testes
 # unitários. Os *.db.test.ts ficam de fora sozinhos, porque aqui não há
 # DATABASE_URL — nunca aponte este workflow para o banco de produção.
+# O job "historico-banco" usa um PostgreSQL vazio, criado só para ele.
 name: CI
 
 on:
@@ -45,3 +46,41 @@ jobs:
 
       - name: Testes unitários
         run: pnpm test
+
+  historico-banco:
+    name: Histórico do banco em dia
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Um PostgreSQL vazio, só deste job, para o Prisma montar o histórico e
+    # comparar com o schema.prisma. Nunca aponte isto para o banco de produção.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sombra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sombra
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sombra
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/sombra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --filter @clinicaiq/db
+      # Falha se alguém mudou o schema.prisma sem registrar a mudança em
+      # packages/db/prisma/migrations (pnpm --filter @clinicaiq/db historico:nova nome).
+      - name: Conferir o histórico
+        run: pnpm --filter @clinicaiq/db historico:conferir

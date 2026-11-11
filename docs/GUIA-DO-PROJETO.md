@@ -47,6 +47,13 @@ captação (funil de leads no estilo Kommo).
 - `packages/pdf` — PDF generation for quotes
 - `packages/ui` — shared UI components
 
+## Histórico do banco
+
+- `packages/db/prisma/migrations/` guarda a estrutura do banco. A pasta `0_estrutura_inicial` é a linha de base de 10/11/2026 (o que produção já tem); **nunca rode `prisma migrate deploy`/`dev`/`resolve` contra produção**. O dono pediu para não mexer no banco: o histórico só existe no código.
+- Mudou o `schema.prisma`? Rode `pnpm --filter @clinicaiq/db historico:nova nome-curto`: grava o SQL da mudança (comparando com a main, sem conectar em banco). Esse arquivo é o SQL que o dono roda no Supabase antes do merge. Tabela nova: acrescente `ENABLE ROW LEVEL SECURITY` à mão.
+- O CI (job "Histórico do banco em dia") falha se o `schema.prisma` mudar sem a pasta nova.
+- `docs/producao/` continua para dados e para o que o Prisma não escreve (RLS, pg_cron, funções).
+
 ## Multi-tenancy
 
 Every tenant-scoped table has `tenantId`. Use `getTenantClient(tenantId)` from `@clinicaiq/db` — it auto-filters all queries by tenant. Never use raw `prisma` for tenant-scoped data.
