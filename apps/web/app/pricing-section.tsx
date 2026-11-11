@@ -95,7 +95,7 @@ const COMPARATIVO: { grupo: string; linhas: Linha[] }[] = [
     grupo: 'Em todos os planos',
     linhas: [
       { recurso: 'WhatsApp oficial da Meta no número da clínica', agenda: true, crm: true, completo: true },
-      { recurso: 'LGPD, dados sensíveis criptografados e backup diário', agenda: true, crm: true, completo: true },
+      { recurso: 'LGPD e dados sensíveis criptografados', agenda: true, crm: true, completo: true },
       { recurso: 'Suporte por WhatsApp e acessibilidade WCAG 2.1 AA', agenda: true, crm: true, completo: true },
     ],
   },

@@ -243,7 +243,7 @@ const CONFIANCA = [
   { icon: BadgeCheck, label: 'API oficial do WhatsApp (Meta)' },
   { icon: ShieldCheck, label: 'LGPD por padrão' },
   { icon: Lock, label: 'CPF e telefone criptografados' },
-  { icon: Database, label: 'Backup diário' },
+  { icon: Database, label: 'Dados separados por clínica' },
   { icon: Accessibility, label: 'Acessibilidade WCAG 2.1 AA' },
   { icon: Heart, label: 'Feito no Brasil' },
 ];
@@ -678,7 +678,7 @@ export const FAQS = [
   },
   {
     q: 'Meus dados e os dos pacientes estão seguros?',
-    a: 'Sim. CPF e telefone são criptografados (AES-256), o sistema segue a LGPD desde a arquitetura, faz backup diário e cada clínica só acessa os próprios dados.',
+    a: 'Sim. CPF e telefone são criptografados (AES-256), o sistema segue a LGPD desde a arquitetura e cada clínica só acessa os próprios dados.',
   },
   {
     q: 'Consigo trazer meus pacientes e leads de outro sistema?',
