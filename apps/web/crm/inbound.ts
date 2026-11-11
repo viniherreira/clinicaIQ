@@ -4,6 +4,7 @@ import { runBotOnInbound } from './bot';
 import { distributeConversation } from './assignment';
 import { applyOrigin, originOf, readAd } from './ad-origin';
 import { applyCapture } from './capture';
+import { applyProcedureTags } from './auto-tags';
 import { acceptConversation, classifyConversation } from './conversations';
 
 /**
@@ -97,6 +98,22 @@ export async function afterInbound(
       if (lead) await applyOrigin(db, tenantId, lead.id, origem, ad);
     } catch (e) {
       console.error('[crm] origem do anúncio falhou', e instanceof Error ? e.message : e);
+    }
+  }
+
+  // Tags de procedimento: o que a pessoa escreveu (e o texto do anúncio) vira
+  // tag do negócio aberto: implante, clareamento, aparelho…
+  if (prefs.autoTags) {
+    try {
+      const c = await db.conversation.findFirst({
+        where: { id: conversationId },
+        select: { lead: { select: { id: true, wonAt: true, lostAt: true, deletedAt: true } } },
+      });
+      const lead = c?.lead && !c.lead.wonAt && !c.lead.lostAt && !c.lead.deletedAt ? c.lead : null;
+      const doAnuncio = ad ? [ad.headline, ad.body].filter(Boolean).join(' ') : '';
+      if (lead) await applyProcedureTags(db, tenantId, lead.id, [text, doAnuncio].filter(Boolean).join(' '));
+    } catch (e) {
+      console.error('[crm] tags de procedimento falharam', e instanceof Error ? e.message : e);
     }
   }
 

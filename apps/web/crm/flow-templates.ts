@@ -16,17 +16,25 @@ export interface StepMeta {
 }
 
 export const STEP_META: Record<FlowStepType, StepMeta> = {
-  message: { label: 'Mensagem', description: 'Manda texto, botões e espera a resposta.', tone: 'bg-sky-500' },
-  condition: { label: 'Condição', description: 'Separa o caminho pelo que a pessoa escreveu, tags, etapa, campos ou horário.', tone: 'bg-violet-500' },
-  pause: { label: 'Esperar', description: 'Espera a pessoa escrever ou passar um tempo.', tone: 'bg-amber-500' },
-  validate: { label: 'Validar', description: 'Confere se a resposta é e-mail, telefone, número, CPF…', tone: 'bg-teal-500' },
-  action: { label: 'Ação', description: 'Etapa, tags, campos, responsável, tarefa, nota ou aviso à equipe.', tone: 'bg-emerald-500' },
-  goto: { label: 'Ir para o passo', description: 'Volta ou pula para outro passo.', tone: 'bg-slate-500' },
-  startBot: { label: 'Iniciar outro robô', description: 'Passa a conversa para outro robô.', tone: 'bg-indigo-500' },
-  roundRobin: { label: 'Rodízio', description: 'Alterna entre caminhos (distribuir, testar mensagens).', tone: 'bg-pink-500' },
-  handoff: { label: 'Passar para a equipe', description: 'O robô para e a conversa fica com vocês.', tone: 'bg-orange-500' },
-  stop: { label: 'Parar o robô', description: 'Termina aqui.', tone: 'bg-red-500' },
+  message: { label: 'Mensagem', description: 'O robô escreve. Pode ter botões (ex.: Agendar, Preços) e esperar a resposta.', tone: 'bg-sky-500' },
+  condition: { label: 'Condição', description: 'Escolhe o caminho: se a pessoa escreveu "preço", se tem uma tag, se é fora do horário…', tone: 'bg-violet-500' },
+  pause: { label: 'Esperar', description: 'Dá um tempo: espera a pessoa escrever ou passar alguns minutos.', tone: 'bg-amber-500' },
+  validate: { label: 'Conferir a resposta', description: 'Confere se a pessoa mandou um e-mail, telefone, CPF ou número válido.', tone: 'bg-teal-500' },
+  action: { label: 'Ação no CRM', description: 'Muda a etapa, põe tag, guarda o nome, cria tarefa ou avisa a equipe.', tone: 'bg-emerald-500' },
+  goto: { label: 'Voltar a um passo', description: 'Volta para um passo anterior (ex.: repetir o menu).', tone: 'bg-slate-500' },
+  startBot: { label: 'Chamar outro robô', description: 'Passa a conversa para outro robô da clínica.', tone: 'bg-indigo-500' },
+  roundRobin: { label: 'Rodízio', description: 'Alterna entre caminhos, um de cada vez (ex.: dividir entre atendentes).', tone: 'bg-pink-500' },
+  handoff: { label: 'Passar para a equipe', description: 'O robô sai e uma pessoa da equipe continua a conversa.', tone: 'bg-orange-500' },
+  stop: { label: 'Encerrar o robô', description: 'O robô para aqui, sem chamar ninguém.', tone: 'bg-red-500' },
 };
+
+/** O menu "+ Passo" em grupos, pelo que a pessoa quer fazer. */
+export const STEP_GROUPS: { label: string; types: FlowStepType[] }[] = [
+  { label: 'Conversar', types: ['message', 'pause', 'validate'] },
+  { label: 'Decidir o caminho', types: ['condition', 'goto', 'roundRobin'] },
+  { label: 'Fazer no CRM', types: ['action'] },
+  { label: 'Terminar', types: ['handoff', 'startBot', 'stop'] },
+];
 
 /** A ordem do menu "+ Passo". */
 export const STEP_ORDER: FlowStepType[] = ['message', 'condition', 'action', 'pause', 'validate', 'goto', 'roundRobin', 'startBot', 'handoff', 'stop'];

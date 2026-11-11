@@ -6,6 +6,9 @@ const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
 process.env.ENCRYPTION_MASTER_KEY ??= 'unit-test-master-key-not-a-real-secret';
 
+// As tags automáticas têm o próprio teste (auto-tags.db.test.ts); aqui ficam desligadas.
+const SEM_TAGS_AUTO = { crm: { autoTags: false } };
+
 describe('automações: configuração', async () => {
   const { parseConfig } = await import('./stage-automations');
   it.each([
@@ -28,7 +31,7 @@ describe.skipIf(!process.env.DATABASE_URL)('automações por etapa (banco)', asy
   const key = process.env.ENCRYPTION_MASTER_KEY!;
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `auto_${suffix}`, name: 'Automação', slug: `auto-${suffix}` } });
+  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `auto_${suffix}`, name: 'Automação', slug: `auto-${suffix}`, settings: SEM_TAGS_AUTO } });
   const dona = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Dona', email: `d-${suffix}@teste.local`, role: 'OWNER' } });
   const rita = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Rita', email: `r-${suffix}@teste.local`, role: 'RECEPTIONIST' } });
   const db = getTenantClient(tenant.id);

@@ -85,6 +85,24 @@ export function GeneralSection({ initial }: { initial: CrmPrefs }) {
         </span>
       </label>
 
+      <label aria-label="Tags automáticas" className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={s.p.autoTags}
+          onChange={(e) => s.setP({ ...s.p, autoTags: e.target.checked })}
+          className={`${switchCls} mt-0.5`}
+        />
+        <span>
+          <span className="block text-sm font-semibold">Tags automáticas</span>
+          <span className="block text-xs text-muted-foreground">
+            Todo negócio ganha a tag do canal de onde veio (whatsapp, instagram, facebook, site, indicação) e dos procedimentos que a
+            pessoa citou na conversa ou no anúncio (implante, clareamento, aparelho…). O primeiro procedimento cadastrado na clínica vira o
+            interesse do negócio.
+          </span>
+        </span>
+      </label>
+
       <fieldset className="mt-4">
         <legend className="text-sm font-semibold">Quem já teve negócio fechado e escreve de novo</legend>
         <div className="mt-2 space-y-2">

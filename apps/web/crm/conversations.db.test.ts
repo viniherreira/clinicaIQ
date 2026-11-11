@@ -5,6 +5,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // `agenda-mirror` lê os módulos da clínica (lib/access), que é só do servidor.
 vi.mock('server-only', () => ({}));
 
+// As tags automáticas (canal e procedimento) têm o próprio teste (auto-tags.db.test.ts);
+// aqui ficam desligadas para as contas de tags deste arquivo continuarem exatas.
+const SEM_TAGS_AUTO = { crm: { autoTags: false } };
+
 /** As conversas do CRM contra o banco de desenvolvimento, numa clínica descartável. */
 const envFile = resolve(__dirname, '..', '.env.local');
 if (!process.env.DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
@@ -20,7 +24,7 @@ describe.skipIf(!process.env.DATABASE_URL)('conversas (banco)', async () => {
   const key = process.env.ENCRYPTION_MASTER_KEY!;
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `conv_${suffix}`, name: 'Conversas', slug: `conv-${suffix}` } });
+  const tenant = await prisma.tenant.create({ data: { clerkOrgId: `conv_${suffix}`, name: 'Conversas', slug: `conv-${suffix}`, settings: SEM_TAGS_AUTO } });
   const user = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Recepção', email: `r-${suffix}@teste.local`, role: 'RECEPTIONIST' } });
   const outra = await prisma.user.create({ data: { tenantId: tenant.id, name: 'Dona', email: `d-${suffix}@teste.local`, role: 'OWNER' } });
   const db = getTenantClient(tenant.id);

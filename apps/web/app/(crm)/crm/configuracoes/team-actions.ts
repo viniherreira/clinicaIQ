@@ -96,7 +96,7 @@ export async function transferPortfolioAction(fromUserId: string, to: string): P
   return r;
 }
 
-const prefsSchema = z.object({ autoLead: z.boolean(), reuseClosedLead: z.boolean(), senderName: z.boolean() });
+const prefsSchema = z.object({ autoLead: z.boolean(), reuseClosedLead: z.boolean(), senderName: z.boolean(), autoTags: z.boolean() });
 
 /** Configurações › Geral e Conversas. */
 export async function savePrefsAction(input: z.input<typeof prefsSchema>): Promise<Result> {

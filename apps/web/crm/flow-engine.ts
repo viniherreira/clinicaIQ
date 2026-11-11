@@ -542,7 +542,45 @@ export const isFlowDoc = (raw: unknown): raw is FlowDoc =>
   Boolean(raw) && (raw as FlowDoc).version === 2 && typeof (raw as FlowDoc).start === 'string' && typeof (raw as FlowDoc).steps === 'object';
 
 /** Problemas antes de salvar (ou null). */
-export function flowProblem(doc: FlowDoc): string | null {
+/** O que falta num passo para o robô poder ser salvo, ou null. Sem o "Passo N:". */
+export function stepProblem(doc: FlowDoc, s: FlowStep): string | null {
+  for (const alvo of Object.values(s.out)) if (alvo && !doc.steps[alvo]) return `uma seta aponta para um passo que não existe.`;
+  if (s.type === 'message') {
+    if (!s.text.trim() && s.buttons.length === 0) return `escreva a mensagem.`;
+    if (s.buttons.length > 10) return `no máximo 10 botões por mensagem.`;
+    for (const b of s.buttons) {
+      if (!b.label.trim()) return `todo botão precisa de um texto.`;
+      if (b.label.trim().length > 24) return `o texto do botão tem no máximo 24 letras (limite do WhatsApp).`;
+    }
+  }
+  if (s.type === 'condition' && s.cases.length === 0) return `a condição precisa de pelo menos um caso.`;
+  if (s.type === 'goto' && !doc.steps[s.target]) return `escolha para qual passo ir.`;
+  if (s.type === 'roundRobin' && (s.options.length < 2 || s.options.length > 10)) return `o rodízio tem de 2 a 10 opções.`;
+  if (s.type === 'pause' && s.minutes != null && (s.minutes < 1 || s.minutes > 60 * 24 * 30)) return `a pausa vai de 1 minuto a 30 dias.`;
+  if (s.type === 'action') {
+    if (s.actions.length === 0) return `escolha pelo menos uma ação.`;
+    for (const a of s.actions) {
+      if ((a.type === 'tag' || a.type === 'untag') && !a.tagId) return `escolha a tag.`;
+      if (a.type === 'stage' && !a.stageId) return `escolha a etapa.`;
+      if (a.type === 'assign' && !a.userId) return `escolha o responsável.`;
+      if ((a.type === 'task' || a.type === 'note' || a.type === 'notify') && !a.text.trim()) return `escreva o texto da ${a.type === 'task' ? 'tarefa' : a.type === 'note' ? 'anotação' : 'mensagem para a equipe'}.`;
+      if (a.type === 'setField' && a.from === 'value' && !(a.value ?? '').trim()) return `escreva o valor do campo.`;
+    }
+  }
+  if (s.type === 'condition') {
+    for (const c of s.cases) {
+      for (const r of c.rules) {
+        if ((r.subject === 'tag' || r.subject === 'stage' || r.subject === 'field') && !r.ref) return `complete a condição (escolha a tag, etapa ou campo).`;
+        if (r.subject === 'message' && (r.op === 'contains' || r.op === 'equals' || r.op === 'starts') && !(r.value ?? '').trim()) return `escreva as palavras da condição.`;
+      }
+    }
+  }
+  if (s.type === 'startBot' && !s.botId) return `escolha qual robô iniciar.`;
+  return null;
+}
+
+/** Problema geral do robô (sem passo): primeiro passo, tamanho, horário. */
+function docProblem(doc: FlowDoc): string | null {
   const ids = Object.keys(doc.steps);
   if (ids.length === 0 || !doc.steps[doc.start]) return 'O robô precisa de um primeiro passo.';
   if (ids.length > 200) return 'No máximo 200 passos por robô.';
@@ -552,42 +590,27 @@ export function flowProblem(doc: FlowDoc): string | null {
     if (!ok.test(h.start) || !ok.test(h.end) || h.start >= h.end) return 'Confira o horário de atendimento (o começo vem antes do fim).';
     if (!h.days.length) return 'Marque pelo menos um dia de atendimento.';
   }
-  for (const [i, s] of Object.values(doc.steps).entries()) {
-    const n = `Passo ${i + 1}`;
-    for (const alvo of Object.values(s.out)) if (alvo && !doc.steps[alvo]) return `${n}: uma seta aponta para um passo que não existe.`;
-    if (s.type === 'message') {
-      if (!s.text.trim() && s.buttons.length === 0) return `${n}: escreva a mensagem.`;
-      if (s.buttons.length > 10) return `${n}: no máximo 10 botões por mensagem.`;
-      for (const b of s.buttons) {
-        if (!b.label.trim()) return `${n}: todo botão precisa de um texto.`;
-        if (b.label.trim().length > 24) return `${n}: o texto do botão tem no máximo 24 letras (limite do WhatsApp).`;
-      }
-    }
-    if (s.type === 'condition' && s.cases.length === 0) return `${n}: a condição precisa de pelo menos um caso.`;
-    if (s.type === 'goto' && !doc.steps[s.target]) return `${n}: escolha para qual passo ir.`;
-    if (s.type === 'roundRobin' && (s.options.length < 2 || s.options.length > 10)) return `${n}: o rodízio tem de 2 a 10 opções.`;
-    if (s.type === 'pause' && s.minutes != null && (s.minutes < 1 || s.minutes > 60 * 24 * 30)) return `${n}: a pausa vai de 1 minuto a 30 dias.`;
-    if (s.type === 'action') {
-      if (s.actions.length === 0) return `${n}: escolha pelo menos uma ação.`;
-      for (const a of s.actions) {
-        if ((a.type === 'tag' || a.type === 'untag') && !a.tagId) return `${n}: escolha a tag.`;
-        if (a.type === 'stage' && !a.stageId) return `${n}: escolha a etapa.`;
-        if (a.type === 'assign' && !a.userId) return `${n}: escolha o responsável.`;
-        if ((a.type === 'task' || a.type === 'note' || a.type === 'notify') && !a.text.trim()) return `${n}: escreva o texto da ${a.type === 'task' ? 'tarefa' : a.type === 'note' ? 'anotação' : 'mensagem para a equipe'}.`;
-        if (a.type === 'setField' && a.from === 'value' && !(a.value ?? '').trim()) return `${n}: escreva o valor do campo.`;
-      }
-    }
-    if (s.type === 'condition') {
-      for (const c of s.cases) {
-        for (const r of c.rules) {
-          if ((r.subject === 'tag' || r.subject === 'stage' || r.subject === 'field') && !r.ref) return `${n}: complete a condição (escolha a tag, etapa ou campo).`;
-          if (r.subject === 'message' && (r.op === 'contains' || r.op === 'equals' || r.op === 'starts') && !(r.value ?? '').trim()) return `${n}: escreva as palavras da condição.`;
-        }
-      }
-    }
-    if (s.type === 'startBot' && !s.botId) return `${n}: escolha qual robô iniciar.`;
-  }
   return null;
+}
+
+/**
+ * Tudo o que falta no robô, um item por problema, para a lista "Antes de
+ * salvar" do editor e o aviso em cada caixa do quadro.
+ */
+export function flowProblems(doc: FlowDoc): { stepId: string | null; n: number | null; text: string }[] {
+  const geral = docProblem(doc);
+  const out: { stepId: string | null; n: number | null; text: string }[] = geral ? [{ stepId: null, n: null, text: geral }] : [];
+  for (const [i, s] of Object.values(doc.steps).entries()) {
+    const p = stepProblem(doc, s);
+    if (p) out.push({ stepId: s.id, n: i + 1, text: p });
+  }
+  return out;
+}
+
+/** O primeiro problema, como frase ("Passo 3: escreva a mensagem."), ou null. */
+export function flowProblem(doc: FlowDoc): string | null {
+  const p = flowProblems(doc)[0];
+  return p ? (p.n ? `Passo ${p.n}: ${p.text}` : p.text) : null;
 }
 
 export { DEFAULT_HOURS };
