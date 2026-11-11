@@ -130,6 +130,16 @@ A extensão filtra **todo** modelo, menos os de `MODELS_WITHOUT_TENANT`. Tabela 
 - **"/" na caixa de texto, como no Kommo** (`components/crm-chat/chat-composer.tsx`): a barra (ou o raio ao lado) abre um menu só com **Robôs** (os ligados, como o Salesbot) e **Respostas rápidas**, filtrados pelo que vem depois da barra. Resposta vira o texto (`{nome}` preenchido); robô vira a etiqueta "/Nome" e o Enviar executa (`startBotAction`: do primeiro passo, só dentro da janela de 24 h na API oficial, anotado no histórico do lead). Com robô conversando, a faixa acima da caixa diz qual e tem **Parar robô** (`stopBotOnConversation`). Na API oficial, embaixo, "A sessão de mensagens termina em" (`ChatThread.windowEndsAt`).
 - Spec e plano: `docs/specs/2026-10-16-crm-pacote-a-dados-lista-design.md` e `docs/planos/2026-10-16-crm-pacote-a-plan.md`.
 
+## Site público e SEO
+
+- **Clerk só onde é usado:** o `ClerkProvider` fica em `components/auth-provider.tsx`, chamado pelos layouts de `(app)`, `(crm)`, `(auth)` e `onboarding`, e não no layout raiz. O site de vendas, as páginas legais, `/agendar` e `/orcamento` não baixam o JavaScript do Clerk. Componente novo com `useClerk`/`useUser` precisa estar debaixo de um desses layouts. Ler a sessão no servidor (`auth()`) não precisa do provider.
+- **Página inicial estática** (`revalidate = 3600`): quem já entrou é levado ao `/dashboard` pelo `middleware.ts`, não pela página. Não chame `auth()`, `headers()` nem `cookies()` em `app/page.tsx` ou `app/landing.tsx`, senão ela volta a ser montada a cada visita.
+- **Títulos:** cada página escreve só o próprio título (`'Pacientes'`); o `| DreamClin` vem do `template` do layout raiz. Página pública usa `pageMetadata()` de `lib/seo.ts` (descrição, canônico e prévia de compartilhamento).
+- **Dados estruturados:** `homeJsonLd` (empresa, site, software com os preços do banco) e `faqJsonLd` (as perguntas de `FAQS` em `landing.tsx`), em `lib/seo.ts`.
+- **Sitemap e robots:** `app/sitemap.ts` (atualize o `lastModified` ao mudar o texto de uma página) e `app/robots.ts` (rota nova do sistema entra na lista `SISTEMA`).
+- **Animação da página de vendas:** só `transform`, `translate`, `rotate`, `scale` e `opacity`, que a placa de vídeo faz sozinha. Animar `box-shadow`, `background`, `filter` ou elementos dentro de um SVG redesenha a tela a cada quadro e trava o celular (o Lighthouse mostra em "non-composited animations").
+- **Search Console:** o código de verificação vai na variável `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` da Vercel.
+
 ## Accessibility
 
 WCAG 2.1 AA is a product differentiator. Every component must be keyboard-navigable, have proper ARIA attributes, and pass axe-core checks. Use `eslint-plugin-jsx-a11y` and `@axe-core/playwright`.

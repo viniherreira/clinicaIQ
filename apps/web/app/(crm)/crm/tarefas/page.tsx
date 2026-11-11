@@ -4,7 +4,7 @@ import { loadTasks, type TaskRow } from '@/crm/task-list';
 import { TaskList } from './_components/task-list';
 import { WhoFilter } from './_components/who-filter';
 
-export const metadata = { title: 'Tarefas · DreamClin' };
+export const metadata = { title: 'Tarefas' };
 
 /**
  * O dia da recepção, como no Kommo: o que venceu, hoje, amanhã, o resto da

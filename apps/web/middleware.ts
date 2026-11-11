@@ -22,6 +22,11 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
+  // Quem já entrou e abre o site vai direto para o painel. Fica aqui, e não na
+  // página, para o site de vendas sair pronto do cache (mais rápido no Google).
+  if (request.nextUrl.pathname === '/' && (await auth()).userId) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
   // O caminho vai junto para o layout do sistema, que não o recebe: a clínica
   // só com o CRM é levada para o CRM quando abre uma tela da agenda.
   const headers = new Headers(request.headers);

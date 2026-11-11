@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { listQuoteProcedures, listQuoteProfessionals, defaultValidUntil, getQuotePatient, planQuoteItems } from '../actions';
 import { QuoteBuilder } from '../_components/quote-builder';
 
-export const metadata = { title: 'Novo orçamento · DreamClin' };
+export const metadata = { title: 'Novo orçamento' };
 
 export default async function NovoOrcamentoPage({
   searchParams,

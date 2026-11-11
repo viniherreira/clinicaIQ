@@ -3,7 +3,7 @@ import { loadCrmBasics } from '@/crm/page-data';
 import { parseConditions, type StageTriggerKind } from '@/crm/stage-automation-rules';
 import { DigitalPipeline, type ActionKind, type PipelineAutomation } from './_components/digital-pipeline';
 
-export const metadata = { title: 'Funil digital · DreamClin' };
+export const metadata = { title: 'Funil digital' };
 
 /**
  * O "funil digital" do Kommo: uma coluna por etapa do funil e, nela, os

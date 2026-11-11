@@ -5,7 +5,7 @@ import { listTemplateRows } from '@/lib/whatsapp-templates';
 import { WhatsAppTemplates } from '@/components/whatsapp-templates';
 import { createTemplateAction, syncTemplatesAction } from '../../whatsapp/actions';
 
-export const metadata = { title: 'Modelos · DreamClin' };
+export const metadata = { title: 'Modelos' };
 
 /**
  * Modelos de mensagem da API oficial. Fora das 24 horas depois da última

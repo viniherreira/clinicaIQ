@@ -13,7 +13,7 @@ import { LeadRightPane } from './_components/lead-chat';
 import { EraseLeadData } from './_components/erase-lead-data';
 
 export async function generateMetadata() {
-  return { title: 'Lead · DreamClin' };
+  return { title: 'Lead' };
 }
 
 /** A ficha do lead, como no Kommo: dados à esquerda; conversa e histórico juntos à direita. */

@@ -20,7 +20,7 @@ import { CrmToolbar } from '../_components/toolbar';
 import { LeadTable } from './_components/lead-table';
 import { AutoRefresh } from '@/components/auto-refresh';
 
-export const metadata = { title: 'Leads · DreamClin' };
+export const metadata = { title: 'Leads' };
 
 const SITUACOES: { key: ListStatus; label: string }[] = [
   { key: 'abertos', label: 'Abertos' },

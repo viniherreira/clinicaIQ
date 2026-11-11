@@ -8,7 +8,7 @@ import { loadCrmAddon } from '@/crm/addon';
 import { crmOfferText } from '@/crm/format';
 import { CrmTurnOnButton } from '@/components/crm-turn-on-button';
 
-export const metadata = { title: 'CRM · DreamClin' };
+export const metadata = { title: 'CRM' };
 
 /**
  * Onde para quem abre /crm sem poder entrar. Dois casos:

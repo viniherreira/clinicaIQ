@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 
-export const metadata = { title: 'Página não encontrada · DreamClin' };
+export const metadata = { title: 'Página não encontrada', robots: { index: false } };
 
 export default function NotFound() {
   return (

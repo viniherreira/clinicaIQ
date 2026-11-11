@@ -6,7 +6,7 @@ import { loadCrmBasics, stageOptions } from '@/crm/page-data';
 import { CaptureRules } from '../../configuracoes/_components/capture-rules';
 import { BotsList } from './_components/bots-list';
 
-export const metadata = { title: 'Bots · DreamClin' };
+export const metadata = { title: 'Bots' };
 
 /**
  * Os robôs de atendimento do WhatsApp (passos ligados, como o Salesbot do

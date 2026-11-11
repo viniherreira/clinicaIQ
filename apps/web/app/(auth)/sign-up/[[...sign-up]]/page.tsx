@@ -5,9 +5,14 @@ import { prisma } from '@clinicaiq/db';
 import { clerkAppearance } from '@/lib/clerk-appearance';
 import { TRIAL_DAYS } from '@/lib/subscription';
 import { parseProduct, parseTier, productPriceCents, productSlug, PRODUCT_INFO, tierSlug } from '@/lib/products';
+import { pageMetadata } from '@/lib/seo';
 import { InviteBlocked } from '../_components/invite-blocked';
 
-export const metadata = { title: 'Criar conta' };
+export const metadata = pageMetadata({
+  title: `Criar conta: teste grátis por ${TRIAL_DAYS} dias`,
+  description: `Crie a conta da sua clínica no DreamClin e use agenda, prontuário, orçamentos e CRM no WhatsApp oficial por ${TRIAL_DAYS} dias, sem cartão de crédito.`,
+  path: '/sign-up',
+});
 
 const brl = (cents: number) =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });

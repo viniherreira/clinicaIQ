@@ -7,7 +7,7 @@ import { formatDue } from '@/crm/format';
 import { BROADCAST_STATUS, StatsGrid } from '../_components/stats';
 import { AutoRefresh, CancelBroadcast } from '../_components/detail-controls';
 
-export const metadata = { title: 'Transmissão · DreamClin' };
+export const metadata = { title: 'Transmissão' };
 
 const MSG_STATUS: Record<string, string> = {
   PENDING: 'Na fila',

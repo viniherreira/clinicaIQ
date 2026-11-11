@@ -23,7 +23,7 @@ import { requireCapability } from '@/lib/guard';
 import { cloudAccountSummary } from '@/lib/cloud-account-admin';
 import { can } from '@/lib/permissions';
 import { getTenantModules } from '@/lib/access';
-export const metadata = { title: 'Configurações · DreamClin' };
+export const metadata = { title: 'Configurações' };
 
 export default async function ConfiguracoesPage() {
   const { role, tenantId } = await requireCapability('configuracoes');

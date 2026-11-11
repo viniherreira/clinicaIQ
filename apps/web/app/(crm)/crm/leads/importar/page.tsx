@@ -4,7 +4,7 @@ import { requireCrm } from '@/crm/guard';
 import { loadCrmBasics } from '@/crm/page-data';
 import { ImportWizard } from './_components/import-wizard';
 
-export const metadata = { title: 'Importar leads · DreamClin' };
+export const metadata = { title: 'Importar leads' };
 
 /**
  * Importar leads de planilha: a exportação do Kommo (Excel ou CSV) ou uma

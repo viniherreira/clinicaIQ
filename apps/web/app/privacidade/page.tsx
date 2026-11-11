@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalPage, PrivacyContact } from '@/components/legal-page';
 import { COMPANY, companyLine } from '@/lib/company';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: `Política de Privacidade · ${COMPANY.brand}`,
-  description: `Como o ${COMPANY.brand} trata dados pessoais, de acordo com a LGPD.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Política de Privacidade',
+  description: `Como o ${COMPANY.brand} trata os dados pessoais das clínicas e dos pacientes, de acordo com a LGPD: o que guardamos, para quê e os seus direitos.`,
+  path: '/privacidade',
+});
 
 /**
  * Política de Privacidade. Texto de partida, escrito a partir do que o sistema
