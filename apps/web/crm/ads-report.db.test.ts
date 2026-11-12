@@ -125,6 +125,25 @@ describe.skipIf(!process.env.DATABASE_URL)('Gerenciador de Anúncios: conexão e
     expect(await account.adsCredentials(tenant.id)).toBeNull();
   });
 
+  it('token de sistema que não lista direto: acha a conta pela empresa', async () => {
+    const { listAdAccounts } = await import('./ads-meta');
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+    meta({
+      'me/adaccounts': () => ({ body: { data: [] } }),
+      'me/assigned_ad_accounts': () => ({ status: 400, body: { error: { code: 100 } } }),
+      debug_token: () => ({ body: { data: { granular_scopes: [{ scope: 'ads_read' }, { scope: 'business_management', target_ids: ['777777777'] }] } } }),
+      me: () => ({ body: { id: '1' } }),
+      '777777777/owned_ad_accounts': () => ({ body: { data: [contas[1]] } }),
+      '777777777/client_ad_accounts': () => ({ body: { data: [] } }),
+    });
+    const achadas = await listAdAccounts('TOKEN-SECRETO', { id: 'APP', secret: 'SEGREDO' });
+    expect(achadas.map((a) => a.id)).toEqual(['3745555152329524']);
+    // O registro diz o que cada caminho achou, sem o token.
+    expect(JSON.stringify(log.mock.calls)).not.toContain('TOKEN-SECRETO');
+    expect(log.mock.calls[0][1]).toMatchObject({ 'me/adaccounts': 0, 'empresa/owned_ad_accounts': 1 });
+    log.mockRestore();
+  });
+
   it('escolher a conta: confere com a Meta antes de gravar', async () => {
     meta({ act_999999: () => ({ status: 400, body: { error: { code: 200 } } }) });
     expect(await account.chooseAdAccount(tenant.id, null, '999999')).toMatchObject({ ok: false });

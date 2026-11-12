@@ -82,28 +82,69 @@ function toOption(raw: unknown): AdAccountOption | null {
 }
 
 /**
- * As contas de anúncios que a pessoa liberou na janela da Meta. Primeiro pela
- * lista do próprio token; se vier vazia (token de sistema às vezes não lista),
- * pelas contas que a Meta diz que o token alcança.
+ * As contas de anúncios que a pessoa liberou na janela da Meta. O token que a
+ * Meta entrega aqui é de um "usuário do sistema" criado na hora, e nem sempre a
+ * lista direta devolve as contas: por isso são vários caminhos, do mais simples
+ * ao mais indireto, e vale o primeiro que achar alguma conta.
+ *
+ * Deixa no log quantas contas cada caminho achou (só números e nomes de
+ * permissão, nunca o token), para dar para entender uma conexão que não lista nada.
  */
 export async function listAdAccounts(token: string, app: { id: string; secret: string }): Promise<AdAccountOption[]> {
-  const direto = await graphList<unknown>('me/adaccounts', { fields: ACCOUNT_FIELDS, limit: '100' }, token, 5).catch((e) => {
-    if (e instanceof MetaAdsError && e.kind !== 'other' && e.kind !== 'permission') throw e;
-    return [] as unknown[];
-  });
-  const achadas = direto.map(toOption).filter((a): a is AdAccountOption => a !== null);
-  if (achadas.length > 0) return achadas;
+  const passos: Record<string, number | string> = {};
+  const tentar = async (nome: string, fn: () => Promise<unknown[]>): Promise<AdAccountOption[]> => {
+    try {
+      const contas = (await fn()).map(toOption).filter((a): a is AdAccountOption => a !== null);
+      passos[nome] = contas.length;
+      return contas;
+    } catch (e) {
+      // Token inválido ou pausa da Meta: não adianta tentar os outros caminhos.
+      if (e instanceof MetaAdsError && (e.kind === 'auth' || e.kind === 'rate')) throw e;
+      passos[nome] = e instanceof MetaAdsError ? `erro:${e.kind}` : 'erro';
+      return [];
+    }
+  };
+  const lista = (path: string) => () => graphList<unknown>(path, { fields: ACCOUNT_FIELDS, limit: '100' }, token, 5);
+  const fim = (contas: AdAccountOption[]) => {
+    console.info('[crm] contas de anúncios na conexão', passos);
+    const unicas = new Map(contas.map((c) => [c.id, c]));
+    return [...unicas.values()];
+  };
 
+  let contas = await tentar('me/adaccounts', lista('me/adaccounts'));
+  if (contas.length) return fim(contas);
+  contas = await tentar('me/assigned_ad_accounts', lista('me/assigned_ad_accounts'));
+  if (contas.length) return fim(contas);
+
+  // O que a Meta diz que este token alcança: contas de anúncios e empresas.
   const debug = await graphGet<{ data?: { granular_scopes?: { scope?: string; target_ids?: string[] }[] } }>(
     'debug_token',
     { input_token: token },
     `${app.id}|${app.secret}`,
   ).catch(() => ({ data: undefined }));
-  const ids = (debug.data?.granular_scopes ?? []).filter((s) => s.scope === 'ads_read').flatMap((s) => s.target_ids ?? []);
-  const contas = await Promise.all(
-    [...new Set(ids)].slice(0, 25).map((id) => readAdAccount(token, id).catch(() => null)),
+  const escopos = debug.data?.granular_scopes ?? [];
+  passos.escopos = escopos.map((e) => `${e.scope}:${e.target_ids?.length ?? 'todos'}`).join(',') || 'nenhum';
+  const alvos = (nomes: string[]) => [...new Set(escopos.filter((e) => nomes.includes(e.scope ?? '')).flatMap((e) => e.target_ids ?? []))];
+
+  contas = await tentar('alvos-de-ads_read', async () =>
+    (await Promise.all(alvos(['ads_read', 'ads_management']).slice(0, 25).map((id) => graphGet<unknown>(`act_${id.replace(/^act_/, '')}`, { fields: ACCOUNT_FIELDS }, token).catch(() => null)))).filter(
+      (x) => x !== null,
+    ),
   );
-  return contas.filter((a): a is AdAccountOption => a !== null);
+  if (contas.length) return fim(contas);
+
+  // As contas das empresas que o token alcança (da própria empresa e as compartilhadas com ela).
+  const eu = await graphGet<{ client_business_id?: string }>('me', { fields: 'client_business_id' }, token).catch(() => ({ client_business_id: undefined }));
+  const empresas = [...new Set([eu.client_business_id, ...alvos(['business_management'])].filter((id): id is string => !!id && /^\d{5,25}$/.test(id)))].slice(0, 5);
+  passos.empresas = empresas.length;
+  for (const empresa of empresas) {
+    contas = [
+      ...(await tentar(`empresa/owned_ad_accounts`, lista(`${empresa}/owned_ad_accounts`))),
+      ...(await tentar(`empresa/client_ad_accounts`, lista(`${empresa}/client_ad_accounts`))),
+    ];
+    if (contas.length) return fim(contas);
+  }
+  return fim([]);
 }
 
 /** Uma conta, lida com o token: é assim que se confere se o token alcança a conta escolhida. */
