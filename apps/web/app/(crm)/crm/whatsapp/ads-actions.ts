@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { headers } from 'next/headers';
 import { guardCrmAction } from '@/crm/guard';
 import * as ads from '@/crm/ads-account';
 import type { AdAccountOption } from '@/crm/ads-meta';
@@ -20,8 +21,25 @@ async function comoGestor<T extends object>(fn: (g: { tenantId: string; userId: 
   return r;
 }
 
-export const finishAdsLoginAction = async (code: string): Promise<Result<{ accounts: AdAccountOption[]; chosen: AdAccountOption | null }>> =>
-  comoGestor((g) => ads.startAdsConnection(g.tenantId, g.userId, String(code ?? '')));
+/** A página só vale se for deste site (https e o mesmo endereço do pedido). */
+async function paginaDoSite(pageUrl: unknown): Promise<string | null> {
+  if (typeof pageUrl !== 'string' || pageUrl.length > 500) return null;
+  try {
+    const u = new URL(pageUrl);
+    const host = (await headers()).get('host');
+    return u.protocol === 'https:' && host && u.host === host ? `${u.origin}${u.pathname}` : null;
+  } catch {
+    return null;
+  }
+}
+
+export const finishAdsLoginAction = async (
+  code: string,
+  pageUrl?: string,
+): Promise<Result<{ accounts: AdAccountOption[]; chosen: AdAccountOption | null }>> => {
+  const pagina = await paginaDoSite(pageUrl);
+  return comoGestor((g) => ads.startAdsConnection(g.tenantId, g.userId, String(code ?? ''), pagina));
+};
 
 export const chooseAdAccountAction = async (accountId: string): Promise<Result> =>
   comoGestor((g) => ads.chooseAdAccount(g.tenantId, g.userId, String(accountId ?? '')));

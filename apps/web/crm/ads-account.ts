@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { decrypt, prisma, type Prisma } from '@clinicaiq/db';
-import { exchangeSignupCode } from '@clinicaiq/whatsapp';
 import { graphVersion, sealToken } from '@/lib/cloud-account';
 import { accountNumber, readAdsSettings, type AdsSettings } from './ads-rules';
 import { listAdAccounts, MetaAdsError, readAdAccount, type AdAccountOption } from './ads-meta';
@@ -54,6 +53,48 @@ async function audit(tenantId: string, userId: string | null, action: string, me
   await prisma.auditLog
     .create({ data: { tenantId, userId, action, entity: 'AdsAccount', entityId: tenantId, metadata } })
     .catch(() => undefined);
+}
+
+/** O erro da troca, para o registro: só códigos e o texto da Meta sem nada que pareça token. */
+function oauthFailure(status: number, body: unknown): string {
+  const e = (body as { error?: { code?: number; error_subcode?: number; type?: string; message?: string } } | null)?.error;
+  const msg = (e?.message ?? '').replace(/EAA[A-Za-z0-9]+/g, '[token]').slice(0, 200);
+  return `${status}:${e?.code ?? '?'}${e?.error_subcode ? `/${e.error_subcode}` : ''}:${e?.type ?? ''}:${msg}`;
+}
+
+/**
+ * Troca o código da janela da Meta pelo token. Primeiro do jeito do cadastro do
+ * WhatsApp (sem endereço de retorno); se a Meta pedir o endereço, tenta com o
+ * da página e com o vazio. Cada tentativa que falha vai para o registro.
+ */
+async function exchangeCode(code: string, appId: string, appSecret: string, pageUrl: string | null): Promise<string> {
+  const tentativas: (string | null)[] = [null, ''];
+  if (pageUrl) tentativas.splice(1, 0, pageUrl);
+  const falhas: string[] = [];
+  for (const redirect of tentativas) {
+    const url = new URL(`https://graph.facebook.com/${graphVersion()}/oauth/access_token`);
+    url.searchParams.set('client_id', appId);
+    url.searchParams.set('client_secret', appSecret);
+    url.searchParams.set('code', code);
+    if (redirect !== null) url.searchParams.set('redirect_uri', redirect);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: 'no-store' });
+    } catch {
+      falhas.push(`${redirect === null ? 'sem' : redirect === '' ? 'vazio' : 'pagina'}:rede`);
+      continue;
+    }
+    const body = (await res.json().catch(() => ({}))) as { access_token?: string };
+    if (res.ok && body.access_token) {
+      if (falhas.length) console.info('[crm] troca do código dos anúncios', { falhas, valeu: redirect === null ? 'sem' : redirect === '' ? 'vazio' : 'pagina' });
+      return body.access_token;
+    }
+    falhas.push(`${redirect === null ? 'sem' : redirect === '' ? 'vazio' : 'pagina'}:${oauthFailure(res.status, body)}`);
+    // Código vencido ou já usado: não adianta tentar de novo.
+    if (/expired|been used|has been used/i.test(JSON.stringify(body))) break;
+  }
+  console.error('[crm] troca do código dos anúncios falhou', { falhas });
+  throw new MetaAdsError('other', 'A Meta não aceitou a autorização. Clique em Conectar de novo; se repetir, avise o suporte.');
 }
 
 /** Troca um token de pessoa pelo de longa duração (60 dias). Nulo se a Meta não trocar. */
@@ -119,6 +160,8 @@ export async function startAdsConnection(
   tenantId: string,
   userId: string | null,
   code: string,
+  /** A página onde a janela da Meta foi aberta: algumas trocas de código pedem o mesmo endereço. */
+  pageUrl?: string | null,
 ): Promise<Result<{ accounts: AdAccountOption[]; chosen: AdAccountOption | null }>> {
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
@@ -128,11 +171,12 @@ export async function startAdsConnection(
   let token: string;
   let accounts: AdAccountOption[];
   try {
-    token = await exchangeSignupCode({ appId, appSecret, code, version: graphVersion() });
+    token = await exchangeCode(code, appId, appSecret, pageUrl ?? null);
     // Token de pessoa dura 1 a 2 horas: troca pelo de 60 dias. Token de sistema não troca (e não precisa).
     token = (await longLivedToken(token, appId, appSecret)) ?? token;
     accounts = await listAdAccounts(token, { id: appId, secret: appSecret });
   } catch (e) {
+    if (!(e instanceof MetaAdsError)) console.error('[crm] conexão dos anúncios falhou', { tenantId, erro: e instanceof Error ? e.name : 'desconhecido' });
     return { ok: false, message: why(e) };
   }
   if (accounts.length === 0) {

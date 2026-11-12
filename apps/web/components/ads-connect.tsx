@@ -80,7 +80,7 @@ export function AdsConnect({
         const code = r.authResponse?.code;
         if (!code) return setEstado('parado');
         setEstado('salvando');
-        void finishAdsLoginAction(code).then((res) => {
+        void finishAdsLoginAction(code, `${window.location.origin}${window.location.pathname}`).then((res) => {
           setEstado('parado');
           if (!res.ok) return setErro(res.message);
           if (res.chosen) {
