@@ -21,11 +21,40 @@ export function adsConfigured(): boolean {
   return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_ADS_CONFIG_ID);
 }
 
+/**
+ * Como a janela da Meta devolve a autorização:
+ * - 'token' (padrão): configuração de token de pessoa. A janela entrega o token
+ *   direto; trocar código dá erro de endereço de retorno no SDK da Meta.
+ * - 'code': configuração de token de usuário do sistema (exige código). Ligar
+ *   com META_ADS_FLOW=code quando voltar a ela.
+ */
+export type AdsFlow = 'token' | 'code';
+export const adsFlow = (): AdsFlow => (process.env.META_ADS_FLOW?.trim() === 'code' ? 'code' : 'token');
+
 /** O que o botão precisa para abrir a janela (nada disso é segredo). */
-export function adsLoginConfig(): { appId: string; configId: string; version: string } | null {
+export function adsLoginConfig(): { appId: string; configId: string; version: string; flow: AdsFlow } | null {
   return adsConfigured()
-    ? { appId: process.env.META_APP_ID!, configId: process.env.META_ADS_CONFIG_ID!, version: graphVersion() }
+    ? { appId: process.env.META_APP_ID!, configId: process.env.META_ADS_CONFIG_ID!, version: graphVersion(), flow: adsFlow() }
     : null;
+}
+
+/**
+ * Confere com a Meta que o token veio do nosso app e é válido, antes de usar.
+ * Sem isso, alguém poderia mandar um token de outro app.
+ */
+async function checkUserToken(token: string, appId: string, appSecret: string): Promise<boolean> {
+  try {
+    const url = new URL(`https://graph.facebook.com/${graphVersion()}/debug_token`);
+    url.searchParams.set('input_token', token);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${appId}|${appSecret}` }, signal: AbortSignal.timeout(15_000), cache: 'no-store' });
+    const body = (await res.json().catch(() => ({}))) as { data?: { is_valid?: boolean; app_id?: string; scopes?: string[] } };
+    const ok = res.ok && body.data?.is_valid === true && body.data.app_id === appId;
+    if (!ok) console.error('[crm] token dos anúncios recusado', { status: res.status, valido: body.data?.is_valid ?? null, mesmoApp: body.data?.app_id === appId });
+    else console.info('[crm] token dos anúncios conferido', { permissoes: (body.data?.scopes ?? []).join(',') });
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 function masterKey(): string {
@@ -159,19 +188,29 @@ export async function adsCredentials(tenantId: string): Promise<{ token: string;
 export async function startAdsConnection(
   tenantId: string,
   userId: string | null,
-  code: string,
+  /** O que a janela da Meta devolveu: código (token de sistema) ou o token de pessoa. */
+  auth: { code?: string | null; accessToken?: string | null },
   /** A página onde a janela da Meta foi aberta: algumas trocas de código pedem o mesmo endereço. */
   pageUrl?: string | null,
 ): Promise<Result<{ accounts: AdAccountOption[]; chosen: AdAccountOption | null }>> {
+  const code = typeof auth.code === 'string' ? auth.code : '';
+  const direto = typeof auth.accessToken === 'string' ? auth.accessToken : '';
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   if (!appId || !appSecret || !adsConfigured()) return { ok: false, message: 'A conexão com a Meta ainda não está configurada no servidor.' };
-  if (!code || code.length > 2000) return { ok: false, message: 'A Meta não devolveu a autorização. Tente de novo.' };
+  if ((!code && !direto) || code.length > 2000 || direto.length > 2000) {
+    return { ok: false, message: 'A Meta não devolveu a autorização. Tente de novo.' };
+  }
 
   let token: string;
   let accounts: AdAccountOption[];
   try {
-    token = await exchangeCode(code, appId, appSecret, pageUrl ?? null);
+    if (direto) {
+      if (!(await checkUserToken(direto, appId, appSecret))) return { ok: false, message: 'A Meta não confirmou a autorização. Clique em Conectar de novo.' };
+      token = direto;
+    } else {
+      token = await exchangeCode(code, appId, appSecret, pageUrl ?? null);
+    }
     // Token de pessoa dura 1 a 2 horas: troca pelo de 60 dias. Token de sistema não troca (e não precisa).
     token = (await longLivedToken(token, appId, appSecret)) ?? token;
     accounts = await listAdAccounts(token, { id: appId, secret: appSecret });

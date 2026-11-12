@@ -34,11 +34,12 @@ async function paginaDoSite(pageUrl: unknown): Promise<string | null> {
 }
 
 export const finishAdsLoginAction = async (
-  code: string,
+  auth: { code?: string; accessToken?: string },
   pageUrl?: string,
 ): Promise<Result<{ accounts: AdAccountOption[]; chosen: AdAccountOption | null }>> => {
   const pagina = await paginaDoSite(pageUrl);
-  return comoGestor((g) => ads.startAdsConnection(g.tenantId, g.userId, String(code ?? ''), pagina));
+  const limpo = { code: typeof auth?.code === 'string' ? auth.code : null, accessToken: typeof auth?.accessToken === 'string' ? auth.accessToken : null };
+  return comoGestor((g) => ads.startAdsConnection(g.tenantId, g.userId, limpo, pagina));
 };
 
 export const chooseAdAccountAction = async (accountId: string): Promise<Result> =>
