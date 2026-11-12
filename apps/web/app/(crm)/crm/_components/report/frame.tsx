@@ -61,8 +61,14 @@ export function ReportFrame({
     <div className="flex min-h-full flex-col">
       <div className="border-b border-border bg-surface px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-3">
-          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-          <div role="group" aria-label="Período" className="segmented -mx-1 max-w-full overflow-x-auto">
+          <h1 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <span className="relative flex h-2 w-2" aria-hidden="true">
+              <span className="viz-ping absolute inset-0 rounded-full bg-primary" />
+              <span className="relative h-2 w-2 rounded-full bg-primary" />
+            </span>
+            {title}
+          </h1>
+          <div role="group" aria-label="Período" className="segmented -mx-1 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {periods.map((p) => (
               <button
                 key={p.key}
@@ -95,7 +101,7 @@ export function ReportFrame({
           )}
           {(updatedAt || refresh) && (
             <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-              {updatedAt && <span>{updatedAt}</span>}
+              {updatedAt && <span className="font-mono text-[11px] tabular-nums">{updatedAt}</span>}
               {refresh && (
                 <button type="button" onClick={atualizar} disabled={pending} className="btn-outline btn-sm">
                   <RefreshCw className={`h-3.5 w-3.5 ${pending ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
@@ -113,7 +119,7 @@ export function ReportFrame({
       </div>
       <div
         aria-busy={pending}
-        className={`flex-1 bg-board px-4 py-5 transition-opacity duration-200 sm:px-6 ${pending ? 'opacity-60' : ''}`}
+        className={`viz-stage flex-1 px-4 py-5 transition-opacity duration-200 sm:px-6 sm:py-6 ${pending ? 'opacity-60' : ''}`}
       >
         <div className="mx-auto w-full max-w-[1400px] space-y-5">{children}</div>
       </div>
@@ -126,7 +132,7 @@ export function ReportFrame({
 
 /** O esqueleto das telas de números, no formato real, para o primeiro carregamento. */
 export function ReportSkeleton({ title, tiles = 5 }: { title: string; tiles?: number }) {
-  const bloco = 'animate-pulse rounded-xl border border-border/70 bg-surface motion-reduce:animate-none';
+  const bloco = 'viz-card animate-pulse motion-reduce:animate-none';
   return (
     <div className="flex min-h-full flex-col" aria-busy="true">
       <div className="border-b border-border bg-surface px-4 py-3 sm:px-6">
@@ -135,7 +141,7 @@ export function ReportSkeleton({ title, tiles = 5 }: { title: string; tiles?: nu
           <span className="h-8 w-72 max-w-[50%] animate-pulse rounded-lg bg-surface-alt motion-reduce:animate-none" />
         </div>
       </div>
-      <div className="flex-1 bg-board px-4 py-5 sm:px-6">
+      <div className="viz-stage flex-1 px-4 py-5 sm:px-6 sm:py-6">
         <div className="mx-auto w-full max-w-[1400px] space-y-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
             {Array.from({ length: tiles }, (_, i) => (

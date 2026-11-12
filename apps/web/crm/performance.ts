@@ -47,6 +47,12 @@ export interface PerformanceData {
     scheduledToWon: Metric;
     revenueCents: Metric;
     won: number;
+    /** Valor médio de cada negócio fechado no período, em centavos. */
+    ticketCents: Metric;
+    /** Quantos dias, na mediana, do primeiro contato até fechar. */
+    cycleDays: number | null;
+    /** Negócios perdidos no período. */
+    lost: number;
     responseMinutes: Metric;
     openLeads: number;
     openValueCents: number;
@@ -58,6 +64,8 @@ export interface PerformanceData {
   sources: { label: string; leads: number; won: number }[];
   stages: { id: string; name: string; reached: number; lostHere: number }[];
   lostReasons: { label: string; count: number }[];
+  /** Os procedimentos mais procurados pelos leads do período. */
+  procedures: { label: string; leads: number; won: number; revenueCents: number }[];
   team: { id: string; name: string; attended: number; scheduled: number; won: number; revenueCents: number; responseMinutes: number | null }[];
   bot: { attended: number };
 }
@@ -140,6 +148,8 @@ export async function loadPerformance(
     atendeu,
     agendouPor,
     ganhouPor,
+    ciclo,
+    porProcedimento,
   ] = await Promise.all([
     cohort(current),
     cohort(previous),
@@ -222,11 +232,35 @@ export async function loadPerformance(
       _count: true,
       _sum: { estimatedValueCents: true },
     }),
+    // Do primeiro contato até fechar, em dias (mediana dos fechados no período).
+    prisma.$queryRaw<{ dias: number | null }[]>(Prisma.sql`
+      SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (l."wonAt" - l."createdAt")) / 86400.0)::float8 AS dias
+      FROM "leads" l
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."wonAt" >= ${current.from} AND l."wonAt" < ${current.to} ${dono}
+    `),
+    prisma.$queryRaw<{ pid: string; n: number; won: number; cents: bigint | number | null }[]>(Prisma.sql`
+      SELECT l."interestProcedureId" AS pid, count(*)::int AS n,
+        count(*) FILTER (WHERE l."wonAt" IS NOT NULL)::int AS won,
+        sum(CASE WHEN l."wonAt" IS NOT NULL THEN COALESCE(l."estimatedValueCents", 0) ELSE 0 END)::bigint AS cents
+      FROM "leads" l
+      WHERE l."tenantId" = ${tenantId} AND l."deletedAt" IS NULL AND l."interestProcedureId" IS NOT NULL
+        AND l."createdAt" >= ${current.from} AND l."createdAt" < ${current.to} ${dono}
+      GROUP BY 1
+      ORDER BY 2 DESC
+      LIMIT 8
+    `),
   ]);
 
   const nomesMotivo = new Map(
     (await ctx.db.lostReason.findMany({ where: { id: { in: motivos.map((m) => m.lostReasonId).filter((id): id is string => !!id) } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]),
   );
+
+  const nomesProcedimento = new Map(
+    (porProcedimento.length ? await ctx.db.procedure.findMany({ where: { id: { in: porProcedimento.map((p) => p.pid) } }, select: { id: true, name: true } }) : []).map((p) => [p.id, p.name]),
+  );
+  const perdidos = motivos.reduce((s, m) => s + m._count, 0);
+  const ticket = (g: { _count: number; _sum: { estimatedValueCents: number | null } }) =>
+    g._count > 0 ? Math.round((g._sum.estimatedValueCents ?? 0) / g._count) : null;
 
   const resposta = responseMedians(msgs);
   const respostaAntes = responseMedians(msgsAntes);
@@ -262,6 +296,9 @@ export async function loadPerformance(
       scheduledToWon: metric(rate(coorte.sched_won, coorte.sched), rate(coorteAntes.sched_won, coorteAntes.sched)),
       revenueCents: metric(receita, ganhosAntes._sum.estimatedValueCents ?? 0),
       won: ganhosAgora._count,
+      ticketCents: metric(ticket(ganhosAgora), ticket(ganhosAntes)),
+      cycleDays: ciclo[0]?.dias == null ? null : Math.round(ciclo[0].dias * 10) / 10,
+      lost: perdidos,
       responseMinutes: metric(resposta.all, respostaAntes.all, true),
       openLeads: abertos._count,
       openValueCents: abertos._sum.estimatedValueCents ?? 0,
@@ -277,6 +314,12 @@ export async function loadPerformance(
     lostReasons: motivos
       .map((m) => ({ label: m.lostReasonId ? nomesMotivo.get(m.lostReasonId) ?? 'Motivo removido' : 'Sem motivo', count: m._count }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR')),
+    procedures: porProcedimento.map((p) => ({
+      label: nomesProcedimento.get(p.pid) ?? 'Procedimento removido',
+      leads: p.n,
+      won: p.won,
+      revenueCents: Number(p.cents ?? 0),
+    })),
     team: equipe,
     bot: { attended: ctx.ownOnly ? 0 : atendeu.filter((x) => x.bot).reduce((s, x) => s + x.n, 0) },
   };

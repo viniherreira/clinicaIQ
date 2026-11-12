@@ -212,6 +212,12 @@ describe.skipIf(!process.env.DATABASE_URL)('Gerenciador de Anúncios: conexão e
     meta({
       insights: (u) => {
         const nivel = u.searchParams.get('level');
+        const recorte = u.searchParams.get('breakdowns');
+        const conversas = (n: string) => ({ spend: '100.00', impressions: '900', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: n }] });
+        if (recorte === 'publisher_platform') return { body: { data: [{ publisher_platform: 'instagram', ...conversas('7') }, { publisher_platform: 'facebook', ...conversas('3') }] } };
+        if (recorte === 'age,gender') return { body: { data: [{ age: '35-44', gender: 'female', ...conversas('6') }, { age: '25-34', gender: 'male', ...conversas('4') }] } };
+        // A Meta nega o recorte por hora: a tela segue sem aquele gráfico.
+        if (recorte) return { status: 400, body: { error: { code: 100, message: 'breakdown não permitido' } } };
         if (u.searchParams.get('time_increment')) return { body: { data: [{ ...linha, date_start: hoje, date_stop: hoje }] } };
         if (nivel === 'ad') return { body: { data: [{ ...linha, ad_id: '120200000000001', ad_name: 'Vídeo implante' }] } };
         return { body: { data: [linha] } };
@@ -228,6 +234,12 @@ describe.skipIf(!process.env.DATABASE_URL)('Gerenciador de Anúncios: conexão e
     expect(r.report.funnel.map((f) => f.value)).toEqual([2000, 40, 10, 2, 1, 1]);
     expect(r.report.lines[0]).toMatchObject({ name: 'Implante', status: 'good' });
     expect(r.report.lines[0].ads[0]).toMatchObject({ name: 'Vídeo implante', thumbnailUrl: 'https://scontent.xx/t.jpg', won: 1 });
+    expect(r.report.delivery).toMatchObject({ impressions: 5000, reach: 2000, cpmCents: 6000, ticketCents: 450000 });
+    // Os recortes: lugar, idade e gênero; o de hora falhou e ficou vazio.
+    expect(r.breakdowns.platforms.lines.map((l) => [l.label, l.value])).toEqual([['Instagram', 7], ['Facebook', 3]]);
+    expect(r.breakdowns.audience.top).toEqual({ age: '35-44', gender: 'female', value: 6 });
+    expect(r.breakdowns.audience.totals).toEqual({ female: 6, male: 4, unknown: 0 });
+    expect(r.breakdowns.hours.peak).toBeNull();
     // Nenhum pedido levou o token no endereço.
     expect(pedidos.every((p) => !p.url.includes('TOKEN-SECRETO'))).toBe(true);
   });

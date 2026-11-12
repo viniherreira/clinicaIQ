@@ -50,6 +50,9 @@ describe.skipIf(!process.env.DATABASE_URL)('Painel de desempenho (banco)', async
   await moveLead(db, como(ana.id), fechou, { stageId: etapa('WON') });
   const motivo = await db.lostReason.findFirst();
   await moveLead(db, como(ana.id), perdeu, { stageId: etapa('LOST'), lostReasonId: motivo!.id });
+  // Os dois da Ana queriam implante.
+  const implante = await prisma.procedure.create({ data: { tenantId: tenant.id, name: `Implante ${suffix}`, basePrice: 3000, durationMinutes: 60 } });
+  await prisma.lead.updateMany({ where: { id: { in: [fechou, perdeu] } }, data: { interestProcedureId: implante.id } });
   // Um lead de outra clínica não pode aparecer.
   const dbOutra = getTenantClient(outra.id);
   await createLead(dbOutra, { tenantId: outra.id, userId: null }, { name: 'De fora', phone: '11 95555-0000', source: 'SITE' });
@@ -75,6 +78,7 @@ describe.skipIf(!process.env.DATABASE_URL)('Painel de desempenho (banco)', async
       await prisma.leadTag.deleteMany({ where: t });
       await prisma.leadActivity.deleteMany({ where: t });
       await prisma.lead.deleteMany({ where: t });
+      await prisma.procedure.deleteMany({ where: t });
       await prisma.lostReason.deleteMany({ where: t });
       await prisma.pipelineStage.deleteMany({ where: t });
       await prisma.pipeline.deleteMany({ where: t });
@@ -97,8 +101,18 @@ describe.skipIf(!process.env.DATABASE_URL)('Painel de desempenho (banco)', async
     // Sem período anterior: não inventa variação.
     expect(d.kpis.newLeads.change).toBeNull();
 
+    // Ticket médio: R$ 3.000 em 1 fechamento. Fechou no mesmo dia em que chegou.
+    expect(d.kpis.ticketCents.value).toBe(300000);
+    expect(d.kpis.ticketCents.change).toBeNull();
+    expect(d.kpis.cycleDays).toBe(0);
+    expect(d.kpis.lost).toBe(1);
+    expect(d.procedures).toEqual([{ label: implante.name, leads: 2, won: 1, revenueCents: 300000 }]);
+
     expect(d.arrivals.total).toBe(3);
     expect(d.arrivals.peak?.n).toBe(3);
+    expect(d.arrivals.byHour).toHaveLength(24);
+    expect(d.arrivals.byHour.reduce((a, b) => a + b, 0)).toBe(3);
+    expect(d.arrivals.top[0]).toEqual(d.arrivals.peak);
     expect(d.arrivals.days).toBe(90);
     expect(d.months).toHaveLength(12);
     expect(d.months.at(-1)).toMatchObject({ leads: 3, won: 1 });
@@ -126,6 +140,9 @@ describe.skipIf(!process.env.DATABASE_URL)('Painel de desempenho (banco)', async
     expect(d.kpis.leadToScheduled.value).toBe(0);
     expect(d.sources).toEqual([{ label: 'WhatsApp', leads: 1, won: 0 }]);
     expect(d.lostReasons).toEqual([]);
+    expect(d.procedures).toEqual([]);
+    expect(d.kpis).toMatchObject({ cycleDays: null, lost: 0 });
+    expect(d.kpis.ticketCents.value).toBeNull();
     expect(d.team.map((p) => p.name)).toEqual(['Bia']);
     expect(d.team[0]).toMatchObject({ attended: 0, won: 0 });
   });

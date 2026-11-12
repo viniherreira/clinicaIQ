@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArrivals, firstResponseWaits, lastMonths, median, monthLabel, peakText, responseMedians, type PersonSample } from './performance-rules';
+import { bestIndex, buildArrivals, firstResponseWaits, lastMonths, median, monthLabel, peakText, responseMedians, type PersonSample } from './performance-rules';
 
 const msg = (conversationId: string, min: number, direction: 'INBOUND' | 'OUTBOUND', origin: string, sentById: string | null = null): PersonSample => ({
   conversationId,
@@ -60,6 +60,16 @@ describe('quando os leads chegam', () => {
     expect(a.byWeekOfMonth).toEqual([3, 2, 1, 0, 4]);
     expect(a.total).toBe(10);
     expect(a.peak).toEqual({ day: 0, hour: 9, n: 5 });
+    // Por hora do dia e os horários mais cheios, em ordem.
+    expect(a.byHour[9]).toBe(5);
+    expect(a.byHour[19]).toBe(4);
+    expect(a.top.map((t) => [t.day, t.hour, t.n])).toEqual([
+      [0, 9, 5],
+      [3, 19, 4],
+      [6, 23, 1],
+    ]);
+    expect(bestIndex(a.byWeekOfMonth)).toBe(4);
+    expect(bestIndex([0, 0])).toBeNull();
     expect(peakText(a.peak!)).toBe('Segunda, das 9h às 10h');
     expect(buildArrivals([]).peak).toBeNull();
   });
