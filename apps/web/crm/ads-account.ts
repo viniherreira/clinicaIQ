@@ -56,6 +56,22 @@ async function audit(tenantId: string, userId: string | null, action: string, me
     .catch(() => undefined);
 }
 
+/** Troca um token de pessoa pelo de longa duração (60 dias). Nulo se a Meta não trocar. */
+async function longLivedToken(token: string, appId: string, appSecret: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/${graphVersion()}/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: token }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { access_token?: string };
+    return res.ok && body.access_token ? body.access_token : null;
+  } catch {
+    return null;
+  }
+}
+
 const why = (e: unknown) => (e instanceof MetaAdsError ? e.message : 'Não foi possível falar com a Meta agora. Tente de novo.');
 
 function tokenOf(tenantId: string, ads: AdsSettings): string | null {
@@ -113,6 +129,8 @@ export async function startAdsConnection(
   let accounts: AdAccountOption[];
   try {
     token = await exchangeSignupCode({ appId, appSecret, code, version: graphVersion() });
+    // Token de pessoa dura 1 a 2 horas: troca pelo de 60 dias. Token de sistema não troca (e não precisa).
+    token = (await longLivedToken(token, appId, appSecret)) ?? token;
     accounts = await listAdAccounts(token, { id: appId, secret: appSecret });
   } catch (e) {
     return { ok: false, message: why(e) };

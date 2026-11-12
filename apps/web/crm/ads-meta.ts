@@ -12,6 +12,9 @@ export class MetaAdsError extends Error {
   constructor(
     readonly kind: MetaErrorKind,
     message: string,
+    /** Código e subcódigo do erro da Meta (números, sem dado pessoal): servem para o diagnóstico. */
+    readonly code?: number,
+    readonly subcode?: number,
   ) {
     super(message);
     this.name = 'MetaAdsError';
@@ -32,7 +35,8 @@ async function graphGet<T>(path: string, params: Record<string, string>, token: 
   const body = (await res.json().catch(() => ({}))) as T;
   if (!res.ok) {
     const e = classifyMetaError(res.status, body);
-    throw new MetaAdsError(e.kind, e.message);
+    const err = (body as { error?: { code?: number; error_subcode?: number } } | null)?.error;
+    throw new MetaAdsError(e.kind, e.message, err?.code ?? res.status, err?.error_subcode);
   }
   return body;
 }
@@ -100,7 +104,7 @@ export async function listAdAccounts(token: string, app: { id: string; secret: s
     } catch (e) {
       // Token inválido ou pausa da Meta: não adianta tentar os outros caminhos.
       if (e instanceof MetaAdsError && (e.kind === 'auth' || e.kind === 'rate')) throw e;
-      passos[nome] = e instanceof MetaAdsError ? `erro:${e.kind}` : 'erro';
+      passos[nome] = e instanceof MetaAdsError ? `erro:${e.kind}:${e.code ?? '?'}${e.subcode ? `/${e.subcode}` : ''}` : 'erro';
       return [];
     }
   };
@@ -117,12 +121,17 @@ export async function listAdAccounts(token: string, app: { id: string; secret: s
   if (contas.length) return fim(contas);
 
   // O que a Meta diz que este token alcança: contas de anúncios e empresas.
-  const debug = await graphGet<{ data?: { granular_scopes?: { scope?: string; target_ids?: string[] }[] } }>(
-    'debug_token',
-    { input_token: token },
-    `${app.id}|${app.secret}`,
-  ).catch(() => ({ data: undefined }));
+  type Debug = { data?: { is_valid?: boolean; type?: string; app_id?: string; scopes?: string[]; granular_scopes?: { scope?: string; target_ids?: string[] }[] } };
+  const debug = await graphGet<Debug>('debug_token', { input_token: token }, `${app.id}|${app.secret}`).catch((e) => {
+    passos.debug = e instanceof MetaAdsError ? `erro:${e.kind}:${e.code ?? '?'}` : 'erro';
+    return { data: undefined } as Debug;
+  });
   const escopos = debug.data?.granular_scopes ?? [];
+  if (debug.data) {
+    // Só o tipo do token, se é válido e os nomes das permissões: nada que identifique alguém.
+    passos.token = `${debug.data.type ?? '?'}${debug.data.is_valid === false ? ':invalido' : ''}${debug.data.app_id && debug.data.app_id !== app.id ? ':outro-app' : ''}`;
+    passos.permissoes = (debug.data.scopes ?? []).join(',') || 'nenhuma';
+  }
   passos.escopos = escopos.map((e) => `${e.scope}:${e.target_ids?.length ?? 'todos'}`).join(',') || 'nenhum';
   const alvos = (nomes: string[]) => [...new Set(escopos.filter((e) => nomes.includes(e.scope ?? '')).flatMap((e) => e.target_ids ?? []))];
 
