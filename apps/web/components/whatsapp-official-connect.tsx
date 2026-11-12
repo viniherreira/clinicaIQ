@@ -32,7 +32,8 @@ declare global {
   }
 }
 
-function loadSdk(appId: string, version: string): Promise<void> {
+/** Carrega o SDK da Meta (uma vez por página). Usado também para conectar os anúncios. */
+export function loadMetaSdk(appId: string, version: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.FB) return resolve();
     window.fbAsyncInit = () => {
@@ -98,7 +99,7 @@ export function EmbeddedSignup({
 
   async function abrir() {
     try {
-      await loadSdk(signup.appId, signup.version);
+      await loadMetaSdk(signup.appId, signup.version);
     } catch {
       onDone({ ok: false, message: 'Não foi possível abrir a janela da Meta. Confira se algum bloqueador está ativo.' });
       return;

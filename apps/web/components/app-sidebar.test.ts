@@ -83,13 +83,13 @@ describe('navFor — espaço do CRM', () => {
   });
 
   it('a recepção trabalha o funil; só dono e admin configuram', () => {
-    expect(crm('RECEPTIONIST')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/configuracoes']);
+    expect(crm('RECEPTIONIST')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/anuncios', '/crm/configuracoes']);
     expect(crm('OWNER')).toEqual(CRM_NAV.map((i) => i.href));
     expect(crm('ADMIN')).toContain('/crm/configuracoes');
   });
 
   it('o profissional usa o CRM, mas sem as configurações', () => {
-    expect(crm('PROFESSIONAL')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/configuracoes']);
+    expect(crm('PROFESSIONAL')).toEqual(['/crm/painel', '/crm', '/crm/conversas', '/crm/leads', '/crm/tarefas', '/crm/automacoes', '/crm/anuncios', '/crm/configuracoes']);
   });
 
   it('as configurações do CRM seguem o cargo no CRM, não o perfil', () => {
