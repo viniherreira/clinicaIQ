@@ -4,6 +4,9 @@ import { conversationHashes, encryptPhone, phoneHash } from './phone';
 import { queueTriggeredBot } from './bot-queue';
 import { queueStageAutomations } from './stage-queue';
 import { channelTagForNewLead } from './auto-tags';
+import { conversionForRole } from './meta-conversions-rules';
+import { reportConversion } from './meta-conversions';
+import { runAfter } from './run-after';
 
 /**
  * Operações do lead. Cada uma grava a mudança e o registro no histórico na
@@ -133,7 +136,7 @@ export async function moveLead(
   },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { tenantId } = actor;
-  return db.$transaction(async (tx) => {
+  const r = await db.$transaction(async (tx) => {
     const [lead, stages] = await Promise.all([
       tx.lead.findFirst({ where: { id: leadId, tenantId, deletedAt: null } }),
       tx.pipelineStage.findMany({ where: { tenantId } }),
@@ -193,8 +196,14 @@ export async function moveLead(
         },
       });
     }
-    return { ok: true as const };
+    return { ok: true as const, conversion: mudouEtapa ? conversionForRole(target.role) : null };
   });
+  if (!r.ok) return r;
+  // Entrou em Agendados ou Fechou: avisa a Meta (só quem veio de anúncio),
+  // depois da resposta. Importação de planilha não conta.
+  const conversion = r.conversion;
+  if (conversion && input.origin?.reason !== 'import') runAfter(() => reportConversion(tenantId, leadId, conversion));
+  return { ok: true };
 }
 
 // ─── Criar e editar ──────────────────────────────────────────────────────────

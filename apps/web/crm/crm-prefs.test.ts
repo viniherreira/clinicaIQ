@@ -3,12 +3,13 @@ import { needsSignature, readCrmPrefs, signText } from './crm-prefs';
 
 describe('readCrmPrefs', () => {
   it('padrão: lead automático, sem reusar fechado, sem assinatura', () => {
-    expect(readCrmPrefs(null)).toEqual({ autoLead: true, reuseClosedLead: false, senderName: false, autoTags: true });
+    expect(readCrmPrefs(null)).toEqual({ autoLead: true, reuseClosedLead: false, senderName: false, autoTags: true, metaEvents: true });
     expect(readCrmPrefs({ crm: { autoLead: false, senderName: true, reuseClosedLead: 'sim' } })).toEqual({
       autoLead: false,
       reuseClosedLead: false,
       senderName: true,
       autoTags: true,
+      metaEvents: true,
     });
   });
 });

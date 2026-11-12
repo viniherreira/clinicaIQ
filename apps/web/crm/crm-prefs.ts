@@ -21,9 +21,14 @@ export interface CrmPrefs {
    * clareamento…). Ver `crm/auto-tags.ts`.
    */
   autoTags: boolean;
+  /**
+   * Avisa a Meta quando um lead que veio de anúncio agenda ou fecha
+   * (Conversions API). Ver `crm/meta-conversions.ts`.
+   */
+  metaEvents: boolean;
 }
 
-export const CRM_PREFS_DEFAULTS: CrmPrefs = { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: true };
+export const CRM_PREFS_DEFAULTS: CrmPrefs = { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: true, metaEvents: true };
 
 export function readCrmPrefs(settings: unknown): CrmPrefs {
   const raw = settings && typeof settings === 'object' ? (settings as Record<string, unknown>).crm : undefined;
@@ -35,6 +40,7 @@ export function readCrmPrefs(settings: unknown): CrmPrefs {
     reuseClosedLead: bool(o.reuseClosedLead, d.reuseClosedLead),
     senderName: bool(o.senderName, d.senderName),
     autoTags: bool(o.autoTags, d.autoTags),
+    metaEvents: bool(o.metaEvents, d.metaEvents),
   };
 }
 

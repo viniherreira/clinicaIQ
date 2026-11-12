@@ -147,14 +147,15 @@ async function applyEvent(tenantId: string, event: ClinicEvent) {
     },
   });
 
+  // O valor antes de mover: o aviso de "fechou" à Meta leva o valor do orçamento.
+  if (plan.wonValueCents !== undefined) {
+    await db.lead.update({ where: { id: lead.id, tenantId }, data: { estimatedValueCents: plan.wonValueCents } });
+  }
+
   if (plan.moveTo && plan.moveTo !== lead.stageId) {
     await moveLead(db, automacao, lead.id, { stageId: plan.moveTo, origin: { event: event.type, ...ref } });
     // As automações "na hora" da etapa nova (mensagem, tarefa…) saem já.
     await runDueAutomations(new Date(), { tenantId });
-  }
-
-  if (plan.wonValueCents !== undefined) {
-    await db.lead.update({ where: { id: lead.id, tenantId }, data: { estimatedValueCents: plan.wonValueCents } });
   }
 
   if (plan.completes?.length) {
