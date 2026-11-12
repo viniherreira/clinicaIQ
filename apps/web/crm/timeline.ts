@@ -43,6 +43,8 @@ const CLINIC_TEXT: Record<string, string> = {
   'quote.reopened': 'Orçamento reaberto',
   'quote.rejected': 'Orçamento recusado pelo paciente',
   'quote.deleted': 'Orçamento excluído',
+  'meta.agendou': 'Meta avisada: agendou (conta no Gerenciador de Anúncios)',
+  'meta.fechou': 'Meta avisada: fechou (conta no Gerenciador de Anúncios)',
 };
 
 const SOURCE: Record<string, string> = {

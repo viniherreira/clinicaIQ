@@ -103,6 +103,24 @@ export function GeneralSection({ initial }: { initial: CrmPrefs }) {
         </span>
       </label>
 
+      <label aria-label="Avisar a Meta quando agendar ou fechar" className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={s.p.metaEvents}
+          onChange={(e) => s.setP({ ...s.p, metaEvents: e.target.checked })}
+          className={`${switchCls} mt-0.5`}
+        />
+        <span>
+          <span className="block text-sm font-semibold">Avisar a Meta quando agendar ou fechar</span>
+          <span className="block text-xs text-muted-foreground">
+            Quem chegou por anúncio de WhatsApp e entra em Agendados ou Fechou é contado no Gerenciador de Anúncios (com o valor do
+            negócio). Assim você vê o custo por agendamento e por paciente, e a Meta procura pessoas parecidas com quem fecha. Vai só o
+            código do clique no anúncio: nada de nome, telefone ou conversa.
+          </span>
+        </span>
+      </label>
+
       <fieldset className="mt-4">
         <legend className="text-sm font-semibold">Quem já teve negócio fechado e escreve de novo</legend>
         <div className="mt-2 space-y-2">

@@ -209,9 +209,9 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
 
   it('preferências: número novo sem lead automático e volta ao negócio fechado', async () => {
     const { readCrmPrefs } = await import('./crm-prefs');
-    await team.savePrefs(tenant.id, { autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false });
+    await team.savePrefs(tenant.id, { autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false, metaEvents: false });
     const t = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { settings: true } });
-    expect(readCrmPrefs(t?.settings)).toEqual({ autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false });
+    expect(readCrmPrefs(t?.settings)).toEqual({ autoLead: false, reuseClosedLead: true, senderName: true, autoTags: false, metaEvents: false });
     // A distribuição continua lá (o JSON das configurações é mesclado, não trocado).
     expect((t?.settings as Record<string, unknown>).crmDistribution).toBeTruthy();
 
@@ -231,6 +231,6 @@ describe.skipIf(!process.env.DATABASE_URL)('equipe e distribuição (banco)', as
     const texto = async (id: string) => decrypt((await prisma.chatMessage.findUnique({ where: { id } }))!.textEncrypted!, key, tenant.id);
     expect(await texto(m1.messageId)).toBe('*Ana:*\nOi!');
     expect(await texto(m2.messageId)).toBe('Tudo bem?');
-    await team.savePrefs(tenant.id, { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: false });
+    await team.savePrefs(tenant.id, { autoLead: true, reuseClosedLead: false, senderName: false, autoTags: false, metaEvents: false });
   });
 });
