@@ -26,7 +26,7 @@ declare global {
   interface Window {
     FB?: {
       init: (o: object) => void;
-      login: (cb: (r: { authResponse?: { code?: string } }) => void, o: object) => void;
+      login: (cb: (r: { authResponse?: { code?: string; accessToken?: string } }) => void, o: object) => void;
     };
     fbAsyncInit?: () => void;
   }

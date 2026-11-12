@@ -103,7 +103,7 @@ describe.skipIf(!process.env.DATABASE_URL)('Gerenciador de Anúncios: conexão e
       'oauth/access_token': () => ({ body: { access_token: 'TOKEN-SECRETO' } }),
       'me/adaccounts': () => ({ body: { data: contas } }),
     });
-    const r = await account.startAdsConnection(tenant.id, null, 'CODIGO');
+    const r = await account.startAdsConnection(tenant.id, null, { code: 'CODIGO' });
     expect(r).toMatchObject({ ok: true, chosen: null });
     if (!r.ok) throw new Error(r.message);
     expect(r.accounts.map((a) => [a.id, a.spentCents])).toEqual([
@@ -142,6 +142,33 @@ describe.skipIf(!process.env.DATABASE_URL)('Gerenciador de Anúncios: conexão e
     expect(JSON.stringify(log.mock.calls)).not.toContain('TOKEN-SECRETO');
     expect(log.mock.calls[0][1]).toMatchObject({ 'me/adaccounts': 0, 'empresa/owned_ad_accounts': 1 });
     log.mockRestore();
+  });
+
+  it('token de pessoa direto da janela: confere com a Meta antes de usar', async () => {
+    const outro = await prisma.tenant.create({ data: { clerkOrgId: `adsT_${suffix}`, name: 'Token', slug: `adst-${suffix}` } });
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // Token de outro app: recusa e não grava nada.
+      meta({ debug_token: () => ({ body: { data: { is_valid: true, app_id: 'OUTRO' } } }) });
+      expect(await account.startAdsConnection(outro.id, null, { accessToken: 'TOKEN-DE-FORA' })).toMatchObject({ ok: false });
+      expect(await account.adsConnection(outro.id)).toMatchObject({ state: 'none' });
+
+      meta({
+        debug_token: () => ({ body: { data: { is_valid: true, app_id: 'APP', scopes: ['ads_read'] } } }),
+        'oauth/access_token': () => ({ body: { access_token: 'TOKEN-60-DIAS' } }),
+        'me/adaccounts': () => ({ body: { data: [contas[1]] } }),
+      });
+      const r = await account.startAdsConnection(outro.id, null, { accessToken: 'TOKEN-CURTO' });
+      expect(r).toMatchObject({ ok: true, chosen: { id: '3745555152329524' } });
+      // Guardou o de 60 dias, não o curto.
+      expect(await account.adsCredentials(outro.id)).toEqual({ token: 'TOKEN-60-DIAS', accountId: '3745555152329524' });
+    } finally {
+      info.mockRestore();
+      erro.mockRestore();
+      await prisma.auditLog.deleteMany({ where: { tenantId: outro.id } });
+      await prisma.tenant.delete({ where: { id: outro.id } });
+    }
   });
 
   it('escolher a conta: confere com a Meta antes de gravar', async () => {

@@ -22,6 +22,8 @@ export interface AdsLoginConfig {
   appId: string;
   configId: string;
   version: string;
+  /** 'token': a janela devolve o token de pessoa; 'code': devolve o código (token de sistema). */
+  flow: 'token' | 'code';
 }
 
 export interface AdsConnectionView {
@@ -78,9 +80,11 @@ export function AdsConnect({
     window.FB!.login(
       (r) => {
         const code = r.authResponse?.code;
-        if (!code) return setEstado('parado');
+        const accessToken = r.authResponse?.accessToken;
+        if (!code && !accessToken) return setEstado('parado');
         setEstado('salvando');
-        void finishAdsLoginAction(code, `${window.location.origin}${window.location.pathname}`).then((res) => {
+        // O token só passa daqui para o servidor, que confere com a Meta e guarda cifrado; nunca aparece na tela.
+        void finishAdsLoginAction(code ? { code } : { accessToken }, `${window.location.origin}${window.location.pathname}`).then((res) => {
           setEstado('parado');
           if (!res.ok) return setErro(res.message);
           if (res.chosen) {
@@ -93,7 +97,9 @@ export function AdsConnect({
           router.refresh();
         });
       },
-      { config_id: login.configId, response_type: 'code', override_default_response_type: true },
+      login.flow === 'code'
+        ? { config_id: login.configId, response_type: 'code', override_default_response_type: true }
+        : { config_id: login.configId },
     );
   }
 
