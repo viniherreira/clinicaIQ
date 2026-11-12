@@ -44,8 +44,9 @@ async function readSettings(tenantId: string): Promise<{ all: Record<string, unk
 /** Grava só a parte `ads` das configurações; o resto do JSON fica como está. */
 async function writeAds(tenantId: string, ads: AdsSettings | null): Promise<void> {
   const { all } = await readSettings(tenantId);
-  const { ads: _antes, ...resto } = all;
-  const novo = ads ? { ...resto, ads: { ...ads } } : resto;
+  const novo: Record<string, unknown> = { ...all };
+  if (ads) novo.ads = { ...ads };
+  else delete novo.ads;
   await prisma.tenant.update({ where: { id: tenantId }, data: { settings: novo as Prisma.InputJsonValue } });
 }
 

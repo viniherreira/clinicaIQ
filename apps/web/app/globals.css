@@ -428,3 +428,59 @@
   ::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--muted-foreground)); }
   ::-webkit-scrollbar-track { background: transparent; }
 }
+
+/*
+ * Cores dos gráficos (Anúncios e Painel do CRM). Conferidas com o validador de
+ * paletas no claro (#ffffff) e no escuro (#111827): contraste com o fundo,
+ * distância entre as duas séries para quem tem daltonismo e para visão comum.
+ * - meta: o que vem da Meta (gasto, alcance, cliques, conversas) — azul.
+ * - crm: o que vem do CRM (agendou, compareceu, fechou) — verde-água.
+ * - seq-1..5: uma cor só, do pouco ao muito (mapa de calor, funil).
+ * Texto nunca usa estas cores: rótulos e números ficam nas cores de texto.
+ */
+:root {
+  --viz-meta: #2563c9;
+  --viz-crm: #0f9f92;
+  --viz-seq-1: #cde2fb;
+  --viz-seq-2: #86b6ef;
+  --viz-seq-3: #5598e7;
+  --viz-seq-4: #2a78d6;
+  --viz-seq-5: #184f95;
+  --viz-grid: hsl(60 6% 89%);
+  --viz-good: #0ca30c;
+  --viz-warn: #fab219;
+  --viz-bad: #d03b3b;
+}
+.dark {
+  --viz-meta: #3987e5;
+  --viz-crm: #12a594;
+  --viz-seq-1: #0d366b;
+  --viz-seq-2: #184f95;
+  --viz-seq-3: #256abf;
+  --viz-seq-4: #3987e5;
+  --viz-seq-5: #86b6ef;
+  --viz-grid: hsl(220 24% 20%);
+}
+
+@layer utilities {
+  /* As telas de números entram de mansinho; quem pediu menos movimento não vê animação. */
+  /* Só desliza: se a animação não rodar (aba em segundo plano), o conteúdo já está visível. */
+  @keyframes viz-rise {
+    from { transform: translateY(8px); }
+    to { transform: none; }
+  }
+  @keyframes viz-grow-y {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+  @keyframes viz-grow-x {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  .viz-rise { animation: viz-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+  .viz-grow-y { transform-origin: bottom; animation: viz-grow-y 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .viz-grow-x { transform-origin: left; animation: viz-grow-x 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .viz-rise, .viz-grow-y, .viz-grow-x { animation: none; }
+  }
+}

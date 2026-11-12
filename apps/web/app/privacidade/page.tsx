@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMetadata({
 export default function PrivacidadePage() {
   const b = COMPANY.brand;
   return (
-    <LegalPage title="Política de Privacidade" updated="12 de outubro de 2026">
+    <LegalPage title="Política de Privacidade" updated="12 de novembro de 2026">
       <p>
         Esta política explica como o {b} trata dados pessoais, de acordo com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018, a
         &ldquo;LGPD&rdquo;).
@@ -78,6 +78,35 @@ export default function PrivacidadePage() {
         acordo com as políticas dela. As mensagens ficam guardadas no {b} para a clínica acompanhar as conversas. Quem não quiser
         receber mensagens de transmissão pode responder &ldquo;SAIR&rdquo;.
       </p>
+
+      <h3>Anúncios da clínica na Meta</h3>
+      <p>
+        A clínica pode conectar o {b} ao Gerenciador de Anúncios dela (Facebook e Instagram). Essa conexão é opcional, feita por um
+        gestor da clínica na janela da própria Meta, e pode ser desfeita a qualquer momento em CRM &rsaquo; Canais.
+      </p>
+      <ul>
+        <li>
+          <strong>O que lemos:</strong> os números de desempenho dos anúncios da conta escolhida (valor investido, alcance, cliques e
+          conversas iniciadas), além do nome e da imagem das campanhas e dos anúncios. É só leitura: o {b} não cria, não altera e não
+          paga anúncios.
+        </li>
+        <li>
+          <strong>Para quê:</strong> mostrar à clínica quanto custou cada agendamento e cada paciente que veio de anúncio, juntando esses
+          números com as etapas do funil do CRM.
+        </li>
+        <li>
+          <strong>O que guardamos:</strong> a chave de acesso que a Meta entrega fica cifrada e nunca aparece na tela. Os números dos
+          anúncios não são guardados: são buscados na Meta quando a tela é aberta e ficam em memória por até 15 minutos.
+        </li>
+        <li>
+          <strong>O que enviamos à Meta:</strong> se a clínica deixar ligado, avisamos a Meta quando um contato que veio de anúncio
+          agenda ou fecha, com o valor do negócio. Vai só o código do clique no anúncio que a própria Meta gerou. Nome, telefone e
+          conteúdo das conversas não são enviados. A clínica pode desligar em Configurações do CRM.
+        </li>
+        <li>
+          <strong>Ao desconectar:</strong> a chave de acesso é apagada na hora e a tela de anúncios para de mostrar os números da Meta.
+        </li>
+      </ul>
 
       <h2>6. Com quem compartilhamos</h2>
       <p>Compartilhamos dados só com fornecedores que precisamos para o serviço funcionar, sob contrato e com segurança:</p>
