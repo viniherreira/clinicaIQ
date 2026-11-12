@@ -106,6 +106,7 @@ export default async function AnunciosPage({ searchParams }: { searchParams: Pro
   return (
     <AdsReportView
       report={data.report}
+      breakdowns={data.breakdowns}
       period={period}
       accountName={data.connection.accountName}
       range={data.range}

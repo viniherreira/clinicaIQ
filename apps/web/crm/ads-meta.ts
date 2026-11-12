@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { graphVersion } from '@/lib/cloud-account';
-import { accountNumber, classifyMetaError, parseInsight, type AdInfo, type InsightRow, type MetaErrorKind } from './ads-rules';
+import { accountNumber, classifyMetaError, parseBreakdown, parseInsight, type AdInfo, type BreakdownRow, type InsightRow, type MetaErrorKind } from './ads-rules';
 
 /**
  * As chamadas à Meta da tela Anúncios (Marketing API, só leitura). O token vai
@@ -190,6 +190,39 @@ export async function fetchInsights(
     token,
   );
   return rows.map(parseInsight);
+}
+
+export type BreakdownKind = 'platform' | 'audience' | 'hour';
+
+const BREAKDOWNS: Record<BreakdownKind, string[]> = {
+  platform: ['publisher_platform'],
+  audience: ['age', 'gender'],
+  hour: ['hourly_stats_aggregated_by_advertiser_time_zone'],
+};
+
+/** Os números do período recortados: por lugar (Facebook, Instagram), por idade e gênero, ou por hora do dia. */
+export async function fetchBreakdown(
+  token: string,
+  accountId: string,
+  q: { since: string; until: string; kind: BreakdownKind; campaignId?: string | null },
+): Promise<BreakdownRow[]> {
+  const campos = BREAKDOWNS[q.kind];
+  const rows = await graphList<unknown>(
+    `act_${accountId}/insights`,
+    {
+      level: 'account',
+      fields: 'spend,impressions,clicks,inline_link_clicks,actions',
+      breakdowns: campos.join(','),
+      time_range: JSON.stringify({ since: q.since, until: q.until }),
+      ...(q.campaignId && /^\d{5,25}$/.test(q.campaignId)
+        ? { filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: [q.campaignId] }]) }
+        : {}),
+      limit: '500',
+    },
+    token,
+    5,
+  );
+  return rows.map((r) => parseBreakdown(r, campos));
 }
 
 /** A ficha de cada anúncio: nome, campanha e miniatura. Em lotes de 50. */

@@ -3,8 +3,20 @@ import 'server-only';
 import { prisma, Prisma } from '@clinicaiq/db';
 import { unstable_cache } from 'next/cache';
 import { adsConnection, adsCredentials, adsTag, type AdsConnection } from './ads-account';
-import { fetchAdInfo, fetchInsights, MetaAdsError, type InsightLevel } from './ads-meta';
-import { buildAdsReport, type AdInfo, type AdsReport, type CrmEventKind, type CrmEventRow, type InsightRow, type MetaErrorKind } from './ads-rules';
+import { fetchAdInfo, fetchBreakdown, fetchInsights, MetaAdsError, type BreakdownKind, type InsightLevel } from './ads-meta';
+import {
+  buildAdHours,
+  buildAdsReport,
+  buildAudience,
+  buildPlatforms,
+  type AdInfo,
+  type AdsReport,
+  type BreakdownRow,
+  type CrmEventKind,
+  type CrmEventRow,
+  type InsightRow,
+  type MetaErrorKind,
+} from './ads-rules';
 import { daysOf, reportRange, type DayRange, type ReportPeriodKey } from './report-period';
 
 /**
@@ -89,6 +101,7 @@ export async function adLeadEvents(tenantId: string, r: Pick<DayRange, 'from' | 
 export interface MetaFetchers {
   insights(tenantId: string, accountId: string, q: { since: string; until: string; level: InsightLevel; daily: boolean }): Promise<{ rows: InsightRow[]; at: number }>;
   adInfo(tenantId: string, accountId: string, adIds: string[]): Promise<[string, AdInfo][]>;
+  breakdown(tenantId: string, accountId: string, q: { since: string; until: string; kind: BreakdownKind; campaignId: string | null }): Promise<BreakdownRow[]>;
 }
 
 async function tokenFor(tenantId: string, accountId: string): Promise<string> {
@@ -105,6 +118,9 @@ export const liveFetchers: MetaFetchers = {
   },
   async adInfo(tenantId, accountId, adIds) {
     return [...(await fetchAdInfo(await tokenFor(tenantId, accountId), adIds))];
+  },
+  async breakdown(tenantId, accountId, q) {
+    return fetchBreakdown(await tokenFor(tenantId, accountId), accountId, q);
   },
 };
 
@@ -125,14 +141,26 @@ export const cachedFetchers: MetaFetchers = {
       tags: [adsTag(tenantId)],
     })();
   },
+  breakdown: (tenantId, accountId, q) =>
+    unstable_cache(() => liveFetchers.breakdown(tenantId, accountId, q), ['ads-breakdown', tenantId, accountId, q.since, q.until, q.kind, q.campaignId ?? ''], {
+      revalidate: CACHE_SECONDS,
+      tags: [adsTag(tenantId)],
+    })(),
 };
 
 // ─── A tela ──────────────────────────────────────────────────────────────────
 
+/** Onde, para quem e a que horas o anúncio rendeu. Vazio se a Meta não devolveu o recorte. */
+export interface AdsBreakdowns {
+  platforms: ReturnType<typeof buildPlatforms>;
+  audience: ReturnType<typeof buildAudience>;
+  hours: ReturnType<typeof buildAdHours>;
+}
+
 export type AdsPageData =
   | { state: 'not_connected' | 'choosing'; connection: AdsConnection }
   | { state: 'error'; connection: AdsConnection; kind: MetaErrorKind; message: string }
-  | { state: 'ok'; connection: AdsConnection; report: AdsReport; range: DayRange; fetchedAt: string };
+  | { state: 'ok'; connection: AdsConnection; report: AdsReport; breakdowns: AdsBreakdowns; range: DayRange; fetchedAt: string };
 
 export async function loadAdsPage(
   tenantId: string,
@@ -149,13 +177,22 @@ export async function loadAdsPage(
   const { current, previous } = reportRange(period, opts.now);
 
   try {
-    const [porCampanhaDia, porCampanha, daConta, porAnuncio, crmAtual, crmAntes] = await Promise.all([
+    // Os recortes são um extra: se a Meta negar um deles, a tela segue sem aquele gráfico.
+    const recorte = (kind: BreakdownKind) =>
+      meta.breakdown(tenantId, conta, { since: current.since, until: current.until, kind, campaignId }).catch((e) => {
+        if (e instanceof MetaAdsError && e.kind === 'auth') throw e;
+        return [] as BreakdownRow[];
+      });
+    const [porCampanhaDia, porCampanha, daConta, porAnuncio, crmAtual, crmAntes, porLugar, porPublico, porHora] = await Promise.all([
       meta.insights(tenantId, conta, { since: previous.since, until: current.until, level: 'campaign', daily: true }),
       meta.insights(tenantId, conta, { since: current.since, until: current.until, level: 'campaign', daily: false }),
       meta.insights(tenantId, conta, { since: current.since, until: current.until, level: 'account', daily: false }),
       meta.insights(tenantId, conta, { since: current.since, until: current.until, level: 'ad', daily: false }),
       adLeadEvents(tenantId, current),
       adLeadEvents(tenantId, previous),
+      recorte('platform'),
+      recorte('audience'),
+      recorte('hour'),
     ]);
 
     const anuncios = new Set<string>();
@@ -181,7 +218,8 @@ export async function loadAdsPage(
       campaignId,
     });
     const at = Math.min(porCampanhaDia.at, porCampanha.at, daConta.at, porAnuncio.at);
-    return { state: 'ok', connection, report, range: current, fetchedAt: new Date(at).toISOString() };
+    const breakdowns: AdsBreakdowns = { platforms: buildPlatforms(porLugar), audience: buildAudience(porPublico), hours: buildAdHours(porHora) };
+    return { state: 'ok', connection, report, breakdowns, range: current, fetchedAt: new Date(at).toISOString() };
   } catch (e) {
     if (e instanceof MetaAdsError) return { state: 'error', connection, kind: e.kind, message: e.message };
     console.error('[crm] tela de anúncios falhou', { tenantId, message: e instanceof Error ? e.name : 'erro desconhecido' });

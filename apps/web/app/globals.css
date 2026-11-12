@@ -450,6 +450,13 @@
   --viz-good: #0ca30c;
   --viz-warn: #fab219;
   --viz-bad: #d03b3b;
+  /* Quanto de brilho as marcas ganham (no claro, quase nada). */
+  --viz-glow: 0.18;
+  --viz-card-top: hsl(0 0% 100%);
+  --viz-card-bottom: hsl(60 20% 99%);
+  --viz-card-line: hsl(60 6% 86%);
+  --viz-card-shadow: 0 1px 0 hsl(0 0% 100% / 0.9) inset, 0 14px 30px -22px rgba(15, 30, 60, 0.28), 0 2px 6px -3px rgba(15, 30, 60, 0.08);
+  --viz-dot: hsl(217 55% 13% / 0.07);
 }
 .dark {
   --viz-meta: #3987e5;
@@ -460,6 +467,57 @@
   --viz-seq-4: #3987e5;
   --viz-seq-5: #86b6ef;
   --viz-grid: hsl(220 24% 20%);
+  --viz-glow: 0.55;
+  --viz-card-top: hsl(220 36% 13% / 0.92);
+  --viz-card-bottom: hsl(222 42% 9% / 0.92);
+  --viz-card-line: hsl(215 45% 62% / 0.16);
+  --viz-card-shadow: 0 1px 0 hsl(210 70% 92% / 0.07) inset, 0 22px 44px -28px rgba(0, 0, 0, 0.9);
+  --viz-dot: hsl(210 60% 80% / 0.08);
+}
+
+@layer components {
+  /* O "palco" das telas de números: malha de pontos e dois clarões das cores dos gráficos. */
+  .viz-stage {
+    background-color: hsl(var(--board));
+    background-image:
+      radial-gradient(60rem 26rem at 12% -8%, color-mix(in srgb, var(--viz-meta) calc(var(--viz-glow) * 40%), transparent), transparent 70%),
+      radial-gradient(48rem 22rem at 96% -4%, color-mix(in srgb, var(--viz-crm) calc(var(--viz-glow) * 34%), transparent), transparent 70%),
+      radial-gradient(var(--viz-dot) 1px, transparent 1px);
+    background-size: auto, auto, 22px 22px;
+    background-attachment: scroll;
+  }
+
+  /* Cartão: degradê discreto, fio de luz no topo e sombra funda. `--viz-accent` dá a cor do fio. */
+  .viz-card {
+    position: relative;
+    border-radius: 16px;
+    border: 1px solid var(--viz-card-line);
+    background: linear-gradient(180deg, var(--viz-card-top), var(--viz-card-bottom));
+    box-shadow: var(--viz-card-shadow);
+  }
+  .viz-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px 18% auto;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--viz-accent, var(--viz-meta)) calc(35% + var(--viz-glow) * 60%), transparent), transparent);
+    opacity: 0.9;
+  }
+
+  /* Números grandes: fonte mono, apertada, com cara de painel. */
+  .viz-num {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    font-weight: 600;
+  }
+
+  /* Trilho das barras em lista. */
+  .viz-track {
+    background-color: hsl(var(--surface-alt));
+    background-image: repeating-linear-gradient(90deg, transparent 0 11px, hsl(var(--foreground) / 0.05) 11px 12px);
+  }
 }
 
 @layer utilities {
@@ -477,10 +535,31 @@
     from { transform: scaleX(0); }
     to { transform: scaleX(1); }
   }
-  .viz-rise { animation: viz-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
-  .viz-grow-y { transform-origin: bottom; animation: viz-grow-y 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .viz-grow-x { transform-origin: left; animation: viz-grow-x 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  /* A linha aparece da esquerda para a direita. A folga de 50 unidades não corta o traço nem o brilho. */
+  @keyframes viz-draw {
+    from { clip-path: inset(-50px 100% -50px -50px); }
+    to { clip-path: inset(-50px -50px -50px -50px); }
+  }
+  @keyframes viz-reveal {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes viz-ping {
+    0% { transform: scale(1); opacity: 0.7; }
+    80%, 100% { transform: scale(2.6); opacity: 0; }
+  }
+  @keyframes viz-flow {
+    from { background-position: 0 0; }
+    to { background-position: 220px 0; }
+  }
+  .viz-rise { animation: viz-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 40ms); }
+  .viz-grow-y { transform-origin: bottom; animation: viz-grow-y 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .viz-grow-x { transform-origin: left; animation: viz-grow-x 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .viz-draw { animation: viz-draw 1.1s cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+  .viz-reveal { animation: viz-reveal 1.1s cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+  .viz-ping { animation: viz-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  .viz-flow { background-size: 220px 100%; animation: viz-flow 3.2s linear infinite; }
   @media (prefers-reduced-motion: reduce) {
-    .viz-rise, .viz-grow-y, .viz-grow-x { animation: none; }
+    .viz-rise, .viz-grow-y, .viz-grow-x, .viz-draw, .viz-reveal, .viz-ping, .viz-flow { animation: none; }
   }
 }

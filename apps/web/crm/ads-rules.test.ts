@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   accountNumber,
+  ageLabel,
+  buildAdHours,
   buildAdsReport,
+  buildAudience,
+  buildPlatforms,
   change,
   changeTone,
   classifyMetaError,
@@ -12,11 +16,13 @@ import {
   formatRate,
   formatRoas,
   moneyToCents,
+  parseBreakdown,
   parseInsight,
   readAdsSettings,
   roasOf,
   roasStatus,
   type AdInfo,
+  type BreakdownRow,
   type CrmEventRow,
   type InsightRow,
 } from './ads-rules';
@@ -254,11 +260,99 @@ describe('o relatório (Meta + CRM)', () => {
     expect(buildAdsReport({ ...base, days: ['2026-11-02'] }).kpis.spend.trend).toEqual([]);
   });
 
+  it('entrega: exibições, alcance, frequência, custo por mil, taxa de clique e ticket médio', () => {
+    const comExibicoes = base.campaignDaily.map((l) => ({ ...l, impressions: l.day! >= '2026-11-01' ? 6000 : 1000 }));
+    const d = buildAdsReport({ ...base, campaignDaily: comExibicoes }).delivery;
+    expect(d.impressions).toBe(18000);
+    expect(d.reach).toBe(9000);
+    expect(d.clicks).toBe(240);
+    expect(d.frequency).toBeCloseTo(2);
+    // R$ 800 por 18 mil exibições = R$ 44,44 a cada mil.
+    expect(d.cpmCents).toBe(4444);
+    expect(d.ctr).toBeCloseTo(240 / 18000);
+    // R$ 12.000 em 3 fechamentos.
+    expect(d.ticketCents).toBe(400000);
+  });
+
   it('sem nada no período: vazio, sem dividir por zero', () => {
     const r = buildAdsReport({ ...base, campaignDaily: [], adTotals: [], accountReach: 0, crmCurrent: [], crmPrevious: [] });
     expect(r.empty).toBe(true);
+    expect(r.delivery).toMatchObject({ ctr: null, cpmCents: null, frequency: null, ticketCents: null });
     expect(r.kpis.costPerConversation.value).toBeNull();
     expect(r.kpis.roas.value).toBeNull();
     expect(r.lines).toEqual([]);
+  });
+});
+
+describe('recortes: onde, para quem e a que horas', () => {
+  const linha = (keys: Record<string, string>, n: Partial<Omit<BreakdownRow, 'keys'>> = {}): BreakdownRow => ({
+    keys,
+    spendCents: 0,
+    impressions: 0,
+    clicks: 0,
+    conversations: 0,
+    ...n,
+  });
+
+  it('lê a linha da Meta com as chaves do recorte; chave faltando vira "unknown"', () => {
+    const r = parseBreakdown(
+      { age: '35-44', spend: '12.50', impressions: '300', clicks: '9', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '4' }] },
+      ['age', 'gender'],
+    );
+    expect(r).toEqual({ keys: { age: '35-44', gender: 'unknown' }, spendCents: 1250, impressions: 300, clicks: 9, conversations: 4 });
+    expect(parseBreakdown(null, ['age']).keys).toEqual({ age: 'unknown' });
+  });
+
+  it('lugares: soma por plataforma, ordena pelo resultado e calcula a fatia e o custo', () => {
+    const p = buildPlatforms([
+      linha({ publisher_platform: 'facebook' }, { spendCents: 20000, conversations: 10 }),
+      linha({ publisher_platform: 'instagram' }, { spendCents: 30000, conversations: 20 }),
+      linha({ publisher_platform: 'instagram' }, { spendCents: 30000, conversations: 10 }),
+      linha({ publisher_platform: 'messenger' }),
+    ]);
+    expect(p.metric).toBe('conversations');
+    expect(p.lines.map((l) => l.label)).toEqual(['Instagram', 'Facebook']);
+    expect(p.lines[0]).toMatchObject({ value: 30, spendCents: 60000, costPerCents: 2000, share: 0.75 });
+  });
+
+  it('sem conversas, mostra cliques; sem cliques, exibições', () => {
+    expect(buildPlatforms([linha({ publisher_platform: 'facebook' }, { clicks: 5, impressions: 90 })]).metric).toBe('clicks');
+    expect(buildPlatforms([linha({ publisher_platform: 'facebook' }, { impressions: 90 })]).metric).toBe('impressions');
+    expect(buildPlatforms([])).toEqual({ metric: 'impressions', lines: [] });
+  });
+
+  it('público: faixas em ordem de idade, totais por gênero e quem mais respondeu', () => {
+    const a = buildAudience([
+      linha({ age: '45-54', gender: 'male' }, { conversations: 3 }),
+      linha({ age: '25-34', gender: 'female' }, { conversations: 8 }),
+      linha({ age: '35-44', gender: 'female' }, { conversations: 14 }),
+      linha({ age: '35-44', gender: 'male' }, { conversations: 5 }),
+      linha({ age: '35-44', gender: 'unknown' }, { conversations: 1 }),
+      linha({ age: '65+', gender: 'female' }),
+    ]);
+    expect(a.ages.map((x) => x.age)).toEqual(['25-34', '35-44', '45-54']);
+    expect(a.ages[1]).toEqual({ age: '35-44', female: 14, male: 5, unknown: 1 });
+    expect(a.totals).toEqual({ female: 22, male: 8, unknown: 1 });
+    expect(a.top).toEqual({ age: '35-44', gender: 'female', value: 14 });
+    expect(buildAudience([]).top).toBeNull();
+  });
+
+  it('idade por extenso', () => {
+    expect(ageLabel('35-44')).toBe('35 a 44');
+    expect(ageLabel('65+')).toBe('65 ou mais');
+  });
+
+  it('horas: 24 posições no horário da conta, com o pico', () => {
+    const h = buildAdHours([
+      linha({ hourly_stats_aggregated_by_advertiser_time_zone: '09:00:00 - 09:59:59' }, { conversations: 4 }),
+      linha({ hourly_stats_aggregated_by_advertiser_time_zone: '19:00:00 - 19:59:59' }, { conversations: 11 }),
+      linha({ hourly_stats_aggregated_by_advertiser_time_zone: '19:00:00 - 19:59:59' }, { conversations: 2 }),
+      linha({ hourly_stats_aggregated_by_advertiser_time_zone: 'lixo' }, { conversations: 50 }),
+    ]);
+    expect(h.hours).toHaveLength(24);
+    expect(h.hours[9]).toBe(4);
+    expect(h.hours[19]).toBe(13);
+    expect(h.peak).toBe(19);
+    expect(buildAdHours([]).peak).toBeNull();
   });
 });

@@ -67,6 +67,10 @@ export interface ArrivalRow {
 export interface Arrivals {
   /** [dia 0..6 (seg..dom)][hora 0..23] */
   grid: number[][];
+  /** Por hora do dia (0 a 23), somando todos os dias. */
+  byHour: number[];
+  /** Os horários mais cheios, do maior para o menor. */
+  top: { day: number; hour: number; n: number }[];
   byWeekday: number[];
   /** Semana 1 a 5 do mês (dias 1–7, 8–14, 15–21, 22–28, 29–31). */
   byWeekOfMonth: number[];
@@ -83,13 +87,23 @@ export function buildArrivals(rows: readonly ArrivalRow[]): Arrivals {
     byWeekOfMonth[Math.min(5, Math.max(1, r.week)) - 1] += r.n;
   }
   const byWeekday = grid.map((d) => d.reduce((s, v) => s + v, 0));
-  let peak: Arrivals['peak'] = null;
-  grid.forEach((dia, d) => dia.forEach((n, h) => (n > 0 && (!peak || n > peak.n) ? (peak = { day: d, hour: h, n }) : null)));
-  return { grid, byWeekday, byWeekOfMonth, total: byWeekday.reduce((s, v) => s + v, 0), peak };
+  const byHour = Array.from({ length: 24 }, (_, h) => grid.reduce((s, dia) => s + dia[h], 0));
+  const top = grid
+    .flatMap((dia, d) => dia.map((n, h) => ({ day: d, hour: h, n })))
+    .filter((c) => c.n > 0)
+    .sort((a, b) => b.n - a.n || a.day - b.day || a.hour - b.hour)
+    .slice(0, 5);
+  return { grid, byHour, top, byWeekday, byWeekOfMonth, total: byWeekday.reduce((s, v) => s + v, 0), peak: top[0] ?? null };
 }
 
 export const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 export const WEEKDAYS_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+/** O índice do maior valor, ou nulo se tudo é zero. */
+export function bestIndex(values: readonly number[]): number | null {
+  const max = Math.max(0, ...values);
+  return max > 0 ? values.indexOf(max) : null;
+}
 
 /** "Quinta, das 10h às 11h" */
 export const peakText = (p: { day: number; hour: number }) => `${WEEKDAYS[p.day]}, das ${p.hour}h às ${p.hour + 1}h`;

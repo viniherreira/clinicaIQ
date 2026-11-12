@@ -131,6 +131,141 @@ export function parseInsight(raw: unknown): InsightRow {
   };
 }
 
+// ─── Recortes: onde, para quem e a que horas o anúncio apareceu ─────────────
+
+/** Uma linha de `/insights` com `breakdowns`: as chaves do recorte e os números. */
+export interface BreakdownRow {
+  keys: Record<string, string>;
+  spendCents: number;
+  impressions: number;
+  clicks: number;
+  conversations: number;
+}
+
+export function parseBreakdown(raw: unknown, fields: readonly string[]): BreakdownRow {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const base = parseInsight(raw);
+  const keys: Record<string, string> = {};
+  for (const f of fields) keys[f] = texto(r[f]) ?? 'unknown';
+  return { keys, spendCents: base.spendCents, impressions: base.impressions, clicks: base.clicks, conversations: base.conversations };
+}
+
+/** Qual número o recorte mostra: conversas; sem conversas, cliques; sem cliques, vezes que apareceu. */
+export type BreakdownMetric = 'conversations' | 'clicks' | 'impressions';
+
+export const BREAKDOWN_METRIC_LABEL: Record<BreakdownMetric, string> = {
+  conversations: 'conversas',
+  clicks: 'cliques',
+  impressions: 'exibições',
+};
+
+function pickMetric(rows: readonly BreakdownRow[]): BreakdownMetric {
+  if (rows.some((r) => r.conversations > 0)) return 'conversations';
+  return rows.some((r) => r.clicks > 0) ? 'clicks' : 'impressions';
+}
+
+const PLATFORM: Record<string, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  messenger: 'Messenger',
+  audience_network: 'Audience Network',
+  threads: 'Threads',
+  whatsapp: 'WhatsApp',
+};
+
+export interface PlatformLine {
+  key: string;
+  label: string;
+  spendCents: number;
+  value: number;
+  costPerCents: number | null;
+  /** Parte do total do número mostrado (0 a 1). */
+  share: number;
+}
+
+/** Facebook, Instagram…: onde o anúncio apareceu e quanto rendeu em cada lugar. */
+export function buildPlatforms(rows: readonly BreakdownRow[]): { metric: BreakdownMetric; lines: PlatformLine[] } {
+  const metric = pickMetric(rows);
+  const soma = new Map<string, { spendCents: number; value: number }>();
+  for (const r of rows) {
+    const k = r.keys.publisher_platform ?? 'unknown';
+    const a = soma.get(k) ?? { spendCents: 0, value: 0 };
+    soma.set(k, { spendCents: a.spendCents + r.spendCents, value: a.value + r[metric] });
+  }
+  const total = [...soma.values()].reduce((s, v) => s + v.value, 0);
+  const lines = [...soma.entries()]
+    .filter(([, v]) => v.value > 0 || v.spendCents > 0)
+    .map(([key, v]): PlatformLine => ({
+      key,
+      label: PLATFORM[key] ?? (key === 'unknown' ? 'Outros' : key),
+      spendCents: v.spendCents,
+      value: v.value,
+      costPerCents: costPer(v.spendCents, v.value),
+      share: total > 0 ? v.value / total : 0,
+    }))
+    .sort((a, b) => b.value - a.value || b.spendCents - a.spendCents);
+  return { metric, lines };
+}
+
+export interface AudienceAge {
+  age: string;
+  female: number;
+  male: number;
+  unknown: number;
+}
+
+export interface Audience {
+  metric: BreakdownMetric;
+  ages: AudienceAge[];
+  totals: { female: number; male: number; unknown: number };
+  /** A faixa e o gênero com mais resultado ("Mulheres de 35 a 44 anos"). */
+  top: { age: string; gender: 'female' | 'male'; value: number } | null;
+}
+
+const AGE_ORDER = ['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+
+/** "35-44" → "35 a 44"; "65+" → "65 ou mais". */
+export const ageLabel = (age: string) => (age.endsWith('+') ? `${age.slice(0, -1)} ou mais` : age.replace('-', ' a '));
+
+/** Idade e gênero de quem respondeu ao anúncio. */
+export function buildAudience(rows: readonly BreakdownRow[]): Audience {
+  const metric = pickMetric(rows);
+  const porIdade = new Map<string, AudienceAge>();
+  const totals = { female: 0, male: 0, unknown: 0 };
+  for (const r of rows) {
+    const age = r.keys.age ?? 'unknown';
+    const g = r.keys.gender === 'female' ? 'female' : r.keys.gender === 'male' ? 'male' : 'unknown';
+    const v = r[metric];
+    if (v <= 0 || age === 'unknown') {
+      totals[g] += Math.max(0, v);
+      continue;
+    }
+    const a = porIdade.get(age) ?? { age, female: 0, male: 0, unknown: 0 };
+    a[g] += v;
+    porIdade.set(age, a);
+    totals[g] += v;
+  }
+  const ordem = (a: string) => (AGE_ORDER.indexOf(a) === -1 ? 99 : AGE_ORDER.indexOf(a));
+  const ages = [...porIdade.values()].sort((a, b) => ordem(a.age) - ordem(b.age) || a.age.localeCompare(b.age));
+  let top: Audience['top'] = null;
+  for (const a of ages) {
+    for (const g of ['female', 'male'] as const) if (a[g] > 0 && (!top || a[g] > top.value)) top = { age: a.age, gender: g, value: a[g] };
+  }
+  return { metric, ages, totals, top };
+}
+
+/** A que horas do dia o anúncio rendeu (0 a 23, no horário da conta de anúncios). */
+export function buildAdHours(rows: readonly BreakdownRow[]): { metric: BreakdownMetric; hours: number[]; peak: number | null } {
+  const metric = pickMetric(rows);
+  const hours = Array<number>(24).fill(0);
+  for (const r of rows) {
+    const h = Number((r.keys.hourly_stats_aggregated_by_advertiser_time_zone ?? '').slice(0, 2));
+    if (Number.isInteger(h) && h >= 0 && h <= 23) hours[h] += r[metric];
+  }
+  const max = Math.max(...hours);
+  return { metric, hours, peak: max > 0 ? hours.indexOf(max) : null };
+}
+
 // ─── As contas ───────────────────────────────────────────────────────────────
 
 /** Custo por unidade, em centavos. Sem unidades, não há custo a mostrar. */
@@ -269,6 +404,20 @@ export interface AdsReport {
   daily: DailyPoint[];
   lines: CampaignLine[];
   totals: { spendCents: number; conversations: number; scheduled: number; attended: number; won: number; revenueCents: number };
+  /** Os números de entrega do anúncio: quantas vezes apareceu, para quantas pessoas e quanto custou aparecer. */
+  delivery: {
+    impressions: number;
+    reach: number;
+    clicks: number;
+    /** Cliques ÷ exibições (0 a 1). */
+    ctr: number | null;
+    /** Custo de mil exibições, em centavos. */
+    cpmCents: number | null;
+    /** Quantas vezes, em média, cada pessoa viu o anúncio. */
+    frequency: number | null;
+    /** Valor médio de cada negócio fechado, em centavos. */
+    ticketCents: number | null;
+  };
   /** Leads de anúncios que a conta conectada não conhece (outra conta, anúncio apagado). */
   unmatched: CrmTotals;
   /** Há qualquer número no período (da Meta ou do CRM)? */
@@ -354,8 +503,13 @@ export function buildAdsReport(input: ReportInput): AdsReport {
 
   const somaMeta = (rows: readonly InsightRow[]) =>
     rows.reduce(
-      (s, r) => ({ spendCents: s.spendCents + r.spendCents, clicks: s.clicks + r.clicks, conversations: s.conversations + r.conversations }),
-      { spendCents: 0, clicks: 0, conversations: 0 },
+      (s, r) => ({
+        spendCents: s.spendCents + r.spendCents,
+        clicks: s.clicks + r.clicks,
+        conversations: s.conversations + r.conversations,
+        impressions: s.impressions + r.impressions,
+      }),
+      { spendCents: 0, clicks: 0, conversations: 0, impressions: 0 },
     );
   const [m, mAntes] = [somaMeta(metaAtual), somaMeta(metaAntes)];
   const [c, cAntes] = [crmTotals(crmAtual), crmTotals(crmAntes)];
@@ -480,6 +634,15 @@ export function buildAdsReport(input: ReportInput): AdsReport {
     daily,
     lines,
     totals: { spendCents: m.spendCents, conversations: m.conversations, scheduled: c.scheduled, attended: c.attended, won: c.won, revenueCents: c.revenueCents },
+    delivery: {
+      impressions: m.impressions,
+      reach: alcance,
+      clicks: m.clicks,
+      ctr: rate(m.clicks, m.impressions),
+      cpmCents: m.impressions > 0 ? Math.round((m.spendCents / m.impressions) * 1000) : null,
+      frequency: alcance > 0 && m.impressions > 0 ? m.impressions / alcance : null,
+      ticketCents: costPer(c.revenueCents, c.won),
+    },
     unmatched,
     empty: m.spendCents === 0 && m.conversations === 0 && alcance === 0 && c.leads + c.scheduled + c.attended + c.won === 0,
   };
