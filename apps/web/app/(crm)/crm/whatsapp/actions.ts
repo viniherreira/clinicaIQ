@@ -23,7 +23,7 @@ async function run(fn: (g: { tenantId: string; userId: string }) => Promise<Resu
 export const connectManualAction = async (input: { token: string; phoneNumberId: string; wabaId: string }) =>
   run((g) => admin.connectManual(g.tenantId, g.userId, input));
 
-export const finishSignupAction = async (input: { code: string; wabaId: string; phoneNumberId: string; coexistence: boolean }) =>
+export const finishSignupAction = async (input: { code: string; wabaId: string; phoneNumberId?: string | null; coexistence: boolean }) =>
   run((g) => admin.finishEmbeddedSignup(g.tenantId, g.userId, input));
 
 export const disconnectCloudAction = async () => run((g) => admin.disconnectCloud(g.tenantId, g.userId));

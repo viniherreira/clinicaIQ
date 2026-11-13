@@ -105,6 +105,13 @@ describe('CloudApi', () => {
     expect(f.mock.calls[1][0]).toBe('https://graph.facebook.com/v23.0/waba/message_templates?after=X');
   });
 
+  it('lista os números da conta (coexistência não manda o id do número)', async () => {
+    const f = vi.fn(async () => ok({ data: [{ id: '1279209198609150', display_phone_number: '+55 11 90000-5000' }, { id: 'lixo' }] }));
+    const api = new CloudApi({ token: 't', phoneNumberId: '', wabaId: 'W1', fetchImpl: f as unknown as typeof fetch });
+    expect((await api.listPhoneNumbers()).map((n) => n.id)).toEqual(['1279209198609150']);
+    expect(String((f.mock.calls[0] as unknown as [string])[0])).toContain('/W1/phone_numbers');
+  });
+
   it('troca o código do cadastro pelo token', async () => {
     const f = vi.fn(async () => ok({ access_token: 'TOKEN' }));
     expect(await exchangeSignupCode({ appId: 'a', appSecret: 's', code: 'c', fetchImpl: f as unknown as typeof fetch })).toBe('TOKEN');

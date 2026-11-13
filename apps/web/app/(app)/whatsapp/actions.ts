@@ -157,7 +157,7 @@ async function official(fn: (g: { tenantId: string; userId: string | null }) => 
 export const connectOfficialManual = async (input: { token: string; phoneNumberId: string; wabaId: string }) =>
   official((g) => oficial.connectManual(g.tenantId, g.userId, input));
 
-export const finishOfficialSignup = async (input: { code: string; wabaId: string; phoneNumberId: string; coexistence: boolean }) =>
+export const finishOfficialSignup = async (input: { code: string; wabaId: string; phoneNumberId?: string | null; coexistence: boolean }) =>
   official((g) => oficial.finishEmbeddedSignup(g.tenantId, g.userId, input));
 
 export const disconnectOfficial = async () => official((g) => oficial.disconnectCloud(g.tenantId, g.userId));

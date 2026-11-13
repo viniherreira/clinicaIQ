@@ -278,6 +278,15 @@ export class CloudApi {
     });
   }
 
+  /** Os números da conta do WhatsApp Business (na coexistência a Meta não manda o id do número). */
+  async listPhoneNumbers(): Promise<{ id: string; display_phone_number?: string; verified_name?: string }[]> {
+    if (!this.cfg.wabaId) throw new Error('wabaId necessário para listar números');
+    const r = await this.call<{ data?: { id: string; display_phone_number?: string; verified_name?: string }[] }>(
+      `${this.cfg.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&limit=50`,
+    );
+    return (r.data ?? []).filter((n) => /^\d{5,25}$/.test(String(n.id)));
+  }
+
   /** Inscreve o app do DreamClin nos webhooks da conta da clínica. */
   async subscribeApp(): Promise<void> {
     if (!this.cfg.wabaId) throw new Error('wabaId necessário');
