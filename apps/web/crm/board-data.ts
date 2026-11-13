@@ -3,7 +3,7 @@ import 'server-only';
 import type { LeadSource, Prisma } from '@clinicaiq/db';
 import type { CrmContext } from './guard';
 import { OPEN_LEAD } from './leads';
-import { liveInfoForLeads } from './live';
+import { liveInfoForLeads, openQuotesByPatient } from './live';
 import { canonicalPhone, decryptPhone, maskPhone, phoneHashes } from './phone';
 import { taskStatus } from './tasks-status';
 import type { BoardFilters, BoardLead, BoardTaskStatus } from './types';
@@ -113,20 +113,67 @@ export async function toBoardLeads(ctx: CrmContext, rows: LeadRow[], now: Date =
   });
 }
 
-/** Quantos o quadro carrega de uma vez; a lista, 500. A contagem é sempre a de verdade. */
-export const BOARD_LIMIT = 1000;
+/** Quantos cards cada coluna do quadro carrega por vez; rolando até o fim, vêm mais. */
+export const BOARD_PAGE = 50;
 /** A lista mostra de 100 em 100 (`pagina=`). */
 export const LIST_PAGE_SIZE = 100;
 
-/** Os leads abertos do quadro, com os filtros aplicados. */
-export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, now: Date = new Date()) {
+/** O filtro do quadro numa etapa só; `null` quando o filtro de etapa aponta para outra. */
+function columnWhere(ctx: CrmContext, f: BoardFilters, stageId: string, now: Date): Prisma.LeadWhereInput | null {
+  if (f.etapa && f.etapa !== stageId) return null;
+  return { ...leadWhere(ctx, f, now), ...OPEN_LEAD, stageId };
+}
+
+/** Os primeiros cards de cada coluna do quadro, já com os filtros. */
+export async function loadBoardLeads(ctx: CrmContext, f: BoardFilters, stageIds: readonly string[], now: Date = new Date()) {
+  const porColuna = await Promise.all(
+    stageIds.map((stageId) => {
+      const where = columnWhere(ctx, f, stageId, now);
+      return where
+        ? ctx.db.lead.findMany({ where, include: leadInclude, orderBy: [{ position: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }], take: BOARD_PAGE })
+        : [];
+    }),
+  );
+  return toBoardLeads(ctx, porColuna.flat(), now);
+}
+
+/** Mais cards de uma coluna, a partir do `skip`-ésimo (a mesma ordem da primeira carga). */
+export async function loadColumnLeads(ctx: CrmContext, f: BoardFilters, stageId: string, skip: number, now: Date = new Date()) {
+  const where = columnWhere(ctx, f, stageId, now);
+  if (!where) return [];
   const rows = await ctx.db.lead.findMany({
-    where: { ...leadWhere(ctx, f, now), ...OPEN_LEAD },
+    where,
     include: leadInclude,
-    orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
-    take: BOARD_LIMIT,
+    orderBy: [{ position: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
+    skip: Math.max(0, skip),
+    take: BOARD_PAGE,
   });
   return toBoardLeads(ctx, rows, now);
+}
+
+export interface ColumnStats {
+  count: number;
+  valueCents: number;
+}
+
+/**
+ * Quantos leads e quanto valem, por coluna, contando todos (não só os
+ * carregados). O valor segue o do card: o orçamento em aberto, senão o estimado.
+ */
+export async function boardColumnStats(ctx: CrmContext, f: BoardFilters, now: Date = new Date()): Promise<Record<string, ColumnStats>> {
+  const rows = await ctx.db.lead.findMany({
+    where: { ...leadWhere(ctx, f, now), ...OPEN_LEAD },
+    select: { stageId: true, patientId: true, estimatedValueCents: true },
+  });
+  const pacientes = [...new Set(rows.map((r) => r.patientId).filter((id): id is string => Boolean(id)))];
+  const orcamentos = pacientes.length ? await openQuotesByPatient(ctx.db, pacientes) : new Map<string, { totalCents: number }>();
+  const stats: Record<string, ColumnStats> = {};
+  for (const r of rows) {
+    const s = (stats[r.stageId] ??= { count: 0, valueCents: 0 });
+    s.count++;
+    s.valueCents += (r.patientId ? orcamentos.get(r.patientId)?.totalCents : undefined) ?? r.estimatedValueCents ?? 0;
+  }
+  return stats;
 }
 
 /** Quantos leads batem com o filtro (sem o limite de carregar). */

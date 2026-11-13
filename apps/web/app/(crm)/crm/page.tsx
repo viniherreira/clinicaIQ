@@ -1,8 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireCrm } from '@/crm/guard';
-import { BOARD_LIMIT, countLeads, loadBoardLeads, parseFilters, tagCounts } from '@/crm/board-data';
-import { OPEN_LEAD } from '@/crm/leads';
+import { boardColumnStats, loadBoardLeads, parseFilters, tagCounts, type ColumnStats } from '@/crm/board-data';
 import { hasPeriod } from '@/crm/period';
 import { clinicToday } from '@/lib/tz';
 import { loadCrmBasics } from '@/crm/page-data';
@@ -39,9 +38,10 @@ export default async function FunilPage({
   const editando = sp.editar === '1' && canConfig;
 
   await classifyPending(ctx.db, ctx.tenantId);
-  const [leads, total, counts, porEtapa] = await Promise.all([
-    editando ? Promise.resolve([]) : loadBoardLeads(ctx, filters),
-    editando ? Promise.resolve(0) : countLeads(ctx, filters, OPEN_LEAD),
+  // Cada coluna vem com os primeiros cards; as contas do topo contam todos.
+  const [leads, stats, counts, porEtapa] = await Promise.all([
+    editando ? Promise.resolve([]) : loadBoardLeads(ctx, filters, funil.columns.map((s) => s.id)),
+    editando ? Promise.resolve<Record<string, ColumnStats>>({}) : boardColumnStats(ctx, filters),
     tagCounts(ctx),
     editando
       ? ctx.db.lead.groupBy({
@@ -75,23 +75,21 @@ export default async function FunilPage({
         fields={basics.fields}
         procedures={basics.procedures}
         meId={ctx.userId}
-        summary={{ count: total, valueCents: leads.reduce((s, l) => s + (l.valueCents ?? 0), 0) }}
+        summary={funil.columns.reduce(
+          (t, c) => ({ count: t.count + (stats[c.id]?.count ?? 0), valueCents: t.valueCents + (stats[c.id]?.valueCents ?? 0) }),
+          { count: 0, valueCents: 0 },
+        )}
         pipelines={basics.pipelines}
         currentPipeline={funil}
         canConfig={canConfig}
         canExport={ctx.rights.leads.export === 'all'}
         today={clinicToday()}
       />
-      {total > BOARD_LIMIT && (
-        <p role="status" className="border-b border-border bg-surface-alt px-4 py-2 text-xs text-muted-foreground">
-          O quadro mostra os {BOARD_LIMIT.toLocaleString('pt-BR')} primeiros de {total.toLocaleString('pt-BR')} leads. Use os filtros
-          (período, etapa, tags) para chegar nos outros, ou a Lista.
-        </p>
-      )}
       <Board
         key={funil.id}
         stages={funil.columns}
         leads={leads}
+        stats={stats}
         closedStages={funil.closed}
         lostReasons={basics.lostReasons}
         canDelete={ctx.rights.leads.delete !== 'none'}

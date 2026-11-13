@@ -37,11 +37,7 @@ export async function liveInfoForLeads(
       orderBy: { startTime: 'asc' },
       select: { patientId: true, startTime: true, professional: { select: { name: true } } },
     }),
-    db.quote.findMany({
-      where: { patientId: { in: patientIds }, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, patientId: true, number: true, total: true },
-    }),
+    openQuotesByPatient(db, patientIds),
   ]);
 
   // A lista vem ordenada: o primeiro de cada paciente é o que interessa.
@@ -49,21 +45,37 @@ export async function liveInfoForLeads(
   for (const c of consultas) {
     if (!proxima.has(c.patientId)) proxima.set(c.patientId, { startTime: c.startTime, professionalName: c.professional.name });
   }
-  const aberto = new Map<string, LiveInfo['openQuote']>();
-  for (const q of orcamentos) {
-    if (!aberto.has(q.patientId)) {
-      aberto.set(q.patientId, { id: q.id, number: q.number, totalCents: Math.round(Number(q.total) * 100) });
-    }
-  }
-
   for (const lead of leads) {
     if (!lead.patientId) continue;
     const info: LiveInfo = {};
     const c = proxima.get(lead.patientId);
-    const q = aberto.get(lead.patientId);
+    const q = orcamentos.get(lead.patientId);
     if (c) info.nextAppointment = c;
     if (q) info.openQuote = q;
     if (c || q) result.set(lead.id, info);
   }
   return result;
+}
+
+/** Até quantos pacientes por consulta (o Postgres aceita no máximo 32.767 valores numa consulta). */
+const PACIENTES_POR_CONSULTA = 5000;
+
+/** O orçamento em aberto mais novo de cada paciente. */
+export async function openQuotesByPatient(
+  db: TenantPrismaClient,
+  patientIds: readonly string[],
+): Promise<Map<string, NonNullable<LiveInfo['openQuote']>>> {
+  const aberto = new Map<string, NonNullable<LiveInfo['openQuote']>>();
+  for (let i = 0; i < patientIds.length; i += PACIENTES_POR_CONSULTA) {
+    const orcamentos = await db.quote.findMany({
+      where: { patientId: { in: patientIds.slice(i, i + PACIENTES_POR_CONSULTA) }, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, patientId: true, number: true, total: true },
+    });
+    // A lista vem ordenada: o primeiro de cada paciente é o que interessa.
+    for (const q of orcamentos) {
+      if (!aberto.has(q.patientId)) aberto.set(q.patientId, { id: q.id, number: q.number, totalCents: Math.round(Number(q.total) * 100) });
+    }
+  }
+  return aberto;
 }

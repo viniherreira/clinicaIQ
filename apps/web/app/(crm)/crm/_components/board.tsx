@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors,
   type Announcements, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { Check, Trash2, X } from 'lucide-react';
 import type { BoardLead, BoardStage, LostReasonOption } from '@/crm/types';
-import { deleteLeadAction, moveLeadAction } from '../actions';
+import { appendColumn, columnTotals, mergeRefresh, nextSkip, shiftTotals, type ColumnTotals } from '@/crm/board-columns';
+import { deleteLeadAction, loadColumnAction, moveLeadAction } from '../actions';
 import { BoardNavigator } from './board-navigator';
 import { Column } from './column';
 import { LeadCard, type MoveTarget } from './lead-card';
@@ -23,30 +24,48 @@ import { AutoRefresh } from '@/components/auto-refresh';
  * arrastar pelo teclado (alça do card) e o menu "Mover para…". Os três passam
  * por `move`, que atualiza a tela na hora e confirma no servidor; se o
  * servidor recusar, a tela volta como estava e o motivo é anunciado.
+ *
+ * Cada coluna chega com os primeiros cards e carrega mais quando a pessoa rola
+ * até o fim dela (regras em `crm/board-columns.ts`). As contas do topo vêm do
+ * servidor (`stats`, todos os leads) e andam junto com o que muda na tela.
  */
 export function Board({
   stages,
   leads: initial,
+  stats,
   closedStages,
   lostReasons,
   canDelete,
 }: {
   stages: BoardStage[];
   leads: BoardLead[];
+  stats: Record<string, ColumnTotals>;
   closedStages: { won: string; lost: string };
   lostReasons: LostReasonOption[];
   canDelete: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState(initial);
+  // Colunas em que a pessoa já carregou mais cards rolando.
+  const abertas = useRef(new Set<string>());
+  const [ajustes, setAjustes] = useState<Record<string, ColumnTotals>>({});
+  const [carregando, setCarregando] = useState<ReadonlySet<string>>(new Set());
+  // Pediu mais e não veio nenhum card novo: para de pedir até a próxima atualização.
+  const [esgotadas, setEsgotadas] = useState<ReadonlySet<string>>(new Set());
+  // Deu erro ao carregar: a coluna para de pedir sozinha e mostra "Tentar de novo".
+  const [falhas, setFalhas] = useState<ReadonlySet<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [perder, setPerder] = useState<BoardLead | null>(null);
   const [aviso, setAviso] = useState('');
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    setLeads(initial);
-  }, [initial]);
+    setLeads((naTela) => mergeRefresh(initial, naTela, abertas.current));
+    setAjustes({});
+    setEsgotadas(new Set());
+    setFalhas(new Set());
+  }, [initial, stats]);
 
   // O card já mudou de lugar na tela antes de o servidor confirmar. Sair da
   // página nesse meio-tempo cancelaria o envio — o navegador avisa antes.
@@ -75,9 +94,42 @@ export function Board({
     setTimeout(() => setAviso(msg), 30);
   }
 
+  // A lista da tela agora, para a leva nova que chega depois de esperar o servidor.
+  const leadsAgora = useRef(leads);
+  useEffect(() => {
+    leadsAgora.current = leads;
+  }, [leads]);
+
+  async function carregarMais(stageId: string, carregados: number) {
+    setCarregando((c) => new Set(c).add(stageId));
+    const r = await loadColumnAction({ stageId, skip: nextSkip(carregados) }, Object.fromEntries(searchParams.entries())).catch(
+      () => ({ ok: false as const, message: 'Confira a internet.' }),
+    );
+    const sem = (c: ReadonlySet<string>) => {
+      const n = new Set(c);
+      n.delete(stageId);
+      return n;
+    };
+    setCarregando(sem);
+    if (!r.ok) {
+      setFalhas((f) => new Set(f).add(stageId));
+      return anunciar(`Não deu para carregar mais leads. ${r.message}`);
+    }
+    setFalhas(sem);
+    abertas.current.add(stageId);
+    const { added } = appendColumn(leadsAgora.current.filter((l) => l.stageId === stageId), r.leads, stageId);
+    if (!added) return setEsgotadas((e) => new Set(e).add(stageId));
+    setLeads((ls) => {
+      const tem = new Set(ls.map((l) => l.id));
+      return [...ls, ...r.leads.filter((l) => l.stageId === stageId && !tem.has(l.id))];
+    });
+  }
+
   function enviar(lead: BoardLead, stageId: string, index: number | undefined, lostReasonId?: string) {
     const antes = leads;
+    const ajustesAntes = ajustes;
     const sai = stageId === closedStages.won || stageId === closedStages.lost;
+    setAjustes((a) => shiftTotals(a, lead.stageId, sai ? null : stageId, lead.valueCents ?? 0));
     setLeads((ls) => {
       const sem = ls.filter((l) => l.id !== lead.id);
       if (sai) return sem;
@@ -92,6 +144,7 @@ export function Board({
       const r = await moveLeadAction({ leadId: lead.id, stageId, index, lostReasonId });
       if (!r.ok) {
         setLeads(antes);
+        setAjustes(ajustesAntes);
         anunciar(`Não foi possível mover ${lead.name}. ${r.message}`);
         return;
       }
@@ -112,11 +165,14 @@ export function Board({
     if (target.kind === 'delete') {
       if (!confirm(`Excluir o lead ${lead.name}? Ele some do funil.`)) return;
       const antes = leads;
+      const ajustesAntes = ajustes;
       setLeads((ls) => ls.filter((l) => l.id !== lead.id));
+      setAjustes((a) => shiftTotals(a, lead.stageId, null, lead.valueCents ?? 0));
       start(async () => {
         const r = await deleteLeadAction(lead.id);
         if (!r.ok) {
           setLeads(antes);
+          setAjustes(ajustesAntes);
           anunciar(r.message);
         } else {
           anunciar(`${lead.name} excluído.`);
@@ -188,11 +244,19 @@ export function Board({
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
         <div ref={quadro} className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto bg-board px-4 pb-4 pt-4 sm:px-5" role="list" aria-label="Etapas do funil">
-          {stages.map((s) => (
+          {stages.map((s) => {
+            const daColuna = porEtapa.get(s.id) ?? [];
+            const conta = columnTotals(stats, ajustes, s.id);
+            return (
             <div role="listitem" key={s.id} className="flex">
               <Column
                 stage={s}
-                leads={porEtapa.get(s.id) ?? []}
+                leads={daColuna}
+                totals={conta}
+                hasMore={!esgotadas.has(s.id) && daColuna.length < conta.count}
+                loading={carregando.has(s.id)}
+                failed={falhas.has(s.id)}
+                onLoadMore={() => carregarMais(s.id, daColuna.length)}
                 stages={stages}
                 canDelete={canDelete}
                 activeId={activeId}
@@ -200,14 +264,15 @@ export function Board({
                 onAnnounce={anunciar}
               />
             </div>
-          ))}
+            );
+          })}
         </div>
         {/* Arrastando um card, o rodapé é da barra de Ganho/Perdido. */}
         {!ativo && (
           <BoardNavigator
             target={quadro}
             columns={[
-              ...stages.map((s) => ({ id: s.id, name: s.name, color: s.color, count: porEtapa.get(s.id)?.length ?? 0 })),
+              ...stages.map((s) => ({ id: s.id, name: s.name, color: s.color, count: columnTotals(stats, ajustes, s.id).count })),
             ]}
           />
         )}

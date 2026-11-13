@@ -8,11 +8,12 @@ import { setLeadFields } from '@/crm/lead-fields';
 import { guardCrmAction } from '@/crm/guard';
 import { deleteBlocked, guardLead } from '@/crm/scope';
 import { createLead, moveLead, OPEN_LEAD, softDeleteLead } from '@/crm/leads';
-import { countLeads, effectiveStatus, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
+import { countLeads, effectiveStatus, loadColumnLeads, parseFilters, parseListParams, statusWhere } from '@/crm/board-data';
 import { hasPeriod } from '@/crm/period';
 import { findOpenLeadByPhone, findPatientByPhone } from '@/crm/duplicates';
 import { isValidPhone } from '@/crm/phone';
 import { runDueAutomations } from '@/crm/stage-automations';
+import type { BoardLead } from '@/crm/types';
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
@@ -156,4 +157,29 @@ export async function countLeadsAction(
   const fechados = f.periodo.field === 'fechado' && hasPeriod(f.periodo);
   const situacao = view === 'quadro' && !fechados ? OPEN_LEAD : statusWhere(effectiveStatus(parseListParams(sp).status, f));
   return { ok: true, count: await countLeads(g, f, situacao) };
+}
+
+const columnSchema = z.object({
+  stageId: z.string().min(1).max(40),
+  skip: z.number().int().min(0).max(100_000),
+});
+
+/**
+ * Mais cards de uma coluna do quadro: chamado quando a pessoa rola até o fim
+ * dela. Os filtros são os da página (`params`), e o funil é o da etapa. Só lê.
+ */
+export async function loadColumnAction(
+  input: z.input<typeof columnSchema>,
+  params: Record<string, string>,
+): Promise<{ ok: true; leads: BoardLead[] } | { ok: false; message: string }> {
+  const g = await guardCrmAction('crm', { write: false });
+  if (!g.ok) return g;
+  const p = columnSchema.safeParse(input);
+  if (!p.success) return { ok: false, message: 'Coluna inválida.' };
+  const etapa = await g.db.pipelineStage.findFirst({ where: { id: p.data.stageId }, select: { pipelineId: true } });
+  if (!etapa) return { ok: false, message: 'Essa etapa não existe mais. Atualize a página.' };
+  const sp: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params ?? {}).slice(0, 30)) if (typeof v === 'string') sp[k] = v.slice(0, 200);
+  const f = { ...parseFilters(sp), funil: etapa.pipelineId };
+  return { ok: true, leads: await loadColumnLeads(g, f, p.data.stageId, p.data.skip) };
 }

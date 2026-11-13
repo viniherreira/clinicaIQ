@@ -1,8 +1,8 @@
 'use client';
 
-import { useId, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { colorClasses } from '@/crm/colors';
 import { formatCents } from '@/crm/format';
 import type { BoardLead, BoardStage } from '@/crm/types';
@@ -13,10 +13,19 @@ import { LeadCard, type MoveTarget } from './lead-card';
  * Uma coluna do funil, como no Kommo: o nome da etapa em maiúsculas, a linha
  * da cor dela, quantos leads e quanto valem; depois o "Adição rápida" (nome e
  * telefone, Enter salva) e os cards, direto sobre o fundo do quadro.
+ *
+ * A conta do topo é a de todos os leads da etapa (`totals`); os cards vêm aos
+ * poucos: chegando perto do fim da coluna, ela pede mais (`onLoadMore`). O botão
+ * "Carregar mais" faz o mesmo para quem usa o teclado.
  */
 export function Column({
   stage,
   leads,
+  totals,
+  hasMore,
+  loading,
+  failed,
+  onLoadMore,
   stages,
   canDelete,
   activeId,
@@ -25,6 +34,12 @@ export function Column({
 }: {
   stage: BoardStage;
   leads: BoardLead[];
+  totals: { count: number; valueCents: number };
+  hasMore: boolean;
+  loading: boolean;
+  /** A última carga deu erro: não pede mais sozinha, só pelo botão. */
+  failed: boolean;
+  onLoadMore: () => void;
   stages: BoardStage[];
   canDelete: boolean;
   activeId: string | null;
@@ -32,8 +47,24 @@ export function Column({
   onAnnounce: (msg: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${stage.id}`, data: { stageId: stage.id } });
-  const total = leads.reduce((s, l) => s + (l.valueCents ?? 0), 0);
+  const { count, valueCents: total } = totals;
   const headingId = useId();
+  const rolagem = useRef<HTMLDivElement | null>(null);
+  const fim = useRef<HTMLDivElement>(null);
+  const pedir = useRef(onLoadMore);
+  useEffect(() => {
+    pedir.current = onLoadMore;
+  }, [onLoadMore]);
+
+  // Chegando a uns 400px do fim da coluna, pede a próxima leva.
+  useEffect(() => {
+    if (!hasMore || loading || failed || !fim.current) return;
+    const obs = new IntersectionObserver((e) => {
+      if (e.some((x) => x.isIntersecting)) pedir.current();
+    }, { root: rolagem.current, rootMargin: '0px 0px 400px 0px' });
+    obs.observe(fim.current);
+    return () => obs.disconnect();
+  }, [hasMore, loading, failed]);
 
   return (
     <section
@@ -46,16 +77,21 @@ export function Column({
       <header className="px-1 pb-2.5 pt-1 text-center">
         <h2 id={headingId} className="truncate text-[13px] font-semibold uppercase tracking-wide text-foreground/85">
           {stage.name}
-          <span className="sr-only">, {leads.length} {leads.length === 1 ? 'lead' : 'leads'}</span>
+          <span className="sr-only">, {count.toLocaleString('pt-BR')} {count === 1 ? 'lead' : 'leads'}</span>
         </h2>
         <div className={`mt-2 h-[3px] rounded-full ${colorClasses(stage.color).dot}`} aria-hidden="true" />
         <p className="mt-1.5 text-xs tabular-nums text-muted-foreground" aria-hidden="true">
-          {leads.length} {leads.length === 1 ? 'lead' : 'leads'}: {formatCents(total)}
+          {count.toLocaleString('pt-BR')} {count === 1 ? 'lead' : 'leads'}: {formatCents(total)}
         </p>
         <p className="sr-only">Valor: {formatCents(total)}</p>
       </header>
 
-      <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto px-0.5 pb-3">
+      <div
+        ref={(el) => {
+          setNodeRef(el);
+          rolagem.current = el;
+        }}
+        className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto px-0.5 pb-3">
         <QuickAdd stage={stage} onAnnounce={onAnnounce} />
         <ul className="flex flex-col gap-2" aria-label={`Leads em ${stage.name}`}>
           {leads.map((lead) => (
@@ -64,7 +100,21 @@ export function Column({
             </li>
           ))}
         </ul>
-        {leads.length === 0 && (
+        {hasMore && (
+          <div ref={fim} className="flex justify-center py-1">
+            <button
+              type="button"
+              onClick={() => onLoadMore()}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface hover:text-primary focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
+            >
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+              {loading ? 'Carregando…' : failed ? 'Não carregou. Tentar de novo' : `Carregar mais (${(count - leads.length).toLocaleString('pt-BR')})`}
+              <span className="sr-only"> em {stage.name}</span>
+            </button>
+          </div>
+        )}
+        {count === 0 && leads.length === 0 && (
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             Nenhum lead nesta etapa
           </p>
