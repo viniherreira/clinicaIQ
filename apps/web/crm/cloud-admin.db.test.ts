@@ -38,7 +38,7 @@ describe('modelos: regras antes de mandar para a Meta', async () => {
 
 describe.skipIf(!process.env.DATABASE_URL)('conectar a API oficial (banco)', async () => {
   const { prisma } = await import('@clinicaiq/db');
-  const { connectManual, disconnectCloud, syncTemplates } = await import('./cloud-admin');
+  const { connectManual, disconnectCloud, finishEmbeddedSignup, syncTemplates } = await import('./cloud-admin');
   const { activeCloudAccount } = await import('./cloud');
 
   const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -86,5 +86,39 @@ describe.skipIf(!process.env.DATABASE_URL)('conectar a API oficial (banco)', asy
   it('desconectar volta para o QR', async () => {
     expect(await disconnectCloud(tenant.id, user.id)).toEqual({ ok: true });
     expect(await activeCloudAccount(tenant.id)).toBeNull();
+  });
+
+  it('número do celular (coexistência): a Meta manda só a conta e o sistema acha o número', async () => {
+    process.env.META_APP_ID ??= 'APP';
+    process.env.META_APP_SECRET ??= 'SEGREDO';
+    const pn2 = String(Date.now() + 7).slice(-12);
+    const pedidos: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | string, init?: RequestInit) => {
+        const u = String(input);
+        pedidos.push(`${init?.method ?? 'GET'} ${u.replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, '').split('?')[0]}`);
+        if (u.includes('/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'TOKEN-CLINICA' }));
+        if (u.includes('/phone_numbers')) return new Response(JSON.stringify({ data: [{ id: pn2, display_phone_number: '+55 11 98888-0000' }] }));
+        return new Response(JSON.stringify({ success: true, display_phone_number: '+55 11 98888-0000', verified_name: 'Clínica Mariane' }));
+      }),
+    );
+    expect(await finishEmbeddedSignup(tenant.id, user.id, { code: 'CODIGO', wabaId: '987654321', phoneNumberId: null, coexistence: true })).toEqual({ ok: true });
+    const row = await prisma.whatsAppCloudAccount.findUnique({ where: { tenantId: tenant.id } });
+    expect(row).toMatchObject({ phoneNumberId: pn2, wabaId: '987654321', coexistence: true, manual: false, active: true, verifiedName: 'Clínica Mariane' });
+    // Na coexistência o número já está no celular: não registra de novo.
+    expect(pedidos.some((p) => p.endsWith('/register'))).toBe(false);
+    expect(pedidos).toContain('POST 987654321/subscribed_apps');
+  });
+
+  it('conta sem nenhum número: avisa em vez de ficar parado', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | string) =>
+        new Response(JSON.stringify(String(input).includes('/oauth/') ? { access_token: 'T' } : { data: [] })),
+      ),
+    );
+    const r = await finishEmbeddedSignup(tenant.id, user.id, { code: 'C', wabaId: '987654321', coexistence: true });
+    expect(r).toMatchObject({ ok: false, message: expect.stringMatching(/nenhum número/) });
   });
 });

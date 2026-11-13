@@ -56,18 +56,32 @@ export function EmbeddedSignup({
 }: {
   signup: MetaSignupConfig;
   /** A action que troca o código pelo token (CRM ou gestão). */
-  finish: (i: { code: string; wabaId: string; phoneNumberId: string; coexistence: boolean }) => Promise<Result>;
+  finish: (i: { code: string; wabaId: string; phoneNumberId?: string | null; coexistence: boolean }) => Promise<Result>;
   onDone: (r: Result) => void;
 }) {
   const [coexistence, setCoexistence] = useState(true);
   const [estado, setEstado] = useState<'parado' | 'aberto' | 'salvando'>('parado');
   const sessao = useRef<{ wabaId?: string; phoneNumberId?: string; code?: string }>({});
+  // Chegou o código mas a conta não: em vez de ficar parado em silêncio, avisa.
+  const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
   const id = useId();
 
   useEffect(() => {
+    return () => {
+      if (espera.current) clearTimeout(espera.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (!/(^|\.)facebook\.com$/.test(new URL(e.origin).hostname)) return;
-      let data: { type?: string; event?: string; data?: { phone_number_id?: string; waba_id?: string } };
+      let host = '';
+      try {
+        host = new URL(e.origin).hostname;
+      } catch {
+        return;
+      }
+      if (!/(^|\.)facebook\.com$/.test(host)) return;
+      let data: { type?: string; event?: string; data?: { phone_number_id?: string; waba_id?: string; error_message?: string } };
       try {
         data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       } catch {
@@ -75,7 +89,14 @@ export function EmbeddedSignup({
       }
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
       if (data.event === 'CANCEL') {
+        sessao.current = {};
         setEstado('parado');
+        return;
+      }
+      if (data.event === 'ERROR') {
+        sessao.current = {};
+        setEstado('parado');
+        onDone({ ok: false, message: data.data?.error_message ? `A Meta avisou: ${data.data.error_message}` : 'A Meta não concluiu a conexão. Tente de novo.' });
         return;
       }
       if (data.data?.waba_id) sessao.current.wabaId = data.data.waba_id;
@@ -87,12 +108,33 @@ export function EmbeddedSignup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coexistence]);
 
+  // O número do celular (coexistência) vem sem o id do número: o servidor procura na conta.
   async function terminar() {
     const { code, wabaId, phoneNumberId } = sessao.current;
-    if (!code || !wabaId || !phoneNumberId) return;
+    if (!code || !wabaId) {
+      if (code && !espera.current) {
+        espera.current = setTimeout(() => {
+          espera.current = null;
+          if (!sessao.current.code || sessao.current.wabaId) return;
+          sessao.current = {};
+          setEstado('parado');
+          onDone({ ok: false, message: 'A Meta autorizou, mas não informou a conta do WhatsApp. Clique em "Conectar com a Meta" de novo e vá até o fim da janela.' });
+        }, 20_000);
+      }
+      return;
+    }
+    if (espera.current) {
+      clearTimeout(espera.current);
+      espera.current = null;
+    }
     sessao.current = {};
     setEstado('salvando');
-    const r = await finish({ code, wabaId, phoneNumberId, coexistence });
+    let r: Result;
+    try {
+      r = await finish({ code, wabaId, phoneNumberId: phoneNumberId ?? null, coexistence });
+    } catch {
+      r = { ok: false, message: 'Não foi possível concluir a conexão agora. Tente de novo.' };
+    }
     setEstado('parado');
     onDone(r);
   }
@@ -104,6 +146,7 @@ export function EmbeddedSignup({
       onDone({ ok: false, message: 'Não foi possível abrir a janela da Meta. Confira se algum bloqueador está ativo.' });
       return;
     }
+    sessao.current = {};
     setEstado('aberto');
     window.FB!.login(
       (r) => {
@@ -111,7 +154,11 @@ export function EmbeddedSignup({
           sessao.current.code = r.authResponse.code;
           void terminar();
         } else {
+          // Fechou a janela sem autorizar. Se a conta chegou mesmo assim, algo ficou pela metade: avisa.
+          const pelaMetade = !!sessao.current.wabaId;
+          sessao.current = {};
           setEstado('parado');
+          if (pelaMetade) onDone({ ok: false, message: 'A janela da Meta fechou antes de terminar. Clique em "Conectar com a Meta" de novo.' });
         }
       },
       {

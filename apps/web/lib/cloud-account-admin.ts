@@ -96,30 +96,55 @@ export async function connectManual(
   return r;
 }
 
+/**
+ * Na coexistência (número do WhatsApp Business do celular) a Meta devolve só a
+ * conta, sem o id do número: procura o número na conta. Com mais de um, fica com
+ * o primeiro que não está ligado em outra clínica.
+ */
+async function findPhoneNumber(api: CloudApi, tenantId: string): Promise<{ id: string } | Result> {
+  const numeros = await api.listPhoneNumbers();
+  console.info('[whatsapp] números na conta do cadastro', { tenantId, quantos: numeros.length });
+  if (numeros.length === 0) return { ok: false, message: 'A Meta não mostrou nenhum número nessa conta do WhatsApp. Conecte de novo e escolha o número da clínica.' };
+  const ocupados = new Set(
+    (await prisma.whatsAppCloudAccount.findMany({ where: { phoneNumberId: { in: numeros.map((n) => n.id) }, NOT: { tenantId } }, select: { phoneNumberId: true } })).map(
+      (a) => a.phoneNumberId,
+    ),
+  );
+  const livre = numeros.find((n) => !ocupados.has(n.id));
+  return livre ? { id: livre.id } : { ok: false, message: 'Este número já está conectado em outra clínica.' };
+}
+
 /** Fim do cadastro incorporado: troca o código pelo token e liga a conta. */
 export async function finishEmbeddedSignup(
   tenantId: string,
   userId: string | null,
-  input: { code: string; wabaId: string; phoneNumberId: string; coexistence: boolean },
+  input: { code: string; wabaId: string; phoneNumberId?: string | null; coexistence: boolean },
 ): Promise<Result> {
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   if (!appId || !appSecret) return { ok: false, message: 'A conexão com a Meta ainda não está configurada no servidor.' };
-  if (!input.code || !/^\d{5,25}$/.test(input.wabaId) || !/^\d{5,25}$/.test(input.phoneNumberId)) {
+  const veioNumero = !!input.phoneNumberId && /^\d{5,25}$/.test(input.phoneNumberId);
+  if (!input.code || !/^\d{5,25}$/.test(input.wabaId) || (input.phoneNumberId && !veioNumero)) {
     return { ok: false, message: 'A Meta não devolveu os dados do número. Tente de novo.' };
   }
 
   let r: Result;
+  let phoneNumberId = veioNumero ? input.phoneNumberId! : '';
   try {
     const token = await exchangeSignupCode({ appId, appSecret, code: input.code, version: graphVersion() });
-    const api = new CloudApi({ token, phoneNumberId: input.phoneNumberId, wabaId: input.wabaId, version: graphVersion() });
+    if (!phoneNumberId) {
+      const achado = await findPhoneNumber(new CloudApi({ token, phoneNumberId: '', wabaId: input.wabaId, version: graphVersion() }), tenantId);
+      if (!('id' in achado)) return achado;
+      phoneNumberId = achado.id;
+    }
+    const api = new CloudApi({ token, phoneNumberId, wabaId: input.wabaId, version: graphVersion() });
     await api.subscribeApp();
     // Na coexistência o número já está no app do celular; fora dela, registra na Cloud API.
     if (!input.coexistence) await api.registerPhone(String(randomInt(100000, 999999)));
     const info = await api.getPhoneNumber().catch(() => ({ display_phone_number: undefined, verified_name: undefined }));
     r = await saveAccount(tenantId, {
       wabaId: input.wabaId,
-      phoneNumberId: input.phoneNumberId,
+      phoneNumberId,
       token,
       manual: false,
       coexistence: input.coexistence,
@@ -127,10 +152,17 @@ export async function finishEmbeddedSignup(
       verifiedName: info.verified_name,
     });
   } catch (e) {
+    console.error('[whatsapp] cadastro incorporado falhou', {
+      tenantId,
+      coexistence: input.coexistence,
+      veioNumero,
+      code: e instanceof CloudApiError ? e.code : undefined,
+      erro: e instanceof CloudApiError ? e.userMessage : e instanceof Error ? e.message : 'desconhecido',
+    });
     return { ok: false, message: why(e) };
   }
   if (r.ok) {
-    await audit(tenantId, userId, 'WHATSAPP_CLOUD_CONNECTED', { manual: false, coexistence: input.coexistence });
+    await audit(tenantId, userId, 'WHATSAPP_CLOUD_CONNECTED', { manual: false, coexistence: input.coexistence, phoneNumberId });
     await afterConnect(tenantId);
   }
   return r;
